@@ -61,6 +61,11 @@
     "cancel": "Avbryt"
   },
   "fieldError": {
+    "type": "fel typ av värde",
+    "too_short": "för kort",
+    "too_long": "för långt",
+    "too_small": "för litet",
+    "too_large": "för stort",
     "required": "obligatoriskt",
     "exists": "används redan",
     "unknown": "okänt",
@@ -214,6 +219,7 @@
     },
     "collect": {
       "title": "Säkra spår",
+      "trace": "Spår",
       "packaging": "Förpackning",
       "marker": "Markörnummer",
       "submit": "Säkra"

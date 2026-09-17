@@ -1,5 +1,38 @@
-<script lang="ts">
+<script module lang="ts">
   import { nui } from '../../lib/nui';
+
+  /**
+   * The placement this interface was opened from (spec 3.10, ADR-006).
+   *
+   * `evidence.intake` carries `context = { accessPoint = 'property_terminal' }`,
+   * so the call has to name the terminal it is being made at; the server then
+   * checks the officer is genuinely standing at that placement before the
+   * handler runs. The id is a *claim*, never a grant — naming a terminal you
+   * are not at is refused on the server (invariant 4). Without it every accept
+   * and every reject came back as `context`.
+   *
+   * It is captured in module scope rather than in the component because the
+   * game pushes `fredpd:open` once, at the moment the terminal is opened, while
+   * this page exists only while the evidence module is the one on screen. An
+   * officer who opens the property terminal and then picks Evidence off the
+   * rail would mount after the message and never see it. The module is
+   * evaluated when the shell is imported, so the handler is registered before
+   * the first message can arrive.
+   */
+  let openedAt: number | null = null;
+
+  nui.on('fredpd:open', (message) => {
+    openedAt = typeof message['placementId'] === 'number' ? message['placementId'] : null;
+  });
+
+  // Closing the interface ends the visit. The next call has to carry the
+  // terminal it was actually made at, not the one from last time.
+  nui.on('fredpd:close', () => {
+    openedAt = null;
+  });
+</script>
+
+<script lang="ts">
   import { t } from '../../lib/i18n';
   import {
     EVIDENCE_DESTINATIONS,
@@ -33,6 +66,12 @@
 
   /** Which form's label a rejected field belongs to. */
   const FIELD_LABELS: Record<string, string> = {
+    // The terminal the intake is being made at. A refusal here reads as the
+    // property room counter, because that is the thing the officer is standing
+    // at when it happens.
+    placementId: 'placement.property_terminal',
+    search: 'evidence.filter.search',
+    traceKey: 'evidence.collect.trace',
     storageLocation: 'evidence.intake.storage',
     reason: 'evidence.transfer.reason',
     destination: 'evidence.transfer.destination',
@@ -85,7 +124,13 @@
   let scenes = $state<Scene[]>([]);
   let sceneStatus = $state('');
   let sceneCase = $state('');
-  let sceneRadius = $state(25);
+  /**
+   * `SceneCreate` takes 5 to 500 metres and the table's CHECK caps at 500. The
+   * box is bound to those, and holds `null` while it is empty: `bind:value` on
+   * a number input yields null for a cleared box, and null on the wire is a
+   * silent server-side default rather than a perimeter anybody chose.
+   */
+  let sceneRadius = $state<number | null>(25);
   let confirmRelease = $state<number | null>(null);
 
   /**
@@ -248,6 +293,9 @@
     const done = await submit(
       'evidence.intake',
       {
+        // Which property room counter this is. The server checks the officer is
+        // standing at it (8.6); sending it is not what makes it true.
+        placementId: openedAt ?? undefined,
         id: item.id,
         accepted,
         storageLocation: storageLocation.trim() || undefined,
@@ -298,7 +346,10 @@
     // standing. A scene thrown from the terminal is a scene nobody attended.
     const done = await submit(
       'scene.create',
-      { caseNumber: sceneCase.trim() || undefined, radius: sceneRadius },
+      {
+        caseNumber: sceneCase.trim() || undefined,
+        radius: typeof sceneRadius === 'number' ? sceneRadius : undefined,
+      },
       loadScenes,
     );
 
@@ -455,6 +506,7 @@
         <input
           class="border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1"
           bind:value={query.search}
+          maxlength="64"
           placeholder={t('evidence.filter.searchPlaceholder')}
         />
       </label>
@@ -865,6 +917,7 @@
         <input
           class="border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1 font-[family-name:var(--font-mono)]"
           bind:value={sceneCase}
+          maxlength="32"
         />
       </label>
 
@@ -873,8 +926,8 @@
         <input
           class="w-24 border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1 font-[family-name:var(--font-mono)]"
           type="number"
-          min="0.5"
-          max="50"
+          min="5"
+          max="500"
           step="0.5"
           bind:value={sceneRadius}
         />

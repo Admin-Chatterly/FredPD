@@ -384,12 +384,19 @@ end
 --- Read fresh rather than taken from the permission cache, because a write is
 --- about to be judged against it and the cache is only as current as the last
 --- reload.
+---
+--- Each entry also carries the row's `version`, which is what every write below
+--- is guarded on. `Perms.expandGroup` ignores the extra field.
 local function loadGroupModel()
     local groups = {}
 
-    local groupRows = db.query('SELECT `key`, `inherits` FROM fpd_permission_groups')
+    local groupRows = db.query('SELECT `key`, `inherits`, `version` FROM fpd_permission_groups')
     for index = 1, #groupRows do
-        groups[groupRows[index].key] = { inherits = groupRows[index].inherits, permissions = {} }
+        groups[groupRows[index].key] = {
+            inherits = groupRows[index].inherits,
+            version = groupRows[index].version,
+            permissions = {},
+        }
     end
 
     local permissionRows = db.query('SELECT `group_key`, `permission` FROM fpd_group_permissions')
@@ -461,6 +468,81 @@ local function refuseEscalation(session, action, groups, key)
     return route.refuse(FredPD.ErrorCode.FORBIDDEN)
 end
 
+--- True when, in this model, `admin` still expands to everything the floor
+--- needs -- which is to say somebody can still open the permission editor.
+---
+--- Measured against the *expanded* set deliberately, so the floor keys are
+--- allowed to live in a group `admin` inherits from. That is also why the check
+--- cannot belong to the `admin` row: stripping the keys out of the inherited
+--- group empties `admin`'s expansion just as effectively, and that edit names a
+--- different key entirely. Every write to the model runs this, whichever group
+--- it edits.
+local function holdsFloor(groups)
+    if not groups[PROTECTED_GROUP] then return false end
+
+    local granted = FredPD.Core.perms.expandGroup(PROTECTED_GROUP, groups)
+
+    for index = 1, #ADMIN_FLOOR do
+        if not FredPD.Core.perms.satisfies(granted, ADMIN_FLOOR[index]) then
+            return false
+        end
+    end
+
+    return true
+end
+
+--- Refuses the write that would take the last route back into the editor away.
+---
+--- Compared before and after rather than asserted outright: a database whose
+--- floor is already broken -- edited by hand, which is the only way back in
+--- after a lockout -- must not have every repair refused as well.
+---
+--- @param before table the model as loaded
+--- @param after table the model with the proposed change applied
+--- @return table|nil a refusal to return from the handler, or nil to proceed
+local function refuseLockout(before, after)
+    if not holdsFloor(before) then return nil end
+    if holdsFloor(after) then return nil end
+
+    return route.refuse(FredPD.ErrorCode.FORBIDDEN, { permissions = 'would_lock_out' })
+end
+
+--- Takes the permission model's write lock, by bumping `admin`'s row version.
+---
+--- Every check above -- escalation, cycles, the floor -- is decided against a
+--- model read a moment earlier, and the model spans rows: an edit to one group
+--- changes what its children grant. Two administrators editing different rows
+--- in one chain can each pass a check the other is about to invalidate, and the
+--- committed state is one neither of them approved. The worst case is exactly
+--- the lockout `refuseLockout` exists to prevent, arrived at by two edits that
+--- were each safe on their own.
+---
+--- So every write to the model, whichever group it names, first bumps one row:
+--- `admin`. The bump is guarded on the version this handler read, so the second
+--- writer's guard matches nothing, it refuses with `conflict` before writing
+--- anything, and its administrator reloads and sees what actually happened.
+--- Locks are always taken in this order -- `admin` first, then the edited row --
+--- so two writes cannot deadlock against each other.
+---
+--- `skipKey` is the group being written when that group *is* `admin`: its own
+--- guarded write is the same lock, and taking it twice would refuse itself.
+---
+--- @return boolean taken
+local function takeModelLock(groups, skipKey)
+    local protected = groups[PROTECTED_GROUP]
+
+    -- No `admin` row to lock on: a database seeded without it, where there is
+    -- no floor to protect either. Refusing every edit would be the lockout.
+    if not protected or skipKey == PROTECTED_GROUP then return true end
+
+    local affected = db.execute(
+        'UPDATE fpd_permission_groups SET `version` = `version` + 1 WHERE `key` = ? AND `version` = ?',
+        { PROTECTED_GROUP, protected.version }
+    )
+
+    return affected > 0
+end
+
 --- Statements that write a group's permission rows.
 ---
 --- `replace` clears what is stored first, which is how an update writes: a
@@ -500,10 +582,15 @@ route.define({
     name = 'admin.group.list',
     perm = 'admin.groups.edit',
     schema = 'GroupList',
-    -- A read, but marked like the writes beside it: the group model is the
-    -- permission model, and reading it off a Discord snapshot nobody can vouch
-    -- for is not a page anyone needs during an outage (spec 4.2).
-    writes = true,
+    -- A read, and marked as one. `sensitive` is the flag that carries the
+    -- argument this route wants -- the group model is the permission model, and
+    -- it is not shown against a Discord snapshot nobody can vouch for (spec 4.2,
+    -- first tier). `writes` is the *second* tier: it refuses state changes once
+    -- the snapshot is older still, and spec 4.2 is explicit that reads keep
+    -- working there. Marking a read as a write inverts that -- the longer the
+    -- gateway is down, the less an administrator can see of the thing they are
+    -- trying to diagnose. The audit entry stays: who read the permission model
+    -- is exactly the question invariant 11 exists to answer.
     sensitive = true,
     audit = 'group.listed',
     subjectType = 'permission_group',
@@ -514,7 +601,10 @@ route.define({
         local groups = loadGroupModel()
 
         local rows = db.query(
-            [[SELECT g.`key`, g.name, g.inherits, g.description, g.created_at AS createdAt,
+            -- `version` travels to the editor and comes back on the update, so
+            -- a save that was composed against an older model is refused rather
+            -- than applied over somebody else's (spec 3.5, `conflict`).
+            [[SELECT g.`key`, g.name, g.inherits, g.description, g.version, g.created_at AS createdAt,
                      (SELECT COUNT(*) FROM fpd_permission_groups c WHERE c.inherits = g.`key`) AS childCount,
                      (SELECT COUNT(*) FROM fpd_role_map m WHERE m.group_key = g.`key`) AS roleMapCount,
                      (SELECT COUNT(*) FROM fpd_role_map m
@@ -586,6 +676,13 @@ route.define({
 
         local refusal = refuseEscalation(session, 'admin.group.create', groups, input.key)
         if refusal then return refusal end
+
+        -- A create can only add to the model, so it cannot break the floor. It
+        -- still takes the lock: it changes what the next writer's check will be
+        -- measured against, and every writer has to be looking at one model.
+        if not takeModelLock(groups) then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { _input = 'model_changed' })
+        end
 
         local statements = {
             {

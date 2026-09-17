@@ -19,6 +19,74 @@ local Route = {}
 
 local registered = {}
 
+-- -----------------------------------------------------------------------------
+-- Lists in the response envelope
+--
+-- An empty Lua table is both `{}` and `[]`. Every encoder between this function
+-- and the NUI has to guess which one it is, and they all guess object: a route
+-- that returns an empty list -- a group created from the editor with no
+-- permissions of its own, a search with no hits, a case with no notes -- reaches
+-- the interface as `{}`, where `list.length` is `undefined` and `{#each}` over
+-- it throws. That is a broken page on the first click after a create, in every
+-- module, so it is fixed here rather than once per module.
+--
+-- The guess is only settled by a marker the encoder itself recognises. FiveM's
+-- Lua JSON is lua-cjson, which decides from the marker metatables it exports
+-- (`json.array_mt`, and `json.empty_array_mt` for the empty case) and not from
+-- one of our own invention -- a plain `{ __jsontype = 'array' }` is the fix that
+-- looks right and encodes nothing differently. A runtime that exports neither
+-- (busted, and any encoder that already writes a sequence as an array) leaves
+-- `ARRAY_MT` nil and the walk below becomes a no-op rather than an error.
+-- -----------------------------------------------------------------------------
+
+local ARRAY_MT = (type(json) == 'table' and (rawget(json, 'array_mt') or rawget(json, 'empty_array_mt'))) or nil
+
+--- How deep the walk goes. A response is a record, not a tree; anything past
+--- this is a bug somewhere else and is left alone rather than chased.
+local MAX_DEPTH <const> = 12
+
+--- True when `value` is a sequence: the keys 1..n, or no keys at all.
+---
+--- An empty table counts, which is the whole point -- and is also the one
+--- judgement call here. A route that means to return an empty *object* has to
+--- say so some other way, because nothing in the table itself can say it.
+local function isSequence(value)
+    local count = 0
+
+    for key in pairs(value) do
+        if type(key) ~= 'number' then return false end
+        count = count + 1
+    end
+
+    return count == #value
+end
+
+--- Marks every list in a response so it encodes as a JSON array.
+---
+--- Walks the whole value: a list of rows each carrying lists of their own is the
+--- normal shape here, and the empty one is usually the nested one. A table that
+--- already carries a metatable is left alone, and a cycle is visited once.
+function Route.markArrays(value, seen, depth)
+    if type(value) ~= 'table' then return value end
+
+    depth = depth or 1
+    if depth > MAX_DEPTH then return value end
+
+    seen = seen or {}
+    if seen[value] then return value end
+    seen[value] = true
+
+    for _, entry in pairs(value) do
+        Route.markArrays(entry, seen, depth + 1)
+    end
+
+    if ARRAY_MT and getmetatable(value) == nil and isSequence(value) then
+        setmetatable(value, ARRAY_MT)
+    end
+
+    return value
+end
+
 --- Context conditions (spec 4.3). These *restrict* a granted permission; none
 --- of them ever grants one.
 local conditions = {}
@@ -188,7 +256,11 @@ function Route.define(definition)
             })
         end
 
-        return { ok = true, data = result }
+        -- 9. Response. The wrapper order above is unchanged: marking lists is
+        --    part of writing the answer, not a check, and it runs after the
+        --    audit entry so nothing a handler returns can be audited as one
+        --    shape and answered as another.
+        return { ok = true, data = Route.markArrays(result) }
     end)
 end
 

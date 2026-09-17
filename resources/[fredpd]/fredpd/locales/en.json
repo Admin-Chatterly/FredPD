@@ -61,6 +61,11 @@
     "cancel": "Cancel"
   },
   "fieldError": {
+    "type": "the wrong kind of value",
+    "too_short": "too short",
+    "too_long": "too long",
+    "too_small": "too small",
+    "too_large": "too large",
     "required": "required",
     "exists": "already in use",
     "unknown": "unknown",
@@ -214,6 +219,7 @@
     },
     "collect": {
       "title": "Collect trace",
+      "trace": "Trace",
       "packaging": "Packaging",
       "marker": "Marker number",
       "submit": "Collect"

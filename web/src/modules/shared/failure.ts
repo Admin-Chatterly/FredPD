@@ -27,6 +27,16 @@ export interface Failure {
  * is visibly data rather than a missing translation.
  */
 const REASONS = new Set([
+  // The validator's own codes (server/core/validate.lua). Every route can
+  // answer with these, so they belong here before any route-specific one:
+  // without them a bounded field rejects with the raw English word in both
+  // languages.
+  'type',
+  'too_short',
+  'too_long',
+  'too_small',
+  'too_large',
+
   'required',
   'exists',
   'unknown',
