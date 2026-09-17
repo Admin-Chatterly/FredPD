@@ -49,6 +49,11 @@ server_scripts {
     'server/core/route.lua',
 
     -- Modules: service (logic) and repo (SQL) before the routes that use them.
+
+    -- Record-level access (spec 4.5) comes before every module that reads a
+    -- record, because all of them ask it the same question.
+    'server/modules/access/service.lua',
+
     'server/modules/placements/service.lua',
     'server/modules/placements/repo.lua',
     'server/modules/placements/routes.lua',
