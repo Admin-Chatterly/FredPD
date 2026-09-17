@@ -186,16 +186,14 @@
       "digital": "Digital enhet"
     },
     "packaging": {
+      "evidence_bag": "Beslagspåse",
       "envelope": "Kuvert",
       "swab_box": "Provtagningsask",
       "lift_card": "Lyftfolie",
-      "bag": "Påse",
-      "gsr_kit": "Provtagningssats för krutstänk",
-      "tape_lift": "Tejplyft",
-      "cast": "Avgjutning",
-      "photo": "Fotografi",
-      "field_test_kit": "Fälttestsats",
-      "evidence_bag": "Beslagspåse"
+      "firearm_box": "Vapenlåda",
+      "drug_bag": "Narkotikapåse",
+      "phone_bag": "Telefonpåse",
+      "item_tag": "Godsetikett"
     },
     "seal": {
       "sealed": "Obruten",

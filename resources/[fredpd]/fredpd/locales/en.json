@@ -186,16 +186,14 @@
       "digital": "Digital device"
     },
     "packaging": {
+      "evidence_bag": "Evidence bag",
       "envelope": "Envelope",
       "swab_box": "Swab box",
       "lift_card": "Lift card",
-      "bag": "Bag",
-      "gsr_kit": "GSR kit",
-      "tape_lift": "Tape lift",
-      "cast": "Cast",
-      "photo": "Photograph",
-      "field_test_kit": "Field test kit",
-      "evidence_bag": "Evidence bag"
+      "firearm_box": "Firearm box",
+      "drug_bag": "Drug bag",
+      "phone_bag": "Phone bag",
+      "item_tag": "Large-item tag"
     },
     "seal": {
       "sealed": "Intact",

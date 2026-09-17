@@ -278,7 +278,7 @@ FredPD.Schema = {
         traceKey = { type = 'string', required = true, min = 1, max = 64 },
         sceneId = { type = 'integer', required = false, min = 1 },
         caseNumber = { type = 'string', required = false, max = 32 },
-        packaging = { type = 'enum', required = false, values = { 'envelope', 'swab_box', 'lift_card', 'bag', 'gsr_kit', 'tape_lift', 'cast', 'photo', 'field_test_kit', 'evidence_bag' } },
+        packaging = { type = 'enum', required = false, values = { 'evidence_bag', 'envelope', 'swab_box', 'lift_card', 'firearm_box', 'drug_bag', 'phone_bag', 'item_tag' } },
         markerNumber = { type = 'integer', required = false, min = 1, max = 999 },
         description = { type = 'string', required = false, max = 512 },
     },

@@ -162,23 +162,28 @@ export const EVIDENCE_TYPES = [
 export type EvidenceType = (typeof EVIDENCE_TYPES)[number];
 
 /**
- * How an item is packaged at collection — the "collected as" column of 8.2.
+ * How an item is packaged, from the list spec 8.5 fixes.
+ *
+ * These are ox_inventory *items* an officer carries and spends, not a
+ * description of how the trace was lifted: 8.5 marks the list [M] and names
+ * exactly these eight. The distinction matters because 8.2's "collected as"
+ * column reads like a packaging list and is not one -- a photograph and a cast
+ * are how a footwear impression is recorded, and neither is a container that
+ * can hold anything.
  *
  * Packaging is the officer's choice and the one thing about a collection the
  * client genuinely decides, which is why it is the field `evidence.collect`
- * validates most strictly: the wrong container degrades a sample (8.5).
+ * validates most strictly: the wrong container degrades a sample.
  */
 export const EVIDENCE_PACKAGING = [
+  'evidence_bag',
   'envelope',
   'swab_box',
   'lift_card',
-  'bag',
-  'gsr_kit',
-  'tape_lift',
-  'cast',
-  'photo',
-  'field_test_kit',
-  'evidence_bag',
+  'firearm_box',
+  'drug_bag',
+  'phone_bag',
+  'item_tag',
 ] as const;
 
 export type EvidencePackaging = (typeof EVIDENCE_PACKAGING)[number];
