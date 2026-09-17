@@ -28,6 +28,11 @@ modules.
 
 Working today:
 
+- **Setup is one config file and one command.** A Discord bot token, a guild id
+  and an agency name, then `/fredpd setup` in game (ADR-010).
+- **Discord roles sync themselves.** FXServer reads the guild's member list
+  directly, so a role added or removed takes effect without a restart and
+  without anything to deploy beside the server.
 - **Permissions configured in game.** Map a Discord role to a permission group
   from the MDT; it takes effect immediately, with no restart (spec 4.3, 7.30).
 - **World positions configured in game.** `/fredpd placement` puts a terminal,
@@ -90,26 +95,32 @@ Try `?locale=sv`, `?latency=400` and `?fail=forbidden`.
 
 ### Running it on a server
 
-This needs an FXServer with ESX (`es_extended`), ox_lib and oxmysql, a MariaDB
-database, and the gateway service. `p_policejob`, `esx_society`, `esx_textui`
-and `esx_menu_dialog` are used where present and degrade with a warning where
-not — each sits behind a bridge (spec 3.8, ADR-008).
+This needs an FXServer with ESX (`es_extended`), ox_lib and oxmysql, and a
+MariaDB database. `p_policejob`, `esx_society`, `esx_textui` and
+`esx_menu_dialog` are used where present and degrade with a warning where not —
+each sits behind a bridge (spec 3.8, ADR-008).
 
-Build first — the NUI is served from `resources/[fredpd]/fredpd/web/dist`,
-which `pnpm build` produces. Then apply `database/migrations/0001_fredpd.sql` —
-the whole schema, one file — followed by `database/seeds/0001_permissions.sql`.
+Four steps, and no convars:
 
-A fresh install deliberately grants nobody anything: map your first Discord role
-to the `admin` group in `fpd_role_map`, and everything else can be configured
-from inside the game.
+1. **Copy** `resources/[fredpd]/` to the server. Use the release bundle, or run
+   `pnpm build` first — the NUI is served from
+   `resources/[fredpd]/fredpd/web/dist`, which the build produces.
+2. **Apply** `database/migrations/0001_fredpd.sql`, the whole schema in one
+   file, then `database/seeds/0001_permissions.sql`.
+3. **Edit** `resources/[fredpd]/fredpd/config/server.lua` — a Discord bot token,
+   your guild id, and your agency's name. That is the only file to edit, and the
+   only configuration there is.
+4. **Run the setup command** the console prints on first start: `/fredpd setup
+   <code>` in game, or `fredpd_setup` in the server console. It creates the
+   agency, puts you on the roster, and maps your Discord roles to
+   administration.
 
-```
-set fredpd:gateway_secret "<openssl rand -hex 32>"   # `set`, never `setr`
-set fredpd:discord_guild  "<guild id>"
-setr fredpd:locale sv
-```
+Everything after that is configured from inside the game: Discord roles from
+**Administration** in the MDT, and world positions with `/fredpd placement`.
 
-Gateway configuration lives in the environment; copy `.env.example` to `.env`.
+The bot needs the **Server Members** privileged intent — reading the member list
+is how Discord roles, the only permission source, reach FredPD (ADR-010). The
+Node gateway is off by default and is not needed to run any of this.
 
 ## Working on it
 

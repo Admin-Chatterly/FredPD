@@ -8,9 +8,9 @@ finns i [`handbok.sv.md`](handbok.sv.md).
 > och **underrättelsemodulen** (avsnitt 11b). Register, ledningscentral, bevis,
 > laboratorium och domstol kommer i M2–M6 (se avsnitt 17 i `FredPD.md`).
 >
-> **Discord-boten är ännu inte byggd.** Tills den är det måste rollerna föras in
-> för hand i `fpd_discord_members` — se steg 6. Utan den raden får ingen
-> behörighet till någonting.
+> **Hela installationen är fyra saker:** kopiera resursen, fyll i
+> `config/server.lua`, kör en SQL-fil, och kör uppstartskommandot i spelet.
+> Inga convars, ingen Node-tjänst, inget cron-jobb (ADR-010).
 
 ---
 
@@ -127,112 +127,94 @@ ensure fredpd_forensics
 ensure fredpd_surveillance
 ```
 
-Lägg till convars:
+Inga convars behövs. All konfiguration ligger i en enda fil — se nästa steg.
 
-```cfg
-## Miljö: development | staging | production
-set fredpd:env production
-
-## Delad hemlighet mot gateway-tjänsten.
-## Använd `set`, ALDRIG `setr` — `setr` skickar värdet till varje spelare.
-## Skapa en med: openssl rand -hex 32
-set fredpd:gateway_secret "DIN_HEMLIGHET"
-set fredpd:gateway_url    "http://127.0.0.1:3080"
-
-## Din Discord-server (guild-ID).
-set fredpd:discord_guild "DITT_GUILD_ID"
-
-## Dessa två läses även av klienten och måste därför vara `setr`.
-setr fredpd:locale sv
-setr fredpd:timezone Europe/Stockholm
-```
-
-I `production` vägrar resursen starta om `fredpd:gateway_secret` eller
-`fredpd:discord_guild` saknas. I `development` startar den ändå, med en varning
-i konsolen, så att gränssnittet går att arbeta med utan gateway.
+> Kör inte `ensure fredpd_forensics` eller `fredpd_surveillance` ännu. De är
+> tomma skal för M3 och M5 och kräver `ox_target` respektive `pma-voice`, så
+> utan dem vägrar FXServer starta dem och fyller konsolen med fel som ser ut som
+> en trasig installation.
 
 ---
 
-## 5. Steg 4 — Gateway-tjänsten
+## 5. Steg 4 — Konfigurationsfilen
 
-Gateway:n är en Node-tjänst som körs på samma maskin och sköter Discord-synk,
-media, PDF och schemalagda jobb. Den lyssnar bara på `127.0.0.1`.
+**Det här är den enda filen du redigerar:**
+`resources/[fredpd]/fredpd/config/server.lua`.
 
-```bash
-cp .env.example .env
+Den ligger i `server_scripts` och står *inte* i `files {}`, så ingenting i den
+når spelarna — därför får bottoken bo där (invariant 7).
+
+### Skapa Discord-botten (en gång, ca 3 minuter)
+
+1. <https://discord.com/developers/applications> → **New Application**
+2. **Bot** → **Reset Token** → kopiera token
+3. **Bot** → **Privileged Gateway Intents** → slå på **SERVER MEMBERS INTENT**
+4. **Installation** → bjud in botten till din Discord-server (den behöver inga
+   rättigheter alls — den läser bara medlemslistan)
+
+Guild-ID: högerklicka servern i Discord → **Kopiera server-ID**. Kräver
+Utvecklarläge: Inställningar → Avancerat → Utvecklarläge.
+
+### Fyll i
+
+```lua
+discord = {
+    token   = 'DIN_BOT_TOKEN',
+    guildId = 'DITT_GUILD_ID',
+    refreshMinutes = 10,
+    ...
+},
+
+agency = {
+    id        = 'lspd',
+    name      = 'Los Santos Police Department',
+    shortName = 'LSPD',
+},
 ```
 
-Fyll i:
+Språk och tidszon står i `config/shared.lua` och är redan satta till `sv` och
+`Europe/Stockholm`.
 
-```
-FREDPD_ENV=production
-FREDPD_GATEWAY_HOST=127.0.0.1
-FREDPD_GATEWAY_PORT=3080
+I `production` vägrar resursen starta utan token, guild-ID och myndighet. Utan
+dem får nämligen ingen någon behörighet alls, och det är svårare att felsöka än
+en server som inte startar.
 
-# Måste vara exakt samma sträng som `set fredpd:gateway_secret` i server.cfg.
-FREDPD_GATEWAY_SECRET=DIN_HEMLIGHET
-
-DISCORD_BOT_TOKEN=
-DISCORD_GUILD_ID=
-
-DATABASE_URL=mysql://användare:lösenord@127.0.0.1:3306/ditt_schema
-```
-
-Starta:
-
-```bash
-node gateway/dist/index.js
-```
-
-Tjänsten vägrar starta utan hemlighet — en osignerad gateway skulle låta vad som
-helst på maskinen ändra roller och skapa mediatokens.
-
-Lägg den under systemd i skarp drift, med automatisk omstart. Hälsokontroll:
-`curl http://127.0.0.1:3080/health`.
-
-> Discord-boten som fyller `fpd_discord_members` är **inte byggd ännu**. Tills
-> den är det gör gateway-tjänsten ingen nytta för behörigheterna, och steg 6
-> nedan är hur du kommer runt det.
+**Gateway-tjänsten behöver du inte.** Den är avstängd som standard och FXServer
+anropar den aldrig. Rollsynken sköts numera av resursen själv (ADR-010). Node
+behövs bara för att *bygga* gränssnittet, inte för att köra det.
 
 ---
 
-## 6. Steg 5 — Grundregistrering
+## 6. Steg 5 — Uppstart
 
-Fyra rader, en gång. Allt därefter konfigureras inifrån spelet.
+Ingen SQL. Starta resursen och läs konsolen:
 
-```sql
--- 1. Myndigheten.
-INSERT INTO fpd_agencies (id, name, short_name)
-VALUES ('lspd', 'Los Santos Police Department', 'LSPD');
-
--- 2. Du själv i personalregistret, med ditt Discord-ID.
---    Hämtas i Discord: Användarinställningar -> Avancerat -> Utvecklarläge,
---    högerklicka sedan på ditt namn -> Kopiera användar-ID.
-INSERT INTO fpd_officers (discord_id, agency_id, callsign, name)
-VALUES ('DITT_DISCORD_ID', 'lspd', '12-40', 'A. Lindqvist');
-
--- 3. Dina Discord-roller.
---    Den här raden skrivs normalt av boten. Tills den finns lägger du in den
---    själv. Utan den här raden har du inga roller, och därmed ingen behörighet
---    till någonting alls.
---    Högerklicka rollen i Serverinställningar -> Roller -> Kopiera roll-ID.
-INSERT INTO fpd_discord_members (discord_id, roles, synced_at)
-VALUES ('DITT_DISCORD_ID', '["DITT_ROLL_ID"]', NOW());
-
--- 4. Rollen kopplas till admin-gruppen. Det här är den enda kopplingen du
---    någonsin behöver skriva för hand — resten görs i MDT:n.
-INSERT INTO fpd_role_map (discord_role_id, discord_role_name, group_key, agency_id)
-VALUES ('DITT_ROLL_ID', 'FredPD Admin', 'admin', 'lspd');
+```
+[fredpd] ------------------------------------------------------------
+[fredpd] This install is not set up yet.
+[fredpd] Join the server, then type this in the game chat:
+[fredpd]     /fredpd setup K7M2QX
+[fredpd] Or run `fredpd_setup` here in the console while you are in game.
+[fredpd] ------------------------------------------------------------
 ```
 
-`roles` är en JSON-lista. Har du flera roller: `'["111...","222..."]'`.
+Gå in i spelet och skriv `/fredpd setup K7M2QX` i chatten. Då skapas
+myndigheten, du läggs in i personalregistret med det Discord-ID FiveM redan
+känner dig som, och **alla** dina Discord-roller kopplas till `admin`-gruppen.
 
-> **Viktigt så länge boten saknas:** `synced_at` styr hur färsk FredPD anser att
-> rollistan är. Är den äldre än 15 minuter vägras känsliga åtgärder, och äldre än
-> 6 timmar går sessionen i skrivskyddat läge. Kör
-> `UPDATE fpd_discord_members SET synced_at = NOW();` när du ska administrera.
+Koden skrivs bara ut i serverkonsolen. Det är hela poängen: på en publik server
+ska inte den första som gissar kommandot bli administratör. Har du konsolen
+framme går det lika bra att köra `fredpd_setup` där medan du är inne i spelet —
+då behövs ingen kod.
 
-Starta om resursen: `restart fredpd`.
+Uppstarten vägrar så fort det finns någon i `fpd_officers`. Det finns exakt en
+första gång.
+
+> `fpd_discord_members` fylls av rollsynken i `server/core/discord.lua`, som
+> uppdaterar hela guilden med några minuters mellanrum och varje spelare när
+> hen ansluter. Du ska aldrig röra den tabellen för hand, och framför allt
+> aldrig sätta `synced_at` med ett schemalagt jobb — den kolumnen är hur FredPD
+> avgör om rollistan alls går att lita på (avsnitt 4.2).
 
 ---
 
@@ -325,15 +307,19 @@ antecknas i loggboken.
 
 | Symptom | Orsak |
 | --- | --- |
+| Konsolen upprepar *"This install is not set up yet"* | Uppstarten är inte körd. Den skrivs ut vid varje start tills den lyckats |
+| *"Fel uppstartskod"* | Koden byts vid varje omstart av resursen. Ta den senaste ur konsolen |
+| *"Du har inga roller i den Discord-servern"* | Botten ser dig, men du har ingen roll. Ge dig själv en och kör uppstarten igen |
+| *"Discord gick inte att nå"* | Fel token eller guild-ID, eller så saknar botten **Server Members**-intentet |
 | *"Du är inte inloggad"* när MDT:n öppnas | Du saknas i `fpd_officers`, eller står på en annan karaktär än den som är knuten till kontot |
-| MDT:n öppnas men listan till vänster är tom | Ingen roll är kopplad, eller så saknas raden i `fpd_discord_members` (steg 5, punkt 3) |
+| MDT:n öppnas men listan till vänster är tom | Ingen av dina roller är kopplad till en grupp |
 | *"Dina Discord-roller ger inte behörighet"* på `/fredpd placement` | Din roll saknar `admin`-gruppen |
-| *"Dina behörigheter är inaktuella"* | `synced_at` är äldre än 15 minuter. Kör `UPDATE fpd_discord_members SET synced_at = NOW();` |
+| *"Dina behörigheter är inaktuella"* | Rollsynken har inte lyckats på över 15 minuter. Konsolen skriver ut varför |
 | Ingenting syns ute i världen | Inga placeringar är skapade ännu. Det är det normala utgångsläget |
-| Fordonsdepån är tom | `fpd_fleet` saknar rader för din myndighet (steg 6) |
+| Fordonsdepån är tom | `fpd_fleet` saknar rader för din myndighet (steg 7) |
 | Fordonsmenyn visar `fleet.cruiser` i stället för ett namn | Språknyckeln saknas i `en.json`/`sv.json` |
-| Resursen startar inte, klagar på tabeller | Migrationerna är inte körda |
-| Resursen startar inte i produktion | `fredpd:gateway_secret` eller `fredpd:discord_guild` saknas |
+| Resursen startar inte, klagar på tabeller | Migrationen är inte körd |
+| Resursen startar inte i produktion | `discord.token`, `discord.guildId` eller `agency` saknas i `config/server.lua` |
 
 Loggboken (`fpd_audit_log`) innehåller även nekade försök, med skäl. Den är ofta
 snabbaste vägen till varför något vägras.
@@ -384,9 +370,11 @@ Ge någon behörighet genom att koppla en Discord-roll till `intel_analyst`,
 
 Var beredd på det här — det är inte fel, det är kommande milstolpar:
 
-- **Discord-boten och rollsynkningen.** Steg 5 punkt 3 är tillfällig.
-- **Migrationskörare.** Migrationerna körs för hand tills vidare.
+- **Migrationskörare.** Migrationen körs för hand tills vidare.
 - **Flotteditor i gränssnittet.** `fpd_fleet` redigeras i databasen.
+- **Tomma sidor i listan.** Ger du någon `patrol` eller `dispatch` dyker
+  *Register* och *Kommunikation* upp i listan till vänster utan att ha någon
+  sida bakom sig ännu.
 - **Certifieringar** (M6). En flottrad med `certification` visas för ingen ännu.
 - **Register, ledningscentral, bevis, laboratorium, domstol** — M2 till M6.
 - **Länkdiagrammet** (`/board` i PD-Span) är ännu inte byggt i MDT:n.

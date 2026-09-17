@@ -39,6 +39,18 @@
     "stale_permissions": "Dina behörigheter är inaktuella. Logga in igen.",
     "internal": "Något gick fel på servern. Felet har loggats."
   },
+  "setup": {
+    "done": "FredPD är klart. {agency} skapad, {roles} Discord-roll(er) kopplade till administration.",
+    "alreadyDone": "FredPD är redan uppsatt. Hantera behörigheter under Administration i MDT:n.",
+    "busy": "Uppstarten pågår redan. Vänta ett ögonblick och försök igen.",
+    "badCode": "Fel uppstartskod. Den skrivs ut i serverkonsolen när resursen startar.",
+    "noSeed": "Behörighetsgrupperna saknas. Kör database/seeds/0001_permissions.sql och försök igen.",
+    "noDiscord": "Ingen Discord-identitet. Starta Discord och anslut igen — FredPD identifierar poliser via Discord-konto.",
+    "noToken": "Ingen Discord-bottoken i config/server.lua. Lägg in en, starta om resursen och försök igen.",
+    "discordFailed": "Discord gick inte att nå. Kontrollera token och guild-id i config/server.lua.",
+    "noRoles": "Du har inga roller i den Discord-servern. Ge dig själv en och kör uppstarten igen.",
+    "failed": "Uppstarten kunde inte sparas i databasen. Anledningen finns i serverkonsolen."
+  },
   "placement": {
     "station_terminal": "Stationsterminal",
     "property_terminal": "Terminal i beslagsrummet",

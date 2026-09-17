@@ -10,6 +10,7 @@ max_line_length = 140
 read_globals = {
     -- FiveM natives and server API
     'AddEventHandler',
+    'Citizen',
     'CreateThread',
     'GetCurrentResourceName',
     'GetConvar',
@@ -17,11 +18,13 @@ read_globals = {
     'GetGameTimer',
     'GetPlayerIdentifierByType',
     'GetPlayerName',
+    'GetPlayers',
     'GetPlayerPed',
     'GetResourceMetadata',
     'GetResourceState',
     'LoadResourceFile',
     'PerformHttpRequest',
+    'promise',
     'RegisterCommand',
     'RegisterNetEvent',
     'RemoveEventHandler',

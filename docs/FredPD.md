@@ -79,7 +79,7 @@ FredPD is the in-game computer system of a police agency, built to feel like the
 | `fredpd_forensics` | FiveM resource | In-world evidence generation, scene tools, packaging, destruction mechanics |
 | `fredpd_surveillance` | FiveM resource | Wiretaps, radio monitoring, listening devices, trackers (pma-voice) |
 | `fredpd_assets` | FiveM resource | Streamed props (MDC tablet, terminals, evidence bags, markers, tape), sounds |
-| `gateway` | Node.js service on the same host | Discord bot and role sync, media service, PDF rendering, scheduled jobs, optional web portal |
+| `gateway` | Node.js service on the same host | Media service, PDF rendering, scheduled jobs, Discord role *actions*, optional web portal. Off by default; role *sync* runs in FXServer (ADR-010) |
 | `web` | Built into `fredpd/web/dist` | The NUI application (MDC, station terminal, dispatch console, lab, property room layouts) |
 | PD-Span | Your existing system | Integrated as the intelligence module (section 10) |
 
@@ -303,8 +303,9 @@ Each bridge checks the target resource's state and version at startup and logs a
 
 ### 3.9 Configuration
 
-- Convars: `setr fredpd:locale en`, `set fredpd:gateway_url`, `set fredpd:gateway_secret`, `set fredpd:env production`, `setr fredpd:timezone Europe/Stockholm`.
-- Feature flags per module in `config/server.lua`.
+- **One file: `config/server.lua`** — the Discord bot token and guild, the agency, rate limits, and the gateway (off by default). It is in `server_scripts` and never in `files {}`, so nothing in it reaches a client. `config/shared.lua` carries what the client legitimately needs: environment, locale, timezone (ADR-010).
+- Convars still override every value where one is set, for hosts that template their configuration: `set fredpd:discord_token`, `set fredpd:discord_guild`, `set fredpd:env`, and — because the client reads them — `setr fredpd:locale`, `setr fredpd:timezone`. A normal install needs none of them.
+- Feature flags per module in `config/shared.lua`.
 - Agencies: id, name, short name, logo, seal, accent color, numbering prefixes, jurisdiction polygons, radio channels, report letterhead text.
 
 ### 3.10 In-game configuration and world placement
@@ -384,13 +385,13 @@ Where the two overlap, the rule is one owner per concern:
 
 ### 4.2 Discord role sync
 
-- The gateway bot uses the Server Members privileged intent. On start it snapshots every member holding a mapped role into `fpd_discord_members (discord_id, roles, synced_at)`.
-- Member update, join and leave events update the snapshot and push the change to FXServer, which recomputes affected sessions immediately. An open MDT loses pages the moment a role is removed.
-- FXServer never calls Discord directly.
+- FXServer calls the Discord API itself, with a bot token from `config/server.lua` and the Server Members privileged intent, and writes `fpd_discord_members (discord_id, roles, synced_at)`. This was originally the gateway bot's job; it moved so that a normal install deploys no second service (**ADR-010**).
+- **Two triggers:** the whole guild on a timer (`discord.refreshMinutes`, default 10), so a role *removed* in Discord takes effect without the member doing anything; and each player as they connect, so a role *granted* seconds ago is live when they join. After a successful refresh every open session is recomputed, and an open MDT loses pages it may no longer see.
+- **A failed fetch writes nothing.** Rows age instead, and the outage policy below narrows access on its own. Stamping `synced_at` without a role list Discord actually returned forges the one signal that policy reads, and is forbidden — including from outside the application, such as a cron job.
 - **Outage policy:**
   - Snapshot older than `perms.sensitive_stale_after` (default 15 minutes): approvals, releases, deletions, intelligence and surveillance actions are blocked.
   - Snapshot older than `perms.stale_after` (default 6 hours): read-only mode.
-- **Role actions from FredPD** (hire, promote, demote, suspend, dismiss) go FredPD → gateway → bot changes the Discord role → the update flows back. Discord stays the single source of truth. The bot's Discord role must sit above the roles it manages.
+- **Role actions from FredPD** (hire, promote, demote, suspend, dismiss) still belong to the gateway, which holds a bot able to *write* roles. Not built. Discord stays the single source of truth either way, and that bot's Discord role must sit above the roles it manages.
 
 ### 4.3 Permission model
 
@@ -1108,7 +1109,7 @@ That makes the bridge contract in 10.4 unnecessary — there is no second system
 | Denial of service | Event floods, huge payloads, evidence spam | Rate limits, payload size caps, evidence caps and merging, latent events for bulk data |
 | Item duplication | Place/pickup flows that mint items | Server-side item checks, affected-row checks, transactions |
 | Stale permissions | Discord outage keeps revoked access alive | Snapshot age limits (4.2), live revocation |
-| Secret leakage | Bot token or HMAC secret in client files | `set` convars and gateway env only; CI secret scanning |
+| Secret leakage | Bot token or HMAC secret in client files | `config/server.lua` (server_scripts, never `files {}`), `set` convars, gateway env; CI secret scanning |
 | Server ID reuse | New player inherits a dropped player's session | Sessions destroyed on drop |
 
 ### 11.2 Required controls

@@ -39,6 +39,18 @@
     "stale_permissions": "Your permissions are out of date. Sign on again.",
     "internal": "Something went wrong on the server. The error has been logged."
   },
+  "setup": {
+    "done": "FredPD is set up. {agency} created, {roles} Discord role(s) mapped to administration.",
+    "alreadyDone": "FredPD is already set up. Manage permissions from Administration in the MDT.",
+    "busy": "Setup is already running. Wait a moment and try again.",
+    "badCode": "Wrong setup code. It is printed in the server console when the resource starts.",
+    "noSeed": "The permission groups are missing. Apply database/seeds/0001_permissions.sql, then try again.",
+    "noDiscord": "No Discord identity. Start Discord and reconnect — FredPD identifies officers by Discord account.",
+    "noToken": "No Discord bot token in config/server.lua. Add one, restart the resource and try again.",
+    "discordFailed": "Discord could not be reached. Check the token and the guild id in config/server.lua.",
+    "noRoles": "You hold no roles in that Discord server. Give yourself one, then run setup again.",
+    "failed": "Setup could not be written to the database. The server console has the reason."
+  },
   "placement": {
     "station_terminal": "Station terminal",
     "property_terminal": "Property room terminal",

@@ -78,4 +78,4 @@ function FredPD.t(key, params)
     return value
 end
 
-FredPD.loadLocale(GetConvar('fredpd:locale', FALLBACK_LANG))
+FredPD.loadLocale(FredPD.Config.shared.locale or FALLBACK_LANG)

@@ -44,14 +44,30 @@ local function configurationFaults()
     local faults = {}
     local config = FredPD.Config.server
 
-    if config.gateway.secret == '' then
+    -- Discord first, because it is the only thing that grants anything
+    -- (invariant 2). A server without it starts and grants nobody anything,
+    -- which is confusing enough to be worth refusing over in production.
+    if config.discord.token == '' then
         faults[#faults + 1] =
-            'fredpd:gateway_secret is not set. Add `set fredpd:gateway_secret "<secret>"` to server.cfg (use `set`, never `setr`).'
+            'config/server.lua: discord.token is empty. Discord roles are the only permission source, so nobody will have any access.'
     end
 
-    if FredPD.isProduction() and config.discord.guildId == '' then
+    if config.discord.guildId == '' then
         faults[#faults + 1] =
-            'fredpd:discord_guild is not set. Discord roles are the only permission source, so production cannot grant anything without it.'
+            'config/server.lua: discord.guildId is empty.'
+    end
+
+    if config.agency.id == '' or config.agency.name == '' then
+        faults[#faults + 1] =
+            'config/server.lua: agency.id and agency.name are what setup creates your agency from.'
+    end
+
+    -- Only a gateway that is switched on needs a secret. It is off by default
+    -- and FXServer never calls it, so requiring one would be refusing to start
+    -- over a service that does nothing (ADR-010).
+    if config.gateway.enabled and config.gateway.secret == '' then
+        faults[#faults + 1] =
+            'config/server.lua: gateway.enabled is true but gateway.secret is empty. Generate one with `openssl rand -hex 32`.'
     end
 
     return faults
@@ -93,6 +109,29 @@ AddEventHandler('onResourceStart', function(resource)
     print(('[fredpd] %s started (env=%s, locale=%s, routes=%d)'):format(
         FredPD.version, FredPD.env(), FredPD.lang, #FredPD.Core.route.names()
     ))
+
+    -- Roles first, then tell the operator what to do about an empty install --
+    -- so the instructions are the last thing in the console rather than buried
+    -- under the first sync.
+    FredPD.Core.discord.start()
+    FredPD.Modules.bootstrap.announce()
+end)
+
+--- Refresh a connecting player's roles before they are in a position to open
+--- anything, so a role granted a moment ago is already in effect (spec 4.2).
+---
+--- Deliberately not deferred: a failure here must not keep anybody out of the
+--- server. It leaves their stored roles as they were, and the staleness policy
+--- decides what that is worth.
+AddEventHandler('playerConnecting', function()
+    local src = source
+    local discordId = FredPD.Bridge.framework.getDiscordId(src)
+
+    if not discordId then return end
+
+    CreateThread(function()
+        FredPD.Core.discord.refreshOne(discordId)
+    end)
 end)
 
 --- A player asking for their world geometry once they are in the session.
@@ -115,11 +154,12 @@ RegisterNetEvent('fredpd:requestPlacements', function()
     FredPD.Core.placements.pushTo(src)
 end)
 
---- The gateway tells FXServer that Discord roles changed (spec 4.2, 3.7).
+--- Discord roles changed: re-read the map and redraw every open session's rail
+--- (spec 4.2).
 ---
---- Registered here rather than as a route because the caller is the gateway over
---- the signed loopback link, not a game client. The HMAC check in the HTTP
---- handler is its authentication; M1 wires that handler to this function.
+--- Called by the sync in `core/discord.lua` after a successful refresh, and by
+--- the admin screen after the role map is edited. Not a route: no client is
+--- involved, and nothing here takes input.
 function FredPD.onDiscordChange()
     FredPD.Core.perms.reload()
     FredPD.Core.session.refreshAll()

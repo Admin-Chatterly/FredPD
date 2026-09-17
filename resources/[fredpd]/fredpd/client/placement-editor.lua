@@ -216,9 +216,26 @@ end
 RegisterCommand('fredpd', function(_source, args)
     if args[1] == 'placement' then
         Editor.open()
+    elseif args[1] == 'setup' then
+        -- First-run setup. The code comes from the server console, so this is
+        -- only useful to whoever is running the server (see bootstrap.lua).
+        TriggerServerEvent('fredpd:setup', args[2] or '')
     else
         TriggerEvent('fredpd:toggleInterface')
     end
 end, false)
+
+--- How setup went, translated on the client like every other message.
+RegisterNetEvent('fredpd:setupResult', function(ok, localeKey, params)
+    if ok then
+        FredPD.Client.core.notify(localeKey, params)
+    else
+        lib.notify({
+            title = FredPD.t('app.name'),
+            description = FredPD.t(localeKey, params),
+            type = 'error',
+        })
+    end
+end)
 
 FredPD.Client.placementEditor = Editor

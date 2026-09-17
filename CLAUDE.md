@@ -19,7 +19,9 @@ only a pointer; the spec has the detail.
    exports included. Hiding something in the UI is never the control.
 5. **No record broadcasts.** Never `TriggerClientEvent(..., -1, record)`.
 6. **No hardcoded user-facing text.** `en` and `sv` both complete, or CI fails.
-7. **No secrets on clients.** `set` convars, never `setr`; never in `files {}`.
+7. **No secrets on clients.** They live in `config/server.lua`, which is in
+   `server_scripts` and never in `files {}`. A `set` convar overrides; `setr`
+   never carries one.
 8. **SQL is parameterized. Migrations are append-only** — never edit one that
    has shipped.
 9. **Media only through the gateway**, with signed URLs and the NUI's CSP.
@@ -38,7 +40,7 @@ only a pointer; the spec has the detail.
 | `resources/[fredpd]/fredpd_surveillance/` | Interception, warrant-gated (M5) |
 | `resources/[fredpd]/fredpd_assets/` | Streamed props and sounds |
 | `web/` | Svelte 5 NUI, builds into `fredpd/web/dist` |
-| `gateway/` | Node.js service: Discord sync, media, PDF, scheduler |
+| `gateway/` | Node.js service: media, PDF, scheduler. Off by default; Discord sync moved into FXServer (ADR-010) |
 | `packages/schema/` | Route and entity schemas → TS types **and** generated Lua |
 | `database/migrations/` | Append-only, numbered |
 | `tools/` | i18n checker, codegen |

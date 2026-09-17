@@ -39,6 +39,8 @@ server_scripts {
     'server/core/validate.lua',
     'server/core/ratelimit.lua',
     'server/core/agencies.lua',
+    -- Before perms: it fills the table perms reads (ADR-010).
+    'server/core/discord.lua',
     'server/core/perms.lua',
     'server/core/session.lua',
     'server/core/push.lua',
@@ -58,7 +60,9 @@ server_scripts {
     'server/modules/intel/service.lua',
     'server/modules/intel/repo.lua',
     'server/modules/intel/routes.lua',
+    'server/modules/admin/service.lua',
     'server/modules/admin/routes.lua',
+    'server/modules/admin/bootstrap.lua',
 
     'server/main.lua',
 }

@@ -4,9 +4,14 @@ TypeScript on Node 24, Fastify, pino. Runs on the same host as FXServer, under
 systemd. Read spec sections 3.7 (interface), 4.2 (Discord sync) and 11
 (security) before working here.
 
-Responsibilities: the Discord bot and role sync, the media store, PDF
-rendering, scheduled jobs (retention, lab timers, warrant expiry), and later the
-web portal.
+Responsibilities: the media store, PDF rendering, scheduled jobs (retention, lab
+timers, warrant expiry), Discord role *actions* (hire, promote, demote), and
+later the web portal. None of it is built yet.
+
+**Reading Discord roles is no longer this service's job.** It moved into
+FXServer (`server/core/discord.lua`, ADR-010) so that a normal install deploys
+no Node at all. The gateway is off by default; do not add anything here that an
+install is required to run.
 
 ## Rules specific to this package
 
@@ -23,8 +28,9 @@ web portal.
 - **Secrets come from the environment**, never from a file in the repo
   (invariant 7). A missing secret is a boot failure, not a warning.
 - **Discord stays the source of truth.** Role changes go FredPD → gateway → bot
-  → Discord, then flow back through the sync. Never mirror permissions locally
-  as the authority.
+  → Discord, then flow back through FXServer's own sync. Never mirror
+  permissions locally as the authority, and never write `fpd_discord_members`
+  from here — one writer, and it is not this one.
 - Log with pino, and never log a record's contents, a token or a secret.
 
 ## Tests

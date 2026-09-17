@@ -52,60 +52,49 @@ correct default — and why the bootstrap below exists.
 
 ## Bootstrap
 
-Four rows, once, to get from an empty database to something you can administer
-from inside the game. Everything after this is configured in the MDT.
+**There is no bootstrap SQL.** Fill in `discord` and `agency` in
+`resources/[fredpd]/fredpd/config/server.lua`, start the resource, and run the
+setup command it prints to the console (ADR-010):
 
-```sql
--- 1. Your agency.
-INSERT INTO fpd_agencies (id, name, short_name)
-VALUES ('lspd', 'Los Santos Police Department', 'LSPD');
-
--- 2. Yourself on the roster, by Discord id.
---    Find it in Discord: User Settings -> Advanced -> Developer Mode, then
---    right-click your name -> Copy User ID.
-INSERT INTO fpd_officers (discord_id, agency_id, callsign, name)
-VALUES ('<your discord id>', 'lspd', '12-40', 'A. Lindqvist');
-
--- 3. Your Discord roles.
---    This row is normally written by the gateway's bot -- which is not built
---    yet (M1). Until it is, insert it by hand: without it you hold no roles,
---    and therefore no permissions at all.
---    Right-click the role in Server Settings -> Roles -> Copy Role ID.
-INSERT INTO fpd_discord_members (discord_id, roles, synced_at)
-VALUES ('<your discord id>', '["<your discord role id>"]', NOW());
-
--- 4. That role mapped to the admin group. This is the only mapping you ever
---    have to write by hand; the rest are added from the MDT.
-INSERT INTO fpd_role_map (discord_role_id, discord_role_name, group_key, agency_id)
-VALUES ('<your discord role id>', 'FredPD Admin', 'admin', 'lspd');
+```
+/fredpd setup <code>        in the game chat, with the code from the console
+fredpd_setup                or in the server console, while you are in game
 ```
 
-`roles` is a JSON array — several roles are `'["111…","222…"]'`.
+That creates the agency, puts you on the roster using the Discord id FiveM
+already knows you by, and maps every Discord role you hold to the `admin` group.
+Everything after it is configured in the MDT.
 
-**While the bot is missing,** `synced_at` decides how fresh FredPD considers your
-role list. Older than 15 minutes and sensitive actions are refused; older than 6
-hours and the session goes read-only. Run
-`UPDATE fpd_discord_members SET synced_at = NOW();` before administering.
+Setup refuses once `fpd_officers` has any row, so there is exactly one first run.
+The code exists so that on a public server the first player to guess the command
+does not become an administrator: it is printed only to the server console.
 
-Then restart the resource, open the MDT, and use **Administration → Discord
-roles** to map the rest — and `/fredpd placement` to put the terminals, the lab
-benches and the motor pool where they actually belong (spec 3.10).
+`fpd_discord_members` is written by the role sync in `server/core/discord.lua`,
+which refreshes the whole guild every few minutes and each player as they
+connect. Nothing needs to touch that table by hand, and **nothing should ever
+stamp `synced_at` on a schedule** — it is how FredPD knows whether to trust a
+role list at all (spec 4.2).
 
 Note that the `admin` group deliberately does **not** inherit `patrol`: being
 able to configure FredPD is not the same as being cleared to read records
-(spec 4.3, Appendix C). Map yourself a records group as well if you want both.
+(spec 4.3, Appendix C). Map yourself a records group as well if you want both,
+from **Administration → Discord roles** in the MDT.
 
 ### Why is nothing happening yet?
 
-- **The MDT opens but the rail is empty.** Either no role is mapped, or there is
-  no row for you in `fpd_discord_members` (step 3 above). Permissions come from
-  Discord and only from Discord (invariant 2).
-- **"Your permissions are out of date."** `synced_at` is over 15 minutes old.
+- **The console says the install is not set up.** Run the setup command it
+  printed. It reprints on every resource start until it succeeds.
+- **The MDT opens but the rail is empty.** No role of yours is mapped to a group.
+  Permissions come from Discord and only from Discord (invariant 2).
+- **"Discord could not be reached."** The token or guild id in
+  `config/server.lua` is wrong, or the bot is missing the **Server Members**
+  privileged intent.
+- **"Your permissions are out of date."** The sync has not succeeded for over 15
+  minutes. Check the console: it prints why each failure happened, without ever
+  printing the token.
 - **The motor pool is empty.** `fpd_fleet` has no rows for your agency, and its
   `label_key` column is a locale key rather than a name — see the Swedish
   installation guide, section 7.
-- **`/fredpd placement` says access denied.** The `admin` group grants
-  `admin.placement.edit`; check step 4 above.
-- **Nothing appears in the world.** Placements are created in game, not seeded.
-  An empty `fpd_placements` is an install with no terminals yet, which is the
-  expected starting state.
+- **Nothing appears in the world.** Placements are created in game with
+  `/fredpd placement`, not seeded. An empty `fpd_placements` is an install with
+  no terminals yet, which is the expected starting state.
