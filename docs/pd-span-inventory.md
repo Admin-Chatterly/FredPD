@@ -9,6 +9,7 @@ Required by spec **10.5**. Source imported at `vendor/pd-span/`
 | Spec sections | 10 (integration), 0 and 11 (security review) |
 | Blocks | M0 (this inventory), M5 (intelligence module) |
 | Recommendation | **Option 1, with a caveat** — port the data model, rewrite the UI. See §9. |
+| PD-Span status | **Live, with real intelligence in it** (confirmed 2026-09-17). Everything in §8 is a migration of real data, not a formality. |
 
 ## 1. The headline finding
 
@@ -178,6 +179,22 @@ Two more observations worth carrying into M5:
 
 ## 8. Data migration plan
 
+**PD-Span is live and holds real intelligence.** That changes this section from
+a checklist into the riskiest part of M5. Three consequences follow, and they
+are the reason the steps below are ordered the way they are:
+
+1. **There is no acceptable data-loss window.** The migration must be
+   re-runnable and idempotent, so it can be rehearsed against a copy as often as
+   needed and re-run after a correction without duplicating anything.
+2. **The system stays in use while the port is built.** Officers keep logging
+   intelligence into PD-Span until cutover, so the migration must be able to run
+   twice: a bulk pass, and a delta pass at cutover for everything logged since.
+   The `fpd_span_id_map` table in step 2 is what makes the second pass possible.
+3. **Wrong is worse than late.** A mis-merged person attributes one person's
+   intelligence to another, and a mis-classified source register exposes an
+   informant. Both are worse outcomes than the migration taking another week.
+   Step 3 is reviewed by a person, not automated.
+
 Cross-engine (Postgres → MariaDB) and cross-model, so this is an ETL, not a
 dump and restore. Volumes are small; correctness of identity is the hard part.
 
@@ -215,6 +232,15 @@ dump and restore. Volumes are small; correctness of identity is the hard part.
    system "legacy import" officer rather than to whoever is running the import.
 8. **Verify** with counts per table, a sample diff, and a check that every
    `notes` row still resolves to its subject.
+9. **Rehearse against a copy, twice**, before touching anything real: once from
+   an empty FredPD schema, and once as a delta on top of the first run, which is
+   exactly the shape cutover takes. Keep PD-Span readable (option 2's temporary
+   read-only bridge) until the rehearsal has been signed off.
+
+**Retire PD-Span deliberately, not by switching it off.** Once cutover is done,
+its Supabase project should be made read-only rather than deleted, and kept for
+at least one retention period: it is the only copy of the original data if a
+reconciliation decision in step 3 turns out to be wrong.
 
 ## 9. Recommendation
 
@@ -277,11 +303,15 @@ porting.
 
 ## 10. Open questions for Rami
 
-1. **Is PD-Span live with real data?** The whole reconciliation plan (§8)
-   depends on whether there is intelligence worth migrating or only seed data.
-2. **Should PD-Span keep running during M5?** If yes, option 2's temporary
-   read-only bridge is worth building; if it can go dark at cutover, skip it.
+1. ~~Is PD-Span live with real data?~~ **Answered: yes.** §8 is rewritten
+   around that, and it is why the migration is rehearsed rather than run.
+2. **Roughly how much data, and how far back?** Row counts for `people`,
+   `notes` and `evidence` would turn §9's estimate for the migration tooling
+   (6–10 h) from a guess into a number — a few hundred rows and a few hundred
+   thousand are different pieces of work.
 3. **Who grades the imported intelligence?** Step 4 needs a named analyst role,
    or the backlog sits at "not evaluated" indefinitely.
 4. **Do unidentified persons stay separate from the master name index?** §7's
    last point — this is a product decision, not a technical one.
+5. **Is there a cutover date to work back from?** It decides whether the
+   temporary read-only bridge in §9 is worth building at all.

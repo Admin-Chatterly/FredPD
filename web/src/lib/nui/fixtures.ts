@@ -1,5 +1,7 @@
 import type { ErrorCode } from '@fredpd/schema';
 
+import type { PermissionGroup, RoleMapping } from '../types';
+
 /**
  * Fixtures for browser development (spec 17.2, M0).
  *
@@ -33,30 +35,87 @@ const session = {
   agencyId: 'lspd',
   agencyName: 'Los Santos Police Department',
   onDuty: true,
-  accessPoint: 'station',
+  permissionsStale: false,
   // Only what this fake session may open. The real list is derived from
   // Discord roles on the server (invariant 2).
-  modules: ['records', 'admin'],
-  permissions: ['records.person.search', 'admin.permission.view'],
+  modules: ['records', 'comms', 'admin'],
 };
+
+const groups: PermissionGroup[] = [
+  { key: 'patrol_basic', name: 'Patrol (trainee)', inherits: null, description: null },
+  { key: 'patrol', name: 'Patrol', inherits: 'patrol_basic', description: null },
+  { key: 'supervisor', name: 'Supervisor', inherits: 'patrol', description: null },
+  { key: 'dispatch', name: 'Dispatch', inherits: 'patrol_basic', description: null },
+  { key: 'admin', name: 'FredPD administration', inherits: null, description: null },
+];
+
+/**
+ * Mutable so the browser session behaves like a real one: adding a mapping and
+ * seeing it appear is the whole point of the screen, and a fixture that always
+ * returned the same list would hide a broken refresh.
+ */
+let mappings: RoleMapping[] = [
+  {
+    id: 1,
+    discordRoleId: '100000000000000001',
+    discordRoleName: 'Officer',
+    groupKey: 'patrol',
+    groupName: 'Patrol',
+    agencyId: 'lspd',
+  },
+  {
+    id: 2,
+    discordRoleId: '100000000000000002',
+    discordRoleName: 'Sergeant',
+    groupKey: 'supervisor',
+    groupName: 'Supervisor',
+    agencyId: 'lspd',
+  },
+];
+
+let nextId = 3;
 
 export const fixtures: FixtureSet = {
   ok: {
     'session.get': () => session,
 
-    'session.setStatus': (input) => ({
-      ...session,
-      status: (input as { status?: string } | undefined)?.status ?? 'available',
-    }),
-
-    'admin.permission.view': () => ({
-      groups: [
-        { key: 'patrol', name: 'Patrol', discordRoleId: '000000000000000001', members: 24 },
-        { key: 'investigations', name: 'Investigations', discordRoleId: '000000000000000002', members: 6 },
-        { key: 'command', name: 'Command', discordRoleId: '000000000000000003', members: 3 },
-      ],
+    'admin.rolemap.list': () => ({
+      mappings,
+      groups,
       snapshotAgeSeconds: 12,
     }),
+
+    'admin.rolemap.create': (input) => {
+      const body = input as {
+        discordRoleId: string;
+        discordRoleName?: string;
+        groupKey: string;
+        agencyId: string;
+      };
+
+      const group = groups.find((candidate) => candidate.key === body.groupKey);
+
+      mappings = [
+        ...mappings,
+        {
+          id: nextId,
+          discordRoleId: body.discordRoleId,
+          discordRoleName: body.discordRoleName ?? null,
+          groupKey: body.groupKey,
+          groupName: group?.name ?? body.groupKey,
+          agencyId: body.agencyId,
+        },
+      ];
+
+      return { id: nextId++ };
+    },
+
+    'admin.rolemap.delete': (input) => {
+      const { id } = input as { id: number };
+      mappings = mappings.filter((mapping) => mapping.id !== id);
+
+      return { id };
+    },
   },
 
   fail: {

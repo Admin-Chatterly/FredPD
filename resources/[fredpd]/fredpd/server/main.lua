@@ -1,10 +1,25 @@
 --- Boot for the core resource.
 ---
---- M0 scope: come up cleanly, or refuse to come up and say exactly why. The
---- route layer, session service, permissions and modules land in M1 under
---- `server/core/` and `server/modules/`.
+--- Come up cleanly, or refuse to come up and say exactly why.
 
 local REQUIRED_RESOURCES <const> = { 'ox_lib', 'oxmysql', 'es_extended' }
+
+--- Tables the server cannot function without. Checked once at boot so a server
+--- started against an unmigrated database fails here, with a clear message,
+--- rather than one confusing query at a time (spec 16).
+local REQUIRED_TABLES <const> = {
+    'fpd_agencies',
+    'fpd_officers',
+    'fpd_permission_groups',
+    'fpd_group_permissions',
+    'fpd_role_map',
+    'fpd_discord_members',
+    'fpd_audit_log',
+    'fpd_placements',
+    'fpd_chat_messages',
+    'fpd_fleet',
+    'fpd_motorpool_log',
+}
 
 --- Returns the names of any dependency that is not started.
 local function missingResources()
@@ -47,7 +62,10 @@ AddEventHandler('onResourceStart', function(resource)
     end
 
     -- Bridges check the resources they wrap before anything tries to use them.
+    -- The framework is required; the rest degrade with a warning (spec 3.8).
     FredPD.Bridge.framework.verify()
+    FredPD.Bridge.policejob.verify()
+    FredPD.Bridge.society.verify()
 
     local faults = configurationFaults()
     if #faults > 0 then
@@ -62,5 +80,34 @@ AddEventHandler('onResourceStart', function(resource)
         end
     end
 
-    print(('[fredpd] %s started (env=%s, locale=%s)'):format(FredPD.version, FredPD.env(), FredPD.lang))
+    FredPD.Core.db.verifySchema(REQUIRED_TABLES)
+
+    FredPD.Core.agencies.reload()
+    FredPD.Core.perms.reload()
+    FredPD.Core.placements.reload()
+
+    print(('[fredpd] %s started (env=%s, locale=%s, routes=%d)'):format(
+        FredPD.version, FredPD.env(), FredPD.lang, #FredPD.Core.route.names()
+    ))
 end)
+
+--- A player asking for their world geometry once they are in the session.
+---
+--- Placements carry no permission data (ADR-006), so this needs no permission
+--- of its own beyond having a session at all.
+RegisterNetEvent('fredpd:requestPlacements', function()
+    local src = source
+    if not FredPD.Core.session.get(src) then return end
+
+    FredPD.Core.placements.pushTo(src)
+end)
+
+--- The gateway tells FXServer that Discord roles changed (spec 4.2, 3.7).
+---
+--- Registered here rather than as a route because the caller is the gateway over
+--- the signed loopback link, not a game client. The HMAC check in the HTTP
+--- handler is its authentication; M1 wires that handler to this function.
+function FredPD.onDiscordChange()
+    FredPD.Core.perms.reload()
+    FredPD.Core.session.refreshAll()
+end

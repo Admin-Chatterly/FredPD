@@ -14,9 +14,26 @@ of truth.** Section 0 lists the invariants that override everything else.
 
 ## Status
 
-**M0 — repository and tooling.** The monorepo, toolchain, CI and the mock NUI
-bridge are in place; the resources start clean. The platform core lands in M1
-(see the roadmap in spec section 17).
+**M0 complete, M1 in progress.** The monorepo, toolchain, CI and the mock NUI
+bridge are in place, and the platform core is building out: the route layer,
+sessions, the Discord-derived permission model, the audit log, and the first
+modules.
+
+Working today:
+
+- **Permissions configured in game.** Map a Discord role to a permission group
+  from the MDT; it takes effect immediately, with no restart (spec 4.3, 7.30).
+- **World positions configured in game.** `/fredpd placement` puts a terminal,
+  a lab bench or a motor pool ped where it actually belongs — aim at a prop to
+  bind it, or place a ped — instead of editing coordinates in a config file
+  (spec 3.10, ADR-006).
+- **Internal police channel** in the standard game chat: `/pd <message>`,
+  delivered only to officers who may read it (spec 7.26, ADR-007).
+- **Agency motor pool** with an attendant ped, permission-gated vehicles and a
+  log of every draw and return (spec 7.31).
+
+Records, dispatch, evidence, lab, court and intelligence follow in M2–M6; see
+the roadmap in spec section 17.
 
 ## Layout
 
@@ -55,15 +72,26 @@ Try `?locale=sv`, `?latency=400` and `?fail=forbidden`.
 | `pnpm build` | Schema codegen → NUI → gateway |
 | `pnpm check` | ESLint, TypeScript, svelte-check, i18n |
 | `pnpm test` | Unit tests (Vitest) |
+| `pnpm test:lua` | Lua unit tests (busted) |
+| `pnpm lint:lua` | luacheck over the resources |
 | `pnpm test:e2e` | NUI tests in a browser (Playwright) |
 | `pnpm schema:gen` | Regenerate the Lua schema — commit the result |
 | `pnpm i18n:check` | `en` and `sv` complete and consistent |
 
 ### Running it on a server
 
-Beyond M0 this needs an FXServer with ESX, ox_lib, oxmysql and ox_target, a
-MariaDB database, and the gateway service. Build first — the NUI is served from
-`resources/[fredpd]/fredpd/web/dist`, which `pnpm build` produces.
+This needs an FXServer with ESX (`es_extended`), ox_lib and oxmysql, a MariaDB
+database, and the gateway service. `p_policejob`, `esx_society`, `esx_textui`
+and `esx_menu_dialog` are used where present and degrade with a warning where
+not — each sits behind a bridge (spec 3.8, ADR-008).
+
+Build first — the NUI is served from `resources/[fredpd]/fredpd/web/dist`,
+which `pnpm build` produces. Then apply `database/migrations/` in order and the
+seeds in `database/seeds/`.
+
+A fresh install deliberately grants nobody anything: map your first Discord role
+to the `admin` group in `fpd_role_map`, and everything else can be configured
+from inside the game.
 
 ```
 set fredpd:gateway_secret "<openssl rand -hex 32>"   # `set`, never `setr`

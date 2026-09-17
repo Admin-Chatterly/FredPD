@@ -2,15 +2,17 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { ACCESS_POINTS, UNIT_STATUSES } from './enums';
+import { ACCESS_POINTS, PLACEMENT_INTERACTIONS, PLACEMENT_KINDS, UNIT_STATUSES } from './enums';
 import { ERROR_CODES } from './errors';
+import { schemas, type FieldSpec, type Schema } from './schemas';
 
 /**
  * Generates the Lua side of the shared schema (spec 17.2).
  *
- * TypeScript is the single source of truth; the Lua table is produced from it.
- * That is the whole point: an enum can never mean one thing in the NUI and
- * another in the route layer, because only one of the two is written by hand.
+ * TypeScript is the single source of truth; the Lua tables are produced from
+ * it. That is the whole point: an enum or a field constraint can never mean one
+ * thing in the NUI and another in the route layer, because only one of the two
+ * is written by hand.
  *
  * CI regenerates and fails on any diff, so a stale file cannot merge.
  */
@@ -18,17 +20,48 @@ import { ERROR_CODES } from './errors';
 const here = dirname(fileURLToPath(import.meta.url));
 const OUTPUT = resolve(here, '../../../resources/[fredpd]/fredpd/shared/generated/schema.lua');
 
+const INDENT = '    ';
+
 /** `en_route` becomes `EN_ROUTE`, the conventional Lua constant spelling. */
 function constantName(value: string): string {
   return value.toUpperCase();
 }
 
-function luaTable(name: string, values: readonly string[], comment: string): string {
+function luaString(value: string): string {
+  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+}
+
+function luaList(values: readonly string[]): string {
+  return `{ ${values.map(luaString).join(', ')} }`;
+}
+
+function enumTable(name: string, values: readonly string[], comment: string): string {
   const entries = values
-    .map((value) => `    ${constantName(value)} = '${value}',`)
+    .map((value) => `${INDENT}${constantName(value)} = ${luaString(value)},`)
     .join('\n');
 
   return `--- ${comment}\nFredPD.${name} = {\n${entries}\n}\n`;
+}
+
+/** One field constraint, as a Lua table literal on a single line. */
+function fieldTable(spec: FieldSpec): string {
+  const parts = [`type = ${luaString(spec.type)}`];
+
+  parts.push(`required = ${spec.required === true ? 'true' : 'false'}`);
+
+  if ('min' in spec && spec.min !== undefined) parts.push(`min = ${spec.min}`);
+  if ('max' in spec && spec.max !== undefined) parts.push(`max = ${spec.max}`);
+  if (spec.type === 'enum') parts.push(`values = ${luaList(spec.values)}`);
+
+  return `{ ${parts.join(', ')} }`;
+}
+
+function schemaTable(name: string, schema: Schema): string {
+  const fields = Object.entries(schema)
+    .map(([field, spec]) => `${INDENT}${INDENT}${field} = ${fieldTable(spec)},`)
+    .join('\n');
+
+  return `${INDENT}${name} = {\n${fields}\n${INDENT}},`;
 }
 
 const banner = `--- GENERATED FILE -- DO NOT EDIT.
@@ -39,13 +72,30 @@ const banner = `--- GENERATED FILE -- DO NOT EDIT.
 FredPD = FredPD or {}
 `;
 
-const body = [
-  luaTable('ErrorCode', ERROR_CODES, 'Route error codes (spec 3.5).'),
-  luaTable('AccessPoint', ACCESS_POINTS, 'Where a session opened FredPD from (spec 1.4).'),
-  luaTable('UnitStatus', UNIT_STATUSES, 'Unit status (spec 7.1).'),
+const enums = [
+  enumTable('ErrorCode', ERROR_CODES, 'Route error codes (spec 3.5).'),
+  enumTable('AccessPoint', ACCESS_POINTS, 'Where a session opened FredPD from (spec 1.4).'),
+  enumTable('UnitStatus', UNIT_STATUSES, 'Unit status (spec 7.1).'),
+  enumTable('PlacementKind', PLACEMENT_KINDS, 'What a world placement opens (spec 3.10).'),
+  enumTable(
+    'PlacementInteraction',
+    PLACEMENT_INTERACTIONS,
+    'How a placement is reached in the world (spec 3.10).',
+  ),
 ].join('\n');
 
+const schemaBody = Object.entries(schemas)
+  .map(([name, schema]) => schemaTable(name, schema as Schema))
+  .join('\n\n');
+
+const schemaSection = `--- Route input schemas (spec 3.5). The route layer validates against these and
+--- drops any key not listed, so a handler never sees a field it did not ask for.
+FredPD.Schema = {
+${schemaBody}
+}
+`;
+
 await mkdir(dirname(OUTPUT), { recursive: true });
-await writeFile(OUTPUT, `${banner}\n${body}`, 'utf8');
+await writeFile(OUTPUT, `${banner}\n${enums}\n${schemaSection}`, 'utf8');
 
 console.log(`schema: wrote ${OUTPUT}`);

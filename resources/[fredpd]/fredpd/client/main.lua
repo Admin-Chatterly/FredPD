@@ -1,10 +1,7 @@
 --- NUI host.
 ---
---- M0 scope: open and close the interface and hand focus back reliably. Access
---- points, status keys and the camera land in M1.
----
---- The client sends intent only. It never decides what the player may see:
---- the server answers each route with what that session is allowed (invariant 1).
+--- The client sends intent only. It never decides what the player may see: the
+--- server answers each route with what that session is allowed (invariant 1).
 
 local isOpen = false
 
@@ -25,11 +22,55 @@ RegisterNUICallback('fredpd:close', function(_, cb)
     cb({ ok = true })
 end)
 
---- Development convenience: opening from the console until access points land
---- in M1. It only draws the shell; every piece of data still comes from a route.
-RegisterCommand('fredpd', function()
+--- The NUI calls a route. Everything it asks for goes through the route layer,
+--- with the session, permission and context checked server-side (invariant 3).
+RegisterNUICallback('fredpd:route', function(data, cb)
+    if type(data) ~= 'table' or type(data.route) ~= 'string' then
+        cb({ ok = false, err = FredPD.ErrorCode.INVALID })
+        return
+    end
+
+    cb(FredPD.Client.core.call(data.route, data.body))
+end)
+
+AddEventHandler('fredpd:toggleInterface', function()
     setOpen(not isOpen)
-end, false)
+end)
+
+--- Opening a terminal is the same action wherever it is placed, so every
+--- terminal kind maps to it (spec 3.10). What the officer can then *do* inside
+--- differs by permission, which the server decides.
+for _, kind in ipairs({
+    'station_terminal',
+    'property_terminal',
+    'lab_terminal',
+    'booking_terminal',
+    'dispatch_console',
+    'courthouse_terminal',
+}) do
+    FredPD.Client.placements.registerAction(kind, function()
+        setOpen(true)
+    end)
+end
+
+--- Permissions changed while the player was connected: a role was added or
+--- removed, or an administrator edited the role map. The shell redraws its rail
+--- from what the server now allows (spec 4.2).
+RegisterNetEvent('fredpd:permissions', function(payload)
+    SendNUIMessage({ type = 'fredpd:permissions', modules = payload.modules })
+end)
+
+--- Ask for world geometry once the session exists on the server.
+AddEventHandler('playerSpawned', function()
+    TriggerServerEvent('fredpd:requestPlacements')
+end)
+
+CreateThread(function()
+    -- Covers a resource restart while players are already in the world, where
+    -- playerSpawned has long since fired.
+    Wait(2000)
+    TriggerServerEvent('fredpd:requestPlacements')
+end)
 
 --- Never leave a player stuck with NUI focus and no NUI.
 AddEventHandler('onResourceStop', function(resource)

@@ -39,6 +39,16 @@ read_globals = {
     'SetNuiFocus',
     'RegisterNUICallback',
 
+    -- Entities and world, used on both sides
+    'DoesEntityExist',
+    'GetEntityCoords',
+    'GetEntityHeading',
+    'GetEntityModel',
+    'GetVehicleClass',
+    'GetVehiclePedIsIn',
+    'joaat',
+    'vec3',
+
     -- Ecosystem
     'exports',
     'lib',
@@ -100,8 +110,38 @@ files['**/fxmanifest.lua'] = {
     },
 }
 
-files['resources/[fredpd]/*/client/**/*.lua'] = {
-    read_globals = { 'IsControlJustReleased', 'IsPedInAnyVehicle', 'PlayerPedId' },
+-- Natives that only exist on the client.
+files['**/client/**/*.lua'] = {
+    read_globals = {
+        'CreatePed',
+        'CreateVehicle',
+        'DeleteEntity',
+        'DeleteVehicle',
+        'FreezeEntityPosition',
+        'GetClosestVehicle',
+        'GetEntityForwardVector',
+        'GetGameplayCamCoord',
+        'GetShapeTestResult',
+        'GetVehicleNumberPlateText',
+        'IsControlJustReleased',
+        'IsModelInCdimage',
+        'IsPedInAnyVehicle',
+        'PlayerPedId',
+        'SetBlockingOfNonTemporaryEvents',
+        'SetEntityAsMissionEntity',
+        'SetEntityInvincible',
+        'SetModelAsNoLongerNeeded',
+        'SetPedIntoVehicle',
+        'SetVehicleLivery',
+        'SetVehicleNumberPlateText',
+        'StartShapeTestRay',
+        'ESX',
+    },
+}
+
+-- Generated code is machine-formatted; long table literals there are expected.
+files['**/shared/generated/*.lua'] = {
+    max_line_length = false,
 }
 
 files['**/*_spec.lua'] = {

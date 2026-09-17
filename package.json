@@ -20,7 +20,9 @@
     "test:e2e": "pnpm --filter @fredpd/web test:e2e",
     "i18n:check": "tsx tools/i18n-check.ts",
     "schema:gen": "pnpm --filter @fredpd/schema build",
-    "check": "pnpm lint && pnpm typecheck && pnpm svelte-check && pnpm i18n:check"
+    "check": "pnpm lint && pnpm typecheck && pnpm svelte-check && pnpm i18n:check",
+    "test:lua": "busted",
+    "lint:lua": "luacheck resources/"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

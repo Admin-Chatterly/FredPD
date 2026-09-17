@@ -2,25 +2,19 @@
   import { nui } from './lib/nui';
   import { t } from './lib/i18n';
   import type { ErrorCode } from '@fredpd/schema';
+  import type { Session } from './lib/types';
+  import RoleMap from './modules/admin/RoleMap.svelte';
 
   /**
-   * The application shell (spec 6.3). M1 fills in the module rail, command line,
-   * tabs and context panel properly; M0 proves the frame: the NUI boots, calls a
-   * route through the bridge, and renders success, failure and loading states
-   * without a game server.
+   * The application shell (spec 6.3). M1 fills in the command line, tabs and
+   * context panel; what is here is the frame: the NUI boots, calls a route, and
+   * draws the module rail the *server* said this session may open.
    */
-
-  interface Session {
-    callsign: string;
-    name: string;
-    agencyName: string;
-    onDuty: boolean;
-    modules: string[];
-  }
 
   let session = $state<Session | null>(null);
   let error = $state<ErrorCode | null>(null);
   let loading = $state(true);
+  let current = $state<string | null>(null);
 
   $effect(() => {
     let cancelled = false;
@@ -32,6 +26,7 @@
       if (response.ok) {
         session = response.data;
         error = null;
+        current ??= response.data.modules[0] ?? null;
       } else {
         error = response.err;
         session = null;
@@ -44,6 +39,24 @@
       cancelled = true;
     };
   });
+
+  /**
+   * Permissions changed while the MDT was open — a role was added or removed,
+   * or an administrator edited the role map. The rail redraws, and a module the
+   * session can no longer open stops being selected (spec 4.2).
+   */
+  $effect(() =>
+    nui.on('fredpd:permissions', (message) => {
+      const modules = message['modules'];
+      if (!session || !Array.isArray(modules)) return;
+
+      session = { ...session, modules: modules as string[] };
+
+      if (current !== null && !session.modules.includes(current)) {
+        current = session.modules[0] ?? null;
+      }
+    }),
+  );
 
   function close(): void {
     void nui.call('fredpd:close');
@@ -76,17 +89,24 @@
          decides the list; the UI just draws it (invariant 4). -->
     <nav class="w-44 shrink-0 border-r border-[var(--color-border)] p-2">
       {#each session?.modules ?? [] as module (module)}
-        <div class="px-2 py-1.5 text-xs text-[var(--color-ink-muted)]">
+        <button
+          type="button"
+          class="block w-full px-2 py-1.5 text-left text-xs hover:bg-[var(--color-surface)]"
+          class:font-semibold={current === module}
+          onclick={() => (current = module)}
+        >
           {t(`shell.module.${module}`)}
-        </div>
+        </button>
       {/each}
     </nav>
 
-    <main class="min-w-0 flex-1 p-4">
+    <main class="min-w-0 flex-1 overflow-y-auto p-4">
       {#if loading}
         <p class="text-sm text-[var(--color-ink-muted)]">{t('app.loading')}</p>
       {:else if error}
         <p class="text-sm">{t(`error.${error}`)}</p>
+      {:else if session && current === 'admin'}
+        <RoleMap agencyId={session.agencyId} />
       {/if}
     </main>
   </div>
@@ -96,9 +116,12 @@
     class="flex items-center gap-4 border-t border-[var(--color-border)] px-4 py-1.5 text-xs text-[var(--color-ink-muted)]"
   >
     {#if session}
-      <span>{t('shell.status.unit', { callsign: session.callsign })}</span>
+      <span>{t('shell.status.unit', { callsign: session.callsign ?? '' })}</span>
       <span>{t('shell.status.signedInAs', { name: session.name })}</span>
       <span>{session.onDuty ? t('shell.status.onDuty') : t('shell.status.offDuty')}</span>
+      {#if session.permissionsStale}
+        <span>{t('shell.status.permissionsStale')}</span>
+      {/if}
     {/if}
   </footer>
 </div>

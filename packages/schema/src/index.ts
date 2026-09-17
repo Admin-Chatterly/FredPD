@@ -12,5 +12,14 @@
 export { ERROR_CODES, isErrorCode } from './errors';
 export type { ErrorCode } from './errors';
 
-export { ACCESS_POINTS, UNIT_STATUSES } from './enums';
-export type { AccessPoint, UnitStatus } from './enums';
+export {
+  ACCESS_POINTS,
+  PLACEMENT_ACCESS_POINTS,
+  PLACEMENT_INTERACTIONS,
+  PLACEMENT_KINDS,
+  UNIT_STATUSES,
+} from './enums';
+export type { AccessPoint, PlacementInteraction, PlacementKind, UnitStatus } from './enums';
+
+export { schemas } from './schemas';
+export type { FieldSpec, Schema, SchemaName } from './schemas';

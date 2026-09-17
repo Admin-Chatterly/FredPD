@@ -280,6 +280,11 @@ Response envelope: `{ ok = true, data = ... }` or `{ ok = false, err = 'code', f
 | Bridge | Responsibilities | Default implementation |
 |---|---|---|
 | framework | Characters, names, DOB, phone, jobs, duty, licences | es_extended |
+| policejob | Duty state, rank, armory, cloakroom, impound | p_policejob (section 3.11) |
+| society | Agency funds, society-owned vehicles | esx_society |
+| textui | In-world prompts ("Press E to open the terminal") | esx_textui |
+| menu | In-world option menus and input dialogs | esx_menu_dialog |
+| garage | Agency motor pool vehicles (section 7.31) | Built-in, over society |
 | inventory | Items, metadata, stashes, hooks, weapons | ox_inventory |
 | target | Interactions | ox_target |
 | voice | Radio channels, voice targets | pma-voice |
@@ -301,6 +306,69 @@ Each bridge checks the target resource's state and version at startup and logs a
 - Convars: `setr fredpd:locale en`, `set fredpd:gateway_url`, `set fredpd:gateway_secret`, `set fredpd:env production`, `setr fredpd:timezone Europe/Stockholm`.
 - Feature flags per module in `config/server.lua`.
 - Agencies: id, name, short name, logo, seal, accent color, numbering prefixes, jurisdiction polygons, radio channels, report letterhead text.
+
+### 3.10 In-game configuration and world placement
+
+Nothing with a world position is hardcoded. Every terminal, lab bench, booking
+station, dispatch console, courthouse desk and motor pool ped is a **placement**
+row in `fpd_placements`, created and edited in game by an administrator holding
+`admin.placement.edit`. A server operator never edits a Lua config to move a
+desk, and never needs a restart to do it.
+
+A placement carries:
+
+| Field | Meaning |
+|---|---|
+| `kind` | What it opens — an access point (1.4), a motor pool ped, a scene-tool bench |
+| `agency_id` | Which agency owns it; `NULL` means shared |
+| `coords`, `heading` | Where it is |
+| `interaction` | `prop` (bind to a nearby prop model), `ped` (spawn one), or `zone` (a radius with no entity) |
+| `model` | Prop or ped model, for the `ped` and `prop` interactions |
+| `radius` | Interaction distance, default 1.5 m |
+| `label_key` | Locale key for the prompt, never a literal string (invariant 6) |
+| `enabled` | Off without deleting, so a station can be closed for an event |
+
+**The editor.** `/fredpd placement` opens placement mode: aim at a prop to bind
+it, or place a ped with a live preview, then pick the `kind` from a menu. Move,
+rotate, disable and delete are the same mode. Every write goes through a route
+with `admin.placement.edit` and is audited like any other change (invariant 11).
+
+**A placement decides *where*, never *who*.** It binds a prop to a UI element;
+it does not grant access to that element. Permission still comes from Discord
+roles, checked on the server for every route the element calls (invariants 2
+and 4). Disabling a placement hides an entrance, not a permission.
+
+**Placements are not trusted from the client.** A client that calls a route
+"from" a placement sends the placement id, and the server verifies the player is
+actually within `radius` of that placement's coordinates before honouring the
+access-point context condition (4.3). Otherwise the access-point rule would be
+worth nothing: any client could claim to be standing in the property room.
+
+Placements are pushed to clients as world geometry only — coordinates, models
+and label keys, for the placements that exist. They carry no permission data,
+because a client knowing a door exists is not the same as a client being able to
+open it.
+
+### 3.11 Coexistence with p_policejob
+
+FredPD does not replace the police job resource. `p_policejob` keeps the
+in-world job — duty toggle, armory, cloakroom, impound — and FredPD owns
+records, dispatch, evidence, lab, court, intelligence and the MDT.
+
+The `policejob` bridge is the only place that names it. Duty and rank are read
+through that bridge as **context conditions** (4.3), never as grants: a
+`p_policejob` rank grants nothing in FredPD, exactly as an ESX job grade does
+not (invariant 2).
+
+Where the two overlap, the rule is one owner per concern:
+
+| Concern | Owner |
+|---|---|
+| Duty toggle, armory, cloakroom | `p_policejob` |
+| Impound and tow (7.15) | `p_policejob` |
+| Agency motor pool (7.31) | FredPD |
+| MDT, records, CAD, evidence, court | FredPD |
+| Permissions for any of the above | FredPD, from Discord roles |
 - Code tables (call types, dispositions, offences, statuses) live in the database and are seeded from `database/seeds`.
 
 ---
@@ -739,8 +807,24 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 
 - [S] Policy library with versions, categories and required acknowledgement per role; tracking of who has read which version (PowerDMS style).
 
-### 7.26 Communications (M4)
+### 7.26 Communications (M4; internal chat M1)
 
+- [M] **Internal police channel in the game chat (M1).** A police-only channel
+  rendered in the standard FiveM chat box, so officers never have to open the
+  MDT to talk. `/pd <message>` by default, command configurable.
+  - Send needs `comms.pdchat.send`; a message is delivered only to sessions
+    holding `comms.pdchat.view`. It is never broadcast to everyone
+    (invariant 5) — the recipient list is computed on the server, per message.
+  - The sender's callsign, name and agency are resolved **server-side** from the
+    session and prefixed to the message; nothing about the author comes from the
+    client (invariant 1).
+  - Rate limited per session like any other route, and the body is length-capped
+    and stripped of chat colour codes, so the channel cannot be used to spam or
+    to forge another officer's prefix.
+  - Stored append-only in `fpd_chat_messages` and readable in the MDT comms log
+    with `comms.pdchat.view`, which is what makes it evidence rather than
+    ephemeral noise.
+  - Agency-scoped by default; a cross-agency channel needs `comms.pdchat.all`.
 - [M] Unit-to-unit and dispatcher-to-unit messages.
 - [M] Roll-call board: daily briefing with active BOLOs, warrants, officer-safety notes and announcements.
 - [M] Notification center.
@@ -770,6 +854,35 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 - [S] Retention policies per data type (drafts, ALPR reads, query logs, wiretap sessions).
 - [S] System health: gateway status, Discord sync age, DB latency, route timings, queue depths.
 - [S] Feature flags and bridge status overview.
+- [M] **Placement editor** (3.10): create, move, rebind and disable the world
+  placements that open each module, in game, with `admin.placement.edit`.
+- [M] **Discord role mapping** (4.3): map a Discord role ID to permission groups
+  per agency from the MDT, with `admin.permissions.edit`. Every change is
+  audited and takes effect on the next permission push, without a restart.
+
+### 7.31 Agency motor pool (M1)
+
+The garage officers actually use. Impound and tow stay with `p_policejob`
+(3.11); this is the station motor pool only.
+
+- [M] A motor pool is a **placement** (3.10) with a `ped` interaction, so its
+  position and ped model are configured in game rather than in a config file.
+- [M] Draw a vehicle from the agency's configured fleet. Each fleet entry names
+  the model, the permission it needs and, optionally, a required certification
+  (7.23), so a pursuit vehicle or a helicopter can be restricted without a
+  separate garage.
+- [M] Return a vehicle at any motor pool of the same agency.
+- [M] Vehicles are society-owned through the `society` bridge, so the agency —
+  not the officer — owns the fleet.
+- [M] Every draw and return is logged in `fpd_motorpool_log` with the officer,
+  the vehicle, the placement and the time. A vehicle out for a whole shift is
+  visible to command, which is the point of logging it.
+- [M] Drawing requires being on duty (a context condition, 4.3) and standing at
+  the placement, verified server-side (3.10).
+- [S] Fleet editor in Admin, so the vehicle list is configurable in game too.
+- [S] Damage and fuel state carried over on return, where the framework exposes it.
+- **Permissions:** `garage.vehicle.draw`, `garage.vehicle.return`,
+  `garage.fleet.edit`.
 
 ---
 
@@ -1083,14 +1196,15 @@ Unauthenticated call, missing permission, failed context condition, invalid type
 
 | Area | Tables |
 |---|---|
-| Core | `fpd_migrations`, `fpd_settings`, `fpd_agencies`, `fpd_divisions`, `fpd_counters`, `fpd_audit_log`, `fpd_query_log`, `fpd_outbox`, `fpd_i18n_overrides` |
+| Core | `fpd_migrations`, `fpd_settings`, `fpd_agencies`, `fpd_divisions`, `fpd_counters`, `fpd_audit_log`, `fpd_query_log`, `fpd_outbox`, `fpd_i18n_overrides`, `fpd_placements` |
 | Access | `fpd_discord_members`, `fpd_role_map`, `fpd_permission_groups`, `fpd_group_permissions`, `fpd_classifications`, `fpd_compartments`, `fpd_record_compartments`, `fpd_record_grants`, `fpd_breakglass` |
 | Personnel | `fpd_officers`, `fpd_shift_log`, `fpd_certifications`, `fpd_training`, `fpd_equipment`, `fpd_commendations`, `fpd_fto_*`, `fpd_ia_cases`, `fpd_uof_reports`, `fpd_policies`, `fpd_policy_acks` |
 | Records | `fpd_persons`, `fpd_person_index`, `fpd_person_aliases`, `fpd_person_descriptors`, `fpd_person_photos`, `fpd_person_cautions`, `fpd_addresses`, `fpd_person_addresses`, `fpd_vehicles`, `fpd_vehicle_flags`, `fpd_firearms`, `fpd_firearm_events`, `fpd_notes`, `fpd_attachments` |
 | Reports and cases | `fpd_reports`, `fpd_report_versions`, `fpd_report_persons`, `fpd_report_offences`, `fpd_report_property`, `fpd_report_vehicles`, `fpd_cases`, `fpd_case_links`, `fpd_case_tasks` |
 | Enforcement | `fpd_arrests`, `fpd_arrest_charges`, `fpd_bookings`, `fpd_citations`, `fpd_warrants`, `fpd_warrant_events`, `fpd_bolos`, `fpd_fi_cards`, `fpd_stops`, `fpd_impounds` |
 | Legal | `fpd_penal_code`, `fpd_penal_code_versions`, `fpd_court_referrals`, `fpd_hearings`, `fpd_dispositions`, `fpd_discovery_packages` |
-| Dispatch | `fpd_calls`, `fpd_call_units`, `fpd_call_events`, `fpd_units`, `fpd_unit_status_log`, `fpd_beats`, `fpd_premise_hazards`, `fpd_alpr_reads`, `fpd_messages`, `fpd_bulletins` |
+| Dispatch | `fpd_calls`, `fpd_call_units`, `fpd_call_events`, `fpd_units`, `fpd_unit_status_log`, `fpd_beats`, `fpd_premise_hazards`, `fpd_alpr_reads`, `fpd_messages`, `fpd_bulletins`, `fpd_chat_messages` |
+| Motor pool | `fpd_fleet`, `fpd_motorpool_log` |
 | Forensics | `fpd_bio_identity` (hidden), `fpd_weapon_signatures` (hidden), `fpd_scenes`, `fpd_scene_log`, `fpd_scene_photos`, `fpd_evidence_world`, `fpd_evidence_items`, `fpd_custody`, `fpd_storage_locations`, `fpd_audits`, `fpd_lab_requests`, `fpd_lab_results`, `fpd_dna_index`, `fpd_print_index`, `fpd_ballistic_index`, `fpd_leads` |
 | Surveillance | `fpd_surv_sessions`, `fpd_surv_devices`, `fpd_surv_product_log` |
 | Intelligence | Defined after the PD-Span inventory (section 10.5) |
@@ -1283,12 +1397,13 @@ Total: roughly 320–450 hours.
 
 | Decision or input | Why it matters | Needed by |
 |---|---|---|
-| What PD-Span is technically and where its source lives | Integration option and effort | M0 (inventory), M5 (build) |
+| ~~What PD-Span is technically and where its source lives~~ | **Resolved.** A live Next.js app on Supabase, not a FiveM resource. See `docs/pd-span-inventory.md` | M0 — done |
 | Agencies at launch (names, logos, colors) | Branding, numbering, sharing rules | M1 |
 | Discord guild ID and role IDs (ranks, units, compartments, DOJ) | Permission seed | M1 |
 | Procedure style: US-style workflows with Swedish text, or Swedish-style procedure (gripande, anhållande, häktning, prosecutor-led förundersökning) | Report, warrant and court workflows | M2 |
 | UI framework confirmation (Svelte 5 or React) | Locks in the web stack | End of M1 |
-| Phone, jail, billing, garage, housing, appearance resources | Bridges | M2–M4 |
+| Phone, jail, billing, housing, appearance resources | Bridges | M2–M4 |
+| ~~Garage resource~~ | **Resolved.** FredPD owns the agency motor pool (7.31); impound stays with `p_policejob` | M1 — decided |
 | Dispatch alerts: built-in only or a ps-dispatch adapter | CAD scope | M4 |
 | Map tile source | Map module | M4 |
 | Retention periods per data type | Privacy and performance | M3 |
@@ -1373,7 +1488,7 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 
 | Area | Keys |
 |---|---|
-| Pages | `page.query`, `page.dispatch`, `page.records`, `page.evidence`, `page.lab`, `page.intel`, `page.court`, `page.personnel`, `page.stats`, `page.admin` |
+| Pages | `page.query`, `page.dispatch`, `page.records`, `page.evidence`, `page.lab`, `page.intel`, `page.court`, `page.personnel`, `page.stats`, `page.admin`, `page.comms` |
 | Queries | `query.person.run`, `query.vehicle.run`, `query.firearm.run`, `query.phone.run`, `query.address.run`, `query.log.view` |
 | Records | `rms.person.view`, `rms.person.edit`, `rms.person.photo.upload`, `rms.person.caution.edit`, `rms.vehicle.view`, `rms.vehicle.edit`, `rms.vehicle.flag`, `rms.firearm.view`, `rms.firearm.edit`, `rms.firearm.trace`, `rms.location.view`, `rms.location.hazard.edit` |
 | Reports | `rms.report.create`, `rms.report.edit.own`, `rms.report.submit`, `rms.report.approve`, `rms.report.return`, `rms.report.void`, `rms.report.view.<type>` |
@@ -1388,9 +1503,10 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Surveillance | `surv.phone.intercept`, `surv.radio.monitor`, `surv.device.deploy`, `surv.device.listen`, `surv.tracker.deploy`, `surv.tracker.view`, `surv.log.view` |
 | Intelligence | `intel.module.open`, `intel.report.create`, `intel.report.view`, `intel.surveillance.log`, `intel.source.view`, `intel.source.manage`, `intel.source.identity.view`, `intel.operation.approve` |
 | Personnel | `personnel.view`, `personnel.hire`, `personnel.promote`, `personnel.discipline`, `personnel.equipment.assign`, `ia.case.view`, `ia.case.manage`, `uof.review`, `policy.manage`, `policy.ack` |
-| Communications | `comms.message.send`, `comms.bulletin.post` |
+| Communications | `comms.message.send`, `comms.bulletin.post`, `comms.pdchat.send`, `comms.pdchat.view`, `comms.pdchat.all` |
+| Motor pool | `garage.vehicle.draw`, `garage.vehicle.return`, `garage.fleet.edit` |
 | Statistics | `stats.view`, `stats.export` |
-| Administration | `admin.permissions.edit`, `admin.penalcode.edit`, `admin.codetables.edit`, `admin.branding.edit`, `admin.audit.view`, `admin.retention.edit`, `admin.health.view` |
+| Administration | `admin.permissions.edit`, `admin.penalcode.edit`, `admin.codetables.edit`, `admin.branding.edit`, `admin.audit.view`, `admin.retention.edit`, `admin.health.view`, `admin.placement.edit` |
 | Access | `records.breakglass`, `clearance.<level>`, `compartment.<name>`, `fields.mental_health.view`, `fields.victim_address.view` |
 
 ## Appendix C — Default role template

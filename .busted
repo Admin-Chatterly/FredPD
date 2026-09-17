@@ -1,0 +1,15 @@
+-- busted configuration (spec 15).
+--
+-- Only `service.lua` files and the pure parts of core are testable this way:
+-- they contain no natives, which is the rule spec 3.4 sets precisely so that
+-- the logic worth testing can be tested outside the game. A spec that fails to
+-- load usually means a native has crept into a file that should not have one.
+
+return {
+    default = {
+        ROOT = { 'resources/[fredpd]/fredpd/spec' },
+        lpath = 'resources/[fredpd]/fredpd/?.lua',
+        pattern = '_spec%.lua$',
+        output = 'utfTerminal',
+    },
+}

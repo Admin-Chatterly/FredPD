@@ -94,18 +94,21 @@ jobs:
           retention-days: 7
 
   lua:
-    name: Lua static checks
+    name: Lua checks and tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install luacheck
+      - name: Install the Lua toolchain
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends lua5.4 liblua5.4-dev luarocks
+          # luarocks defaults to 5.1; the resources are Lua 5.4 and use <const>,
+          # so busted has to be built against 5.4 or every spec fails to parse.
           sudo luarocks install luacheck
+          sudo luarocks --lua-version=5.4 --lua-dir=/usr install busted
 
       - uses: pnpm/action-setup@v4
 
@@ -121,6 +124,9 @@ jobs:
 
       - name: luacheck
         run: luacheck resources/
+
+      - name: busted
+        run: busted
 
   database:
     name: Migrations

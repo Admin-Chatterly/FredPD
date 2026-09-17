@@ -16,13 +16,15 @@
       "intel": "Underrättelser",
       "court": "Domstol",
       "personnel": "Personal",
+      "comms": "Kommunikation",
       "admin": "Administration"
     },
     "status": {
       "unit": "Enhet {callsign}",
       "onDuty": "I tjänst",
       "offDuty": "Ur tjänst",
-      "signedInAs": "Inloggad som {name}"
+      "signedInAs": "Inloggad som {name}",
+      "permissionsStale": "Behörigheterna är inaktuella"
     }
   },
   "error": {
@@ -36,5 +38,70 @@
     "restricted": "Posten är skyddad. Begär behörighet eller använd nödöppning.",
     "stale_permissions": "Dina behörigheter är inaktuella. Logga in igen.",
     "internal": "Något gick fel på servern. Felet har loggats."
+  },
+  "placement": {
+    "station_terminal": "Stationsterminal",
+    "property_terminal": "Terminal i beslagsrummet",
+    "lab_terminal": "Laboratorieterminal",
+    "booking_terminal": "Terminal för inskrivning",
+    "dispatch_console": "Ledningsplats",
+    "courthouse_terminal": "Terminal i domstolen",
+    "motorpool": "Fordonsdepå",
+    "evidence_bench": "Bevisbänk",
+    "interaction": {
+      "prop": "Koppla till ett föremål",
+      "ped": "Placera en person",
+      "zone": "Markera ett område"
+    },
+    "editor": {
+      "title": "Placeringar",
+      "newZone": "Ny här — område",
+      "newProp": "Ny här — koppla till föremålet jag tittar på",
+      "newPed": "Ny här — placera en person",
+      "move": "Flytta den närmaste hit",
+      "disable": "Stäng av den närmaste",
+      "delete": "Ta bort den närmaste",
+      "pickKind": "Vad ska den här öppna?",
+      "pedModelTitle": "Person",
+      "pedModelLabel": "Modellnamn",
+      "noProp": "Inget föremål i sikte. Titta rakt på ett och försök igen.",
+      "noneNearby": "Ingen placering i närheten.",
+      "created": "Placeringen är skapad.",
+      "moved": "Placeringen är flyttad.",
+      "disabled": "Placeringen är avstängd.",
+      "deleted": "Placeringen är borttagen.",
+      "deleteTitle": "Ta bort placeringen?",
+      "deleteBody": "{kind}, {distance} m härifrån. Det går inte att ångra."
+    }
+  },
+  "chat": {
+    "usage": "Skriv ett meddelande efter kommandot.",
+    "suggestion": "Skicka till polisens interna kanal",
+    "suggestionArg": "Vad du vill skicka"
+  },
+  "garage": {
+    "title": "Fordonsdepå",
+    "returnVehicle": "Lämna tillbaka ett fordon",
+    "drawn": "Fordon {plate} utkvitterat.",
+    "returned": "Fordon {plate} återlämnat.",
+    "noVehicle": "Det finns inget fordon här att lämna tillbaka.",
+    "unknownModel": "Fordonsmodellen finns inte på den här servern."
+  },
+  "admin": {
+    "roleMap": {
+      "title": "Discord-roller",
+      "intro": "Koppla en Discord-roll till en behörighetsgrupp. Rollerna är den enda källan till behörighet; här avgörs vad var och en ger.",
+      "roleId": "Roll-ID i Discord",
+      "roleName": "Namn (för visning)",
+      "group": "Behörighetsgrupp",
+      "add": "Lägg till koppling",
+      "remove": "Ta bort",
+      "empty": "Inga roller är kopplade än. Innan någon är det har ingen behörighet.",
+      "snapshotAge": "Discord synkades senast för {seconds} s sedan",
+      "snapshotMissing": "Discord har aldrig synkats. Kontrollera tjänsten.",
+      "added": "Kopplingen är tillagd.",
+      "removed": "Kopplingen är borttagen.",
+      "confirmRemove": "Ta bort kopplingen? Den som bara hade behörighet genom den förlorar den omedelbart."
+    }
   }
 }

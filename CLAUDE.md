@@ -42,6 +42,7 @@ only a pointer; the spec has the detail.
 | `packages/schema/` | Route and entity schemas → TS types **and** generated Lua |
 | `database/migrations/` | Append-only, numbered |
 | `tools/` | i18n checker, codegen |
+| `resources/[fredpd]/fredpd/spec/` | busted tests for the pure service logic |
 | `vendor/pd-span/` | PD-Span source, for the intelligence integration (section 10) |
 
 ## Commands
@@ -51,7 +52,9 @@ pnpm install
 pnpm dev:web          # NUI in a browser against fixtures, no game server
 pnpm build            # schema → NUI → gateway
 pnpm check            # lint, types, svelte-check, i18n
-pnpm test             # unit tests
+pnpm test             # unit tests (Vitest)
+pnpm test:lua         # Lua unit tests (busted)
+pnpm lint:lua         # luacheck over the resources
 pnpm test:e2e         # Playwright against the mock bridge
 pnpm schema:gen       # regenerate the Lua schema; commit the result
 ```
@@ -60,8 +63,11 @@ pnpm schema:gen       # regenerate the Lua schema; commit the result
 
 - A module calls another module through its `service.lua`, never its `repo.lua`.
 - `service.lua` contains no natives, so it is unit-testable with busted.
-- Bridges are the only place that names another resource. ESX lives behind
-  `server/bridges/framework.lua` and nowhere else.
+- Bridges are the only place that names another resource. `es_extended`,
+  `p_policejob`, `esx_society`, `esx_textui` and `esx_menu_dialog` each live in
+  exactly one bridge file and nowhere else.
+- Anything with a world position is a **placement** row, configured in game
+  (spec 3.10) — never a coordinate in a config file.
 - Every user-facing string is a locale key in `resources/[fredpd]/fredpd/locales/`.
 - `shared/generated/` is generated. Change `packages/schema/src/` and regenerate.
 

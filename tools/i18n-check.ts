@@ -16,13 +16,19 @@ import { ERROR_CODES } from '../packages/schema/src/errors.ts';
  *      and `{enhet}` in `sv` renders a literal brace in game;
  *   4. an error code with no `error.<code>` message, so a route can fail in a
  *      way the UI cannot explain;
- *   5. a `t('key')` used in the NUI that no locale file defines.
+ *   5. a `t('key')` used in the NUI that no locale file defines;
+ *   6. a `FredPD.t('key')` used in Lua that no locale file defines.
+ *
+ * Point 6 matters as much as point 5: an unknown key renders as the key itself,
+ * so a missing translation in game shows up as `garage.drawn` rather than as an
+ * empty string. Visible, but not something anyone should ship.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(here, '..');
 const LOCALE_DIR = join(REPO, 'resources/[fredpd]/fredpd/locales');
 const WEB_SRC = join(REPO, 'web/src');
+const RESOURCE_SRC = join(REPO, 'resources/[fredpd]');
 
 const REFERENCE_LOCALE = 'en';
 
@@ -75,26 +81,43 @@ async function loadLocales(): Promise<Map<string, Map<string, string>>> {
   return locales;
 }
 
-/** Every `t('key')` and `t(\`key\`)` written in the NUI source. */
-async function usedKeys(dir: string): Promise<Map<string, string>> {
+/**
+ * Every translation key referenced in source, with the file that referenced it.
+ *
+ * @param extensions which files to read
+ * @param pattern the call shape to look for
+ * @param skip files to ignore, e.g. tests
+ */
+async function usedKeys(
+  dir: string,
+  extensions: RegExp,
+  pattern: RegExp,
+  skip?: RegExp,
+): Promise<Map<string, string>> {
   const found = new Map<string, string>();
 
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
 
     if (entry.isDirectory()) {
-      for (const [key, file] of await usedKeys(path)) found.set(key, file);
+      // Vendored code is not ours and does not use our locale files.
+      if (entry.name === 'node_modules' || entry.name === 'dist') continue;
+
+      for (const [key, file] of await usedKeys(path, extensions, pattern, skip)) {
+        found.set(key, file);
+      }
       continue;
     }
 
-    if (!/\.(ts|svelte)$/.test(entry.name) || entry.name.endsWith('.test.ts')) continue;
+    if (!extensions.test(entry.name)) continue;
+    if (skip?.test(entry.name)) continue;
 
     const source = await readFile(path, 'utf8');
 
-    for (const match of source.matchAll(/\bt\(\s*'([^']+)'/g)) {
+    for (const match of source.matchAll(pattern)) {
       const key = match[1];
-      // A template literal key is built at runtime (`shell.module.${name}`)
-      // and cannot be resolved here; the enum it comes from is checked instead.
+      // A key built at runtime (`shell.module.${name}`, `'placement.' .. kind`)
+      // cannot be resolved here; the enum it comes from is checked instead.
       if (key !== undefined && !key.includes('${')) found.set(key, path);
     }
   }
@@ -151,9 +174,30 @@ if (!reference) {
   }
 
   // 5: every key the NUI asks for exists.
-  for (const [key, file] of await usedKeys(WEB_SRC)) {
+  const inNui = await usedKeys(WEB_SRC, /\.(ts|svelte)$/, /\bt\(\s*'([^']+)'/g, /\.test\.ts$/);
+
+  for (const [key, file] of inNui) {
     if (!reference.has(key)) {
       fail(`${file.replace(`${REPO}/`, '')}: t('${key}') has no entry in ${REFERENCE_LOCALE}.json`);
+    }
+  }
+
+  // 6: every key the Lua asks for exists.
+  // The trailing `[,)]` is what skips a key built by concatenation:
+  // `FredPD.t('error.' .. code)` is resolved at runtime, so the prefix on its
+  // own is not a key. The enum the suffix comes from is checked instead.
+  const inLua = await usedKeys(
+    RESOURCE_SRC,
+    /\.lua$/,
+    /FredPD\.t\(\s*'([^']+)'\s*[,)]/g,
+    /_spec\.lua$/,
+  );
+
+  for (const [key, file] of inLua) {
+    if (!reference.has(key)) {
+      fail(
+        `${file.replace(`${REPO}/`, '')}: FredPD.t('${key}') has no entry in ${REFERENCE_LOCALE}.json`,
+      );
     }
   }
 }

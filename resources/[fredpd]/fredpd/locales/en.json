@@ -16,13 +16,15 @@
       "intel": "Intelligence",
       "court": "Court",
       "personnel": "Personnel",
+      "comms": "Communications",
       "admin": "Administration"
     },
     "status": {
       "unit": "Unit {callsign}",
       "onDuty": "On duty",
       "offDuty": "Off duty",
-      "signedInAs": "Signed in as {name}"
+      "signedInAs": "Signed in as {name}",
+      "permissionsStale": "Permissions out of date"
     }
   },
   "error": {
@@ -36,5 +38,70 @@
     "restricted": "This record is restricted. Request access or use break-glass.",
     "stale_permissions": "Your permissions are out of date. Sign on again.",
     "internal": "Something went wrong on the server. The error has been logged."
+  },
+  "placement": {
+    "station_terminal": "Station terminal",
+    "property_terminal": "Property room terminal",
+    "lab_terminal": "Lab terminal",
+    "booking_terminal": "Booking terminal",
+    "dispatch_console": "Dispatch console",
+    "courthouse_terminal": "Courthouse terminal",
+    "motorpool": "Motor pool",
+    "evidence_bench": "Evidence bench",
+    "interaction": {
+      "prop": "Bind to a prop",
+      "ped": "Place a person",
+      "zone": "Mark an area"
+    },
+    "editor": {
+      "title": "Placements",
+      "newZone": "New here — area",
+      "newProp": "New here — bind to the prop I am looking at",
+      "newPed": "New here — place a person",
+      "move": "Move the nearest one to me",
+      "disable": "Switch off the nearest one",
+      "delete": "Delete the nearest one",
+      "pickKind": "What should this open?",
+      "pedModelTitle": "Person",
+      "pedModelLabel": "Model name",
+      "noProp": "No prop in view. Look directly at one and try again.",
+      "noneNearby": "No placement nearby.",
+      "created": "Placement created.",
+      "moved": "Placement moved.",
+      "disabled": "Placement switched off.",
+      "deleted": "Placement deleted.",
+      "deleteTitle": "Delete this placement?",
+      "deleteBody": "{kind}, {distance} m away. This cannot be undone."
+    }
+  },
+  "chat": {
+    "usage": "Write a message after the command.",
+    "suggestion": "Message the internal police channel",
+    "suggestionArg": "What to send"
+  },
+  "garage": {
+    "title": "Motor pool",
+    "returnVehicle": "Return a vehicle",
+    "drawn": "Vehicle {plate} signed out.",
+    "returned": "Vehicle {plate} returned.",
+    "noVehicle": "No vehicle here to return.",
+    "unknownModel": "That vehicle model is not available on this server."
+  },
+  "admin": {
+    "roleMap": {
+      "title": "Discord roles",
+      "intro": "Map a Discord role to a permission group. Roles are the only source of access; this decides what each one grants.",
+      "roleId": "Discord role ID",
+      "roleName": "Name (for display)",
+      "group": "Permission group",
+      "add": "Add mapping",
+      "remove": "Remove",
+      "empty": "No roles mapped yet. Until one is, nobody has access.",
+      "snapshotAge": "Discord last synced {seconds} s ago",
+      "snapshotMissing": "Discord has never synced. Check the gateway.",
+      "added": "Mapping added.",
+      "removed": "Mapping removed.",
+      "confirmRemove": "Remove this mapping? Anyone who had access only through it loses it immediately."
+    }
   }
 }

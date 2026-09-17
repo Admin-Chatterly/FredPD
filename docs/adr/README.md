@@ -16,3 +16,6 @@ When a decision changes `docs/FredPD.md`, the ADR and the spec edit go in the
 | [003](003-gateway-service.md) | A separate Node.js gateway service | Accepted |
 | [004](004-discord-permissions.md) | Discord roles as the only permission source | Accepted |
 | [005](005-esx-framework.md) | ESX as the target framework, behind a bridge | Accepted |
+| [006](006-in-game-placement-config.md) | World positions configured in game, not in config files | Accepted |
+| [007](007-police-chat-in-game-chat.md) | The internal police channel lives in the game chat | Accepted |
+| [008](008-coexist-with-p-policejob.md) | Coexist with p_policejob rather than replacing it | Accepted |

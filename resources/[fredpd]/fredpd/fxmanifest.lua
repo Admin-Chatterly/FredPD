@@ -27,11 +27,46 @@ server_scripts {
     -- Server-only. Never list this in files {}: it carries the gateway secret
     -- and anything else a client must not see (invariant 7).
     'config/server.lua',
+
+    -- Bridges load first: core and modules call them during boot.
     'server/bridges/framework.lua',
+    'server/bridges/policejob.lua',
+    'server/bridges/society.lua',
+
+    -- Core, in dependency order. route.lua last: it references the rest.
+    'server/core/db.lua',
+    'server/core/audit.lua',
+    'server/core/validate.lua',
+    'server/core/ratelimit.lua',
+    'server/core/agencies.lua',
+    'server/core/perms.lua',
+    'server/core/session.lua',
+    'server/core/push.lua',
+    'server/core/placements.lua',
+    'server/core/route.lua',
+
+    -- Modules: service (logic) and repo (SQL) before the routes that use them.
+    'server/modules/placements/service.lua',
+    'server/modules/placements/repo.lua',
+    'server/modules/placements/routes.lua',
+    'server/modules/chat/service.lua',
+    'server/modules/chat/repo.lua',
+    'server/modules/chat/routes.lua',
+    'server/modules/garage/service.lua',
+    'server/modules/garage/repo.lua',
+    'server/modules/garage/routes.lua',
+    'server/modules/admin/routes.lua',
+
     'server/main.lua',
 }
 
 client_scripts {
+    'client/bridges/ui.lua',
+    'client/core.lua',
+    'client/placements.lua',
+    'client/placement-editor.lua',
+    'client/chat.lua',
+    'client/garage.lua',
     'client/main.lua',
 }
 
