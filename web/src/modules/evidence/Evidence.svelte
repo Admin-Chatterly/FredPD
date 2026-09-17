@@ -107,7 +107,7 @@
 
       trace = {
         traceKey: key,
-        type: typeof message['type'] === 'string' ? message['type'] : '',
+        type: typeof message['type'] === 'string' && message['type'] !== '' ? message['type'] : null,
         sceneId: typeof message['sceneId'] === 'number' ? message['sceneId'] : null,
       };
     }),
@@ -378,7 +378,9 @@
     <form class="flex flex-wrap items-end gap-3 border border-[var(--color-border)] p-3" onsubmit={collect}>
       <p class="w-full text-xs">
         {t('evidence.collect.title')}
-        <span class="text-[var(--color-ink-muted)]">{t(`evidence.type.${trace.type}`)}</span>
+        {#if trace.type}
+          <span class="text-[var(--color-ink-muted)]">{t(`evidence.type.${trace.type}`)}</span>
+        {/if}
       </p>
 
       <label class="flex flex-col gap-1 text-xs">

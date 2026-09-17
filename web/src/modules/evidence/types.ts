@@ -66,6 +66,12 @@ export interface Scene {
  */
 export interface PendingTrace {
   traceKey: string;
-  type: string;
+  /**
+   * Null when the client's push carried no type. That is a legitimate state,
+   * not a defect to paper over with an empty string: the server reads the real
+   * type from its own grid, so a trace the client cannot name is still
+   * collectable. The form simply says nothing about what it is.
+   */
+  type: string | null;
   sceneId: number | null;
 }
