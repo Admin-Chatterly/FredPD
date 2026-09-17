@@ -271,7 +271,7 @@ route.define({
             -- would put something into the record that nobody can account for
             -- having been inside the perimeter.
             if scene.status ~= 'open' then
-                return route.refuse(FredPD.ErrorCode.CONFLICT, { sceneId = 'released' })
+                return route.refuse(FredPD.ErrorCode.CONFLICT, { sceneId = 'scene_released' })
             end
         end
 

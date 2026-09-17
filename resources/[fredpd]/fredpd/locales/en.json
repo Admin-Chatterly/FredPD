@@ -86,9 +86,10 @@
     "inherited_by_groups": "inherited by another group",
     "mapped_to_roles": "mapped to a Discord role",
     "too_many": "too many",
-    "released": "the scene has been released",
     "stale": "changed since this screen was loaded",
-    "model_changed": "the permissions changed while this was open"
+    "model_changed": "the permissions changed while this was open",
+    "scene_released": "the scene has been released",
+    "unattributed": "no owner on record for this trace"
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -526,7 +527,8 @@
         "own": "Own",
         "effective": "Effective",
         "roles": "Roles"
-      }
+      },
+      "version": "Version"
     },
     "tab": {
       "rolemap": "Role map",

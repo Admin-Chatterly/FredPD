@@ -86,9 +86,10 @@
     "inherited_by_groups": "ärvs av en annan grupp",
     "mapped_to_roles": "kopplad till en Discord-roll",
     "too_many": "för många",
-    "released": "brottsplatsen är hävd",
     "stale": "ändrat sedan sidan lästes in",
-    "model_changed": "behörigheterna ändrades medan sidan var öppen"
+    "model_changed": "behörigheterna ändrades medan sidan var öppen",
+    "scene_released": "brottsplatsen är hävd",
+    "unattributed": "ingen ägare registrerad för spåret"
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -526,7 +527,8 @@
         "own": "Egna",
         "effective": "Sammanlagda",
         "roles": "Roller"
-      }
+      },
+      "version": "Version"
     },
     "tab": {
       "rolemap": "Rollkoppling",

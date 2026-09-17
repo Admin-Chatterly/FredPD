@@ -26,6 +26,10 @@
     inherits: 'admin.groups.inherits',
     description: 'admin.groups.description',
     permissions: 'admin.groups.permissions',
+    // The refusal optimistic locking exists to produce. Without a label here
+    // fieldList falls back to the raw server field name, so the one message
+    // that has to be readable renders as "version".
+    version: 'admin.groups.version',
     _input: 'admin.groups.title',
   };
 
@@ -94,6 +98,13 @@
       await load();
     } else {
       failure = response;
+
+      // A conflict means somebody else saved first, so what is on this screen
+      // is out of date -- including the version, which means every further
+      // save would be refused too. Reloading is the only way out, and there is
+      // no refresh control to reach for. The draft is left alone: the
+      // administrator can still see what they were trying to write.
+      if (response.err === 'conflict') await load();
     }
 
     busy = false;

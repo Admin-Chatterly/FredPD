@@ -17,6 +17,37 @@ local function isSnowflake(value)
     return value:match('^%d+$') ~= nil
 end
 
+--- The seeded group that configures FredPD. It may be edited -- that is the
+--- point of the editor -- but it may not be renamed, deleted, or stripped of
+--- the keys that make the editor reachable. Locking yourself out of the
+--- permission editor means editing the database by hand to get back in.
+---
+--- Declared up here rather than beside the group editor because the role map
+--- reaches the same locked door by a shorter path: a group that still grants
+--- everything is worth nothing if no Discord role is mapped to it.
+local PROTECTED_GROUP <const> = 'admin'
+
+--- What `admin` must keep granting, however it is edited.
+local ADMIN_FLOOR <const> = { 'page.admin', 'admin.permissions.edit', 'admin.groups.edit' }
+
+--- Does this group, expanded, still let its holder reach the permission editor?
+---
+--- Asked of the cache rather than of a freshly loaded model: a role map write
+--- runs `perms.reload()` on the way out, so the cache is the state every other
+--- route will see, and it already carries inheritance expanded.
+local function reachesEditor(groupKey)
+    local granted = FredPD.Core.perms.permissionsOf(groupKey)
+    if not granted then return false end
+
+    for index = 1, #ADMIN_FLOOR do
+        if not FredPD.Core.perms.satisfies(granted, ADMIN_FLOOR[index]) then
+            return false
+        end
+    end
+
+    return true
+end
+
 route.define({
     name = 'admin.rolemap.list',
     perm = 'admin.permissions.edit',
@@ -141,6 +172,39 @@ route.define({
             return route.refuse(FredPD.ErrorCode.FORBIDDEN)
         end
 
+        -- The shortest path to the locked door the group editor guards at
+        -- length. That editor refuses an edit that stops `admin` granting the
+        -- keys which reach it; this route can leave `admin` granting all of
+        -- them and simply unmap the last Discord role that holds it, which
+        -- locks everyone out just as completely and in one call.
+        --
+        -- So: if this mapping is one that reaches the editor, some other
+        -- mapping in this agency must still do so afterwards. Checked against
+        -- what is really in the table rather than against the caller's own
+        -- roles, because an administrator removing their own last mapping is
+        -- the exact accident this exists to catch.
+        if reachesEditor(existing.groupKey) then
+            local others = db.query(
+                'SELECT group_key AS groupKey FROM fpd_role_map WHERE agency_id = ? AND id <> ?',
+                { session.agencyId, input.id }
+            )
+
+            local survives = false
+            for index = 1, #others do
+                if reachesEditor(others[index].groupKey) then
+                    survives = true
+                    break
+                end
+            end
+
+            if not survives then
+                FredPD.Core.audit.denied(
+                    session, 'admin.rolemap.delete', 'would_lock_out', 'role_map', tostring(input.id)
+                )
+                return route.refuse(FredPD.ErrorCode.FORBIDDEN, { id = 'would_lock_out' })
+            end
+        end
+
         db.execute('DELETE FROM fpd_role_map WHERE id = ?', { input.id })
 
         -- Revocation must be immediate: an open MDT loses its pages now, not on
@@ -196,15 +260,6 @@ route.define({
 --     `agency_id`). An edit here changes what the bundle means everywhere, and
 --     is checked against the permissions the editor holds in their own agency.
 -- =============================================================================
-
---- The seeded group that configures FredPD. It may be edited -- that is the
---- point of the editor -- but it may not be renamed, deleted, or stripped of
---- the keys that make the editor reachable. Locking yourself out of the
---- permission editor means editing the database by hand to get back in.
-local PROTECTED_GROUP <const> = 'admin'
-
---- What `admin` must keep granting, however it is edited.
-local ADMIN_FLOOR <const> = { 'page.admin', 'admin.permissions.edit', 'admin.groups.edit' }
 
 --- The permission catalogue (Appendix B).
 ---

@@ -41,6 +41,17 @@ local REQUIRED_TABLES <const> = {
     'fpd_forensic_index',
 }
 
+--- Columns a migration added to a table that already existed, which the table
+--- check above cannot see. One entry per such migration.
+local REQUIRED_COLUMNS <const> = {
+    -- 0003: which Discord role or permission group opens a fleet vehicle.
+    { table = 'fpd_fleet', column = 'required_group' },
+    { table = 'fpd_fleet', column = 'required_discord_role' },
+
+    -- 0004: optimistic locking for the permission group editor.
+    { table = 'fpd_permission_groups', column = 'version' },
+}
+
 --- Returns the names of any dependency that is not started.
 local function missingResources()
     local missing = {}
@@ -117,6 +128,7 @@ AddEventHandler('onResourceStart', function(resource)
     end
 
     FredPD.Core.db.verifySchema(REQUIRED_TABLES)
+    FredPD.Core.db.verifyColumns(REQUIRED_COLUMNS)
 
     FredPD.Core.agencies.reload()
     FredPD.Core.perms.reload()

@@ -57,7 +57,13 @@ const REASONS = new Set([
   'inherited_by_groups',
   'mapped_to_roles',
   'too_many',
-  'released',
+  // Not `released`: an evidence item's status is `released` too, and the codes
+  // share one namespace regardless of which field carried them, so the item
+  // would have been explained as a scene.
+  'scene_released',
+  // A trace the grid has no owner row for. Collection refuses rather than
+  // writing an owner row the CHECK forbids.
+  'unattributed',
 
   // Optimistic locking. `stale` is the record itself having moved on;
   // `model_changed` is the permission model as a whole, which the group editor

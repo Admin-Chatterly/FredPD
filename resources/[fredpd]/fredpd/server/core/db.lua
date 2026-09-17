@@ -79,4 +79,36 @@ function Db.verifySchema(required)
     end
 end
 
+--- The columns a later migration added to a table that already existed.
+---
+--- `verifySchema` above only asks whether a table is there, which is blind to
+--- a migration that adds a column to one. 0004 does exactly that, so a server
+--- on 0001-0003 passed the table check, reported its schema present, and then
+--- died on the first group read with a raw SQL error about an unknown column.
+--- Checking a table exists is not checking the schema is current.
+---
+--- @param required table list of { table = string, column = string }
+function Db.verifyColumns(required)
+    local missing = {}
+
+    for index = 1, #required do
+        local entry = required[index]
+        local found = Db.scalar(
+            [[SELECT COUNT(*) FROM information_schema.columns
+               WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?]],
+            { entry.table, entry.column }
+        )
+
+        if not found or found == 0 then
+            missing[#missing + 1] = ('%s.%s'):format(entry.table, entry.column)
+        end
+    end
+
+    if #missing > 0 then
+        error(('[fredpd] database is missing %s. Apply database/migrations in order.'):format(
+            table.concat(missing, ', ')
+        ))
+    end
+end
+
 FredPD.Core.db = Db
