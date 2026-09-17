@@ -5,8 +5,10 @@ ESX server already uses (spec 3.3).
 
 ## Migrations
 
-`0001_fredpd.sql` is the entire schema as first released — all 23 tables, in
-foreign-key order. A fresh install is one file.
+`0001_fredpd.sql` is the schema as first released — all 23 tables, in
+foreign-key order. `0002_evidence.sql` adds the ten tables section 8 needs:
+hidden biometrics and weapon signatures, scenes, evidence and its owner,
+custody, the lab queue and the forensic indexes.
 
 `migrations/` is **append-only**. Invariant 8: a migration that has shipped is
 never edited, not even to fix a typo in a comment. Correct it with a new
@@ -23,15 +25,9 @@ is the one moment such a rewrite is safe, and it has passed (ADR-009).
   itself to prove idempotency, on each push (spec 15).
 
 The migration runner and the `fpd_migrations` bookkeeping table land in M1
-(spec 17.2). Until then, apply them by hand:
-
-```
-mysql -u root fredpd < database/migrations/0001_fredpd.sql
-mysql -u root fredpd < database/seeds/0001_permissions.sql
-```
-
-Once later versions add migrations, run the whole directory in filename order
-instead — applying one twice does nothing:
+(spec 17.2). Until then, apply them by hand — the whole directory, in filename
+order. Applying a migration twice does nothing, so this is also the upgrade
+command:
 
 ```
 for f in database/migrations/*.sql; do mysql -u root fredpd < "$f"; done

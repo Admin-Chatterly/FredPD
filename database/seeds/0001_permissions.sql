@@ -50,6 +50,29 @@ ON DUPLICATE KEY UPDATE
 -- dependency obvious.
 -- -----------------------------------------------------------------------------
 
+-- -----------------------------------------------------------------------------
+-- Evidence, property and lab groups (spec 8)
+--
+-- Three roles rather than one, because section 8's whole point is that custody
+-- passes between people who are accountable separately. The officer who
+-- collects, the officer who stores and the analyst who tests are different
+-- jobs, and a chain of custody where they are the same person proves nothing.
+-- -----------------------------------------------------------------------------
+
+INSERT INTO `fpd_permission_groups` (`key`, `name`, `inherits`, `description`) VALUES
+    ('evidence_tech', 'Crime scene technician', NULL,
+     'Creates and processes scenes, collects evidence, uses forensic tools.'),
+    ('property_officer', 'Property room officer', NULL,
+     'Takes evidence into the property room, moves it, checks it in and out.'),
+    ('lab_analyst', 'Forensic analyst', NULL,
+     'Works the lab queue and performs analyses. Cannot release a report alone.'),
+    ('lab_supervisor', 'Forensic supervisor', 'lab_analyst',
+     'An analyst who may also technically review another analyst''s work and release the report.')
+ON DUPLICATE KEY UPDATE
+    `name`        = VALUES(`name`),
+    `inherits`    = VALUES(`inherits`),
+    `description` = VALUES(`description`);
+
 INSERT INTO `fpd_permission_groups` (`key`, `name`, `inherits`, `description`) VALUES
     ('intel_analyst', 'Intelligence analyst', NULL,
      'Reads and writes the intelligence register. Cannot see protected sources and cannot delete.'),
@@ -100,6 +123,45 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('admin', 'admin.branding.edit'),
     ('admin', 'admin.audit.view'),
     ('admin', 'garage.fleet.edit'),
+
+    -- The crime scene technician (8.4). Collecting is a specialist job: a
+    -- patrol officer who picks a casing up off the ground has not collected
+    -- evidence, they have contaminated a scene.
+    ('evidence_tech', 'page.evidence'),
+    ('evidence_tech', 'forensics.scene.create'),
+    ('evidence_tech', 'forensics.scene.release'),
+    ('evidence_tech', 'forensics.evidence.collect'),
+    ('evidence_tech', 'forensics.tools.use'),
+    ('evidence_tech', 'evidence.item.view'),
+
+    -- The property room (8.6). Note what is separate: intake and disposal are
+    -- not the same grant, because destroying evidence should be a decision
+    -- somebody is named for.
+    ('property_officer', 'page.evidence'),
+    ('property_officer', 'evidence.item.view'),
+    ('property_officer', 'evidence.item.intake'),
+    ('property_officer', 'evidence.item.transfer'),
+    ('property_officer', 'evidence.item.checkout'),
+    ('property_officer', 'evidence.item.reseal'),
+    ('property_officer', 'evidence.audit.run'),
+
+    -- The lab (8.7).
+    ('lab_analyst', 'page.lab'),
+    ('lab_analyst', 'evidence.item.view'),
+    ('lab_analyst', 'lab.request.create'),
+    ('lab_analyst', 'lab.queue.view'),
+    ('lab_analyst', 'lab.analysis.perform'),
+
+    -- Technical review by a second analyst before release (8.7). Held apart
+    -- from performing the analysis on purpose: reviewing your own work is not
+    -- a review.
+    ('lab_supervisor', 'lab.analysis.review'),
+    ('lab_supervisor', 'lab.report.release'),
+
+    -- Command signs off on releasing and disposing of evidence.
+    ('command', 'evidence.item.view'),
+    ('command', 'evidence.item.release'),
+    ('command', 'evidence.item.dispose'),
 
     -- The analyst: the whole register, read and write.
     ('intel_analyst', 'page.intel'),

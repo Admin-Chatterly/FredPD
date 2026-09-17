@@ -8,8 +8,8 @@ finns i [`handbok.sv.md`](handbok.sv.md).
 > och **underrättelsemodulen** (avsnitt 11b). Register, ledningscentral, bevis,
 > laboratorium och domstol kommer i M2–M6 (se avsnitt 17 i `FredPD.md`).
 >
-> **Hela installationen är fyra saker:** kopiera resursen, fyll i
-> `config/server.lua`, kör en SQL-fil, och kör uppstartskommandot i spelet.
+> **Hela installationen är fyra saker:** kopiera resursen, kör SQL-filerna,
+> fyll i `config/server.lua`, och kör uppstartskommandot i spelet.
 > Inga convars, ingen Node-tjänst, inget cron-jobb (ADR-010).
 
 ---
@@ -65,16 +65,9 @@ Kopiera sedan mappen `resources/[fredpd]/` till serverns resursmapp.
 
 ## 3. Steg 2 — Databas
 
-Två filer, i den här ordningen — hela schemat ligger i en enda migration:
-
-```bash
-mysql -u root DITT_ESX_SCHEMA < database/migrations/0001_fredpd.sql
-mysql -u root DITT_ESX_SCHEMA < database/seeds/0001_permissions.sql
-```
-
-Kommer det fler migrationer i senare versioner körs de i nummerordning efter
-den här. Då går det lika bra att köra hela mappen — inget händer när en
-migration körs igen:
+Kör hela mappen i nummerordning, migrationerna först och seed-filerna sedan.
+Inget händer om en migration körs igen, så det går bra att köra om det här
+kommandot efter en uppdatering:
 
 ```bash
 for f in database/migrations/*.sql; do mysql -u root DITT_ESX_SCHEMA < "$f"; done
@@ -105,6 +98,10 @@ förrän du gjort det — vilket är rätt utgångsläge.
 | `intel_analyst` | — | Läsa och skriva underrättelseregistret |
 | `intel_handler` | `intel_analyst` | Dessutom se skyddade källor och slå ihop dubbletter |
 | `intel_command` | `intel_handler` | Dessutom radera poster ur registret |
+| `evidence_tech` | — | Skapa och bearbeta brottsplatser, säkra spår |
+| `property_officer` | — | Ta in, flytta och kvittera ut bevis i beslagsrummet |
+| `lab_analyst` | — | Arbeta i laboratoriekön och utföra analyser |
+| `lab_supervisor` | `lab_analyst` | Dessutom granska och frisläppa analysrapporter |
 
 `admin` ärver medvetet **inte** `patrol`. Att administrera systemet är inte
 samma sak som att vara behörig att läsa register. Behöver du båda sakerna ger du
@@ -121,18 +118,17 @@ ensure ox_lib
 ensure oxmysql
 ensure es_extended
 
-ensure fredpd
 ensure fredpd_assets
-ensure fredpd_forensics
-ensure fredpd_surveillance
+ensure fredpd
 ```
 
 Inga convars behövs. All konfiguration ligger i en enda fil — se nästa steg.
 
-> Kör inte `ensure fredpd_forensics` eller `fredpd_surveillance` ännu. De är
+> `fredpd_forensics` och `fredpd_surveillance` ska **inte** startas ännu. De är
 > tomma skal för M3 och M5 och kräver `ox_target` respektive `pma-voice`, så
 > utan dem vägrar FXServer starta dem och fyller konsolen med fel som ser ut som
-> en trasig installation.
+> en trasig installation. Bevisregistret i sig ligger i kärnresursen (ADR-011),
+> inte i dem.
 
 ---
 

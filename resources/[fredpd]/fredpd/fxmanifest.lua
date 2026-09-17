@@ -57,6 +57,7 @@ server_scripts {
     'server/modules/garage/service.lua',
     'server/modules/garage/repo.lua',
     'server/modules/garage/routes.lua',
+    'server/modules/evidence/service.lua',
     'server/modules/intel/service.lua',
     'server/modules/intel/repo.lua',
     'server/modules/intel/routes.lua',

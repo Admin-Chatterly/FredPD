@@ -21,3 +21,4 @@ When a decision changes `docs/FredPD.md`, the ADR and the spec edit go in the
 | [008](008-coexist-with-p-policejob.md) | Coexist with p_policejob rather than replacing it | Accepted |
 | [009](009-single-baseline-migration.md) | The schema ships as one baseline migration | Accepted |
 | [010](010-discord-sync-in-fxserver.md) | Discord role sync runs in FXServer, not in the gateway | Accepted |
+| [011](011-evidence-records-live-in-the-core.md) | Evidence records live in the core; satellites hold only in-world mechanics | Accepted |
