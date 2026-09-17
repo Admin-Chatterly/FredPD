@@ -272,7 +272,16 @@
 
     const done = await submit(
       'evidence.transfer',
-      { id: item.id, destination, toParty: toParty.trim() || undefined, reason: transferReason.trim() },
+      {
+        id: item.id,
+        destination,
+        // Every destination but `locker` is a check-out at the property room
+        // counter, and the server requires the terminal for those. Sent for all
+        // of them: a locker deposit simply ignores it.
+        placementId: openedAt ?? undefined,
+        toParty: toParty.trim() || undefined,
+        reason: transferReason.trim(),
+      },
       refreshItem,
     );
 

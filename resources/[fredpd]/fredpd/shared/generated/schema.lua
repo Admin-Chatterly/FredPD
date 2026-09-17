@@ -311,6 +311,7 @@ FredPD.Schema = {
     EvidenceTransfer = {
         id = { type = 'integer', required = true, min = 1 },
         destination = { type = 'enum', required = true, values = { 'locker', 'lab', 'court', 'investigator' } },
+        placementId = { type = 'integer', required = false, min = 1 },
         toParty = { type = 'string', required = false, max = 191 },
         reason = { type = 'string', required = true, min = 1, max = 255 },
     },

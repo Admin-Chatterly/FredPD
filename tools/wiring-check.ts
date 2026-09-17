@@ -221,10 +221,21 @@ for (const file of await walk(core)) {
   const source = await readFile(file, 'utf8');
   const shown = relative(REPO, file);
 
-  // One `route.define({ … })` call: everything up to the handler, which is
-  // where `name`, `perm` and `schema` all live.
-  for (const define of source.matchAll(/route\.define\(\{([\s\S]*?)handler\s*=/g)) {
+  // One `route.define({ … })` call. The definition up to `handler =` is where
+  // `name`, `perm` and `schema` live; the slice after it is the handler, read
+  // only to see which input fields are actually used.
+  const defines = [...source.matchAll(/route\.define\(\{([\s\S]*?)handler\s*=/g)];
+
+  for (let index = 0; index < defines.length; index += 1) {
+    const define = defines[index];
+    if (!define) continue;
+
     const body = define[1] ?? '';
+
+    // Everything from this handler to the start of the next route definition.
+    const from = (define.index ?? 0) + define[0].length;
+    const to = defines[index + 1]?.index ?? source.length;
+    const handler = source.slice(from, to);
 
     const name = /\bname\s*=\s*'([^']+)'/.exec(body)?.[1];
     if (name === undefined) continue;
@@ -240,7 +251,13 @@ for (const file of await walk(core)) {
     // unguarded. This has shipped twice: `evidence.intake`, where the property
     // room counter refused every accept and reject, and the lab routes, where
     // pinning them to the bench refused every analysis.
-    const pinned = /\baccessPoint\s*=\s*'[^']+'/.test(body);
+    // Pinned by the route's own context, or by the handler reading the
+    // placement itself — `evidence.transfer` does the latter, because which
+    // destinations need a terminal depends on the destination. Either way the
+    // field has to survive validation to arrive.
+    const pinned =
+      /\baccessPoint\s*=\s*'[^']+'/.test(body) || /\binput\.placementId\b/.test(handler);
+
     if (pinned) {
       if (schema === undefined) {
         fail(`${shown}: route '${name}' is pinned to a placement but declares no schema, so it can never receive a placementId`);

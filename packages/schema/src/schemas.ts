@@ -297,6 +297,12 @@ export const schemas = {
   EvidenceTransfer: {
     id: { type: 'integer', required: true, min: 1 },
     destination: { type: 'enum', required: true, values: EVIDENCE_DESTINATIONS },
+    // Optional here and required in the handler, because which destinations
+    // need it depends on the destination: checking an item out to the lab, a
+    // court or an investigator happens at the property room counter, while a
+    // locker deposit is the collecting officer putting it away before the
+    // property room has seen it and has no terminal to name.
+    placementId: { type: 'integer', required: false, min: 1 },
     toParty: { type: 'string', required: false, max: 191 },
     // A transfer with no reason is the gap a defence lawyer reads out loud.
     reason: { type: 'string', required: true, min: 1, max: 255 },
