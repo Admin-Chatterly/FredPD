@@ -98,9 +98,19 @@ route.define({
         -- offers the air unit's helicopter to every officer and then refuses it
         -- is a refusal waiting to happen, and the server decides what is
         -- visible (invariant 4).
-        return {
-            fleet = service.drawableFleet(fleet, gateChecks(session)),
-        }
+        local drawable = service.drawableFleet(fleet, gateChecks(session))
+        local offered = {}
+
+        -- Only what the menu draws with. The gating columns decided this list;
+        -- they are not part of it. A Discord role id is configuration, and the
+        -- client has no use for one -- it would only tell an officer which role
+        -- to go and ask for.
+        for index = 1, #drawable do
+            local entry = drawable[index]
+            offered[index] = { model = entry.model, labelKey = entry.labelKey, livery = entry.livery }
+        end
+
+        return { fleet = offered }
     end,
 })
 

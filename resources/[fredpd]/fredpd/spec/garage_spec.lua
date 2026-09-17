@@ -630,6 +630,24 @@ describe('garage routes', function()
             assert.is_nil(models(routes['garage.fleet'].handler(session, {})).fbi)
         end)
 
+        it('sends the menu what it draws with and not the gate itself', function()
+            -- The gating columns decide the list; they are not part of it. A
+            -- role id in the payload tells an officer which role to go and ask
+            -- for, and the menu has no use for it.
+            local routes, session = wire({
+                fleet = gatedFleet(), groups = GROUPS, roles = { AIR_ROLE },
+            })
+
+            local listed = routes['garage.fleet'].handler(session, {}).fleet
+
+            for index = 1, #listed do
+                assert.is_nil(listed[index].requiredDiscordRole)
+                assert.is_nil(listed[index].requiredGroup)
+                assert.is_not_nil(listed[index].model)
+                assert.is_not_nil(listed[index].labelKey)
+            end
+        end)
+
         it('reads the Discord snapshot once, however large the fleet', function()
             -- Forty vehicles must not become forty round trips (spec 12).
             local fleet = {}
