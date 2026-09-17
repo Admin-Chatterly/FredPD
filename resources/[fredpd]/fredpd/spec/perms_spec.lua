@@ -99,6 +99,41 @@ describe('perms', function()
         end)
     end)
 
+    describe('missing', function()
+        it('reports nothing when the actor already holds everything', function()
+            local required = { ['page.admin'] = true, ['admin.placement.edit'] = true }
+            local effective = { ['page.admin'] = true, ['admin.placement.edit'] = true, ['extra'] = true }
+
+            assert.are.same({}, perms.missing(required, effective))
+        end)
+
+        it('reports what the actor is short of', function()
+            -- This is the escalation guard: an administrator may not map a role
+            -- to a group worth more than what they themselves hold.
+            local required = { ['page.admin'] = true, ['rms.person.view'] = true }
+            local effective = { ['page.admin'] = true }
+
+            assert.are.same({ 'rms.person.view' }, perms.missing(required, effective))
+        end)
+
+        it('accepts a wildcard the actor holds', function()
+            local required = { ['rms.person.view'] = true, ['rms.person.edit'] = true }
+            local effective = { ['rms.*'] = true }
+
+            assert.are.same({}, perms.missing(required, effective))
+        end)
+
+        it('reports every gap, sorted, so the message is deterministic', function()
+            local required = { ['b.two'] = true, ['a.one'] = true }
+
+            assert.are.same({ 'a.one', 'b.two' }, perms.missing(required, {}))
+        end)
+
+        it('reports nothing for an empty requirement', function()
+            assert.are.same({}, perms.missing({}, {}))
+        end)
+    end)
+
     describe('satisfies', function()
         it('matches an exact permission', function()
             assert.is_true(perms.satisfies({ ['page.records'] = true }, 'page.records'))

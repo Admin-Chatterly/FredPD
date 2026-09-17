@@ -63,7 +63,11 @@ function Session.open(src)
         name = officer.name or (character.firstName .. ' ' .. character.lastName),
         identifier = character.identifier,
         roleCount = #roles,
-        snapshotAge = snapshotAge,
+        -- Stored as *when* the snapshot was taken, not how old it was at open.
+        -- An age frozen at open never grows, so the outage policy below would
+        -- never fire for anyone already connected -- which is exactly the
+        -- window a gateway outage opens (spec 4.2).
+        snapshotAt = snapshotAge and (os.time() - snapshotAge) or nil,
         permissions = FredPD.Core.perms.effectiveFor(discordId, officer.agency_id),
         openedAt = os.time(),
     }
@@ -93,7 +97,7 @@ function Session.refreshAll()
     for src, session in pairs(sessions) do
         session.permissions = FredPD.Core.perms.effectiveFor(session.discordId, session.agencyId)
         local _, age = FredPD.Core.perms.memberRoles(session.discordId)
-        session.snapshotAge = age
+        session.snapshotAt = age and (os.time() - age) or nil
 
         FredPD.Core.push.toSession(src, 'fredpd:permissions', {
             modules = Session.allowedModules(session),
@@ -101,16 +105,33 @@ function Session.refreshAll()
     end
 end
 
---- True when the permission snapshot is too old to trust for a sensitive action
+--- How old this session's permission snapshot is, right now.
+---
+--- Returns nil when the gateway has never seen this member, which every caller
+--- below treats as maximally stale: we know nothing about their roles.
+function Session.snapshotAge(session)
+    if session.snapshotAt == nil then return nil end
+
+    return os.time() - session.snapshotAt
+end
+
+--- True when the snapshot is too old to trust for a sensitive action
 --- (spec 4.2). Degrades toward less access, never toward more.
 function Session.isStale(session)
-    local maxAge = FredPD.Config.server.discord.maxSnapshotAgeSeconds
+    local age = Session.snapshotAge(session)
+    if age == nil then return true end
 
-    -- No snapshot at all is maximally stale: the gateway has never seen this
-    -- member, so we know nothing about their roles.
-    if session.snapshotAge == nil then return true end
+    return age > FredPD.Config.server.discord.sensitiveStaleAfterSeconds
+end
 
-    return session.snapshotAge > maxAge
+--- True when the snapshot is old enough that the session may only read
+--- (spec 4.2, second tier). A gateway that has been down for hours must not
+--- leave officers writing records against role data nobody can vouch for.
+function Session.isReadOnly(session)
+    local age = Session.snapshotAge(session)
+    if age == nil then return true end
+
+    return age > FredPD.Config.server.discord.readOnlyAfterSeconds
 end
 
 --- Which modules this session may open, for the NUI's module rail.

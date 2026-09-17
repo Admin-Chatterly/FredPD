@@ -12,8 +12,10 @@ route.define({
     name = 'placement.list',
     perm = 'admin.placement.edit',
     schema = 'PlacementList',
-    handler = function(_session, _input)
-        return { placements = repo.all() }
+    handler = function(session, _input)
+        -- Scoped on the server, not by the field the client sent: `agencyId` in
+        -- the input is a filter request, never an authorisation (invariant 4).
+        return { placements = repo.forAgency(session.agencyId) }
     end,
 })
 
@@ -21,6 +23,7 @@ route.define({
     name = 'placement.create',
     perm = 'admin.placement.edit',
     schema = 'PlacementCreate',
+    writes = true,
     sensitive = true,
     audit = 'placement.created',
     subjectType = 'placement',
@@ -49,6 +52,7 @@ route.define({
     name = 'placement.update',
     perm = 'admin.placement.edit',
     schema = 'PlacementUpdate',
+    writes = true,
     sensitive = true,
     audit = 'placement.updated',
     subjectType = 'placement',
@@ -64,6 +68,10 @@ route.define({
         local existing = repo.byId(input.id)
         if not existing then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
 
+        -- A shared placement (NULL agency, spec 3.10) is editable by any
+        -- agency's administrator, deliberately: somebody has to be able to
+        -- manage it, and there is no shared-administrator role. It is the one
+        -- cross-agency write in the module, and it is audited like the rest.
         local usable = service.isUsableBy(existing, session.agencyId)
         if not usable and existing.agencyId ~= nil then
             return route.refuse(FredPD.ErrorCode.FORBIDDEN)
@@ -90,6 +98,7 @@ route.define({
     name = 'placement.delete',
     perm = 'admin.placement.edit',
     schema = 'PlacementDelete',
+    writes = true,
     sensitive = true,
     audit = 'placement.deleted',
     subjectType = 'placement',

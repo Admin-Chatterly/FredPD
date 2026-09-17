@@ -50,6 +50,7 @@ route.define({
     name = 'admin.rolemap.create',
     perm = 'admin.permissions.edit',
     schema = 'RoleMapCreate',
+    writes = true,
     -- Granting permissions on a stale snapshot is exactly the case spec 4.2
     -- blocks: the roles we would be mapping against may already be wrong.
     sensitive = true,
@@ -68,9 +69,22 @@ route.define({
             return route.refuse(FredPD.ErrorCode.FORBIDDEN)
         end
 
-        local group = db.single('SELECT `key` FROM fpd_permission_groups WHERE `key` = ?', { input.groupKey })
-        if not group then
+        local granted = FredPD.Core.perms.permissionsOf(input.groupKey)
+        if not granted then
             return route.refuse(FredPD.ErrorCode.INVALID, { groupKey = 'unknown' })
+        end
+
+        -- An administrator may not hand out more than they hold. Without this,
+        -- `admin.permissions.edit` is self-escalation in one call: map a role
+        -- you already have to any group, including one carrying the record
+        -- clearance the seed deliberately keeps out of `admin` (spec 4.3,
+        -- Appendix C). Auditing it afterwards is not the same as preventing it.
+        local missing = FredPD.Core.perms.missing(granted, session.permissions)
+        if #missing > 0 then
+            FredPD.Core.audit.denied(
+                session, 'admin.rolemap.create', 'escalation:' .. missing[1], 'role_map'
+            )
+            return route.refuse(FredPD.ErrorCode.FORBIDDEN)
         end
 
         local existing = db.single(
@@ -109,6 +123,7 @@ route.define({
     name = 'admin.rolemap.delete',
     perm = 'admin.permissions.edit',
     schema = 'RoleMapDelete',
+    writes = true,
     sensitive = true,
     audit = 'rolemap.deleted',
     subjectType = 'role_map',

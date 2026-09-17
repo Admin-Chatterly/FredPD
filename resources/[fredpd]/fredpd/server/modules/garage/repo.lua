@@ -33,13 +33,15 @@ function Repo.log(action, session, model, plate, placementId)
     )
 end
 
---- The most recent draw of a plate that has not been returned since.
+--- The most recent motor pool event for a plate, whether a draw or a return.
 ---
---- Used to check a vehicle being returned actually came from the motor pool,
---- rather than being any emergency vehicle the officer found in the street.
-function Repo.outstandingDraw(agencyId, plate)
+--- The caller needs both: a plate whose latest event is a `return` has already
+--- been handed back, and must not be returnable again. Filtering to draws here
+--- would hide that and let one plate be returned repeatedly -- each call writing
+--- another log row and releasing the vehicle from the society again.
+function Repo.latestEvent(agencyId, plate)
     return FredPD.Core.db.single(
-        [[SELECT id, model, discord_id AS discordId, occurred_at AS occurredAt
+        [[SELECT id, action, model, discord_id AS discordId, occurred_at AS occurredAt
             FROM fpd_motorpool_log
            WHERE agency_id = ? AND plate = ?
            ORDER BY id DESC

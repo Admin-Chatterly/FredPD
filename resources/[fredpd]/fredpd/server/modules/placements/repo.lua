@@ -25,6 +25,21 @@ function Repo.all()
     return rows
 end
 
+--- Placements one agency may see: its own, plus the shared ones.
+---
+--- `all()` stays for the runtime cache, which needs every placement in order to
+--- answer proximity checks for any session. Reads that answer a *client* go
+--- through here, so an admin in one agency is not shown another's coordinates.
+function Repo.forAgency(agencyId)
+    local rows = FredPD.Core.db.query(
+        SELECT .. ' WHERE agency_id = ? OR agency_id IS NULL ORDER BY kind, id',
+        { agencyId }
+    )
+
+    for index = 1, #rows do normalize(rows[index]) end
+    return rows
+end
+
 function Repo.byId(id)
     return normalize(FredPD.Core.db.single(SELECT .. ' WHERE id = ?', { id }))
 end

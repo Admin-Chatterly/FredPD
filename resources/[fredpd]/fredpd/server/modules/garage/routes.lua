@@ -41,6 +41,7 @@ route.define({
     schema = 'GarageDraw',
     context = { onDuty = true, accessPoint = 'motorpool' },
     limit = { per = 10, window = 60 },
+    writes = true,
     audit = 'garage.drawn',
     subjectType = 'vehicle',
     auditDetail = function(input, result)
@@ -78,6 +79,7 @@ route.define({
     perm = 'garage.vehicle.return',
     schema = 'GarageReturn',
     context = { onDuty = true, accessPoint = 'motorpool' },
+    writes = true,
     audit = 'garage.returned',
     subjectType = 'vehicle',
     auditDetail = function(input)
@@ -85,17 +87,25 @@ route.define({
     end,
     handler = function(session, input)
         local plate = input.plate:upper()
-        local outstanding = repo.outstandingDraw(session.agencyId, plate)
+        local latest = repo.latestEvent(session.agencyId, plate)
 
         -- Only a vehicle this agency's motor pool actually issued can be
         -- returned to it. Otherwise any emergency vehicle found in the street
         -- could be handed in here.
-        if not outstanding then
+        if not latest then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
         end
 
+        -- And only once. A plate whose last event is already a return has been
+        -- handed back; accepting it again would write another log row and
+        -- release the vehicle from the society a second time, which is how the
+        -- record of who had what out gets muddied (spec 7.31).
+        if latest.action ~= 'draw' then
+            return route.refuse(FredPD.ErrorCode.CONFLICT)
+        end
+
         FredPD.Bridge.society.releaseVehicle(session.agencyId, plate)
-        repo.log('return', session, outstanding.model, plate, input.placementId)
+        repo.log('return', session, latest.model, plate, input.placementId)
 
         return { plate = plate }
     end,

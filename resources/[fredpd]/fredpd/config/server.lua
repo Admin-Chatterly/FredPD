@@ -27,8 +27,14 @@ FredPD.Config.server = {
     --- Discord is the only permission source (invariant 2).
     discord = {
         guildId = GetConvar('fredpd:discord_guild', ''),
-        --- How stale a permission snapshot may get before the session is asked
-        --- to refresh rather than trusted (spec 4.2).
-        maxSnapshotAgeSeconds = 300,
+
+        --- Outage policy (spec 4.2). Both tiers degrade toward *less* access:
+        --- a gateway that stops answering must never widen what anyone can do.
+        ---
+        --- Past this, sensitive actions (approvals, releases, deletions,
+        --- intelligence and surveillance) are refused.
+        sensitiveStaleAfterSeconds = 15 * 60,
+        --- Past this, the session is read-only: nothing that changes state.
+        readOnlyAfterSeconds = 6 * 60 * 60,
     },
 }

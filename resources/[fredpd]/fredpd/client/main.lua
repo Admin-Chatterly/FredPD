@@ -22,16 +22,32 @@ RegisterNUICallback('fredpd:close', function(_, cb)
     cb({ ok = true })
 end)
 
---- The NUI calls a route. Everything it asks for goes through the route layer,
---- with the session, permission and context checked server-side (invariant 3).
-RegisterNUICallback('fredpd:route', function(data, cb)
-    if type(data) ~= 'table' or type(data.route) ~= 'string' then
-        cb({ ok = false, err = FredPD.ErrorCode.INVALID })
-        return
-    end
+--- Routes the NUI is allowed to call.
+---
+--- One callback per name, rather than a single "call any route" proxy: spec
+--- 11.2 bans the generic form, and this is the one place you can read what the
+--- interface is able to reach. The route layer re-checks session, permission,
+--- context, rate limit and schema regardless, so this is defence in depth --
+--- but a proxy would also make that list unknowable.
+---
+--- The name is also the NUI callback name, because the web bridge addresses a
+--- route as `https://fredpd/<route>`.
+local NUI_ROUTES <const> = {
+    'session.get',
+    'chat.history',
+    'admin.rolemap.list',
+    'admin.rolemap.create',
+    'admin.rolemap.delete',
+    'placement.list',
+    'placement.update',
+    'placement.delete',
+}
 
-    cb(FredPD.Client.core.call(data.route, data.body))
-end)
+for _, name in ipairs(NUI_ROUTES) do
+    RegisterNUICallback(name, function(data, cb)
+        cb(FredPD.Client.core.call(name, data))
+    end)
+end
 
 AddEventHandler('fredpd:toggleInterface', function()
     setOpen(not isOpen)

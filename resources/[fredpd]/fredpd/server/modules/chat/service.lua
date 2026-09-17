@@ -12,12 +12,22 @@ local Chat = {}
 --- Matches fpd_chat_messages.body and the ChatSend schema.
 local MAX_BODY <const> = 512
 
---- Strips anything that would let a sender paint the chat box or forge a prefix.
+--- Strips anything that would let a sender paint the chat box, forge a prefix,
+--- or inject markup into another officer's client.
 ---
 --- FiveM colour codes are `^1`..`^9`; GTA text tokens are `~r~`, `~b~` and so
---- on. Both render in the chat box, so both are removed rather than escaped:
---- there is no legitimate reason for an officer's message to contain them, and
---- leaving either in would let a sender imitate the server-generated prefix.
+--- on. Both render in the chat box, so both are removed: there is no legitimate
+--- reason for an officer's message to contain them, and leaving either in would
+--- let a sender imitate the server-generated prefix.
+---
+--- Removal **loops until the string stops changing**. A single `gsub` pass is
+--- not enough, because it never re-scans its own output: `^^11` loses the inner
+--- `^1` and leaves a live `^1` behind. Looping closes that, and terminates
+--- because every pass either shortens the string or changes nothing.
+---
+--- `<` and `>` go too. The stock chat resource renders message bodies as HTML
+--- -- that is how `^1` becomes a coloured span -- so an unescaped tag from one
+--- officer lands as markup in every other officer's CEF (invariant 10, §11.3).
 ---
 --- @param body string
 --- @return string|nil cleaned, nil when nothing usable is left
@@ -25,8 +35,17 @@ function Chat.sanitize(body)
     if type(body) ~= 'string' then return nil end
 
     local cleaned = body
-        :gsub('%^%d', '')      -- ^1 .. ^9
-        :gsub('~%a+~', '')     -- ~r~, ~b~, ~HUD_COLOUR~ …
+    local previous
+
+    repeat
+        previous = cleaned
+        cleaned = cleaned
+            :gsub('%^%d', '')    -- ^1 .. ^9
+            :gsub('~%a+~', '')   -- ~r~, ~b~, ~HUD_COLOUR~ …
+            :gsub('[<>]', '')    -- markup
+    until cleaned == previous
+
+    cleaned = cleaned
         :gsub('[%c]', ' ')     -- newlines and control characters
         :gsub('%s+', ' ')      -- collapse runs of whitespace
         :gsub('^%s*(.-)%s*$', '%1')

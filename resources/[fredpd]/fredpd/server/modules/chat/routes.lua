@@ -17,6 +17,7 @@ route.define({
     -- Tighter than the default: this route writes to a chat box shared with
     -- every other resource, so it is the easiest thing in FredPD to spam.
     limit = { per = 8, window = 10 },
+    writes = true,
     handler = function(session, input)
         local body = service.sanitize(input.body)
         if not body then
@@ -48,6 +49,13 @@ route.define({
     name = 'chat.history',
     perm = 'comms.pdchat.view',
     schema = 'ChatHistory',
+    -- Reading other officers' stored messages is a read of personal data, and
+    -- spec 11 audits those too. The count goes in the entry, never the bodies:
+    -- an audit log that copies the messages defeats the point of protecting them.
+    audit = 'chat.history.read',
+    auditDetail = function(_input, result)
+        return { count = #result.messages }
+    end,
     handler = function(session, input)
         return { messages = repo.recent(session.agencyId, input.limit or 50) }
     end,

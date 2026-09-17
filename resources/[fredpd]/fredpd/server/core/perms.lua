@@ -188,6 +188,35 @@ function Perms.effectiveFor(discordId, agencyId)
     return Perms.computeEffective(roleIds, rolesToGroups, cache.groupPermissions)
 end
 
+--- Permissions in `required` that `effective` does not already satisfy.
+---
+--- Used to stop an administrator granting a group that is worth more than what
+--- they hold themselves. `admin.permissions.edit` lets someone map roles to
+--- groups; without this, it also lets them map a role they hold to any group,
+--- including one carrying record clearance the seed deliberately withheld from
+--- `admin` (spec 4.3, Appendix C).
+---
+--- @param required table set of permission keys
+--- @param effective table set the actor holds
+--- @return table sorted list of what is missing; empty means the actor may grant it
+function Perms.missing(required, effective)
+    local missing = {}
+
+    for permission in pairs(required) do
+        if not Perms.satisfies(effective, permission) then
+            missing[#missing + 1] = permission
+        end
+    end
+
+    table.sort(missing)
+    return missing
+end
+
+--- The expanded permission set of one group, or nil when it does not exist.
+function Perms.permissionsOf(groupKey)
+    return cache.groupPermissions[groupKey]
+end
+
 --- Exposed for the admin screen and for tests.
 function Perms.groupKeys()
     local keys = {}

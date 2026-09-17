@@ -30,6 +30,24 @@ describe('chat', function()
             assert.are.equal('careful', chat.sanitize('~r~careful~s~'))
         end)
 
+        it('cannot be defeated by nesting the markers', function()
+            -- gsub is a single pass and never re-scans its output, so one pass
+            -- over `^^11` removes the inner `^1` and leaves a live `^1` behind.
+            -- Removal loops until the string stops changing, which closes that.
+            assert.are.equal('test', chat.sanitize('^^11 test'))
+            assert.are.equal('test', chat.sanitize('~~r~r~ test'))
+            assert.are.equal('test', chat.sanitize('^^11 ~~r~r~ test'))
+        end)
+
+        it('strips angle brackets, so a message cannot carry markup', function()
+            -- The stock chat resource renders bodies as HTML; an unescaped tag
+            -- from one officer would land as markup in every other officer's
+            -- client (invariant 10).
+            assert.are.equal('scriptalert(1)/script', chat.sanitize('<script>alert(1)</script>'))
+            assert.is_not.matches('<', chat.sanitize('<img src=x onerror=alert(1)>'))
+            assert.is_not.matches('>', chat.sanitize('<img src=x onerror=alert(1)>'))
+        end)
+
         it('cannot be used to forge another officer\'s prefix', function()
             local forged = chat.sanitize('^5 12-99 | Chief Vega ^0 stand down')
 

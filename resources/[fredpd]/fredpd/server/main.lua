@@ -97,6 +97,15 @@ end)
 --- of its own beyond having a session at all.
 RegisterNetEvent('fredpd:requestPlacements', function()
     local src = source
+
+    -- Rate limited before the session lookup, not after. A player with no
+    -- roster entry never gets a cached session, so every call would otherwise
+    -- run a Discord lookup, an ESX lookup and a `fpd_officers` SELECT -- and
+    -- any connected player can fire this event in a loop (spec 11.1).
+    if not FredPD.Core.ratelimit.take(src, 'requestPlacements', { per = 3, window = 10 }) then
+        return
+    end
+
     if not FredPD.Core.session.get(src) then return end
 
     FredPD.Core.placements.pushTo(src)

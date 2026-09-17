@@ -76,6 +76,7 @@ end
 ---   context table|nil   context conditions
 ---   limit   table|nil   { per, window }; defaults to the server config
 ---   audit   string|nil  action name written to the audit log on success
+---   writes  boolean|nil  changes state; refused in read-only mode (4.2)
 ---   sensitive boolean|nil  refuse when the Discord snapshot is stale (4.2)
 ---   handler function(session, input) -> data
 function Route.define(definition)
@@ -106,11 +107,17 @@ function Route.define(definition)
             return { ok = false, err = FredPD.ErrorCode.NO_SESSION }
         end
 
-        -- 2. Staleness. Sensitive routes refuse outright on an old snapshot;
-        --    ordinary ones proceed, because degrading to read-only is the
-        --    policy, not locking everyone out (spec 4.2).
+        -- 2. Staleness, in the two tiers spec 4.2 defines. Both degrade toward
+        --    less access: a gateway that stops answering must never widen what
+        --    anyone can do. Reads keep working in either tier, so an outage
+        --    does not lock officers out of the records entirely.
         if definition.sensitive and FredPD.Core.session.isStale(session) then
             audit.denied(session, definition.name, 'stale_permissions')
+            return { ok = false, err = FredPD.ErrorCode.STALE_PERMISSIONS }
+        end
+
+        if definition.writes and FredPD.Core.session.isReadOnly(session) then
+            audit.denied(session, definition.name, 'read_only')
             return { ok = false, err = FredPD.ErrorCode.STALE_PERMISSIONS }
         end
 
