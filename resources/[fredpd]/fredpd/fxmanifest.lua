@@ -53,6 +53,7 @@ server_scripts {
     -- Record-level access (spec 4.5) comes before every module that reads a
     -- record, because all of them ask it the same question.
     'server/modules/access/service.lua',
+    'server/modules/access/repo.lua',
 
     'server/modules/placements/service.lua',
     'server/modules/placements/repo.lua',
