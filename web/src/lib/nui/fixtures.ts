@@ -26,6 +26,28 @@ export interface FixtureFailure {
   fields?: Record<string, string>;
 }
 
+/**
+ * A refusal a fixture decides on, rather than one the route always gives.
+ *
+ * `fail` above marks a whole route as refusing. Some refusals depend on the
+ * call: saving a group whose version has moved on answers `conflict`, and that
+ * is the only thing the version column exists for. A fixture that always
+ * accepted would make it the one path nobody can walk without a game server.
+ */
+const REFUSAL = Symbol('fixture refusal');
+
+export interface FixtureRefusal extends FixtureFailure {
+  [REFUSAL]: true;
+}
+
+export function refuse(err: ErrorCode, fields?: Record<string, string>): FixtureRefusal {
+  return { [REFUSAL]: true, err, ...(fields ? { fields } : {}) };
+}
+
+export function isRefusal(value: unknown): value is FixtureRefusal {
+  return typeof value === 'object' && value !== null && REFUSAL in value;
+}
+
 export interface FixtureSet {
   ok: Record<string, Fixture>;
   fail: Record<string, FixtureFailure>;
@@ -435,6 +457,7 @@ function appendCustody(evidenceId: number, entry: Omit<CustodyEntry, 'id'>): voi
 let groupRows: GroupRow[] = [
   {
     key: 'patrol_basic',
+    version: 1,
     name: 'Patrol (trainee)',
     inherits: null,
     description: null,
@@ -449,6 +472,7 @@ let groupRows: GroupRow[] = [
   },
   {
     key: 'patrol',
+    version: 1,
     name: 'Patrol',
     inherits: 'patrol_basic',
     description: null,
@@ -463,6 +487,7 @@ let groupRows: GroupRow[] = [
   },
   {
     key: 'supervisor',
+    version: 1,
     name: 'Supervisor',
     inherits: 'patrol',
     description: null,
@@ -484,6 +509,7 @@ let groupRows: GroupRow[] = [
   },
   {
     key: 'lab',
+    version: 1,
     name: 'Forensic lab',
     inherits: null,
     description: null,
@@ -500,6 +526,7 @@ let groupRows: GroupRow[] = [
   },
   {
     key: 'admin',
+    version: 1,
     name: 'FredPD administration',
     inherits: null,
     description: null,
@@ -507,8 +534,10 @@ let groupRows: GroupRow[] = [
     childCount: 0,
     roleMapCount: 0,
     agencyRoleMapCount: 0,
-    permissions: ['admin.groups.edit', 'admin.rolemap.edit', 'garage.fleet.edit'],
-    effective: ['admin.groups.edit', 'admin.rolemap.edit', 'garage.fleet.edit'],
+    // The keys the seed actually grants `admin` (database/seeds/0001): the
+    // module itself, and the two editing powers held apart from each other.
+    permissions: ['admin.groups.edit', 'admin.permissions.edit', 'garage.fleet.edit', 'page.admin'],
+    effective: ['admin.groups.edit', 'admin.permissions.edit', 'garage.fleet.edit', 'page.admin'],
     // The administration group. It cannot be renamed, emptied or deleted.
     locked: true,
     editable: true,
@@ -517,7 +546,7 @@ let groupRows: GroupRow[] = [
 
 const permissionCatalogue: PermissionRow[] = [
   { key: 'admin.groups.edit', area: 'admin', groupCount: 1, grantable: true },
-  { key: 'admin.rolemap.edit', area: 'admin', groupCount: 1, grantable: true },
+  { key: 'admin.permissions.edit', area: 'admin', groupCount: 1, grantable: true },
   { key: 'evidence.item.intake', area: 'evidence', groupCount: 1, grantable: true },
   { key: 'evidence.item.transfer', area: 'evidence', groupCount: 1, grantable: true },
   { key: 'evidence.item.view', area: 'evidence', groupCount: 1, grantable: true },
@@ -530,6 +559,9 @@ const permissionCatalogue: PermissionRow[] = [
   { key: 'lab.analysis.perform', area: 'lab', groupCount: 1, grantable: false },
   { key: 'lab.queue.view', area: 'lab', groupCount: 1, grantable: false },
   { key: 'lab.request.create', area: 'lab', groupCount: 1, grantable: false },
+  // Which module rail entries a group opens is a permission like any other, and
+  // the editor has to be able to draw the one the admin group itself holds.
+  { key: 'page.admin', area: 'page', groupCount: 1, grantable: true },
 ];
 
 // --------------------------------------------------------------- motor pool
@@ -731,7 +763,13 @@ export const fixtures: FixtureSet = {
     },
 
     'evidence.intake': (input) => {
+      // `placementId` is the property room terminal the call is being made at.
+      // The real route refuses without it, before the handler runs, and checks
+      // the officer is standing there; the fixture only records that the page
+      // sends it. It cannot refuse on it yet, because the mock bridge's own
+      // `fredpd:open` message carries no placement for the page to read.
       const body = input as {
+        placementId?: number;
         id: number;
         accepted: boolean;
         storageLocation?: string;
@@ -950,6 +988,10 @@ export const fixtures: FixtureSet = {
         ...groupRows,
         {
           key: body.key,
+          // A new row starts at 1, the column default. The browser session has
+          // to move it the way the server does, or saving a group twice in a
+          // row would answer `conflict` here and nowhere else.
+          version: 1,
           name: body.name,
           inherits: body.inherits ?? null,
           description: body.description ?? null,
@@ -970,16 +1012,26 @@ export const fixtures: FixtureSet = {
     'admin.group.update': (input) => {
       const body = input as {
         key: string;
+        version: number;
         name?: string;
         inherits?: string;
         description?: string;
         permissions?: string[];
       };
 
+      // The stale-write refusal, in the browser as on the server. A fixture
+      // that always accepted would make the one path this column exists for
+      // the only path nobody can walk without a game server.
+      const current = groupRows.find((group) => group.key === body.key);
+      if (current && current.version !== body.version) {
+        return refuse('conflict', { version: 'stale' });
+      }
+
       groupRows = groupRows.map((group) =>
         group.key === body.key
           ? {
               ...group,
+              version: group.version + 1,
               name: body.name ?? group.name,
               inherits: body.inherits === undefined ? group.inherits : body.inherits || null,
               description:
@@ -1016,7 +1068,9 @@ export const fixtures: FixtureSet = {
         labelKey: body.labelKey,
         permission: body.permission || null,
         certification: body.certification || null,
-        livery: body.livery ?? null,
+        // `-1` is "no livery": `Repo.addFleet` writes it as NULLIF(?, -1), and
+        // the fixture has to store the same thing the database would.
+        livery: body.livery === undefined || body.livery === -1 ? null : body.livery,
         sortOrder: body.sortOrder ?? 0,
         enabled: body.enabled ?? true,
         requiredGroup: body.requiredGroup || null,
@@ -1045,7 +1099,9 @@ export const fixtures: FixtureSet = {
               permission: body.permission === undefined ? entry.permission : body.permission || null,
               certification:
                 body.certification === undefined ? entry.certification : body.certification || null,
-              livery: body.livery === undefined ? entry.livery : body.livery,
+              // An absent livery leaves it; `-1` clears it (NULLIF(?, -1)).
+              livery:
+                body.livery === undefined ? entry.livery : body.livery === -1 ? null : body.livery,
               sortOrder: body.sortOrder ?? entry.sortOrder,
               enabled: body.enabled ?? entry.enabled,
               requiredGroup:

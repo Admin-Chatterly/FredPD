@@ -139,6 +139,11 @@ export const schemas = {
 
   GroupUpdate: {
     key: { type: 'string', required: true, min: 2, max: 64 },
+    // The version the editor was shown, as on every other editable record. An
+    // update replaces the permission set rather than merging into it, so
+    // without this the loser of a race loses grants silently and the audit
+    // diff reads as though the winner removed them on purpose.
+    version: { type: 'integer', required: true, min: 1 },
     name: { type: 'string', required: false, min: 1, max: 191 },
     inherits: { type: 'string', required: false, max: 64 },
     description: { type: 'string', required: false, max: 255 },

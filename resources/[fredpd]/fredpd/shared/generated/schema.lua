@@ -196,6 +196,7 @@ FredPD.Schema = {
 
     GroupUpdate = {
         key = { type = 'string', required = true, min = 2, max = 64 },
+        version = { type = 'integer', required = true, min = 1 },
         name = { type = 'string', required = false, min = 1, max = 191 },
         inherits = { type = 'string', required = false, max = 64 },
         description = { type = 'string', required = false, max = 255 },

@@ -1,4 +1,4 @@
-import { fixtures } from './fixtures';
+import { fixtures, isRefusal } from './fixtures';
 import type { MessageHandler, NuiBridge, NuiMessage, RouteResponse } from './types';
 
 /**
@@ -75,7 +75,17 @@ export function createMockBridge(): NuiBridge {
         return { ok: false, err: 'not_found' };
       }
 
-      return { ok: true, data: fixture(data) as T };
+      const answer = fixture(data);
+
+      // A refusal the fixture decided on from the call itself, as opposed to a
+      // route marked as always refusing in `fixtures.fail`.
+      if (isRefusal(answer)) {
+        return answer.fields
+          ? { ok: false, err: answer.err, fields: answer.fields }
+          : { ok: false, err: answer.err };
+      }
+
+      return { ok: true, data: answer as T };
     },
 
     on(type, handler) {

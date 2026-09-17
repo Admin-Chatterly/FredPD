@@ -10,6 +10,13 @@
 
 export interface GroupRow {
   key: string;
+  /**
+   * The row version this screen was shown, sent back on the update so a second
+   * administrator editing the same group is refused rather than overwritten.
+   * An update replaces the permission set rather than merging into it, so a
+   * lost race loses grants outright.
+   */
+  version: number;
   name: string;
   inherits: string | null;
   description: string | null;

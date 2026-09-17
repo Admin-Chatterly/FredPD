@@ -30,14 +30,36 @@
     _input: 'admin.fleet.title',
   };
 
-  const EMPTY = {
+  /**
+   * What the two forms hold.
+   *
+   * The number boxes are `number | null` because that is what `bind:value` on
+   * `<input type="number">` produces: a cleared box is null, not zero and not
+   * an empty string. Both are turned into something the route accepts in
+   * `body()` below — null must never reach the wire, where it is neither a
+   * value nor an absent field.
+   */
+  interface Entry {
+    model: string;
+    labelKey: string;
+    permission: string;
+    certification: string;
+    requiredGroup: string;
+    requiredDiscordRole: string;
+    /** The livery index, or null for "no livery". */
+    livery: number | null;
+    sortOrder: number | null;
+    enabled: boolean;
+  }
+
+  const EMPTY: Entry = {
     model: '',
     labelKey: '',
     permission: '',
     certification: '',
     requiredGroup: '',
     requiredDiscordRole: '',
-    livery: '',
+    livery: null,
     sortOrder: 0,
     enabled: true,
   };
@@ -86,7 +108,7 @@
       certification: entry.certification ?? '',
       requiredGroup: entry.requiredGroup ?? '',
       requiredDiscordRole: entry.requiredDiscordRole ?? '',
-      livery: entry.livery === null ? '' : String(entry.livery),
+      livery: entry.livery,
       sortOrder: entry.sortOrder,
       enabled: entry.enabled,
     };
@@ -109,10 +131,23 @@
     return response.ok;
   }
 
-  /** The shape both writes send. `livery` is the only field that can be blank. */
-  function body(entry: typeof EMPTY): Record<string, unknown> {
-    const livery = Number.parseInt(entry.livery, 10);
-
+  /**
+   * The shape both writes send.
+   *
+   * Every field is present on every write, because the server tells an empty
+   * field from an absent one: an empty string clears a gate, while a key that
+   * is not there leaves the column alone. That is why the two blanks are sent
+   * as values rather than dropped:
+   *
+   * - `livery` blank means "no livery", and travels as the sentinel `-1` the
+   *   schema declares and `Repo.updateFleet` writes as `NULLIF(?, -1)`. Sending
+   *   nothing instead left the old livery on the vehicle, so a livery could be
+   *   set from this screen but never cleared.
+   * - `sortOrder` blank would travel as JSON null, which is neither a number
+   *   the validator accepts nor an absent key, and on an add it silently became
+   *   the column default. The box is `required`, and this is the floor under it.
+   */
+  function body(entry: Entry): Record<string, unknown> {
     return {
       model: entry.model.trim(),
       labelKey: entry.labelKey.trim(),
@@ -120,8 +155,8 @@
       certification: entry.certification.trim(),
       requiredGroup: entry.requiredGroup,
       requiredDiscordRole: entry.requiredDiscordRole.trim(),
-      livery: Number.isFinite(livery) ? livery : undefined,
-      sortOrder: entry.sortOrder,
+      livery: entry.livery ?? -1,
+      sortOrder: entry.sortOrder ?? 0,
       enabled: entry.enabled,
     };
   }
@@ -321,10 +356,14 @@
 
         <label class="flex flex-col gap-1 text-xs">
           <span>{t('admin.fleet.livery')}</span>
+          <!-- Empty is how a livery is cleared; `body()` sends that as -1. -->
           <input
             class="w-20 border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1 font-[family-name:var(--font-mono)]"
+            type="number"
+            min="0"
+            max="63"
+            step="1"
             bind:value={draft.livery}
-            inputmode="numeric"
           />
         </label>
 
@@ -333,6 +372,10 @@
           <input
             class="w-20 border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1 font-[family-name:var(--font-mono)]"
             type="number"
+            min="0"
+            max="9999"
+            step="1"
+            required
             bind:value={draft.sortOrder}
           />
         </label>
@@ -402,6 +445,10 @@
         <input
           class="w-20 border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1 font-[family-name:var(--font-mono)]"
           type="number"
+          min="0"
+          max="9999"
+          step="1"
+          required
           bind:value={addition.sortOrder}
         />
       </label>

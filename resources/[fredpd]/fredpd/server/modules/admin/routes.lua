@@ -497,11 +497,11 @@ end
 --- floor is already broken -- edited by hand, which is the only way back in
 --- after a lockout -- must not have every repair refused as well.
 ---
---- @param before table the model as loaded
+--- @param heldBefore boolean `holdsFloor` of the model as it was loaded
 --- @param after table the model with the proposed change applied
 --- @return table|nil a refusal to return from the handler, or nil to proceed
-local function refuseLockout(before, after)
-    if not holdsFloor(before) then return nil end
+local function refuseLockout(heldBefore, after)
+    if not heldBefore then return nil end
     if holdsFloor(after) then return nil end
 
     return route.refuse(FredPD.ErrorCode.FORBIDDEN, { permissions = 'would_lock_out' })
@@ -526,6 +526,11 @@ end
 ---
 --- `skipKey` is the group being written when that group *is* `admin`: its own
 --- guarded write is the same lock, and taking it twice would refuse itself.
+---
+--- The cost is a bump that survives a write which then refuses for its own
+--- reasons, and another administrator reloading a group the first one never
+--- touched. A reload is the price; a permission model assembled from two
+--- half-approved edits is not.
 ---
 --- @return boolean taken
 local function takeModelLock(groups, skipKey)
@@ -723,13 +728,27 @@ route.define({
             return route.refuse(FredPD.ErrorCode.INVALID, { key = 'not_group_key' })
         end
 
+        -- Optimistic locking, as on every other editable record (spec 3.5,
+        -- `conflict`). Without it two administrators with the editor open
+        -- overwrite each other in silence, and because `permissions` replaces
+        -- the set rather than merging into it, the loser's grants do not
+        -- reappear anywhere -- not in the group, and not in the audit diff,
+        -- which would read as if the winner had removed them.
+        if type(input.version) ~= 'number' then
+            return route.refuse(FredPD.ErrorCode.INVALID, { version = 'required' })
+        end
+
         local existing = db.single(
-            'SELECT `key`, `name`, `inherits`, `description` FROM fpd_permission_groups WHERE `key` = ?',
+            'SELECT `key`, `name`, `inherits`, `description`, `version` FROM fpd_permission_groups WHERE `key` = ?',
             { input.key }
         )
 
         if not existing then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
+        end
+
+        if existing.version ~= input.version then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { version = 'stale' })
         end
 
         if input.name ~= nil and blank(input.name) then
@@ -756,6 +775,7 @@ route.define({
         end
 
         local groups = loadGroupModel()
+        local floorBefore = holdsFloor(groups)
 
         if inherits and not groups[inherits] then
             return route.refuse(FredPD.ErrorCode.INVALID, { inherits = 'unknown' })
@@ -765,7 +785,11 @@ route.define({
             return route.refuse(FredPD.ErrorCode.INVALID, { inherits = 'cycle' })
         end
 
-        groups[input.key] = { inherits = inherits, permissions = permissions }
+        groups[input.key] = {
+            inherits = inherits,
+            permissions = permissions,
+            version = existing.version,
+        }
 
         if inheritsCycle(groups, input.key) then
             return route.refuse(FredPD.ErrorCode.INVALID, { inherits = 'cycle' })
@@ -777,22 +801,19 @@ route.define({
         local refusal = refuseEscalation(session, 'admin.group.update', groups, input.key)
         if refusal then return refusal end
 
-        if input.key == PROTECTED_GROUP then
-            if input.name and input.name ~= existing.name then
-                return route.refuse(FredPD.ErrorCode.FORBIDDEN, { name = 'protected' })
-            end
-
-            -- The floor is checked against the expanded set, so `admin` may
-            -- move these keys into a group it inherits from -- what is refused
-            -- is the edit that leaves nobody able to reach the editor at all.
-            local granted = FredPD.Core.perms.expandGroup(input.key, groups)
-
-            for index = 1, #ADMIN_FLOOR do
-                if not FredPD.Core.perms.satisfies(granted, ADMIN_FLOOR[index]) then
-                    return route.refuse(FredPD.ErrorCode.FORBIDDEN, { permissions = 'would_lock_out' })
-                end
-            end
+        -- Renaming `admin` is refused because the seed, the documentation and
+        -- the recovery instructions all name it. That one is about this row, so
+        -- it is the only part of the protection that asks which key was edited.
+        if input.key == PROTECTED_GROUP and input.name and input.name ~= existing.name then
+            return route.refuse(FredPD.ErrorCode.FORBIDDEN, { name = 'protected' })
         end
+
+        -- The floor, on the other hand, is a property of the whole model: it is
+        -- measured against what `admin` *expands* to, so the edit that empties
+        -- that expansion is just as often an edit to the group `admin` inherits
+        -- from. Checked here, outside the `admin` case, for every group.
+        refusal = refuseLockout(floorBefore, groups)
+        if refusal then return refusal end
 
         local sets, values = {}, {}
 
@@ -805,28 +826,52 @@ route.define({
             end
         end
 
-        local statements = {}
-
-        if #sets > 0 then
-            values[#values + 1] = input.key
-            statements[1] = {
-                query = ('UPDATE fpd_permission_groups SET %s WHERE `key` = ?')
-                    :format(table.concat(sets, ', ')),
-                values = values,
-            }
-        end
-
-        if input.permissions then
-            local rows = permissionStatements(input.key, permissions, true)
-            for index = 1, #rows do statements[#statements + 1] = rows[index] end
-        end
-
-        if #statements == 0 then
+        if #sets == 0 and not input.permissions then
             return route.refuse(FredPD.ErrorCode.INVALID, { _input = 'nothing_to_change' })
         end
 
-        if not db.transaction(statements) then
-            return route.refuse(FredPD.ErrorCode.INTERNAL)
+        if not takeModelLock(groups, input.key) then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { _input = 'model_changed' })
+        end
+
+        -- The row write is this group's own lock as well as its update: the
+        -- version is bumped every time, even when only the permission rows
+        -- change, and it is guarded on the version this handler read. It runs on
+        -- its own rather than inside the transaction below because a transaction
+        -- reports only whether it committed, and "committed, matched no row" is
+        -- exactly the case that has to become `conflict` instead of a silent
+        -- success.
+        sets[#sets + 1] = '`version` = `version` + 1'
+        values[#values + 1] = input.key
+        values[#values + 1] = input.version
+
+        local affected = db.execute(
+            ('UPDATE fpd_permission_groups SET %s WHERE `key` = ? AND `version` = ?')
+                :format(table.concat(sets, ', ')),
+            values
+        )
+
+        if affected == 0 then
+            -- The row is gone, or somebody committed between the read and here.
+            -- Nothing has been written either way, so both are safe to report.
+            local present = db.scalar(
+                'SELECT COUNT(*) FROM fpd_permission_groups WHERE `key` = ?', { input.key }
+            )
+
+            if present and present > 0 then
+                return route.refuse(FredPD.ErrorCode.CONFLICT, { version = 'stale' })
+            end
+
+            return route.refuse(FredPD.ErrorCode.NOT_FOUND)
+        end
+
+        -- Only now, and only because the bump above was won: every other editor
+        -- of this group holds a version that no longer matches and refuses
+        -- before it reaches this point, so nobody else is rewriting these rows.
+        if input.permissions then
+            if not db.transaction(permissionStatements(input.key, permissions, true)) then
+                return route.refuse(FredPD.ErrorCode.INTERNAL)
+            end
         end
 
         applied()
@@ -847,6 +892,10 @@ route.define({
         return {
             id = input.key,
             key = input.key,
+            -- The version this write produced, so an editor that stays open
+            -- saves again without a reload -- and so one that does not send it
+            -- back is refused rather than allowed to overwrite.
+            version = input.version + 1,
             permissions = permissions,
             added = added,
             removed = removed,
@@ -878,6 +927,8 @@ route.define({
         end
 
         local groups = loadGroupModel()
+        local floorBefore = holdsFloor(groups)
+
         if not groups[input.key] then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
         end
@@ -909,7 +960,24 @@ route.define({
             return route.refuse(FredPD.ErrorCode.CONFLICT, { key = 'mapped_to_roles' })
         end
 
+        -- The floor again, with the group gone. The two refusals above already
+        -- close the ordinary path -- a group inside `admin`'s chain is a group
+        -- something inherits from, and `children > 0` refuses it, while `admin`
+        -- itself is refused as protected -- so this is what is left: a chain
+        -- that is being assembled by somebody else at this moment, where the
+        -- child that would have refused the delete is not committed yet. The
+        -- model lock below is what makes those two writes take turns; this is
+        -- what the loser of that race is checked against on its retry.
+        groups[input.key] = nil
+
+        local lockout = refuseLockout(floorBefore, groups)
+        if lockout then return lockout end
+
         local permissions = ownPermissions(input.key)
+
+        if not takeModelLock(groups) then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { _input = 'model_changed' })
+        end
 
         if db.execute('DELETE FROM fpd_permission_groups WHERE `key` = ?', { input.key }) == 0 then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
@@ -925,12 +993,15 @@ route.define({
     name = 'admin.permission.list',
     perm = 'admin.groups.edit',
     schema = 'PermissionList',
-    writes = true,
-    sensitive = true,
-    audit = 'permission.listed',
-    auditDetail = function(_input, result)
-        return { count = #result.permissions }
-    end,
+    -- A read of a catalogue, and neither a write nor a record. `writes` refused
+    -- it in read-only mode, which is the tier spec 4.2 keeps reads working in;
+    -- what it returns is the constant above plus a count per key, so there is
+    -- nothing in it that a stale Discord snapshot could make wrong, and
+    -- `sensitive` would only blank half the editor while `admin.group.list`
+    -- already refuses the half that matters. The audit entry went with them:
+    -- invariant 11 audits reads of restricted *records*, and a list of
+    -- permission key names is not one -- opening the editor is already recorded
+    -- by `group.listed`, which the same screen calls beside this.
     handler = function(session, _input)
         local catalogue = {}
 

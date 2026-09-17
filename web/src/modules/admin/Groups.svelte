@@ -106,6 +106,10 @@
 
     await submit('admin.group.update', {
       key: selected.key,
+      // The version this screen was drawn from. A second administrator who
+      // saved first moves it on, and this write is refused instead of quietly
+      // replacing their permission set with the one on this screen.
+      version: selected.version,
       name: draft.name,
       // An empty string clears the inheritance; the server reads it that way.
       inherits: draft.inherits,
