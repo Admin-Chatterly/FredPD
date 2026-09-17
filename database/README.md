@@ -8,7 +8,15 @@ ESX server already uses (spec 3.3).
 `0001_fredpd.sql` is the schema as first released — all 23 tables, in
 foreign-key order. `0002_evidence.sql` adds the ten tables section 8 needs:
 hidden biometrics and weapon signatures, scenes, evidence and its owner,
-custody, the lab queue and the forensic indexes.
+custody, the lab queue and the forensic indexes. `0003_fleet_gating.sql` lets a
+motor pool vehicle name the Discord role or permission group that opens it
+(7.31), and `0004_group_version.sql` gives permission groups the version column
+every other editable record already had, so two administrators editing one
+group cannot silently overwrite each other.
+
+Apply all of them, in filename order. A server carrying only some of them
+refuses to start and names the tables it cannot find, rather than starting and
+failing later on a call nobody connects to the missing migration.
 
 `migrations/` is **append-only**. Invariant 8: a migration that has shipped is
 never edited, not even to fix a typo in a comment. Correct it with a new

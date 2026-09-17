@@ -105,8 +105,16 @@ Four steps, and no convars:
 1. **Copy** `resources/[fredpd]/` to the server. Use the release bundle, or run
    `pnpm build` first — the NUI is served from
    `resources/[fredpd]/fredpd/web/dist`, which the build produces.
-2. **Apply** `database/migrations/0001_fredpd.sql`, the whole schema in one
-   file, then `database/seeds/0001_permissions.sql`.
+2. **Apply** every file in `database/migrations/` in filename order, then
+   `database/seeds/0001_permissions.sql`. In one line:
+
+   ```
+   for f in database/migrations/*.sql; do mysql -u root YOUR_ESX_SCHEMA < "$f"; done
+   ```
+
+   Applying only the first is the mistake this used to invite: the server
+   starts, says the schema is present, and then fails on the first evidence
+   call. It now refuses to start instead, naming the tables it cannot find.
 3. **Edit** `resources/[fredpd]/fredpd/config/server.lua` — a Discord bot token,
    your guild id, and your agency's name. That is the only file to edit, and the
    only configuration there is.
