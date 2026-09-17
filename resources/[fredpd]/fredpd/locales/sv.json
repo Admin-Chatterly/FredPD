@@ -116,6 +116,64 @@
       "added": "Kopplingen är tillagd.",
       "removed": "Kopplingen är borttagen.",
       "confirmRemove": "Ta bort kopplingen? Den som bara hade behörighet genom den förlorar den omedelbart."
+    },
+    "fleet": {
+      "title": "Fordonspark",
+      "intro": "Vad fordonsparken erbjuder och vem som får ta ut det. Ett fordon utan spärr kan tas ut av alla som får ta ut fordon.",
+      "empty": "Inga fordon i fordonsparken.",
+      "new": "Lägg till fordon",
+      "add": "Lägg till",
+      "edit": "Ändra fordon",
+      "save": "Spara",
+      "remove": "Ta bort",
+      "removeConfirm": "Fordonet tas bort ur fordonsparkens meny. Redan uttagna fordon påverkas inte.",
+      "vehicle": "Fordon",
+      "model": "Modell",
+      "modelPlaceholder": "police3",
+      "labelKey": "Namnnyckel",
+      "labelKeyPlaceholder": "fleet.patrol_sedan",
+      "permission": "Behörighet",
+      "certification": "Behörighetsbevis",
+      "livery": "Dekor",
+      "sortOrder": "Ordning",
+      "enabled": "Tillgängligt",
+      "on": "Ja",
+      "off": "Nej",
+      "gating": "Vem får ta ut det",
+      "noGate": "Alla som får ta ut fordon",
+      "requiredGroup": "Behörighetsgrupp",
+      "requiredDiscordRole": "Discord-roll"
+    },
+    "groups": {
+      "title": "Behörighetsgrupper",
+      "intro": "En grupp är en samling behörighetsnycklar. En Discord-roll ger en grupp; rollkopplingen avgör vilken.",
+      "empty": "Inga grupper ännu.",
+      "new": "Ny grupp",
+      "create": "Skapa",
+      "save": "Spara",
+      "delete": "Ta bort",
+      "deleteConfirm": "Gruppen tas bort från alla Discord-roller som är kopplade till den.",
+      "key": "Nyckel",
+      "keyPlaceholder": "patrol_supervisor",
+      "name": "Namn",
+      "description": "Beskrivning",
+      "inherits": "Ärver",
+      "inheritsNone": "Inget",
+      "permissions": "Behörigheter",
+      "permissionsIntro": "En nyckel du inte själv har kan inte läggas i en grupp. Servern nekar skrivningen oavsett vad som visas här.",
+      "effective": "Sammanlagd",
+      "locked": "Inte din att tilldela",
+      "notEditable": "Gruppen ger mer än du själv har, så du kan inte ändra den.",
+      "column": {
+        "own": "Egna",
+        "effective": "Sammanlagda",
+        "roles": "Roller"
+      }
+    },
+    "tab": {
+      "rolemap": "Rollkoppling",
+      "groups": "Grupper",
+      "fleet": "Fordonspark"
     }
   },
   "intel": {
@@ -226,5 +284,216 @@
       "create": "Skapa",
       "back": "Tillbaka"
     }
+  },
+  "evidence": {
+    "empty": "Inget bevismaterial matchar.",
+    "detail": {
+      "none": "Välj ett bevismaterialnummer för att öppna posten."
+    },
+    "tab": {
+      "items": "Bevismaterial",
+      "scenes": "Brottsplatser"
+    },
+    "column": {
+      "number": "Bevismaterialnummer",
+      "type": "Typ",
+      "packaging": "Förpackning",
+      "seal": "Plombering",
+      "status": "Status",
+      "storage": "Förvaring",
+      "case": "Ärende",
+      "collected": "Säkrat",
+      "marker": "Markör",
+      "ref": "Referens",
+      "description": "Beskrivning"
+    },
+    "filter": {
+      "status": "Status",
+      "type": "Typ",
+      "search": "Sök",
+      "searchPlaceholder": "Bevismaterialnummer, ärende eller beskrivning",
+      "any": "Alla",
+      "apply": "Tillämpa"
+    },
+    "type": {
+      "print": "Fingeravtryck",
+      "blood": "Blod",
+      "dna_touch": "Saliv eller kontakt-DNA",
+      "casing": "Patronhylsa",
+      "bullet": "Projektil",
+      "magazine": "Magasin",
+      "gsr": "Krutstänk",
+      "footwear": "Skoavtryck",
+      "glove_mark": "Handskavtryck eller fibrer",
+      "drug_residue": "Narkotikarester",
+      "tool_mark": "Verktygsspår eller glassplitter",
+      "digital": "Digital enhet"
+    },
+    "packaging": {
+      "envelope": "Kuvert",
+      "swab_box": "Provtagningsask",
+      "lift_card": "Lyftfolie",
+      "bag": "Påse",
+      "gsr_kit": "Provtagningssats för skottrester",
+      "tape_lift": "Tejplyft",
+      "cast": "Avgjutning",
+      "photo": "Fotografi",
+      "field_test_kit": "Fälttestsats",
+      "evidence_bag": "Bevispåse"
+    },
+    "seal": {
+      "sealed": "Obruten",
+      "broken": "Bruten",
+      "resealed": "Ny plombering"
+    },
+    "status": {
+      "collected": "Säkrat",
+      "in_locker": "I beslagsskåp",
+      "in_property": "I beslagsrum",
+      "checked_out": "Utkvitterat",
+      "at_lab": "På laboratorium",
+      "released": "Utlämnat",
+      "destroyed": "Förstört"
+    },
+    "destination": {
+      "locker": "Beslagsskåp",
+      "lab": "Forensiskt laboratorium",
+      "court": "Domstol",
+      "investigator": "Utredare"
+    },
+    "collect": {
+      "title": "Säkra spår",
+      "packaging": "Förpackning",
+      "marker": "Markörnummer",
+      "submit": "Säkra"
+    },
+    "intake": {
+      "title": "Mottagning i beslagsrum",
+      "storage": "Förvaringsplats",
+      "storagePlaceholder": "Vapenvalv, hylla B-04",
+      "reason": "Skäl",
+      "accept": "Ta emot i beslag",
+      "reject": "Avvisa med skäl"
+    },
+    "transfer": {
+      "title": "Överlämning",
+      "destination": "Mottagande part",
+      "toParty": "Mottagen av",
+      "reason": "Skäl",
+      "submit": "Överlämna"
+    },
+    "custody": {
+      "title": "Beslagskedja",
+      "time": "Tid",
+      "action": "Åtgärd",
+      "from": "Från",
+      "to": "Till",
+      "reason": "Skäl",
+      "signedBy": "Signerad av",
+      "empty": "Inga poster i beslagskedjan än."
+    },
+    "custodyAction": {
+      "collect": "Säkrad",
+      "deposit": "Deponerad",
+      "intake": "Mottagen",
+      "transfer": "Överlämnad",
+      "checkout": "Utkvitterad",
+      "checkin": "Återlämnad",
+      "release": "Utlämnad",
+      "destroy": "Förstörd"
+    },
+    "labRequest": {
+      "title": "Begär analys",
+      "analyses": "Analyser",
+      "items": "Bevismaterial",
+      "priority": "Prioritet",
+      "justification": "Motivering",
+      "submit": "Skicka analysbegäran"
+    },
+    "analyses": {
+      "title": "Analyser",
+      "empty": "Inga analyser på det här bevismaterialet."
+    },
+    "scene": {
+      "number": "Brottsplatsnummer",
+      "items": "Bevismaterial",
+      "entries": "Inpasseringar",
+      "opened": "Öppnad",
+      "empty": "Inga brottsplatser än.",
+      "create": "Öppna brottsplats",
+      "createIntro": "Brottsplatsen öppnas där du står. Radien är avspärrningen, i meter.",
+      "radius": "Radie (m)",
+      "release": "Häv avspärrning",
+      "releaseConfirm": "När avspärrningen hävs går det inte att säkra fler spår.",
+      "status": {
+        "open": "Öppen",
+        "released": "Hävd"
+      }
+    }
+  },
+  "lab": {
+    "title": "Forensiskt laboratorium",
+    "intro": "Analyser som väntar på laboratoriet. Ta en analys, dokumentera metoden och slutför den när handläggningstiden har löpt ut.",
+    "empty": "Inga analyser i kön. Analysbegäran skapas från ett ärende under Bevis.",
+    "start": "Påbörja",
+    "complete": "Slutför analys",
+    "completeNote": "Resultatet beräknas av laboratoriet när handläggningstiden har löpt ut och anges inte här.",
+    "notStarted": "Inte påbörjad. Handläggningstiden börjar när analysen tas.",
+    "observations": "Iakttagelser",
+    "observationsPlaceholder": "Provet extraherat och kvantifierat. Delvis nedbrutet av regn.",
+    "column": {
+      "analysis": "Analys",
+      "assigned": "Tilldelad",
+      "case": "Ärende",
+      "completed": "Avslutad",
+      "due": "Beräknat klar",
+      "evidence": "Bevismaterial",
+      "priority": "Prioritet",
+      "result": "Resultat",
+      "started": "Påbörjad",
+      "status": "Status"
+    },
+    "filter": {
+      "analysis": "Analys",
+      "any": "Alla",
+      "mine": "Tilldelade mig",
+      "status": "Status"
+    },
+    "analysis": {
+      "dna": "DNA-analys",
+      "print_comparison": "Fingeravtrycksjämförelse",
+      "print_search": "Sökning i fingeravtrycksregistret",
+      "ballistics": "Ballistik",
+      "gsr": "Analys av skottrester",
+      "drug_id": "Narkotikaanalys"
+    },
+    "status": {
+      "queued": "I kö",
+      "in_progress": "Pågår",
+      "complete": "Klar",
+      "reviewed": "Granskad",
+      "released": "Utlämnad",
+      "cancelled": "Makulerad"
+    },
+    "priority": {
+      "routine": "Normal",
+      "expedited": "Förtur",
+      "urgent": "Akut"
+    },
+    "result": {
+      "profile_obtained": "DNA-profil framställd",
+      "partial_profile": "Ofullständig DNA-profil",
+      "mixture": "DNA-blandbild",
+      "no_profile": "Ingen DNA-profil",
+      "identification": "Identifiering",
+      "exclusion": "Uteslutning",
+      "inconclusive": "Inkonklusivt",
+      "insufficient": "Otillräckligt för jämförelse",
+      "candidate_match": "Träff i register, kräver bekräftelse",
+      "no_match": "Ingen träff"
+    }
+  },
+  "form": {
+    "cancel": "Avbryt"
   }
 }

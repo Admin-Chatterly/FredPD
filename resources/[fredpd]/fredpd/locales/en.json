@@ -116,6 +116,64 @@
       "added": "Mapping added.",
       "removed": "Mapping removed.",
       "confirmRemove": "Remove this mapping? Anyone who had access only through it loses it immediately."
+    },
+    "fleet": {
+      "title": "Motor pool fleet",
+      "intro": "What the motor pool offers, and who may draw it. A vehicle with no gate is drawable by anyone who may draw at all.",
+      "empty": "No vehicles in the fleet.",
+      "new": "Add vehicle",
+      "add": "Add",
+      "edit": "Edit vehicle",
+      "save": "Save",
+      "remove": "Remove",
+      "removeConfirm": "Removing the vehicle takes it out of the motor pool menu. Vehicles already drawn are unaffected.",
+      "vehicle": "Vehicle",
+      "model": "Model",
+      "modelPlaceholder": "police3",
+      "labelKey": "Name key",
+      "labelKeyPlaceholder": "fleet.patrol_sedan",
+      "permission": "Permission",
+      "certification": "Certification",
+      "livery": "Livery",
+      "sortOrder": "Order",
+      "enabled": "Available",
+      "on": "Yes",
+      "off": "No",
+      "gating": "Who may draw it",
+      "noGate": "Anyone who may draw",
+      "requiredGroup": "Permission group",
+      "requiredDiscordRole": "Discord role"
+    },
+    "groups": {
+      "title": "Permission groups",
+      "intro": "A group is a bundle of permission keys. A Discord role grants a group; the role map decides which.",
+      "empty": "No groups yet.",
+      "new": "New group",
+      "create": "Create",
+      "save": "Save",
+      "delete": "Delete",
+      "deleteConfirm": "Deleting the group removes it from every Discord role mapped to it.",
+      "key": "Key",
+      "keyPlaceholder": "patrol_supervisor",
+      "name": "Name",
+      "description": "Description",
+      "inherits": "Inherits",
+      "inheritsNone": "Nothing",
+      "permissions": "Permissions",
+      "permissionsIntro": "A key you do not hold yourself cannot be put into a group. The server refuses the write regardless of what is shown here.",
+      "effective": "Effective",
+      "locked": "Not yours to grant",
+      "notEditable": "This group grants more than you hold, so you cannot edit it.",
+      "column": {
+        "own": "Own",
+        "effective": "Effective",
+        "roles": "Roles"
+      }
+    },
+    "tab": {
+      "rolemap": "Role map",
+      "groups": "Groups",
+      "fleet": "Fleet"
     }
   },
   "intel": {
@@ -226,5 +284,216 @@
       "create": "Create",
       "back": "Back"
     }
+  },
+  "evidence": {
+    "empty": "No evidence items match.",
+    "detail": {
+      "none": "Select an evidence number to open the item."
+    },
+    "tab": {
+      "items": "Items",
+      "scenes": "Scenes"
+    },
+    "column": {
+      "number": "Evidence number",
+      "type": "Type",
+      "packaging": "Packaging",
+      "seal": "Seal",
+      "status": "Status",
+      "storage": "Storage",
+      "case": "Case",
+      "collected": "Collected",
+      "marker": "Marker",
+      "ref": "Reference",
+      "description": "Description"
+    },
+    "filter": {
+      "status": "Status",
+      "type": "Type",
+      "search": "Search",
+      "searchPlaceholder": "Evidence number, case or description",
+      "any": "Any",
+      "apply": "Apply"
+    },
+    "type": {
+      "print": "Latent fingerprint",
+      "blood": "Blood",
+      "dna_touch": "Saliva or touch DNA",
+      "casing": "Casing",
+      "bullet": "Bullet",
+      "magazine": "Magazine",
+      "gsr": "Gunshot residue",
+      "footwear": "Footwear impression",
+      "glove_mark": "Glove mark or fiber",
+      "drug_residue": "Drug residue",
+      "tool_mark": "Tool mark or broken glass",
+      "digital": "Digital device"
+    },
+    "packaging": {
+      "envelope": "Envelope",
+      "swab_box": "Swab box",
+      "lift_card": "Lift card",
+      "bag": "Bag",
+      "gsr_kit": "GSR kit",
+      "tape_lift": "Tape lift",
+      "cast": "Cast",
+      "photo": "Photograph",
+      "field_test_kit": "Field test kit",
+      "evidence_bag": "Evidence bag"
+    },
+    "seal": {
+      "sealed": "Intact",
+      "broken": "Broken",
+      "resealed": "Resealed"
+    },
+    "status": {
+      "collected": "Collected",
+      "in_locker": "In locker",
+      "in_property": "In property room",
+      "checked_out": "Checked out",
+      "at_lab": "At lab",
+      "released": "Released",
+      "destroyed": "Destroyed"
+    },
+    "destination": {
+      "locker": "Temporary locker",
+      "lab": "Forensic lab",
+      "court": "Court",
+      "investigator": "Investigator"
+    },
+    "collect": {
+      "title": "Collect trace",
+      "packaging": "Packaging",
+      "marker": "Marker number",
+      "submit": "Collect"
+    },
+    "intake": {
+      "title": "Property room intake",
+      "storage": "Storage location",
+      "storagePlaceholder": "Firearms vault, shelf B-04",
+      "reason": "Reason",
+      "accept": "Accept into custody",
+      "reject": "Reject with reason"
+    },
+    "transfer": {
+      "title": "Transfer custody",
+      "destination": "Destination",
+      "toParty": "Received by",
+      "reason": "Reason",
+      "submit": "Transfer"
+    },
+    "custody": {
+      "title": "Chain of custody",
+      "time": "Time",
+      "action": "Action",
+      "from": "From",
+      "to": "To",
+      "reason": "Reason",
+      "signedBy": "Signed by",
+      "empty": "No custody entries yet."
+    },
+    "custodyAction": {
+      "collect": "Collected",
+      "deposit": "Deposited",
+      "intake": "Received",
+      "transfer": "Transferred",
+      "checkout": "Checked out",
+      "checkin": "Checked in",
+      "release": "Released",
+      "destroy": "Destroyed"
+    },
+    "labRequest": {
+      "title": "Request lab analysis",
+      "analyses": "Analyses",
+      "items": "Evidence items",
+      "priority": "Priority",
+      "justification": "Justification",
+      "submit": "Send request"
+    },
+    "analyses": {
+      "title": "Analyses",
+      "empty": "No analyses on this item."
+    },
+    "scene": {
+      "number": "Scene number",
+      "items": "Items",
+      "entries": "Entries",
+      "opened": "Opened",
+      "empty": "No scenes yet.",
+      "create": "Open scene",
+      "createIntro": "The scene opens where you are standing. The radius is the perimeter, in metres.",
+      "radius": "Radius (m)",
+      "release": "Release scene",
+      "releaseConfirm": "Releasing the perimeter ends collection at this scene.",
+      "status": {
+        "open": "Open",
+        "released": "Released"
+      }
+    }
+  },
+  "lab": {
+    "title": "Forensic lab",
+    "intro": "Analyses waiting at the lab. Take one, record the method used, and complete it when the turnaround has elapsed.",
+    "empty": "No analyses in the queue. Lab requests are created from a case in Evidence.",
+    "start": "Start",
+    "complete": "Complete analysis",
+    "completeNote": "The result is computed by the lab when the turnaround has elapsed and is not entered here.",
+    "notStarted": "Not started. The turnaround begins when the analysis is taken.",
+    "observations": "Observations",
+    "observationsPlaceholder": "Swab extracted and quantified. Sample partly degraded by rain.",
+    "column": {
+      "analysis": "Analysis",
+      "assigned": "Assigned to",
+      "case": "Case",
+      "completed": "Completed",
+      "due": "Due",
+      "evidence": "Evidence",
+      "priority": "Priority",
+      "result": "Result",
+      "started": "Started",
+      "status": "Status"
+    },
+    "filter": {
+      "analysis": "Analysis",
+      "any": "Any",
+      "mine": "Assigned to me",
+      "status": "Status"
+    },
+    "analysis": {
+      "dna": "DNA analysis",
+      "print_comparison": "Fingerprint comparison",
+      "print_search": "Fingerprint index search",
+      "ballistics": "Ballistics",
+      "gsr": "Gunshot residue",
+      "drug_id": "Drug identification"
+    },
+    "status": {
+      "queued": "Queued",
+      "in_progress": "In progress",
+      "complete": "Complete",
+      "reviewed": "Reviewed",
+      "released": "Released",
+      "cancelled": "Cancelled"
+    },
+    "priority": {
+      "routine": "Routine",
+      "expedited": "Expedited",
+      "urgent": "Urgent"
+    },
+    "result": {
+      "profile_obtained": "Profile obtained",
+      "partial_profile": "Partial profile",
+      "mixture": "Mixture",
+      "no_profile": "No profile",
+      "identification": "Identification",
+      "exclusion": "Exclusion",
+      "inconclusive": "Inconclusive",
+      "insufficient": "Insufficient for comparison",
+      "candidate_match": "Candidate match, confirmation required",
+      "no_match": "No match"
+    }
+  },
+  "form": {
+    "cancel": "Cancel"
   }
 }

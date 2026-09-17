@@ -4,6 +4,10 @@
   import type { ErrorCode } from '@fredpd/schema';
   import type { Session } from './lib/types';
   import RoleMap from './modules/admin/RoleMap.svelte';
+  import Groups from './modules/admin/Groups.svelte';
+  import Fleet from './modules/admin/Fleet.svelte';
+  import Evidence from './modules/evidence/Evidence.svelte';
+  import Lab from './modules/lab/Lab.svelte';
   import Intel from './modules/intel/Intel.svelte';
 
   /**
@@ -62,6 +66,21 @@
   function close(): void {
     void nui.call('fredpd:close');
   }
+
+  /**
+   * Administration is three screens, not one: the role map, the groups those
+   * roles grant, and the motor pool fleet. They are a sub-navigation rather
+   * than three rail entries because the rail draws the *modules* the server
+   * opened, and all three sit behind the one `admin` module.
+   *
+   * Which of them a session may actually use is still the server's answer —
+   * each screen's own routes refuse independently, and a tab that leads to a
+   * refusal is drawn as a refusal (invariant 4).
+   */
+  const ADMIN_TABS = ['rolemap', 'groups', 'fleet'] as const;
+  type AdminTab = (typeof ADMIN_TABS)[number];
+
+  let adminTab = $state<AdminTab>('rolemap');
 </script>
 
 <div class="flex h-full flex-col bg-[var(--color-panel)] text-[var(--color-ink)]">
@@ -108,8 +127,33 @@
         <p class="text-sm">{t(`error.${error}`)}</p>
       {:else if current === 'intel'}
         <Intel />
+      {:else if current === 'evidence'}
+        <Evidence />
+      {:else if current === 'lab'}
+        <Lab />
       {:else if session && current === 'admin'}
-        <RoleMap agencyId={session.agencyId} />
+        <nav class="mb-4 flex gap-1 border-b border-[var(--color-border)]">
+          {#each ADMIN_TABS as tab (tab)}
+            <button
+              type="button"
+              class="border-b-2 px-3 py-1.5 text-xs"
+              class:border-transparent={adminTab !== tab}
+              class:border-[var(--color-ink)]={adminTab === tab}
+              class:font-semibold={adminTab === tab}
+              onclick={() => (adminTab = tab)}
+            >
+              {t(`admin.tab.${tab}`)}
+            </button>
+          {/each}
+        </nav>
+
+        {#if adminTab === 'rolemap'}
+          <RoleMap agencyId={session.agencyId} />
+        {:else if adminTab === 'groups'}
+          <Groups />
+        {:else}
+          <Fleet />
+        {/if}
       {/if}
     </main>
   </div>
