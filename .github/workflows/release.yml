@@ -1,8 +1,21 @@
 name: Release
 
+# A pushed `v*` tag releases that version, as always.
+#
+# `workflow_call` is the same job without the tag, for `release-from-notes.yml`
+# -- because not every environment that can push commits can push tags (a token
+# scoped to one branch, for instance), and whoever finished the work should not
+# need somebody else to type three git commands before it ships. When called
+# that way the job creates the tag itself, with the Actions token.
 on:
   push:
     tags: ['v*']
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to release, without the leading v (e.g. 0.2.0)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -15,6 +28,36 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+
+      # One place decides what is being released, so the tag path and the
+      # called path cannot drift apart. `inputs.version` is set only by
+      # release-from-notes.yml; on a tag push it is empty and the ref decides.
+      - name: Resolve the version
+        id: v
+        run: |
+          version="${{ inputs.version }}"
+          [ -n "$version" ] || version="${GITHUB_REF_NAME#v}"
+
+          case "$version" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::'${version}' is not a version"; exit 1 ;;
+          esac
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${version}" >> "$GITHUB_OUTPUT"
+          echo "Releasing v${version}"
+
+      # Stop rather than publish twice. Editing an old notes file would
+      # otherwise re-run everything and move a tag people have already
+      # installed from.
+      - name: Refuse to release a version that already exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ steps.v.outputs.tag }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "::error::${{ steps.v.outputs.tag }} is already released. Bump the version."
+            exit 1
+          fi
 
       - uses: pnpm/action-setup@v4
 
@@ -39,7 +82,7 @@ jobs:
 
       - name: Stamp the release version into each fxmanifest
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${{ steps.v.outputs.version }}"
           for manifest in resources/'[fredpd]'/*/fxmanifest.lua; do
             sed -i "s/^version '.*'$/version '${version}'/" "$manifest"
           done
@@ -47,7 +90,7 @@ jobs:
 
       - name: Bundle what a server actually installs
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${{ steps.v.outputs.version }}"
           staging="$(mktemp -d)"
 
           # The resources, with the built NUI already inside fredpd/web/dist.
@@ -78,7 +121,7 @@ jobs:
       - name: Find the release notes
         id: notes
         run: |
-          path="docs/releases/${GITHUB_REF_NAME}.md"
+          path="docs/releases/${{ steps.v.outputs.tag }}.md"
 
           if [ -f "$path" ]; then
             echo "path=${path}" >> "$GITHUB_OUTPUT"
@@ -91,6 +134,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: fredpd-*.zip
+          # Named explicitly rather than taken from the ref: when this job is
+          # called rather than tag-triggered, the tag does not exist yet and
+          # this is what creates it.
+          tag_name: ${{ steps.v.outputs.tag }}
           # Both together: the file becomes the body, and the generated commit
           # list is appended under it.
           body_path: ${{ steps.notes.outputs.path }}
