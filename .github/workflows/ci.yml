@@ -49,6 +49,12 @@ jobs:
       - name: Locales complete (en and sv)
         run: pnpm i18n:check
 
+      # Nothing else here loads a FiveM resource, so a route can be written,
+      # schema'd and translated and still be unreachable. This is the only step
+      # that would have caught it.
+      - name: Everything written is reachable
+        run: pnpm wiring:check
+
       - name: Generated schema is current
         run: |
           pnpm schema:gen
