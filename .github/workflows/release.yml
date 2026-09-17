@@ -71,8 +71,27 @@ jobs:
           ( cd "$staging" && zip -qr "fredpd-${version}.zip" "fredpd-${version}" )
           mv "$staging/fredpd-${version}.zip" .
 
+      # Hand-written notes for this version, when there are any. The generated
+      # commit list says what changed; it cannot say "this release fixes
+      # something that left your existing install insecure, here is the SQL".
+      # That belongs at the top of the release, above the changelog.
+      - name: Find the release notes
+        id: notes
+        run: |
+          path="docs/releases/${GITHUB_REF_NAME}.md"
+
+          if [ -f "$path" ]; then
+            echo "path=${path}" >> "$GITHUB_OUTPUT"
+            echo "Using ${path}"
+          else
+            echo "No ${path}; publishing with generated notes only."
+          fi
+
       - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
           files: fredpd-*.zip
+          # Both together: the file becomes the body, and the generated commit
+          # list is appended under it.
+          body_path: ${{ steps.notes.outputs.path }}
           generate_release_notes: true
