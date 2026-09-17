@@ -12,6 +12,13 @@ decided by their Discord roles.
 **[`docs/FredPD.md`](docs/FredPD.md) is the specification and the single source
 of truth.** Section 0 lists the invariants that override everything else.
 
+Two guides in Swedish, for the people who run and use the server:
+
+- **[`docs/installation.sv.md`](docs/installation.sv.md)** — installation and
+  deployment: dependencies, build, database, convars, bootstrap, troubleshooting.
+- **[`docs/handbok.sv.md`](docs/handbok.sv.md)** — the service manual officers
+  read: terminals, the internal channel, the motor pool, and what gets logged.
+
 ## Status
 
 **M0 complete, M1 in progress.** The monorepo, toolchain, CI and the mock NUI

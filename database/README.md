@@ -50,12 +50,26 @@ VALUES ('lspd', 'Los Santos Police Department', 'LSPD');
 INSERT INTO fpd_officers (discord_id, agency_id, callsign, name)
 VALUES ('<your discord id>', 'lspd', '12-40', 'A. Lindqvist');
 
--- 3. One Discord role mapped to the admin group. This is the only mapping you
---    ever have to write by hand; the rest are added from the MDT.
+-- 3. Your Discord roles.
+--    This row is normally written by the gateway's bot -- which is not built
+--    yet (M1). Until it is, insert it by hand: without it you hold no roles,
+--    and therefore no permissions at all.
 --    Right-click the role in Server Settings -> Roles -> Copy Role ID.
+INSERT INTO fpd_discord_members (discord_id, roles, synced_at)
+VALUES ('<your discord id>', '["<your discord role id>"]', NOW());
+
+-- 4. That role mapped to the admin group. This is the only mapping you ever
+--    have to write by hand; the rest are added from the MDT.
 INSERT INTO fpd_role_map (discord_role_id, discord_role_name, group_key, agency_id)
 VALUES ('<your discord role id>', 'FredPD Admin', 'admin', 'lspd');
 ```
+
+`roles` is a JSON array — several roles are `'["111…","222…"]'`.
+
+**While the bot is missing,** `synced_at` decides how fresh FredPD considers your
+role list. Older than 15 minutes and sensitive actions are refused; older than 6
+hours and the session goes read-only. Run
+`UPDATE fpd_discord_members SET synced_at = NOW();` before administering.
 
 Then restart the resource, open the MDT, and use **Administration → Discord
 roles** to map the rest — and `/fredpd placement` to put the terminals, the lab
@@ -67,11 +81,15 @@ able to configure FredPD is not the same as being cleared to read records
 
 ### Why is nothing happening yet?
 
-- **The MDT opens but the rail is empty.** Your Discord roles are not mapped, or
-  the gateway has not synced them into `fpd_discord_members` yet. Permissions
-  come from Discord and only from Discord (invariant 2).
+- **The MDT opens but the rail is empty.** Either no role is mapped, or there is
+  no row for you in `fpd_discord_members` (step 3 above). Permissions come from
+  Discord and only from Discord (invariant 2).
+- **"Your permissions are out of date."** `synced_at` is over 15 minutes old.
+- **The motor pool is empty.** `fpd_fleet` has no rows for your agency, and its
+  `label_key` column is a locale key rather than a name — see the Swedish
+  installation guide, section 7.
 - **`/fredpd placement` says access denied.** The `admin` group grants
-  `admin.placement.edit`; check step 3 above.
+  `admin.placement.edit`; check step 4 above.
 - **Nothing appears in the world.** Placements are created in game, not seeded.
   An empty `fpd_placements` is an install with no terminals yet, which is the
   expected starting state.
