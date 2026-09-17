@@ -277,7 +277,8 @@ route.define({
     audit = 'intel.org.deleted',
     subjectType = 'intel_org',
     handler = function(session, input)
-        -- Notes detach rather than die with the organisation (migration 0003).
+        -- Notes detach rather than die with the organisation: the foreign key
+        -- is ON DELETE SET NULL, not CASCADE.
         -- The intelligence survives; only the profile goes.
         if repo.deleteOrg(session.agencyId, input.id) == 0 then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)

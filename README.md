@@ -40,7 +40,7 @@ Working today:
   log of every draw and return (spec 7.31).
 - **The intelligence register** — people, organizations, the intel log, vehicles,
   cases and the links between them — ported from PD-Span onto the server's own
-  MariaDB, so it persists in the game database (spec 10, migration 0003).
+  MariaDB, so it persists in the game database (spec 10).
 
 Records, dispatch, evidence, lab and court follow in M2–M6; see the roadmap in
 spec section 17.
@@ -96,8 +96,8 @@ and `esx_menu_dialog` are used where present and degrade with a warning where
 not — each sits behind a bridge (spec 3.8, ADR-008).
 
 Build first — the NUI is served from `resources/[fredpd]/fredpd/web/dist`,
-which `pnpm build` produces. Then apply `database/migrations/` in order and the
-seeds in `database/seeds/`.
+which `pnpm build` produces. Then apply `database/migrations/0001_fredpd.sql` —
+the whole schema, one file — followed by `database/seeds/0001_permissions.sql`.
 
 A fresh install deliberately grants nobody anything: map your first Discord role
 to the `admin` group in `fpd_role_map`, and everything else can be configured

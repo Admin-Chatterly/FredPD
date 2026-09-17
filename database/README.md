@@ -5,18 +5,33 @@ ESX server already uses (spec 3.3).
 
 ## Migrations
 
+`0001_fredpd.sql` is the entire schema as first released — all 23 tables, in
+foreign-key order. A fresh install is one file.
+
 `migrations/` is **append-only**. Invariant 8: a migration that has shipped is
 never edited, not even to fix a typo in a comment. Correct it with a new
-migration.
+migration. `0001` was consolidated from three files before the first release,
+while the only place it had ever run was CI against a throwaway database; that
+is the one moment such a rewrite is safe, and it has passed (ADR-009).
 
 - Numbered `NNNN_short_name.sql`, applied in filename order.
+- Every statement is `CREATE TABLE IF NOT EXISTS`, so re-applying a migration
+  is a no-op rather than an error.
 - Every FredPD table is prefixed `fpd_` so it is obvious what belongs to this
   suite inside a shared ESX database.
-- CI applies every migration to an empty database, and again on top of itself to
-  prove idempotency, on each pull request (spec 15).
+- CI applies every migration to an empty MariaDB 11.4, and again on top of
+  itself to prove idempotency, on each push (spec 15).
 
 The migration runner and the `fpd_migrations` bookkeeping table land in M1
-(spec 17.2). Until then, apply them by hand, in order:
+(spec 17.2). Until then, apply them by hand:
+
+```
+mysql -u root fredpd < database/migrations/0001_fredpd.sql
+mysql -u root fredpd < database/seeds/0001_permissions.sql
+```
+
+Once later versions add migrations, run the whole directory in filename order
+instead — applying one twice does nothing:
 
 ```
 for f in database/migrations/*.sql; do mysql -u root fredpd < "$f"; done
@@ -26,8 +41,8 @@ for f in database/seeds/*.sql;      do mysql -u root fredpd < "$f"; done
 ## Seeds
 
 `seeds/` holds code tables that ship with the product rather than data a server
-invents: permission groups (0001) and the intelligence groups (0002) now, the
-penal code and disposition codes later.
+invents: the permission groups now — platform and intelligence alike, in
+`0001_permissions.sql` — and the penal code and disposition codes later.
 Seeds are idempotent — re-running one must not duplicate rows.
 
 Note that the seeds create the permission **groups** but map no Discord roles to

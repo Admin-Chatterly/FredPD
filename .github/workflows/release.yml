@@ -25,6 +25,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # A tag can be pushed at any commit, so the release job verifies rather
+      # than trusting that CI already passed on whatever it points at. A bundle
+      # that reaches a server is not the place to find out.
+      - name: Checks
+        run: pnpm check
+
+      - name: Unit tests
+        run: pnpm test
+
       - name: Build the NUI and the gateway
         run: pnpm build
 
@@ -52,6 +61,11 @@ jobs:
           mkdir -p "$staging/fredpd-${version}/gateway"
           cp -r gateway/dist gateway/package.json "$staging/fredpd-${version}/gateway/"
 
+          # The documentation somebody actually needs while installing: the
+          # Swedish setup guide and the in-character service manual, alongside
+          # the README and the specification.
+          mkdir -p "$staging/fredpd-${version}/docs"
+          cp docs/installation.sv.md docs/handbok.sv.md "$staging/fredpd-${version}/docs/"
           cp README.md docs/FredPD.md "$staging/fredpd-${version}/"
 
           ( cd "$staging" && zip -qr "fredpd-${version}.zip" "fredpd-${version}" )

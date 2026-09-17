@@ -1,20 +1,298 @@
--- 0003_intel.sql
+-- 0001_fredpd.sql
 --
--- The intelligence module (spec 10): PD-Span's data model, ported from
--- Supabase/Postgres onto the server's own MariaDB so everything persists in the
--- game database rather than in a separate hosted service.
+-- The whole FredPD schema, in one file: migration bookkeeping, the M1 platform
+-- core (agencies, roster, the Discord-derived permission model, the audit log,
+-- world placements, the internal channel, the motor pool) and the intelligence
+-- register ported from PD-Span (spec 10).
 --
--- Invariant 8: append-only. Never edit this file once it has shipped.
+-- Invariant 8: migrations are append-only. **This file has now shipped.** Never
+-- edit it -- not even a comment. Correct anything here with `0002_*.sql`.
+--
+-- It is one file rather than three because FredPD has never been applied to a
+-- running server: the only place the earlier 0001/0002/0003 split was ever
+-- executed was CI, against a throwaway database. Consolidating before first
+-- release is a rewrite of something nobody has installed; doing the same after
+-- release would be exactly what invariant 8 forbids (ADR-009).
+--
+-- Tables are created in foreign-key order -- `fpd_agencies` before anything
+-- that references it, `fpd_permission_groups` before the grants and the role
+-- map, `fpd_intel_cases` before the notes and links that hang on it -- so the
+-- file applies top to bottom against an empty database.
+--
+-- Every statement is `CREATE TABLE IF NOT EXISTS`, so re-applying this file is
+-- a no-op rather than an error. CI proves that on every push.
+--
+-- Every table is prefixed `fpd_` so it is obvious what belongs to FredPD inside
+-- the ESX database it shares.
+
+
+-- =============================================================================
+-- Migration bookkeeping (spec 17.2)
+--
+-- `checksum` is what lets the runner refuse to start against an unexpected
+-- schema (spec 16): if a shipped migration was edited after the fact, the
+-- recorded checksum no longer matches the file and the server stops instead of
+-- applying a half-known schema to production data.
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS `fpd_migrations` (
+    `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `name`        VARCHAR(191) NOT NULL,
+    `checksum`    CHAR(64)     NOT NULL COMMENT 'SHA-256 of the file as applied',
+    `applied_at`  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `duration_ms` INT UNSIGNED NOT NULL DEFAULT 0,
+
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_fpd_migrations_name` (`name`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+
+-- =============================================================================
+-- PLATFORM CORE
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- Agencies and settings
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS `fpd_agencies` (
+    `id`          VARCHAR(32)  NOT NULL COMMENT 'Stable key, e.g. lspd',
+    `name`        VARCHAR(191) NOT NULL,
+    `short_name`  VARCHAR(32)  NOT NULL,
+    `accent_color` CHAR(7)     NOT NULL DEFAULT '#1b4f9c',
+    `enabled`     TINYINT(1)   NOT NULL DEFAULT 1,
+    `created_at`  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updated_at`  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+
+    PRIMARY KEY (`id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- Runtime configuration that an administrator changes in game rather than in a
+-- file. Scoped per agency, with a NULL agency meaning "server-wide".
+CREATE TABLE IF NOT EXISTS `fpd_settings` (
+    `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `agency_id`  VARCHAR(32)     NULL,
+    `key`        VARCHAR(191)    NOT NULL,
+    `value`      JSON            NOT NULL,
+    `updated_at` DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    `updated_by` VARCHAR(191)    NULL COMMENT 'Discord id of the last editor',
+
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_fpd_settings` (`agency_id`, `key`),
+    CONSTRAINT `fk_fpd_settings_agency` FOREIGN KEY (`agency_id`)
+        REFERENCES `fpd_agencies` (`id`) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------------------------
+-- Roster
+--
+-- One row per person who may open FredPD, keyed by Discord id because that is
+-- what access depends on (invariant 2, ADR-004). `identifier` binds the ESX
+-- character; a Discord user holds one bound character per agency (spec 4.1).
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS `fpd_officers` (
+    `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `discord_id`  VARCHAR(32)     NOT NULL,
+    `agency_id`   VARCHAR(32)     NOT NULL,
+    `identifier`  VARCHAR(191)    NULL COMMENT 'ESX character identifier, e.g. char1:license:…',
+    `callsign`    VARCHAR(32)     NULL,
+    `name`        VARCHAR(191)    NULL COMMENT 'Display name, set by command staff',
+    `active`      TINYINT(1)      NOT NULL DEFAULT 1,
+    `created_at`  DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updated_at`  DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_fpd_officers_discord_agency` (`discord_id`, `agency_id`),
+    KEY `idx_fpd_officers_identifier` (`identifier`),
+    CONSTRAINT `fk_fpd_officers_agency` FOREIGN KEY (`agency_id`)
+        REFERENCES `fpd_agencies` (`id`) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------------------------
+-- Permissions (spec 4.3)
+--
+-- Discord role -> permission groups -> permission keys. The role map is a table
+-- rather than a config file precisely so it can be edited from the MDT in game
+-- (spec 7.30) without a restart.
+-- -----------------------------------------------------------------------------
+
+-- The gateway's bot writes this; FXServer only reads it (spec 4.2).
+CREATE TABLE IF NOT EXISTS `fpd_discord_members` (
+    `discord_id` VARCHAR(32) NOT NULL,
+    `roles`      JSON        NOT NULL COMMENT 'Array of Discord role ids',
+    `synced_at`  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    PRIMARY KEY (`discord_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `fpd_permission_groups` (
+    `key`         VARCHAR(64)  NOT NULL,
+    `name`        VARCHAR(191) NOT NULL,
+    `inherits`    VARCHAR(64)  NULL COMMENT 'Another group key, for bundles that extend one another',
+    `description` VARCHAR(255) NULL,
+    `created_at`  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    PRIMARY KEY (`key`),
+    CONSTRAINT `fk_fpd_groups_inherits` FOREIGN KEY (`inherits`)
+        REFERENCES `fpd_permission_groups` (`key`) ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `fpd_group_permissions` (
+    `group_key`  VARCHAR(64)  NOT NULL,
+    `permission` VARCHAR(128) NOT NULL COMMENT 'A key from Appendix B',
+
+    PRIMARY KEY (`group_key`, `permission`),
+    CONSTRAINT `fk_fpd_group_permissions_group` FOREIGN KEY (`group_key`)
+        REFERENCES `fpd_permission_groups` (`key`) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- The editable mapping: which Discord role grants which group, in which agency.
+CREATE TABLE IF NOT EXISTS `fpd_role_map` (
+    `id`               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `discord_role_id`  VARCHAR(32)     NOT NULL,
+    `discord_role_name` VARCHAR(191)   NULL COMMENT 'Cached for display; Discord remains the source of truth',
+    `group_key`        VARCHAR(64)     NOT NULL,
+    `agency_id`        VARCHAR(32)     NOT NULL,
+    `created_at`       DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `created_by`       VARCHAR(191)    NULL,
+
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_fpd_role_map` (`discord_role_id`, `group_key`, `agency_id`),
+    KEY `idx_fpd_role_map_agency` (`agency_id`),
+    CONSTRAINT `fk_fpd_role_map_group` FOREIGN KEY (`group_key`)
+        REFERENCES `fpd_permission_groups` (`key`) ON DELETE CASCADE,
+    CONSTRAINT `fk_fpd_role_map_agency` FOREIGN KEY (`agency_id`)
+        REFERENCES `fpd_agencies` (`id`) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------------------------
+-- Audit log (invariant 11)
+--
+-- Append-only. Nothing in the application ever updates or deletes a row here,
+-- and the retention job is explicitly forbidden from touching it (spec 13.3).
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS `fpd_audit_log` (
+    `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `occurred_at` DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `action`      VARCHAR(128)    NOT NULL COMMENT 'e.g. placement.created, chat.sent',
+    `discord_id`  VARCHAR(32)     NULL COMMENT 'NULL for server-initiated actions',
+    `agency_id`   VARCHAR(32)     NULL,
+    `subject_type` VARCHAR(64)    NULL COMMENT 'What was acted on',
+    `subject_id`  VARCHAR(64)     NULL,
+    `outcome`     VARCHAR(16)     NOT NULL DEFAULT 'ok' COMMENT 'ok | denied | error',
+    `detail`      JSON            NULL COMMENT 'Never a full record: what changed, not the contents',
+
+    PRIMARY KEY (`id`),
+    KEY `idx_fpd_audit_occurred` (`occurred_at`),
+    KEY `idx_fpd_audit_actor` (`discord_id`, `occurred_at`),
+    KEY `idx_fpd_audit_subject` (`subject_type`, `subject_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------------------------
+-- World placements (spec 3.10, ADR-006)
+--
+-- Where each module opens. Created and moved in game; never in a config file.
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS `fpd_placements` (
+    `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `kind`        VARCHAR(48)     NOT NULL COMMENT 'What it opens: station_terminal, lab_terminal, motorpool, …',
+    `agency_id`   VARCHAR(32)     NULL COMMENT 'NULL means shared between agencies',
+    `interaction` VARCHAR(16)     NOT NULL DEFAULT 'zone' COMMENT 'prop | ped | zone',
+    `model`       VARCHAR(64)     NULL COMMENT 'Prop or ped model for the prop and ped interactions',
+    `x`           DOUBLE          NOT NULL,
+    `y`           DOUBLE          NOT NULL,
+    `z`           DOUBLE          NOT NULL,
+    `heading`     FLOAT           NOT NULL DEFAULT 0,
+    `radius`      FLOAT           NOT NULL DEFAULT 1.5,
+    `label_key`   VARCHAR(128)    NULL COMMENT 'Locale key for the prompt -- never a literal string (invariant 6)',
+    `enabled`     TINYINT(1)      NOT NULL DEFAULT 1,
+    `created_at`  DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `created_by`  VARCHAR(191)    NULL,
+    `updated_at`  DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+
+    PRIMARY KEY (`id`),
+    KEY `idx_fpd_placements_kind` (`kind`, `enabled`),
+    CONSTRAINT `fk_fpd_placements_agency` FOREIGN KEY (`agency_id`)
+        REFERENCES `fpd_agencies` (`id`) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------------------------
+-- Internal police chat (spec 7.26, ADR-007)
+--
+-- Append-only, so the channel is reviewable after an incident rather than
+-- ephemeral. The recipient list is computed per message on the server and is
+-- deliberately not stored: who could read it is derived from permissions at the
+-- time, and storing a snapshot would invite treating it as authoritative.
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS `fpd_chat_messages` (
+    `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `sent_at`     DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `agency_id`   VARCHAR(32)     NOT NULL,
+    `discord_id`  VARCHAR(32)     NOT NULL COMMENT 'Author, from the session -- never from the client',
+    `callsign`    VARCHAR(32)     NULL COMMENT 'Resolved server-side at send time',
+    `author_name` VARCHAR(191)    NULL,
+    `body`        VARCHAR(512)    NOT NULL,
+
+    PRIMARY KEY (`id`),
+    KEY `idx_fpd_chat_agency_time` (`agency_id`, `sent_at`),
+    CONSTRAINT `fk_fpd_chat_agency` FOREIGN KEY (`agency_id`)
+        REFERENCES `fpd_agencies` (`id`) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------------------------
+-- Motor pool (spec 7.31)
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS `fpd_fleet` (
+    `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `agency_id`     VARCHAR(32)     NOT NULL,
+    `model`         VARCHAR(64)     NOT NULL COMMENT 'Spawn name',
+    `label_key`     VARCHAR(128)    NOT NULL COMMENT 'Locale key, not a literal name',
+    `permission`    VARCHAR(128)    NULL COMMENT 'Extra permission beyond garage.vehicle.draw',
+    `certification` VARCHAR(64)     NULL COMMENT 'Required certification, e.g. pursuit, air',
+    `livery`        INT             NULL,
+    `sort_order`    INT             NOT NULL DEFAULT 0,
+    `enabled`       TINYINT(1)      NOT NULL DEFAULT 1,
+
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_fpd_fleet_agency_model` (`agency_id`, `model`),
+    CONSTRAINT `fk_fpd_fleet_agency` FOREIGN KEY (`agency_id`)
+        REFERENCES `fpd_agencies` (`id`) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `fpd_motorpool_log` (
+    `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `occurred_at`  DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `action`       VARCHAR(16)     NOT NULL COMMENT 'draw | return',
+    `agency_id`    VARCHAR(32)     NOT NULL,
+    `discord_id`   VARCHAR(32)     NOT NULL,
+    `model`        VARCHAR(64)     NOT NULL,
+    `plate`        VARCHAR(16)     NULL,
+    -- Deliberately no foreign key: the log outlives the placement. A motor
+    -- pool that is moved or removed must not erase the record of what was
+    -- drawn from it.
+    `placement_id` BIGINT UNSIGNED NULL,
+
+    PRIMARY KEY (`id`),
+    KEY `idx_fpd_motorpool_officer` (`discord_id`, `occurred_at`),
+    KEY `idx_fpd_motorpool_plate` (`plate`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+
+-- =============================================================================
+-- INTELLIGENCE REGISTER (spec 10)
+--
+-- PD-Span's data model, ported from Supabase/Postgres onto the server's own
+-- MariaDB so everything persists in the game database rather than in a separate
+-- hosted service.
 --
 -- What changed in the port, and why:
 --
 --   * `uuid` primary keys become `BIGINT UNSIGNED AUTO_INCREMENT` (spec 13.1).
---
--- The existing PD-Span data is deliberately NOT migrated: this starts empty and
--- the register is built up in game. Nothing here carries the old identifiers.
--- If that decision is ever revisited, a later migration adds a nullable unique
--- `span_uuid` per table and the import keys on it -- it is an ALTER, not a
--- redesign.
 --   * `text[]` tags become a join table. MariaDB has no array type, and a real
 --     table makes the tag filter a GROUP BY instead of an unnest.
 --   * `unique nulls not distinct` has no MariaDB equivalent: MySQL and MariaDB
@@ -33,8 +311,15 @@
 --     locale files (invariant 6), so these columns stay NULL and the interface
 --     renders the key.
 --
+-- The existing PD-Span data is deliberately NOT migrated: this starts empty and
+-- the register is built up in game. Nothing here carries the old identifiers.
+-- If that decision is ever revisited, a later migration adds a nullable unique
+-- `span_uuid` per table and the import keys on it -- it is an ALTER, not a
+-- redesign.
+--
 -- Deliberately lost: pg_trgm typo tolerance. Search is substring-based, as
 -- PD-Span's primary path already was. Fuzzy ranking can come back later.
+-- =============================================================================
 
 -- -----------------------------------------------------------------------------
 -- Persons of interest
@@ -300,7 +585,6 @@ CREATE TABLE IF NOT EXISTS `fpd_intel_vehicles` (
         ('open', 'internal', 'restricted', 'confidential', 'secret'))
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-
 -- -----------------------------------------------------------------------------
 -- Case links: a link points at exactly one of a person or an organisation.
 --
@@ -308,6 +592,8 @@ CREATE TABLE IF NOT EXISTS `fpd_intel_vehicles` (
 -- does not have -- NULLs count as distinct here, so that constraint would have
 -- allowed duplicates. The generated columns below are never NULL, so the unique
 -- key actually holds.
+-- -----------------------------------------------------------------------------
+
 CREATE TABLE IF NOT EXISTS `fpd_intel_case_links` (
     `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `case_id`    BIGINT UNSIGNED NOT NULL,

@@ -10,7 +10,7 @@ Required by spec **10.5**. Source imported at `vendor/pd-span/`
 | Blocks | M0 (this inventory), M5 (intelligence module) |
 | Recommendation | **Option 1, with a caveat** — port the data model, rewrite the UI. See §9. |
 | PD-Span status | **Live, with real intelligence in it** (confirmed 2026-09-17). |
-| Outcome | **Built.** Option 1 taken in its reframed form: the data model is ported to MariaDB as the `intel` module (migration 0003). The existing data is **not** migrated — §8 is retained as a record, not a plan. |
+| Outcome | **Built.** Option 1 taken in its reframed form: the data model is ported to MariaDB as the `intel` module (the `fpd_intel_*` tables in migration 0001). The existing data is **not** migrated — §8 is retained as a record, not a plan. |
 
 ## 1. The headline finding
 

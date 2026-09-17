@@ -6,9 +6,16 @@
 -- These are the *bundles*. Which Discord role grants which bundle is not seeded:
 -- role ids are specific to your guild, and that mapping is edited in the MDT
 -- (spec 7.30). A fresh install therefore grants nobody anything until an
--- administrator maps the first role, which is the correct default.
+-- administrator maps the first role, which is the correct default -- and it is
+-- also why a group you do not want is harmless: an unmapped group grants
+-- nobody anything.
 --
--- Groups here cover what exists today (M1). Later milestones add their own.
+-- Groups here cover what exists today (M1 and the intelligence register).
+-- Later milestones add their own.
+
+-- -----------------------------------------------------------------------------
+-- Platform groups
+-- -----------------------------------------------------------------------------
 
 INSERT INTO `fpd_permission_groups` (`key`, `name`, `inherits`, `description`) VALUES
     ('patrol_basic', 'Patrol (trainee)', NULL,
@@ -26,6 +33,31 @@ INSERT INTO `fpd_permission_groups` (`key`, `name`, `inherits`, `description`) V
 ON DUPLICATE KEY UPDATE
     -- `VALUES(col)` rather than MySQL 8's `AS new` row alias: MariaDB does not
     -- implement the alias form, and the spec targets MariaDB 11.4 (spec 3.3).
+    `name`        = VALUES(`name`),
+    `inherits`    = VALUES(`inherits`),
+    `description` = VALUES(`description`);
+
+-- -----------------------------------------------------------------------------
+-- Intelligence groups (spec 10, Appendix C)
+--
+-- The three mirror the RUE roles. What separates them is not how much they can
+-- read -- an analyst reads the whole register -- but two specific powers:
+-- seeing where protected intelligence came from, and destroying records.
+--
+-- A second statement rather than more rows above, because `inherits` is a
+-- foreign key onto this same table: the platform groups must exist before
+-- anything can inherit from them, and keeping the two sets apart makes the
+-- dependency obvious.
+-- -----------------------------------------------------------------------------
+
+INSERT INTO `fpd_permission_groups` (`key`, `name`, `inherits`, `description`) VALUES
+    ('intel_analyst', 'Intelligence analyst', NULL,
+     'Reads and writes the intelligence register. Cannot see protected sources and cannot delete.'),
+    ('intel_handler', 'Source handler',       'intel_analyst',
+     'An analyst who may also see where protected intelligence came from, and merge duplicate records.'),
+    ('intel_command', 'Intelligence command', 'intel_handler',
+     'A handler who may also delete records from the register.')
+ON DUPLICATE KEY UPDATE
     `name`        = VALUES(`name`),
     `inherits`    = VALUES(`inherits`),
     `description` = VALUES(`description`);
@@ -67,4 +99,30 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('admin', 'admin.placement.edit'),
     ('admin', 'admin.branding.edit'),
     ('admin', 'admin.audit.view'),
-    ('admin', 'garage.fleet.edit');
+    ('admin', 'garage.fleet.edit'),
+
+    -- The analyst: the whole register, read and write.
+    ('intel_analyst', 'page.intel'),
+    ('intel_analyst', 'intel.module.open'),
+    ('intel_analyst', 'intel.person.view'),
+    ('intel_analyst', 'intel.person.edit'),
+    ('intel_analyst', 'intel.org.view'),
+    ('intel_analyst', 'intel.org.edit'),
+    ('intel_analyst', 'intel.case.view'),
+    ('intel_analyst', 'intel.case.edit'),
+    ('intel_analyst', 'intel.report.view'),
+    ('intel_analyst', 'intel.report.create'),
+    ('intel_analyst', 'intel.report.edit'),
+    ('intel_analyst', 'intel.evidence.add'),
+
+    -- The handler. `intel.source.view` is the one that matters: without it a
+    -- note from an informant, a wiretap or surveillance is readable but its
+    -- source is withheld. That distinction is the whole reason the group
+    -- exists -- in PD-Span every account could see every source.
+    ('intel_handler', 'intel.source.view'),
+    ('intel_handler', 'intel.person.merge'),
+
+    -- Command. Deletion is separated deliberately: intelligence is meant to
+    -- outlive the record it hung on, and destroying it should be a decision
+    -- somebody is named for.
+    ('intel_command', 'intel.record.delete');

@@ -65,7 +65,16 @@ Kopiera sedan mappen `resources/[fredpd]/` till serverns resursmapp.
 
 ## 3. Steg 2 — Databas
 
-Kör migrationerna i nummerordning, och därefter seed-filerna:
+Två filer, i den här ordningen — hela schemat ligger i en enda migration:
+
+```bash
+mysql -u root DITT_ESX_SCHEMA < database/migrations/0001_fredpd.sql
+mysql -u root DITT_ESX_SCHEMA < database/seeds/0001_permissions.sql
+```
+
+Kommer det fler migrationer i senare versioner körs de i nummerordning efter
+den här. Då går det lika bra att köra hela mappen — inget händer när en
+migration körs igen:
 
 ```bash
 for f in database/migrations/*.sql; do mysql -u root DITT_ESX_SCHEMA < "$f"; done
@@ -73,8 +82,10 @@ for f in database/seeds/*.sql;      do mysql -u root DITT_ESX_SCHEMA < "$f"; don
 ```
 
 Migrationerna är **append-only**: en fil som en gång körts ändras aldrig, den
-rättas med en ny migration. Seed-filerna går att köra om hur många gånger som
+rättas med en ny migration. Seed-filen går att köra om hur många gånger som
 helst utan att det blir dubbletter.
+
+Alla tabeller heter `fpd_*`, så inget i ditt befintliga ESX-schema rörs.
 
 Seed-filen skapar behörighets**grupperna**, men kopplar inga Discord-roller till
 dem. Roll-ID:n är unika för just din Discord-server, så den kopplingen görs i
@@ -350,9 +361,9 @@ testdata utan spelserver. Frågeparametrar: `?locale=sv`, `?latency=400`,
 ## 11b. Underrättelsemodulen
 
 Underrättelseregistret — personer, organisationer, uppgifter, fordon, ärenden
-och kopplingarna mellan dem — ligger i serverns egen databas (`fpd_intel_*`,
-migration 0003). Det som tidigare låg i PD-Span finns nu här och sparas på
-servern.
+och kopplingarna mellan dem — ligger i serverns egen databas (tabellerna
+`fpd_intel_*`, som skapas av samma migration som resten). Det som tidigare låg
+i PD-Span finns nu här och sparas på servern.
 
 Den befintliga datan i PD-Span flyttas **inte** över: modulen börjar tom och
 registret byggs upp i spelet.

@@ -169,7 +169,7 @@ fredpd/
 ├─ packages/
 │  └─ schema/                   # route and entity schemas → generated TS types + Lua validator tables
 ├─ database/
-│  ├─ migrations/               # append-only, numbered
+│  ├─ migrations/               # append-only, numbered; 0001 is the whole schema as first released
 │  └─ seeds/                    # code tables, penal code, default permission groups
 ├─ tools/                       # i18n checker, codegen, load-test harness
 ├─ vendor/pd-span/              # PD-Span source for integration work (section 10)
@@ -1035,7 +1035,7 @@ Decay times, success rates and caps are configured per type.
 
 The inventory (10.5) is done: `docs/pd-span-inventory.md`. It found that PD-Span is a Next.js application on Supabase rather than a FiveM resource, so option 1 of 10.3 was taken in its reframed form — **the data model is ported into the monorepo as the `intel` module and the interface is rebuilt**, rather than a resource being merged or a bridge being written.
 
-The register now lives in the server's own MariaDB (`fpd_intel_*`, migration 0003) and persists there. The existing PD-Span data is deliberately **not** migrated: the module starts empty and the register is built up in game.
+The register now lives in the server's own MariaDB (the `fpd_intel_*` tables in migration 0001) and persists there. The existing PD-Span data is deliberately **not** migrated: the module starts empty and the register is built up in game.
 
 That makes the bridge contract in 10.4 unnecessary — there is no second system to bridge to. It is kept below as a record of what was considered.
 

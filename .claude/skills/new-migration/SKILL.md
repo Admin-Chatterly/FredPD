@@ -15,6 +15,9 @@ here; if it fires, you are doing the wrong thing.
 `database/migrations/NNNN_short_name.sql`, numbered one above the highest that
 exists. Lower-case, underscores, describing the change: `0007_add_bolo_expiry.sql`.
 
+`0001_fredpd.sql` is the released baseline — the whole schema as first shipped
+(ADR-009). It is frozen. Every change since is its own file.
+
 ## 2. Write it
 
 - Every FredPD table is prefixed `fpd_`.

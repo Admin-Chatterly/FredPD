@@ -19,3 +19,4 @@ When a decision changes `docs/FredPD.md`, the ADR and the spec edit go in the
 | [006](006-in-game-placement-config.md) | World positions configured in game, not in config files | Accepted |
 | [007](007-police-chat-in-game-chat.md) | The internal police channel lives in the game chat | Accepted |
 | [008](008-coexist-with-p-policejob.md) | Coexist with p_policejob rather than replacing it | Accepted |
+| [009](009-single-baseline-migration.md) | The schema ships as one baseline migration | Accepted |
