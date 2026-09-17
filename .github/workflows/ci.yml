@@ -3,7 +3,12 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    # Working branches too, not just main. Without this, nothing on a feature
+    # branch is ever validated -- and the database job is the only place the
+    # migrations are actually applied to MariaDB.
+    branches:
+      - main
+      - 'claude/**'
 
 concurrency:
   group: ci-${{ github.ref }}
