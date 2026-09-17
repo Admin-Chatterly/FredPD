@@ -14,10 +14,17 @@ local isOpen = false
 --- player is standing at that placement. The id is a *claim*, never a grant:
 --- naming a terminal you are not at fails the check on the server.
 ---
+--- Opening while already open is not a no-op, because the placement can have
+--- changed. An officer who opens the MDT on the keybind and then walks up to
+--- the property terminal fires the placement action with the interface already
+--- up: returning early there would leave the NUI holding no placement at all,
+--- and every intake would go on failing on `context` for no visible reason.
+--- Closing while already closed really is nothing.
+---
 --- @param open boolean
 --- @param placement table|nil
 local function setOpen(open, placement)
-    if open == isOpen then return end
+    if not open and not isOpen then return end
 
     isOpen = open
     SetNuiFocus(open, open)

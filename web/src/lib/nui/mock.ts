@@ -46,8 +46,27 @@ export function createMockBridge(): NuiBridge {
     }
   }
 
-  // The game normally opens the NUI; in a browser it is always open.
-  queueMicrotask(() => emit({ type: 'fredpd:open' }));
+  /**
+   * The game normally opens the NUI; in a browser it is always open.
+   *
+   * It opens *at a placement*, because several routes take the id of the
+   * terminal the call is made at and refuse without it — the property room
+   * counter and the lab bench both do. Opening with none would leave every
+   * screen that needs one unreachable in a browser, which is the one place the
+   * interface is supposed to be walkable end to end.
+   *
+   * `?placement=` overrides it, and `?placement=none` opens with none at all,
+   * to walk what an officer sees having opened the MDT on the keybind in the
+   * middle of a field.
+   */
+  const requested = new URLSearchParams(window.location.search).get('placement');
+
+  queueMicrotask(() =>
+    emit({
+      type: 'fredpd:open',
+      ...(requested === 'none' ? {} : { placementId: Number(requested) || 1 }),
+    }),
+  );
 
   return {
     isMock: true,
