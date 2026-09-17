@@ -24,6 +24,68 @@ local function permissionChecker(session)
     end
 end
 
+--- The four predicates `service.drawableFleet` and `service.gatingSatisfied`
+--- take, built once per route call.
+---
+--- Once per *call*, not once per vehicle, is the point of building them here.
+--- The Discord snapshot is one row in `fpd_discord_members`, so reading it
+--- inside the loop would turn a forty-vehicle fleet into forty round trips
+--- (spec 12); it is read once and turned into a set. The group answers are
+--- memoised for the same reason: several vehicles commonly name the same unit.
+---
+--- @param session table
+--- @return table { hasPermission, certifications, holdsDiscordRole, satisfiesGroup }
+local function gateChecks(session)
+    local heldRoles = {}
+
+    -- Role ids are snowflakes, and a JSON decoder is entitled to hand a bare
+    -- number back for one. The column stores them as text and the editor
+    -- validates them as digits, so both sides are compared as strings.
+    local roles = FredPD.Core.perms.memberRoles(session.discordId)
+    for index = 1, #roles do heldRoles[tostring(roles[index])] = true end
+
+    local groupAnswers = {}
+
+    return {
+        hasPermission = permissionChecker(session),
+        certifications = certificationsFor(session),
+
+        holdsDiscordRole = function(roleId)
+            return heldRoles[tostring(roleId)] == true
+        end,
+
+        --- Does this session hold everything the group grants?
+        ---
+        --- Asked of the permission model that already exists rather than of a
+        --- second one: a group is a set of permission keys, the session carries
+        --- the set it holds, and `perms.missing` is the comparison the admin
+        --- screen already uses for "may this actor grant this group". Nothing
+        --- here asks which Discord roles produced the session's permissions,
+        --- because that is not what the gate means.
+        ---
+        --- Fails closed twice over. A group the cache has never heard of --
+        --- renamed, deleted, or a typo the editor was not there to catch when
+        --- the row was written -- answers nil, and a group that grants nothing
+        --- answers an empty set: neither can distinguish one officer from
+        --- another, so neither opens the vehicle.
+        satisfiesGroup = function(groupKey)
+            local answer = groupAnswers[groupKey]
+            if answer ~= nil then return answer end
+
+            local permissions = FredPD.Core.perms.permissionsOf(groupKey)
+
+            if not permissions or next(permissions) == nil then
+                answer = false
+            else
+                answer = #FredPD.Core.perms.missing(permissions, session.permissions) == 0
+            end
+
+            groupAnswers[groupKey] = answer
+            return answer
+        end,
+    }
+end
+
 route.define({
     name = 'garage.fleet',
     perm = 'garage.vehicle.draw',
@@ -32,8 +94,12 @@ route.define({
     handler = function(session, _input)
         local fleet = repo.fleetFor(session.agencyId)
 
+        -- The gate is applied to the *list*, not only to the draw. A menu that
+        -- offers the air unit's helicopter to every officer and then refuses it
+        -- is a refusal waiting to happen, and the server decides what is
+        -- visible (invariant 4).
         return {
-            fleet = service.allowedFleet(fleet, permissionChecker(session), certificationsFor(session)),
+            fleet = service.drawableFleet(fleet, gateChecks(session)),
         }
     end,
 })
@@ -52,18 +118,29 @@ route.define({
     end,
     handler = function(session, input)
         local fleet = repo.fleetFor(session.agencyId)
+        local checks = gateChecks(session)
 
         -- Looked up among what this officer is *allowed* to draw, so asking for
         -- a model the menu never offered fails here rather than succeeding.
         local entry = service.findAllowed(
-            fleet, input.model, permissionChecker(session), certificationsFor(session)
+            fleet, input.model, checks.hasPermission, checks.certifications
         )
 
-        if not entry then
+        -- And gated again here rather than trusting the list route to have
+        -- filtered it: `garage.fleet` and `garage.draw` are two calls, and a
+        -- client is free to make the second without the first (invariant 4).
+        -- This is the authoritative check; the one in the list is courtesy.
+        if not entry or not service.gatingSatisfied(entry, checks.holdsDiscordRole, checks.satisfiesGroup) then
             return route.refuse(FredPD.ErrorCode.FORBIDDEN)
         end
 
-        local plate = service.generatePlate(session.agencyId)
+        -- The plate prefix is the agency's short name -- `LSPD`, not `lspd`,
+        -- and never the raw agency key, which is a primary key chosen by
+        -- whoever ran the bootstrap and can be anything at all. The id is the
+        -- fallback only when the agency row has gone, the same way
+        -- `agencies.nameOf` falls back, so a plate is still issued.
+        local agency = FredPD.Core.agencies.get(session.agencyId)
+        local plate = service.generatePlate(agency and agency.shortName or session.agencyId)
 
         -- The agency owns the fleet, not the officer driving it (spec 7.31).
         -- A society that is unavailable does not block the draw: the vehicle

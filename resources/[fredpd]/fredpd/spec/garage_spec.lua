@@ -438,3 +438,317 @@ describe('garage', function()
         end)
     end)
 end)
+
+-- =============================================================================
+-- The routes (spec 7.31, migration 0003)
+--
+-- The tests above prove the rule. These prove it is *reached*: the gate columns
+-- were configurable and unit-tested for a release in which no route evaluated
+-- them, so every vehicle a department gated was drawable by every officer. A
+-- predicate with no caller is the defect this block exists to catch, which is
+-- why the handlers are driven here rather than the service functions.
+--
+-- `route.define` is stubbed to collect the definitions instead of registering a
+-- callback, and the repo, the agency cache and the society bridge are stubbed
+-- too; `perms.satisfies` and `perms.missing` are the real ones, because how the
+-- group gate composes out of them is exactly what is under test.
+-- =============================================================================
+
+describe('garage routes', function()
+    local FORBIDDEN <const> = 'forbidden'
+    local AIR_ROLE <const> = '900000000000000001'
+    local OTHER_ROLE <const> = '900000000000000002'
+
+    --- Loads the module with its neighbours stubbed.
+    ---
+    --- @param options table
+    ---   fleet   rows `repo.fleetFor` returns
+    ---   roles   the Discord role ids the snapshot holds for this member
+    ---   groups  group key -> set of permissions, as the permission cache holds
+    ---   holds   list of permission keys the session carries
+    ---   agency  the row `agencies.get` returns
+    --- @return table routes by name, table session, table recorded calls
+    local function wire(options)
+        local FredPD = helper.load({
+            'server/core/perms',
+            'server/modules/garage/service',
+        })
+
+        local calls = { memberRoles = 0, logged = {}, registered = {} }
+
+        FredPD.ErrorCode = { FORBIDDEN = FORBIDDEN, NOT_FOUND = 'not_found' }
+
+        local routes = {}
+
+        FredPD.Core.route = {
+            define = function(definition) routes[definition.name] = definition end,
+            refuse = function(code, fields) return { __err = code, fields = fields } end,
+        }
+
+        -- Only the two lookups that touch the database are replaced. Everything
+        -- else about the permission model stays real.
+        FredPD.Core.perms.memberRoles = function(_discordId)
+            calls.memberRoles = calls.memberRoles + 1
+            return options.roles or {}, 0
+        end
+
+        FredPD.Core.perms.permissionsOf = function(groupKey)
+            return (options.groups or {})[groupKey]
+        end
+
+        FredPD.Core.agencies = {
+            get = function(_id) return options.agency end,
+        }
+
+        FredPD.Repo = FredPD.Repo or {}
+        FredPD.Repo.garage = {
+            fleetFor = function(_agencyId) return options.fleet or {} end,
+            log = function(action, _session, model, plate, placementId)
+                calls.logged[#calls.logged + 1] = {
+                    action = action, model = model, plate = plate, placementId = placementId,
+                }
+                return 1
+            end,
+            latestEvent = function() return nil end,
+            fleetAll = function() return {} end,
+            fleetEntry = function() return nil end,
+            fleetEntryByModel = function() return nil end,
+        }
+
+        FredPD.Bridge = {
+            society = {
+                registerVehicle = function(agencyId, plate, model)
+                    calls.registered[#calls.registered + 1] = { agencyId, plate, model }
+                end,
+                releaseVehicle = function() end,
+            },
+        }
+
+        assert(loadfile('resources/[fredpd]/fredpd/server/modules/garage/routes.lua'))()
+
+        local permissions = {}
+        for _, key in ipairs(options.holds or {}) do permissions[key] = true end
+
+        local session = helper.session({ permissions = permissions })
+
+        return routes, session, calls
+    end
+
+    local function models(result)
+        local set = {}
+        for index = 1, #result.fleet do set[result.fleet[index].model] = true end
+        return set
+    end
+
+    --- A fleet covering every shape of gate: none, role only, group only, both.
+    local function gatedFleet()
+        return {
+            { model = 'police', labelKey = 'fleet.cruiser', enabled = true },
+            {
+                model = 'polmav', labelKey = 'fleet.helicopter', enabled = true,
+                requiredDiscordRole = AIR_ROLE,
+            },
+            {
+                model = 'fbi', labelKey = 'fleet.unmarked', enabled = true,
+                requiredGroup = 'detectives',
+            },
+            {
+                model = 'riot', labelKey = 'fleet.bearcat', enabled = true,
+                requiredGroup = 'swat', requiredDiscordRole = OTHER_ROLE,
+            },
+        }
+    end
+
+    --- `detectives` grants one key; `swat` grants two, so a session holding only
+    --- the first satisfies neither.
+    local GROUPS <const> = {
+        detectives = { ['records.person.view'] = true },
+        swat = { ['records.person.view'] = true, ['garage.tactical'] = true },
+    }
+
+    describe('garage.fleet', function()
+        it('lists only the ungated vehicles to an officer who meets no gate', function()
+            local routes, session = wire({ fleet = gatedFleet(), groups = GROUPS })
+            local listed = models(routes['garage.fleet'].handler(session, {}))
+
+            assert.is_true(listed.police)
+            assert.is_nil(listed.polmav)
+            assert.is_nil(listed.fbi)
+            assert.is_nil(listed.riot)
+        end)
+
+        it('lists the role-gated vehicle to the officer holding the role', function()
+            local routes, session = wire({
+                fleet = gatedFleet(), groups = GROUPS, roles = { AIR_ROLE },
+            })
+
+            local listed = models(routes['garage.fleet'].handler(session, {}))
+
+            assert.is_true(listed.polmav)
+            assert.is_nil(listed.fbi)
+        end)
+
+        it('lists the group-gated vehicle to the officer who satisfies the group', function()
+            local routes, session = wire({
+                fleet = gatedFleet(), groups = GROUPS, holds = { 'records.person.view' },
+            })
+
+            local listed = models(routes['garage.fleet'].handler(session, {}))
+
+            assert.is_true(listed.fbi)
+            -- `swat` grants a second key this session does not hold, so the
+            -- vehicle gated on it stays out of the list.
+            assert.is_nil(listed.riot)
+        end)
+
+        it('lists a vehicle gated on both once either gate opens', function()
+            -- The role, without the group.
+            local roleRoutes, roleSession = wire({
+                fleet = gatedFleet(), groups = GROUPS, roles = { OTHER_ROLE },
+            })
+
+            assert.is_true(models(roleRoutes['garage.fleet'].handler(roleSession, {})).riot)
+
+            -- The group, without the role.
+            local groupRoutes, groupSession = wire({
+                fleet = gatedFleet(), groups = GROUPS,
+                holds = { 'records.person.view', 'garage.tactical' },
+            })
+
+            assert.is_true(models(groupRoutes['garage.fleet'].handler(groupSession, {})).riot)
+        end)
+
+        it('fails closed on a gate naming a group the cache never heard of', function()
+            local routes, session = wire({
+                fleet = {
+                    { model = 'fbi', labelKey = 'fleet.unmarked', enabled = true, requiredGroup = 'deleted' },
+                },
+                groups = GROUPS,
+                holds = { 'records.person.view' },
+            })
+
+            assert.is_nil(models(routes['garage.fleet'].handler(session, {})).fbi)
+        end)
+
+        it('reads the Discord snapshot once, however large the fleet', function()
+            -- Forty vehicles must not become forty round trips (spec 12).
+            local fleet = {}
+            for index = 1, 40 do
+                fleet[index] = {
+                    model = ('police%d'):format(index),
+                    labelKey = 'fleet.cruiser',
+                    enabled = true,
+                    requiredDiscordRole = AIR_ROLE,
+                }
+            end
+
+            local routes, session, calls = wire({ fleet = fleet, roles = { AIR_ROLE } })
+            local listed = routes['garage.fleet'].handler(session, {})
+
+            assert.are.equal(40, #listed.fleet)
+            assert.are.equal(1, calls.memberRoles)
+        end)
+    end)
+
+    describe('garage.draw', function()
+        local function draw(routes, session, model)
+            return routes['garage.draw'].handler(session, { model = model, placementId = 7 })
+        end
+
+        it('refuses a gated vehicle to a session that holds neither gate', function()
+            -- The list would not have offered it; this is the call that arrives
+            -- anyway, and it is the one that has to refuse.
+            local routes, session, calls = wire({ fleet = gatedFleet(), groups = GROUPS })
+
+            assert.are.equal(FORBIDDEN, draw(routes, session, 'polmav').__err)
+            assert.are.equal(FORBIDDEN, draw(routes, session, 'fbi').__err)
+            assert.are.equal(FORBIDDEN, draw(routes, session, 'riot').__err)
+            assert.are.equal(0, #calls.logged)
+            assert.are.equal(0, #calls.registered)
+        end)
+
+        it('draws the role-gated vehicle for the officer holding the role', function()
+            local routes, session, calls = wire({
+                fleet = gatedFleet(), groups = GROUPS, roles = { AIR_ROLE },
+                agency = { id = 'lspd', shortName = 'LSPD' },
+            })
+
+            local result = draw(routes, session, 'polmav')
+
+            assert.are.equal('polmav', result.model)
+            assert.are.equal(1, #calls.logged)
+            assert.are.equal('draw', calls.logged[1].action)
+        end)
+
+        it('draws the group-gated vehicle for a session holding everything it grants', function()
+            local routes, session = wire({
+                fleet = gatedFleet(), groups = GROUPS, holds = { 'records.person.view' },
+                agency = { id = 'lspd', shortName = 'LSPD' },
+            })
+
+            assert.are.equal('fbi', draw(routes, session, 'fbi').model)
+        end)
+
+        it('refuses a group gate the session only partly satisfies', function()
+            -- `swat` grants two keys. Holding one of them is not holding the
+            -- group, and the vehicle stays gated.
+            local routes, session = wire({
+                fleet = gatedFleet(), groups = GROUPS, holds = { 'records.person.view' },
+            })
+
+            assert.are.equal(FORBIDDEN, draw(routes, session, 'riot').__err)
+        end)
+
+        it('still draws an ungated vehicle', function()
+            local routes, session = wire({
+                fleet = gatedFleet(), groups = GROUPS,
+                agency = { id = 'lspd', shortName = 'LSPD' },
+            })
+
+            assert.are.equal('police', draw(routes, session, 'police').model)
+        end)
+
+        it('leaves the draw permission to the route wrapper, not the gate', function()
+            -- An ungated vehicle is open to anyone who may draw at all -- it is
+            -- not open to everyone. The permission is checked once, by the
+            -- route layer, and folding it into the gate here would hide it.
+            local routes = wire({ fleet = gatedFleet() })
+
+            assert.are.equal('garage.vehicle.draw', routes['garage.draw'].perm)
+            assert.are.equal('garage.vehicle.draw', routes['garage.fleet'].perm)
+            assert.is_true(routes['garage.draw'].context.onDuty)
+            assert.are.equal('motorpool', routes['garage.draw'].context.accessPoint)
+        end)
+
+        it('plates from the agency short name, not the agency key', function()
+            -- The key is a primary key chosen at bootstrap -- here
+            -- `lspd_metro`, which would have plated the whole agency `LSPD_M`.
+            local routes, session, calls = wire({
+                fleet = gatedFleet(),
+                agency = { id = 'lspd_metro', name = 'Los Santos PD', shortName = 'LSPD' },
+            })
+
+            session.agencyId = 'lspd_metro'
+
+            local result = draw(routes, session, 'police')
+
+            assert.are.equal(8, #result.plate)
+            assert.are.equal('LSPD', result.plate:sub(1, 4))
+
+            -- The plate the officer is given is the plate logged and the plate
+            -- registered to the society: one value, generated once.
+            assert.are.equal(result.plate, calls.logged[1].plate)
+            assert.are.equal(result.plate, calls.registered[1][2])
+        end)
+
+        it('falls back to the agency id when the agency row has gone', function()
+            -- A deleted agency still issues a plate rather than raising, the
+            -- same way `agencies.nameOf` still renders a name.
+            local routes, session = wire({ fleet = gatedFleet() })
+            local result = draw(routes, session, 'police')
+
+            assert.are.equal(8, #result.plate)
+            assert.are.equal('LSPD', result.plate:sub(1, 4))
+        end)
+    end)
+end)

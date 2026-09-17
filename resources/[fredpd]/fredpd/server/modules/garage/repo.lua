@@ -5,9 +5,16 @@ FredPD.Repo = FredPD.Repo or {}
 
 local Repo = {}
 
+--- The fleet a draw menu works from: enabled entries only.
+---
+--- The gating columns are selected here as well as in `fleetAll`. They are not
+--- decoration on the editor screen: `garage.fleet` and `garage.draw` evaluate
+--- them on every call, and a column that never leaves the database is a rule
+--- that is configured and never enforced.
 function Repo.fleetFor(agencyId)
     local rows = FredPD.Core.db.query(
-        [[SELECT id, model, label_key AS labelKey, permission, certification, livery, enabled
+        [[SELECT id, model, label_key AS labelKey, permission, certification, livery, enabled,
+                 required_group AS requiredGroup, required_discord_role AS requiredDiscordRole
             FROM fpd_fleet
            WHERE agency_id = ? AND enabled = 1
            ORDER BY sort_order, model]],
@@ -54,9 +61,9 @@ end
 -- The fleet editor (spec 7.31, migration 0003)
 -- -----------------------------------------------------------------------------
 
---- Every column the editor reads back. `fleetFor` above deliberately selects
---- less: the draw menu has no use for `sort_order`, and it never sees a disabled
---- row at all.
+--- Every column the editor reads back. `fleetFor` above selects all of these but
+--- `sort_order`, which the draw menu has no use for -- it consumes the order,
+--- not the number behind it -- and it never sees a disabled row at all.
 local FLEET_COLUMNS <const> = [[
     id, model, label_key AS labelKey, permission, certification, livery,
     sort_order AS sortOrder, enabled,
