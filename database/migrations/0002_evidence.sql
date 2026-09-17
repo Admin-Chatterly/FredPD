@@ -300,8 +300,14 @@ CREATE TABLE IF NOT EXISTS `fpd_forensic_index` (
     KEY `idx_fpd_forensic_index_subject` (`identifier`),
     CONSTRAINT `fk_fpd_forensic_index_agency` FOREIGN KEY (`agency_id`)
         REFERENCES `fpd_agencies` (`id`) ON DELETE CASCADE,
+    -- CASCADE, not SET NULL. A trace entry exists because an item was found;
+    -- without the item there is no provenance for the profile and it must not
+    -- stay searchable. MariaDB also refuses the alternative outright (error
+    -- 1901): a CHECK cannot constrain a column a foreign key sets to NULL,
+    -- because the delete would then produce a row the CHECK forbids. Reference
+    -- entries have no `evidence_id`, so nothing cascades onto them.
     CONSTRAINT `fk_fpd_forensic_index_evidence` FOREIGN KEY (`evidence_id`)
-        REFERENCES `fpd_evidence` (`id`) ON DELETE SET NULL,
+        REFERENCES `fpd_evidence` (`id`) ON DELETE CASCADE,
     CONSTRAINT `ck_fpd_forensic_index_kind` CHECK (`index_kind` IN
         ('dna_convicted', 'dna_suspect', 'dna_trace', 'fingerprint', 'fingerprint_latent', 'ballistics')),
     CONSTRAINT `ck_fpd_forensic_index_subject` CHECK (
