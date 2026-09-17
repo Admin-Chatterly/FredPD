@@ -47,6 +47,81 @@ function Evidence.public(row)
     return out
 end
 
+--- Fields of a lab analysis that may leave the server before its result is out.
+---
+--- The queue is readable long before a conclusion exists: an analyst needs to
+--- see what is waiting, who has it and when it is due. None of that says what
+--- the answer is.
+local ANALYSIS_FIELDS <const> = {
+    'id', 'requestId', 'evidenceId', 'evidenceNumber', 'analysis', 'status',
+    'assignedTo', 'startedAt', 'dueAt', 'completedAt', 'priority', 'caseNumber',
+}
+
+--- Strips a lab analysis row down to what this reader may see (8.11).
+---
+--- The result is the whole value of the record and it is withheld twice over:
+--- until the analysis is actually finished, and then only from readers cleared
+--- to see lab conclusions. An officer who may look at an evidence item is not
+--- thereby cleared to read what the lab found on it.
+---
+--- @param row table
+--- @param canSeeResult boolean the reader holds a lab permission
+--- @return table
+function Evidence.analysisPublic(row, canSeeResult)
+    local out = {}
+
+    for index = 1, #ANALYSIS_FIELDS do
+        local field = ANALYSIS_FIELDS[index]
+        if row[field] ~= nil then out[field] = row[field] end
+    end
+
+    local finished = row.status == 'complete' or row.status == 'reviewed' or row.status == 'released'
+
+    if canSeeResult and finished then
+        out.resultCode = row.resultCode
+        out.observations = row.observations
+    end
+
+    return out
+end
+
+--- Turns a list of id strings into integers (spec 3.5).
+---
+--- The input validator has no integer-list type, so a request naming several
+--- items sends them as strings and they are checked here instead of being
+--- trusted. Anything that is not a whole positive number fails the whole list:
+--- a lab request that silently analysed four of the five items an officer
+--- selected would be worse than one that was refused.
+---
+--- @param list table list of strings
+--- @param max number|nil
+--- @return table|nil ids
+--- @return string|nil reason
+function Evidence.parseIds(list, max)
+    if type(list) ~= 'table' then return nil, 'type' end
+    if #list == 0 then return nil, 'required' end
+    if max and #list > max then return nil, 'too_many' end
+
+    local ids, seen = {}, {}
+
+    for index = 1, #list do
+        local id = tonumber(list[index])
+
+        if not id or id ~= math.floor(id) or id < 1 then
+            return nil, 'not_integer'
+        end
+
+        -- The same item twice would queue the same analysis twice and bill the
+        -- lab for both.
+        if not seen[id] then
+            seen[id] = true
+            ids[#ids + 1] = id
+        end
+    end
+
+    return ids
+end
+
 --- Render data for a piece of uncollected evidence lying in the world (8.1.6).
 ---
 --- Everything a client needs to draw it and nothing else. No owner, no id that
@@ -78,6 +153,38 @@ end
 --- `LSPD-S-2026-0042` for a scene.
 function Evidence.sceneNumber(agencyShort, year, sequence)
     return ('%s-S-%04d-%04d'):format(tostring(agencyShort):upper(), year, sequence)
+end
+
+--- How wide the sequence is, per kind of number.
+local SEQUENCE_WIDTH <const> = { evidence = 6, scene = 4 }
+
+--- The fixed half of a number, and the width of its sequence.
+---
+--- Numbering has to be unique per agency and year, which means the sequence has
+--- to be read and used without anything slipping in between -- so the repo
+--- computes it inside the same INSERT that writes the row, and needs the number
+--- in two pieces to do that: a prefix it can concatenate and a width it can pad
+--- to. `numberPrefix('evidence', 'lspd', 2026)` gives `LSPD-2026-` and 6, and
+--- `prefix .. ('%06d'):format(sequence)` is byte-for-byte `evidenceNumber(...)`.
+---
+--- Keeping the format here rather than in the SQL is the point: there is one
+--- definition of what a record number looks like, and the spec proves the two
+--- ways of building it agree.
+---
+--- @param kind string 'evidence' or 'scene'
+--- @param agencyShort string
+--- @param year number
+--- @return string|nil prefix
+--- @return number|nil width
+function Evidence.numberPrefix(kind, agencyShort, year)
+    local width = SEQUENCE_WIDTH[kind]
+    if not width then return nil end
+
+    return ('%s%s%04d-'):format(
+        tostring(agencyShort):upper(),
+        kind == 'scene' and '-S-' or '-',
+        year
+    ), width
 end
 
 -- -----------------------------------------------------------------------------
@@ -201,6 +308,88 @@ function Evidence.searchResult(hitCount, quality)
     if hitCount and hitCount > 0 then return 'candidate_match' end
 
     return 'no_match'
+end
+
+--- Which of the three result languages each analysis speaks (8.7).
+---
+--- A table rather than a chain of `if`s because this is the one place that
+--- decides what an analysis can conclude, and it should be readable as a list.
+--- Every entry is a function of `facts` -- quality, contamination and counts of
+--- hidden matches -- and none of it ever came from a client.
+local ANALYSIS_RESULT <const> = {
+    --- Contamination is what makes a mixture: someone walked through the scene
+    --- and left their own DNA on top of the offender's (8.4).
+    dna = function(facts)
+        return Evidence.dnaResult(facts.quality, facts.contaminated and 2 or 1)
+    end,
+
+    --- Compared against the reference prints on file. A reference entry names
+    --- its subject; a trace does not, which is what separates a comparison
+    --- from a search.
+    print_comparison = function(facts)
+        return Evidence.comparisonResult((facts.referenceHits or 0) > 0, facts.quality)
+    end,
+
+    --- Searched against the print index. A hit is a candidate (8.1.3).
+    print_search = function(facts)
+        return Evidence.searchResult(facts.indexHits, facts.quality)
+    end,
+
+    --- NIBIN-style correlation: the barrel signature against everything on
+    --- file. Also a search, and also only ever a lead.
+    ballistics = function(facts)
+        return Evidence.searchResult(facts.indexHits, facts.quality)
+    end,
+
+    --- Residue is only ever "consistent with having fired", never proof that
+    --- this person fired this gun -- which is exactly what `candidate_match`
+    --- means, so GSR speaks the search language rather than the comparison one.
+    gsr = function(facts)
+        return Evidence.searchResult(facts.hasWeapon and 1 or 0, facts.quality)
+    end,
+
+    --- A substance either identifies or the sample is too far gone to say.
+    --- There is nothing to match it against, so there is no exclusion.
+    drug_id = function(facts)
+        return Evidence.comparisonResult(true, facts.quality)
+    end,
+}
+
+--- Is this an analysis the lab performs?
+---
+--- The same table that decides results decides what may be requested, so a
+--- request can never queue work that has no way of concluding. The input
+--- validator has no enum type for list members, which is why this is checked
+--- here rather than at the schema.
+function Evidence.isAnalysis(analysis)
+    return ANALYSIS_RESULT[analysis] ~= nil
+end
+
+--- The result of a completed analysis.
+---
+--- Every input is server-side: the sample's quality, whether the scene was
+--- contaminated, and how many hidden profiles matched. The client sends none of
+--- it and receives only the code this returns.
+---
+--- @param analysis string
+--- @param facts table { quality, contaminated, referenceHits, indexHits, hasWeapon }
+--- @return string|nil result code, or nil when the analysis is not one we run
+function Evidence.resultFor(analysis, facts)
+    local rule = ANALYSIS_RESULT[analysis]
+    if not rule then return nil end
+
+    facts = facts or {}
+
+    -- A missing quality is an unusable sample, not a crash. The database column
+    -- is NOT NULL, so this only bites if a caller forgets to pass it -- and
+    -- failing toward 'insufficient' is the safe direction.
+    return rule({
+        quality = facts.quality or 0,
+        contaminated = facts.contaminated,
+        referenceHits = facts.referenceHits,
+        indexHits = facts.indexHits,
+        hasWeapon = facts.hasWeapon,
+    })
 end
 
 --- Is this result one a court may hear as an identification?

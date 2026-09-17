@@ -99,6 +99,74 @@ describe('evidence', function()
         end)
     end)
 
+    describe('numberPrefix', function()
+        --- The repo builds a number inside the INSERT that allocates its
+        --- sequence, out of a prefix and a padded number. This is the test that
+        --- keeps that assembly honest: if the two ever drift, one agency's
+        --- numbering changes shape halfway through a year and nobody notices
+        --- until two items share a number.
+        local function assembled(kind, agencyShort, year, sequence)
+            local prefix, width = evidence.numberPrefix(kind, agencyShort, year)
+            return prefix .. ('%0' .. width .. 'd'):format(sequence)
+        end
+
+        it('rebuilds exactly what evidenceNumber formats', function()
+            for _, sequence in ipairs({ 1, 9, 10, 123, 999999 }) do
+                assert.are.equal(
+                    evidence.evidenceNumber('lspd', 2026, sequence),
+                    assembled('evidence', 'lspd', 2026, sequence)
+                )
+            end
+        end)
+
+        it('rebuilds exactly what sceneNumber formats', function()
+            for _, sequence in ipairs({ 1, 42, 9999 }) do
+                assert.are.equal(
+                    evidence.sceneNumber('bcso', 2027, sequence),
+                    assembled('scene', 'bcso', 2027, sequence)
+                )
+            end
+        end)
+
+        it('upper-cases the agency, as the number does', function()
+            assert.are.equal('LSPD-2026-', (evidence.numberPrefix('evidence', 'lspd', 2026)))
+        end)
+
+        it('has nothing to say about a kind it does not number', function()
+            assert.is_nil(evidence.numberPrefix('report', 'lspd', 2026))
+        end)
+    end)
+
+    describe('parseIds', function()
+        it('turns a list of strings into integers', function()
+            assert.are.same({ 7, 12 }, evidence.parseIds({ '7', '12' }))
+        end)
+
+        it('drops a repeat rather than queueing the same work twice', function()
+            assert.are.same({ 7 }, evidence.parseIds({ '7', '7' }))
+        end)
+
+        it('refuses the whole list when one entry is not an id', function()
+            -- Analysing four of the five items an officer selected, silently,
+            -- would be worse than refusing: they would believe the fifth was
+            -- tested and come to court saying so.
+            assert.is_nil(evidence.parseIds({ '7', 'x' }))
+            assert.is_nil(evidence.parseIds({ '7', '2.5' }))
+            assert.is_nil(evidence.parseIds({ '7', '0' }))
+            assert.is_nil(evidence.parseIds({ '7', '-3' }))
+        end)
+
+        it('refuses an empty list and one that is too long', function()
+            assert.is_nil(evidence.parseIds({}))
+            assert.is_nil(evidence.parseIds({ '1', '2', '3' }, 2))
+        end)
+
+        it('refuses anything that is not a list', function()
+            assert.is_nil(evidence.parseIds('7'))
+            assert.is_nil(evidence.parseIds(nil))
+        end)
+    end)
+
     describe('qualityAfter', function()
         it('is untouched at the moment of creation', function()
             assert.are.equal(100, evidence.qualityAfter(100, 0, {}))
@@ -236,6 +304,119 @@ describe('evidence', function()
 
         it('will not search on an unusable sample', function()
             assert.are.equal('insufficient', evidence.searchResult(5, 5))
+        end)
+    end)
+
+    describe('analysisPublic', function()
+        local finished = {
+            id = 3,
+            requestId = 1,
+            evidenceId = 7,
+            analysis = 'dna',
+            status = 'complete',
+            assignedTo = '100000000000000009',
+            resultCode = 'profile_obtained',
+            observations = 'Extracted from the swab.',
+            identifier = 'char1:license:abc',
+            dnaProfile = 'deadbeef',
+        }
+
+        it('shows the queue without showing the answer', function()
+            local out = evidence.analysisPublic(finished, false)
+
+            assert.are.equal('dna', out.analysis)
+            assert.are.equal('complete', out.status)
+            assert.is_nil(out.resultCode)
+            assert.is_nil(out.observations)
+        end)
+
+        it('shows the result to a reader cleared for it', function()
+            local out = evidence.analysisPublic(finished, true)
+
+            assert.are.equal('profile_obtained', out.resultCode)
+        end)
+
+        it('withholds a result that does not exist yet', function()
+            -- An analysis in progress has no conclusion. Sending a half-written
+            -- one would let an analyst be watched over the shoulder, and would
+            -- leak whatever a retry wrote before it was overwritten.
+            local out = evidence.analysisPublic({
+                id = 3, analysis = 'dna', status = 'in_progress', resultCode = 'profile_obtained',
+            }, true)
+
+            assert.is_nil(out.resultCode)
+        end)
+
+        it('never carries hidden truth, whoever is reading', function()
+            local out = evidence.analysisPublic(finished, true)
+
+            assert.is_nil(out.identifier)
+            assert.is_nil(out.dnaProfile)
+        end)
+    end)
+
+    describe('resultFor', function()
+        it('reads DNA off quality alone when the scene was clean', function()
+            assert.are.equal('profile_obtained', evidence.resultFor('dna', { quality = 90 }))
+            assert.are.equal('partial_profile', evidence.resultFor('dna', { quality = 30 }))
+        end)
+
+        it('turns a contaminated scene into a mixture', function()
+            -- 8.4: somebody walked the perimeter without protective equipment
+            -- and left their own DNA on top of the offender's. A perfect sample
+            -- of two people is still a mixture.
+            assert.are.equal('mixture', evidence.resultFor('dna', { quality = 100, contaminated = true }))
+        end)
+
+        it('identifies a print against the references on file', function()
+            assert.are.equal(
+                'identification',
+                evidence.resultFor('print_comparison', { quality = 90, referenceHits = 1 })
+            )
+            assert.are.equal(
+                'exclusion',
+                evidence.resultFor('print_comparison', { quality = 90, referenceHits = 0 })
+            )
+        end)
+
+        it('never identifies from a database search', function()
+            -- 8.1.3 and 8.8, enforced at the one place that chooses the
+            -- language: a search produces a lead, and confirming it needs a
+            -- fresh reference sample.
+            for _, analysis in ipairs({ 'print_search', 'ballistics' }) do
+                local hit = evidence.resultFor(analysis, { quality = 100, indexHits = 3 })
+
+                assert.are.equal('candidate_match', hit)
+                assert.is_false(evidence.isCourtGrade(hit))
+            end
+        end)
+
+        it('says GSR is consistent with firing, never that it proves it', function()
+            assert.are.equal('candidate_match', evidence.resultFor('gsr', { quality = 80, hasWeapon = true }))
+            assert.are.equal('no_match', evidence.resultFor('gsr', { quality = 80, hasWeapon = false }))
+        end)
+
+        it('identifies a substance, or admits the sample is gone', function()
+            assert.are.equal('identification', evidence.resultFor('drug_id', { quality = 80 }))
+            assert.are.equal('insufficient', evidence.resultFor('drug_id', { quality = 5 }))
+        end)
+
+        it('treats a missing quality as an unusable sample', function()
+            assert.are.equal('no_profile', evidence.resultFor('dna', {}))
+            assert.are.equal('insufficient', evidence.resultFor('print_search', nil))
+        end)
+
+        it('has no result for an analysis the lab does not run', function()
+            assert.is_nil(evidence.resultFor('astrology', { quality = 100 }))
+        end)
+    end)
+
+    describe('isAnalysis', function()
+        it('accepts what the lab performs and nothing else', function()
+            assert.is_true(evidence.isAnalysis('dna'))
+            assert.is_true(evidence.isAnalysis('ballistics'))
+            assert.is_false(evidence.isAnalysis('astrology'))
+            assert.is_false(evidence.isAnalysis(''))
         end)
     end)
 
