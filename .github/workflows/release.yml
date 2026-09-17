@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish the resource bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the NUI and the gateway
+        run: pnpm build
+
+      - name: Stamp the release version into each fxmanifest
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          for manifest in resources/'[fredpd]'/*/fxmanifest.lua; do
+            sed -i "s/^version '.*'$/version '${version}'/" "$manifest"
+          done
+          grep -H "^version" resources/'[fredpd]'/*/fxmanifest.lua
+
+      - name: Bundle what a server actually installs
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          staging="$(mktemp -d)"
+
+          # The resources, with the built NUI already inside fredpd/web/dist.
+          mkdir -p "$staging/fredpd-${version}"
+          cp -r resources "$staging/fredpd-${version}/"
+
+          # Migrations and seeds: a server needs these to install or upgrade.
+          cp -r database "$staging/fredpd-${version}/"
+
+          # The gateway, built, with the manifest needed to install it.
+          mkdir -p "$staging/fredpd-${version}/gateway"
+          cp -r gateway/dist gateway/package.json "$staging/fredpd-${version}/gateway/"
+
+          cp README.md docs/FredPD.md "$staging/fredpd-${version}/"
+
+          ( cd "$staging" && zip -qr "fredpd-${version}.zip" "fredpd-${version}" )
+          mv "$staging/fredpd-${version}.zip" .
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: fredpd-*.zip
+          generate_release_notes: true

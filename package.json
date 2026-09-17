@@ -1,0 +1,40 @@
+{
+  "name": "fredpd",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Police records, dispatch, evidence and forensics suite for an ESX FiveM server",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "build": "pnpm --filter @fredpd/schema build && pnpm --filter @fredpd/web build && pnpm --filter @fredpd/gateway build",
+    "dev:web": "pnpm --filter @fredpd/web dev",
+    "dev:gateway": "pnpm --filter @fredpd/gateway dev",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r --no-bail typecheck",
+    "svelte-check": "pnpm --filter @fredpd/web check",
+    "test": "pnpm -r --no-bail test",
+    "test:e2e": "pnpm --filter @fredpd/web test:e2e",
+    "i18n:check": "tsx tools/i18n-check.ts",
+    "schema:gen": "pnpm --filter @fredpd/schema build",
+    "check": "pnpm lint && pnpm typecheck && pnpm svelte-check && pnpm i18n:check"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.10.0",
+    "eslint-plugin-svelte": "^3.23.0",
+    "globals": "^17.12.0",
+    "svelte-eslint-parser": "^1.8.1",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.70.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

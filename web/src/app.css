@@ -1,0 +1,42 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens (spec 6.2) land in M1. What is here is the minimum the shell
+ * needs to render in both themes: agency software, so a flat surface, a real
+ * border, and no gradient, glass, glow or neon anywhere (invariant 12).
+ */
+@theme {
+  --color-surface: #f4f5f7;
+  --color-panel: #ffffff;
+  --color-border: #c9ced6;
+  --color-ink: #16191d;
+  --color-ink-muted: #5a626d;
+  --color-accent: #1b4f9c;
+
+  --font-sans: 'Segoe UI', 'Inter', system-ui, sans-serif;
+  --font-mono: 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
+}
+
+/* Night mode is the default in a vehicle; the shell sets data-theme. */
+[data-theme='night'] {
+  --color-surface: #14171c;
+  --color-panel: #1c2027;
+  --color-border: #333a45;
+  --color-ink: #e6e9ee;
+  --color-ink-muted: #949dab;
+  --color-accent: #6ea8ff;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+}
+
+/* In-game the page floats over the world; in a browser it needs a backdrop. */
+body[data-standalone='true'] {
+  background: var(--color-surface);
+}

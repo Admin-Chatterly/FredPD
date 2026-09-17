@@ -1,13 +1,13 @@
 # FredPD — Product & Engineering Specification
 
-Police records, dispatch, evidence and forensics suite for a QBox (qbx_core) FiveM server.
+Police records, dispatch, evidence and forensics suite for an ESX (es_extended) FiveM server.
 
 | Field | Value |
 |---|---|
 | Spec version | 0.1 (draft for implementation) |
 | Date | 2026-09-17 |
 | Owner | Rami |
-| Target platform | FiveM (OneSync) + QBox + ox stack, dedicated high-end host |
+| Target platform | FiveM (OneSync) + ESX + ox stack, dedicated high-end host |
 | Default language | English (`en`), with complete Swedish (`sv`) and custom translation overlays |
 | Permission source | Discord roles only |
 
@@ -50,7 +50,7 @@ Police records, dispatch, evidence and forensics suite for a QBox (qbx_core) Fiv
 These rules override convenience, deadlines and any other section.
 
 1. **Server-authoritative.** Clients send intent (IDs, text, a proposed position). The server validates and decides. Authors, officers, agencies, timestamps, record numbers, analysis results and biometric owners are always generated server-side.
-2. **Discord roles are the only permission source.** QBox job grades never grant anything. Job and duty state are used only as *context conditions* on top of a Discord-granted permission (see 4.3).
+2. **Discord roles are the only permission source.** ESX job grades never grant anything. Job and duty state are used only as *context conditions* on top of a Discord-granted permission (see 4.3).
 3. **One gateway for client calls.** Every client-to-server call goes through `route()` (session, permission, classification, schema validation, rate limit, audit). No raw `RegisterNetEvent` handler may change state.
 4. **Access is checked on the server for every read,** including search results, attachments, prints and exports. Hiding something in the UI is never the control.
 5. **No record broadcasts.** Never `TriggerClientEvent(..., -1, record)`. Push only to authorized, subscribed sessions. No sensitive data in state bags.
@@ -141,7 +141,7 @@ Use real systems for **workflow and data structure**, FiveM resources for **game
 | Citations | Electronic citation systems (TraCS-style) | ps-mdt fines | Citation lifecycle, licence points, contest flow |
 | ALPR | Plate reader hotlists and retention policies | Wolfknight radar (wk_wars2x) | Hotlist hits, read retention |
 | Swedish vocabulary | Swedish Police systems and registers (RAR, DurTvå, Rakel; Belastningsregistret, Misstankeregistret, Vägtrafikregistret, Vapenregistret; DNA-registret, utredningsregistret, spårregistret) | — | Terminology for `sv.json` (Appendix A) |
-| Framework and libraries | — | qbx_core, ox_lib, ox_inventory, ox_target, oxmysql, pma-voice, screenshot-basic | Everything in-game |
+| Framework and libraries | — | es_extended, ox_lib, ox_inventory, ox_target, oxmysql, pma-voice, screenshot-basic | Everything in-game |
 | Discord permissions | Discord developer documentation | Badger_Discord_API (REST plus cache), discord.js | Gateway bot with role snapshots |
 | Tooling | — | overextended/fivem-ts, ps-mdt v3 Svelte 5 web build | Monorepo and build patterns |
 
@@ -198,15 +198,15 @@ fredpd/
 
 | Layer | Choice | Reason |
 |---|---|---|
-| Server scripts | Lua 5.4 with ox_lib | Matches QBox and the ox ecosystem, best FiveM tooling |
-| NUI | Svelte 5 + TypeScript + Vite | Small runtime and fast updates; ps-mdt v3 proves it on QBX |
+| Server scripts | Lua 5.4 with ox_lib | Matches ESX and the ox ecosystem, best FiveM tooling |
+| NUI | Svelte 5 + TypeScript + Vite | Small runtime and fast updates; ps-mdt v3 proves it in production |
 | Styling | Tailwind CSS 4 with CSS-variable design tokens | Tokens from section 6 in one place |
 | Data in NUI | TanStack Query (cache), TanStack Virtual (long lists), TanStack Table core (grids) | Instant reopen, virtualized grids |
 | Rich text | Tiptap, stored as JSON | No raw HTML, schema-validated |
 | Map | Leaflet with `CRS.Simple` and self-hosted GTA V tiles, lazy-loaded | Light, proven for GTA maps |
 | Icons | Lucide SVG | Consistent, no emoji |
 | Gateway | TypeScript on Node.js 24 LTS, Fastify, discord.js, sharp, Playwright (PDF), pino | Mature, well-typed |
-| Database | MariaDB 11.4 LTS or newer, InnoDB, `utf8mb4_unicode_ci` | Same DB as QBox; FULLTEXT, generated columns, JSON |
+| Database | MariaDB 11.4 LTS or newer, InnoDB, `utf8mb4_unicode_ci` | Same DB as ESX; FULLTEXT, generated columns, JSON |
 | Monorepo | pnpm workspaces | Shared schema and locale packages |
 | Tests | busted (pure Lua modules), Vitest, Playwright | See section 15 |
 | Lint | luacheck and lua-language-server diagnostics (with fivem-lls-addon), ESLint, svelte-check, tsc | See section 15 |
@@ -279,7 +279,7 @@ Response envelope: `{ ok = true, data = ... }` or `{ ok = false, err = 'code', f
 
 | Bridge | Responsibilities | Default implementation |
 |---|---|---|
-| framework | Characters, names, DOB, phone, jobs, duty, licences | qbx_core |
+| framework | Characters, names, DOB, phone, jobs, duty, licences | es_extended |
 | inventory | Items, metadata, stashes, hooks, weapons | ox_inventory |
 | target | Interactions | ox_target |
 | voice | Radio channels, voice targets | pma-voice |
@@ -309,7 +309,7 @@ Each bridge checks the target resource's state and version at startup and logs a
 
 ### 4.1 Identity model
 
-- Player → Discord ID (`GetPlayerIdentifierByType(src, 'discord')`, never from the client) → roster entry → bound character (citizenid).
+- Player → Discord ID (`GetPlayerIdentifierByType(src, 'discord')`, never from the client) → roster entry → bound character (the ESX character identifier, e.g. `char1:license:…`).
 - A Discord user can hold one bound character per agency. FredPD refuses to open on any other character ("This character is not registered as agency personnel"). This stops agency access being used on a criminal alt.
 - DOJ, defense and civilian access points bind the same way.
 - A player without a Discord identifier gets no access and sees an instruction to link Discord.
@@ -522,7 +522,7 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 - [M] Sign-on screen with agency branding and authorized-use notice; identity from Discord plus bound character.
 - [M] Unit log-on: callsign, vehicle (auto-detected when in an agency vehicle), partner(s), assignment (beat, division).
 - [M] Unit status via F-keys and command line: Available, En route, On scene, Busy, Transporting, At station, Out of service, Emergency. Every change is timestamped in `fpd_unit_status_log`.
-- [M] Duty integration: sign-on sets QBox duty through the framework bridge (configurable).
+- [M] Duty integration: sign-on sets ESX duty through the framework bridge (configurable).
 - [S] Personal PIN and idle lock.
 - [S] Day/night theme switching by in-game time.
 

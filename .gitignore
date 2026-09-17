@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+# Square brackets are a character class in gitignore, so the literal
+# `resources/[fredpd]/` directory is matched with a wildcard instead.
+resources/*/fredpd/web/dist/
+packages/schema/generated/
+*.tsbuildinfo
+
+# Test output
+coverage/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
+# Environment and secrets (invariant 7: no secrets in the repo)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Locale overlays are per-server, never committed (spec 5.1)
+resources/*/*/locales/custom/
+
+# Editor and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*

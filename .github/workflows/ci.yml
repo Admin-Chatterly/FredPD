@@ -1,0 +1,157 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Never a real secret: these jobs only need the gateway to boot and the
+  # signature paths to be exercised (invariant 7).
+  FREDPD_GATEWAY_SECRET: ci-test-secret
+
+jobs:
+  node:
+    name: Lint, types and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: ESLint
+        run: pnpm lint
+
+      - name: TypeScript
+        run: pnpm typecheck
+
+      - name: svelte-check
+        run: pnpm svelte-check
+
+      - name: Locales complete (en and sv)
+        run: pnpm i18n:check
+
+      - name: Generated schema is current
+        run: |
+          pnpm schema:gen
+          git diff --exit-code -- 'resources/**/shared/generated' \
+            || { echo '::error::Generated schema is stale. Run `pnpm schema:gen` and commit the result.'; exit 1; }
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Dependency audit
+        run: pnpm audit --audit-level=high
+
+  e2e:
+    name: NUI tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The NUI imports generated Lua's TypeScript source, and the dev server
+      # serves from source, so no build is needed -- but the schema must exist.
+      - run: pnpm schema:gen
+
+      - name: Install Chromium
+        run: pnpm --filter @fredpd/web exec playwright install --with-deps chromium
+
+      - name: Playwright
+        run: pnpm test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: web/playwright-report/
+          retention-days: 7
+
+  lua:
+    name: Lua static checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install luacheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends lua5.4 liblua5.4-dev luarocks
+          sudo luarocks install luacheck
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # luacheck reads the generated schema like any other source file.
+      - run: pnpm schema:gen
+
+      - name: luacheck
+        run: luacheck resources/
+
+  database:
+    name: Migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: ci
+          MARIADB_DATABASE: fredpd
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Apply every migration to an empty database
+        run: |
+          for file in database/migrations/*.sql; do
+            echo "applying $file"
+            mysql --host=127.0.0.1 --user=root --password=ci fredpd < "$file"
+          done
+
+      - name: Re-apply to prove migrations are idempotent
+        run: |
+          for file in database/migrations/*.sql; do
+            mysql --host=127.0.0.1 --user=root --password=ci fredpd < "$file"
+          done

@@ -1,0 +1,40 @@
+{
+  "app": {
+    "name": "FredPD",
+    "loading": "Loading…",
+    "offline": "No connection to the server."
+  },
+  "shell": {
+    "close": "Close",
+    "back": "Back",
+    "commandPlaceholder": "Command or search",
+    "module": {
+      "records": "Records",
+      "dispatch": "Dispatch",
+      "evidence": "Evidence",
+      "lab": "Lab",
+      "intel": "Intelligence",
+      "court": "Court",
+      "personnel": "Personnel",
+      "admin": "Administration"
+    },
+    "status": {
+      "unit": "Unit {callsign}",
+      "onDuty": "On duty",
+      "offDuty": "Off duty",
+      "signedInAs": "Signed in as {name}"
+    }
+  },
+  "error": {
+    "no_session": "You are not signed on. Open FredPD from a terminal or an agency vehicle.",
+    "forbidden": "Your Discord roles do not grant access to this.",
+    "context": "This is only available at the right place, on duty, or in the right unit.",
+    "rate_limited": "Too many requests. Wait a moment and try again.",
+    "invalid": "The form contains errors.",
+    "not_found": "The record could not be found.",
+    "conflict": "Someone else changed this record while you were editing. Reload and try again.",
+    "restricted": "This record is restricted. Request access or use break-glass.",
+    "stale_permissions": "Your permissions are out of date. Sign on again.",
+    "internal": "Something went wrong on the server. The error has been logged."
+  }
+}

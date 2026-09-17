@@ -1,0 +1,4 @@
+# Code tables that ship with the product (spec 17.2):
+#   penal code, default permission groups, disposition codes.
+#
+# Seeds must be idempotent: re-running one never duplicates rows.

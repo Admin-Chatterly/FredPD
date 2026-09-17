@@ -1,0 +1,40 @@
+{
+  "app": {
+    "name": "FredPD",
+    "loading": "Laddar…",
+    "offline": "Ingen kontakt med servern."
+  },
+  "shell": {
+    "close": "Stäng",
+    "back": "Tillbaka",
+    "commandPlaceholder": "Kommando eller sökning",
+    "module": {
+      "records": "Register",
+      "dispatch": "Ledningscentral",
+      "evidence": "Bevis",
+      "lab": "Laboratorium",
+      "intel": "Underrättelser",
+      "court": "Domstol",
+      "personnel": "Personal",
+      "admin": "Administration"
+    },
+    "status": {
+      "unit": "Enhet {callsign}",
+      "onDuty": "I tjänst",
+      "offDuty": "Ur tjänst",
+      "signedInAs": "Inloggad som {name}"
+    }
+  },
+  "error": {
+    "no_session": "Du är inte inloggad. Öppna FredPD från en terminal eller ett tjänstefordon.",
+    "forbidden": "Dina Discord-roller ger inte behörighet till det här.",
+    "context": "Det här går bara att göra på rätt plats, i tjänst eller i rätt enhet.",
+    "rate_limited": "För många anrop. Vänta en stund och försök igen.",
+    "invalid": "Formuläret innehåller fel.",
+    "not_found": "Posten hittades inte.",
+    "conflict": "Någon annan ändrade posten medan du redigerade. Ladda om och försök igen.",
+    "restricted": "Posten är skyddad. Begär behörighet eller använd nödöppning.",
+    "stale_permissions": "Dina behörigheter är inaktuella. Logga in igen.",
+    "internal": "Något gick fel på servern. Felet har loggats."
+  }
+}
