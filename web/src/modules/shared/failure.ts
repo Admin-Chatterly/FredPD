@@ -58,6 +58,13 @@ const REASONS = new Set([
   'mapped_to_roles',
   'too_many',
   'released',
+
+  // Optimistic locking. `stale` is the record itself having moved on;
+  // `model_changed` is the permission model as a whole, which the group editor
+  // takes a lock on because an edit anywhere in an inheritance chain can change
+  // what an unrelated group grants.
+  'stale',
+  'model_changed',
 ]);
 
 export interface FieldMessage {

@@ -664,16 +664,16 @@ end)
 -- The response envelope
 -- -----------------------------------------------------------------------------
 
-describe('route.markArrays', function()
-    local route
+describe('FredPD.markArrays', function()
+    local arrays
     local ARRAY_MT = { __jsontype = 'array' }
 
     before_each(function()
         -- The marker the encoder exports. FiveM's is lua-cjson's; the shape is
-        -- all this needs -- that `route.lua` asks the encoder for its own marker
-        -- rather than inventing one.
+        -- all this needs -- that `shared/arrays.lua` asks the encoder for its
+        -- own marker rather than inventing one.
         _G.json = { array_mt = ARRAY_MT }
-        route = helper.load({ 'server/core/route' }).Core.route
+        arrays = helper.load({ 'shared/arrays' })
     end)
 
     after_each(function()
@@ -681,14 +681,14 @@ describe('route.markArrays', function()
     end)
 
     it('marks an empty list so it encodes as [] rather than {}', function()
-        local data = route.markArrays({ permissions = {}, effective = {} })
+        local data = arrays.markArrays({ permissions = {}, effective = {} })
 
         assert.are.equal(ARRAY_MT, getmetatable(data.permissions))
         assert.are.equal(ARRAY_MT, getmetatable(data.effective))
     end)
 
     it('marks the lists nested inside a list of rows', function()
-        local data = route.markArrays({
+        local data = arrays.markArrays({
             groups = {
                 { key = 'patrol', permissions = { 'page.records' }, effective = {} },
                 { key = 'fresh', permissions = {}, effective = {} },
@@ -701,13 +701,13 @@ describe('route.markArrays', function()
     end)
 
     it('leaves a record alone', function()
-        local data = route.markArrays({ group = { key = 'patrol', name = 'Patrol' } })
+        local data = arrays.markArrays({ group = { key = 'patrol', name = 'Patrol' } })
 
         assert.is_nil(getmetatable(data.group))
     end)
 
     it('leaves the values themselves untouched', function()
-        local data = route.markArrays({ count = 2, key = 'patrol', rows = { 'a', 'b' } })
+        local data = arrays.markArrays({ count = 2, key = 'patrol', rows = { 'a', 'b' } })
 
         assert.are.equal(2, data.count)
         assert.are.equal('patrol', data.key)
@@ -716,7 +716,7 @@ describe('route.markArrays', function()
 
     it('does not replace a metatable a value already carries', function()
         local own = {}
-        local data = route.markArrays({ rows = setmetatable({}, own) })
+        local data = arrays.markArrays({ rows = setmetatable({}, own) })
 
         assert.are.equal(own, getmetatable(data.rows))
     end)
@@ -725,14 +725,17 @@ describe('route.markArrays', function()
         local data = { rows = {} }
         data.rows[1] = data
 
-        assert.has_no.errors(function() route.markArrays(data) end)
+        assert.has_no.errors(function() arrays.markArrays(data) end)
     end)
 
     it('does nothing at all when the encoder exports no marker', function()
         _G.json = nil
-        route = helper.load({ 'server/core/route' }).Core.route
 
-        local data = route.markArrays({ rows = {} })
+        -- Reloaded, because `ARRAY_MT` is read once when the file runs: the
+        -- copy loaded in before_each still holds the marker it found then, and
+        -- asking it would prove nothing about a runtime that exports none.
+        local bare = helper.load({ 'shared/arrays' })
+        local data = bare.markArrays({ rows = {} })
 
         assert.is_nil(getmetatable(data.rows))
     end)

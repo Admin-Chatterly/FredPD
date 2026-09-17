@@ -234,6 +234,30 @@ for (const file of await walk(core)) {
       fail(`${shown}: route '${name}' names schema '${schema}', which packages/schema does not define`);
     }
 
+    // A route pinned to a placement reads `input.placementId`, and the
+    // condition fails closed when it is missing — so a schema without the
+    // field makes the route permanently unreachable rather than merely
+    // unguarded. This has shipped twice: `evidence.intake`, where the property
+    // room counter refused every accept and reject, and the lab routes, where
+    // pinning them to the bench refused every analysis.
+    const pinned = /\baccessPoint\s*=\s*'[^']+'/.test(body);
+    if (pinned) {
+      if (schema === undefined) {
+        fail(`${shown}: route '${name}' is pinned to a placement but declares no schema, so it can never receive a placementId`);
+      } else if (!schemaSource.includes('placementId')) {
+        fail(`${shown}: route '${name}' is pinned to a placement but no schema declares placementId`);
+      } else {
+        const declaration = new RegExp(`\\b${schema}:\\s*\\{[\\s\\S]*?\\n {2}\\}`).exec(schemaSource);
+
+        if (declaration && !declaration[0].includes('placementId')) {
+          fail(
+            `${shown}: route '${name}' is pinned to a placement, but schema '${schema}' has no ` +
+              `placementId — the access-point condition fails closed, so every call is refused`,
+          );
+        }
+      }
+    }
+
     const perm = /\bperm\s*=\s*'([^']+)'/.exec(body)?.[1];
     if (perm !== undefined && !granted.has(perm)) {
       fail(

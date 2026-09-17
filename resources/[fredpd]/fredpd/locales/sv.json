@@ -86,7 +86,9 @@
     "inherited_by_groups": "ärvs av en annan grupp",
     "mapped_to_roles": "kopplad till en Discord-roll",
     "too_many": "för många",
-    "released": "brottsplatsen är hävd"
+    "released": "brottsplatsen är hävd",
+    "stale": "ändrat sedan sidan lästes in",
+    "model_changed": "behörigheterna ändrades medan sidan var öppen"
   },
   "placement": {
     "station_terminal": "Stationsterminal",

@@ -120,7 +120,13 @@ local NUI_ROUTES <const> = {
 
 for _, name in ipairs(NUI_ROUTES) do
     RegisterNUICallback(name, function(data, cb)
-        cb(FredPD.Client.core.call(name, data))
+        -- `cb` is what encodes the JSON the browser parses, and this is the
+        -- only hop that can decide array from object: the answer arrived over
+        -- `lib.callback`, which is msgpack and carries no metatables, so
+        -- whatever the server marked was lost on the way here. Without this an
+        -- empty list reaches the interface as `{}` and an `{#each}` over it
+        -- throws (shared/arrays.lua).
+        cb(FredPD.markArrays(FredPD.Client.core.call(name, data)))
     end)
 end
 

@@ -1511,7 +1511,7 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Communications | `comms.message.send`, `comms.bulletin.post`, `comms.pdchat.send`, `comms.pdchat.view`, `comms.pdchat.all` |
 | Motor pool | `garage.vehicle.draw`, `garage.vehicle.return`, `garage.fleet.edit` |
 | Statistics | `stats.view`, `stats.export` |
-| Administration | `admin.permissions.edit`, `admin.penalcode.edit`, `admin.codetables.edit`, `admin.branding.edit`, `admin.audit.view`, `admin.retention.edit`, `admin.health.view`, `admin.placement.edit` |
+| Administration | `admin.permissions.edit`, `admin.groups.edit`, `admin.penalcode.edit`, `admin.codetables.edit`, `admin.branding.edit`, `admin.audit.view`, `admin.retention.edit`, `admin.health.view`, `admin.placement.edit` |
 | Access | `records.breakglass`, `clearance.<level>`, `compartment.<name>`, `fields.mental_health.view`, `fields.victim_address.view` |
 
 ## Appendix C — Default role template

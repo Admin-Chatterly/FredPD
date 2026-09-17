@@ -18,6 +18,7 @@ shared_scripts {
     '@ox_lib/init.lua',
     'config/shared.lua',
     'shared/init.lua',
+    'shared/arrays.lua',
     'shared/generated/schema.lua',
     'shared/locale.lua',
 }

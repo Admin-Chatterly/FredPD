@@ -332,10 +332,12 @@ FredPD.Schema = {
 
     LabAnalysisStart = {
         id = { type = 'integer', required = true, min = 1 },
+        placementId = { type = 'integer', required = true, min = 1 },
     },
 
     LabAnalysisComplete = {
         id = { type = 'integer', required = true, min = 1 },
+        placementId = { type = 'integer', required = true, min = 1 },
         observations = { type = 'string', required = false, max = 1024 },
     },
 

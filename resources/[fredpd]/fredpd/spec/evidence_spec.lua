@@ -420,6 +420,87 @@ describe('evidence', function()
         end)
     end)
 
+    describe('ownerOf', function()
+        it('keeps a person', function()
+            local owner = evidence.ownerOf({ owner = { identifier = 'char1:license:abc' } })
+
+            assert.are.equal('char1:license:abc', owner.identifier)
+            assert.is_nil(owner.weaponSerial)
+        end)
+
+        it('keeps a weapon, which is what a casing carries instead', function()
+            local owner = evidence.ownerOf({ owner = { weaponSerial = 'SN-0001' } })
+
+            assert.are.equal('SN-0001', owner.weaponSerial)
+            assert.is_nil(owner.identifier)
+        end)
+
+        it('has no owner for a trace with neither', function()
+            -- `ck_fpd_evidence_owner_one` refuses to store one, and 8.3.4 says
+            -- why: the owner of a trace is its source. Answering nil is what
+            -- lets the route refuse the collection instead of driving the
+            -- insert into the constraint.
+            assert.is_nil(evidence.ownerOf({ owner = {} }))
+            assert.is_nil(evidence.ownerOf({}))
+            assert.is_nil(evidence.ownerOf(nil))
+        end)
+
+        it('treats a blank identifier as no identifier', function()
+            -- It would pass the CHECK and attribute the trace to nobody, which
+            -- is worse than no owner row: the lab would compare the sample
+            -- against an empty profile and report an exclusion.
+            assert.is_nil(evidence.ownerOf({ owner = { identifier = '   ' } }))
+            assert.is_nil(evidence.ownerOf({ owner = { identifier = 7 } }))
+        end)
+
+        it('trims what it keeps', function()
+            local owner = evidence.ownerOf({ owner = { weaponSerial = ' SN-0001 ' } })
+
+            assert.are.equal('SN-0001', owner.weaponSerial)
+        end)
+    end)
+
+    describe('canIntake', function()
+        it('accepts an item on its way into the property room', function()
+            assert.is_true(evidence.canIntake('collected'))
+            assert.is_true(evidence.canIntake('in_locker'))
+            assert.is_true(evidence.canIntake('checked_out'))
+            assert.is_true(evidence.canIntake('at_lab'))
+        end)
+
+        it('refuses one whose disposition has been carried out', function()
+            -- 8.6: released and destroyed are terminal. An item that has left
+            -- does not come back, and the custody chain is append-only, so an
+            -- entry written against one could never be corrected.
+            assert.is_false(evidence.canIntake('released'))
+            assert.is_false(evidence.canIntake('destroyed'))
+            assert.is_false(evidence.canIntake('in_property'))
+            assert.is_false(evidence.canIntake(nil))
+        end)
+    end)
+
+    describe('traceIndexFor', function()
+        it('files a DNA profile as an unidentified crime-scene trace', function()
+            assert.are.equal('dna_trace', evidence.traceIndexFor('dna', 'profile_obtained'))
+        end)
+
+        it('files a partial too, because a partial is searchable', function()
+            assert.are.equal('dna_trace', evidence.traceIndexFor('dna', 'partial_profile'))
+        end)
+
+        it('files nothing when no profile came out of the sample', function()
+            -- A mixture is more than one contributor (8.7), and a profile of
+            -- two people is a profile of neither.
+            assert.is_nil(evidence.traceIndexFor('dna', 'mixture'))
+            assert.is_nil(evidence.traceIndexFor('dna', 'no_profile'))
+        end)
+
+        it('has nothing to file from an analysis that is already a search', function()
+            assert.is_nil(evidence.traceIndexFor('print_search', 'candidate_match'))
+            assert.is_nil(evidence.traceIndexFor('ballistics', 'candidate_match'))
+        end)
+    end)
+
     describe('isCourtGrade', function()
         it('accepts a direct comparison', function()
             assert.is_true(evidence.isCourtGrade('identification'))
@@ -431,6 +512,349 @@ describe('evidence', function()
             assert.is_false(evidence.isCourtGrade('partial_profile'))
             assert.is_false(evidence.isCourtGrade('inconclusive'))
             assert.is_false(evidence.isCourtGrade(nil))
+        end)
+    end)
+end)
+
+-- -----------------------------------------------------------------------------
+-- The routes (spec 11.5)
+-- -----------------------------------------------------------------------------
+--
+-- `routes.lua` is not pure the way a `service.lua` is, so it is loaded against a
+-- fake route registry, a fake repo and a placement test that answers where the
+-- player is standing. What the handlers decide -- where a check-out may happen,
+-- what may be written into an append-only chain, and what an analyst is told
+-- when nothing was written -- is decided in this file and nowhere else, so it is
+-- worth a harness rather than a game server.
+
+local function loadInto(path)
+    assert(loadfile(('resources/[fredpd]/fredpd/%s.lua'):format(path)))()
+end
+
+describe('evidence routes', function()
+    local routes, state, printed, realPrint
+
+    --- Only what the handlers under test call. Anything they reach for that is
+    --- not here fails loudly rather than answering nil, which is the point: a
+    --- handler that starts calling something new shows up as a broken test.
+    local function fakeRepo()
+        return {
+            getEvidence = function(_agencyId, id) return state.items[id] end,
+            getScene = function(_agencyId, id) return state.scenes[id] end,
+            currentHolder = function() return 'A. Lindqvist' end,
+            unprotectedEntries = function() return state.unprotected end,
+
+            appendCustody = function(entry, discordId)
+                state.custody[#state.custody + 1] = { entry = entry, signedBy = discordId }
+                return #state.custody
+            end,
+
+            setEvidenceStatus = function(_agencyId, id, status, storage, fromStatuses)
+                local item = state.items[id]
+                if not item then return 0 end
+
+                for index = 1, #fromStatuses do
+                    if fromStatuses[index] == item.status then
+                        item.status = status
+                        item.storageLocation = storage or item.storageLocation
+                        return 1
+                    end
+                end
+
+                return 0
+            end,
+
+            insertEvidence = function(_agencyId, input, owner, _discordId)
+                state.inserted[#state.inserted + 1] = { input = input, owner = owner }
+                return { id = 9, evidenceNumber = 'LSPD-2026-000009', type = input.type }
+            end,
+
+            hiddenFacts = function() return state.facts end,
+            indexHits = function() return state.indexHits end,
+            completeAnalysis = function() return state.completedRows end,
+            completionBlocker = function() return state.blocker end,
+
+            indexTraceProfile = function(_agencyId, evidenceId, indexKind, discordId)
+                state.indexed[#state.indexed + 1] = {
+                    evidenceId = evidenceId, indexKind = indexKind, addedBy = discordId,
+                }
+                return 1
+            end,
+        }
+    end
+
+    local function analyst()
+        return helper.session({ discordId = '100000000000000009' })
+    end
+
+    local function call(name, session, input)
+        return routes[name].handler(session, input)
+    end
+
+    before_each(function()
+        state = {
+            items = {
+                [1] = { id = 1, status = 'in_property', storageLocation = 'vault-1' },
+                [2] = { id = 2, status = 'collected' },
+                [3] = { id = 3, status = 'released' },
+            },
+            scenes = {},
+            custody = {},
+            inserted = {},
+            indexed = {},
+            unprotected = 0,
+            indexHits = 0,
+            completedRows = 1,
+            blocker = nil,
+            -- Where the player actually is, by placement kind.
+            standingAt = {},
+            trace = { type = 'blood', quality = 90, owner = { identifier = 'char1:license:abc' } },
+            facts = {
+                id = 5,
+                analysis = 'dna',
+                status = 'in_progress',
+                assignedTo = '100000000000000009',
+                evidenceId = 1,
+                quality = 90,
+            },
+        }
+
+        -- The collect handler writes a line to the console when the generation
+        -- pipeline hands it something impossible. Captured so the test output
+        -- stays readable, and so the test can prove it was written.
+        printed = {}
+        realPrint = _G.print
+        _G.print = function(line) printed[#printed + 1] = line end
+
+        local FredPD = helper.load({
+            'shared/generated/schema',
+            'server/modules/evidence/service',
+        })
+
+        routes = {}
+
+        FredPD.Config = { server = { lab = { analysisMinutes = { dna = 40 } } } }
+
+        FredPD.Core = {
+            route = {
+                define = function(definition) routes[definition.name] = definition end,
+                refuse = function(code, fields) return { __err = code, fields = fields } end,
+            },
+            perms = { satisfies = function() return true end },
+            placements = {
+                playerIsAt = function(_src, placementId, kind)
+                    return state.standingAt[kind] == placementId
+                end,
+            },
+        }
+
+        FredPD.Repo = { evidence = fakeRepo() }
+        FredPD.Evidence = { claimTrace = function() return state.trace end }
+
+        loadInto('server/modules/evidence/routes')
+    end)
+
+    after_each(function()
+        _G.print = realPrint
+    end)
+
+    describe('evidence.transfer', function()
+        it('refuses a check-out from outside the property room', function()
+            -- 8.6 puts check-out at the counter beside intake. Without this an
+            -- item can be taken out of the vault from anywhere in the world.
+            local result = call('evidence.transfer', helper.session(), {
+                id = 1, destination = 'lab', reason = 'Ballistics',
+            })
+
+            assert.are.equal('context', result.__err)
+            assert.are.equal('required', result.fields.placementId)
+            assert.are.equal('in_property', state.items[1].status)
+            assert.are.same({}, state.custody)
+        end)
+
+        it('refuses a placement the player is not actually standing at', function()
+            state.standingAt.property_terminal = 4
+
+            local result = call('evidence.transfer', helper.session(), {
+                id = 1, destination = 'court', reason = 'Hearing', placementId = 7,
+            })
+
+            assert.are.equal('context', result.__err)
+            assert.are.equal('not_allowed', result.fields.placementId)
+        end)
+
+        it('checks an item out at the counter', function()
+            state.standingAt.property_terminal = 7
+
+            local result = call('evidence.transfer', helper.session(), {
+                id = 1, destination = 'lab', reason = 'Ballistics', placementId = 7,
+            })
+
+            assert.is_nil(result.__err)
+            assert.are.equal('at_lab', result.status)
+            assert.are.equal('checkout', state.custody[1].entry.action)
+        end)
+
+        it('lets the collecting officer deposit in a locker without one', function()
+            -- The other half of 8.6: a temporary locker is where the officer
+            -- puts the item before the property room opens, and there is no
+            -- counter to stand at when they do it.
+            local result = call('evidence.transfer', helper.session(), {
+                id = 2, destination = 'locker', reason = 'End of shift',
+            })
+
+            assert.is_nil(result.__err)
+            assert.are.equal('in_locker', result.status)
+            assert.are.equal('deposit', state.custody[1].entry.action)
+        end)
+    end)
+
+    describe('evidence.intake', function()
+        it('refuses a rejection against an item that has been released', function()
+            -- The chain is append-only (invariant 11): an entry written against
+            -- an item whose disposition has been carried out can never be taken
+            -- back, so the state is checked before anything is written.
+            local result = call('evidence.intake', helper.session(), {
+                id = 3, accepted = false, reason = 'Seal broken', placementId = 1,
+            })
+
+            assert.are.equal('conflict', result.__err)
+            assert.are.equal('released', result.fields.status)
+            assert.are.same({}, state.custody)
+        end)
+
+        it('records a rejection against an item that could have been accepted', function()
+            local result = call('evidence.intake', helper.session(), {
+                id = 2, accepted = false, reason = 'Description does not match', placementId = 1,
+            })
+
+            assert.is_false(result.accepted)
+            assert.are.equal('intake', state.custody[1].entry.action)
+            assert.are.equal('Description does not match', state.custody[1].entry.reason)
+            -- A rejection moves nothing.
+            assert.are.equal('collected', state.items[2].status)
+        end)
+    end)
+
+    describe('evidence.collect', function()
+        it('refuses a trace nobody left', function()
+            -- 8.3.4: the owner of a trace is its source. One with neither a
+            -- person nor a weapon is a bug in the generation pipeline, and the
+            -- officer is told that rather than shown a server error.
+            state.trace = { type = 'blood', quality = 90, owner = {} }
+
+            local result = call('evidence.collect', helper.session(), { traceKey = 'g:12:4' })
+
+            assert.are.equal('invalid', result.__err)
+            assert.are.equal('unattributed', result.fields.traceKey)
+            assert.are.same({}, state.inserted)
+            assert.are.equal(1, #printed)
+        end)
+
+        it('collects an attributed trace', function()
+            local result = call('evidence.collect', helper.session(), { traceKey = 'g:12:4' })
+
+            assert.is_nil(result.__err)
+            assert.are.equal('char1:license:abc', state.inserted[1].owner.identifier)
+            -- The type comes from the grid, never from the call (8.3.6).
+            assert.are.equal('blood', state.inserted[1].input.type)
+        end)
+    end)
+
+    describe('lab.analysis.complete', function()
+        it('tells an analyst whose analysis was cancelled, not to keep waiting', function()
+            state.completedRows = 0
+            state.blocker = { status = 'cancelled', elapsed = 1 }
+
+            local result = call('lab.analysis.complete', analyst(), { id = 5 })
+
+            assert.are.equal('conflict', result.__err)
+            assert.are.equal('cancelled', result.fields.status)
+            assert.is_nil(result.fields.dueAt)
+        end)
+
+        it('tells an analyst who is early to wait', function()
+            state.completedRows = 0
+            state.blocker = { status = 'in_progress', elapsed = 0 }
+
+            local result = call('lab.analysis.complete', analyst(), { id = 5 })
+
+            assert.are.equal('conflict', result.__err)
+            assert.are.equal('not_elapsed', result.fields.dueAt)
+        end)
+
+        it('reports a write that should have happened as a server fault', function()
+            state.completedRows = 0
+            state.blocker = { status = 'in_progress', elapsed = 1 }
+
+            local result = call('lab.analysis.complete', analyst(), { id = 5 })
+
+            assert.are.equal('internal', result.__err)
+        end)
+
+        it('reports an analysis that is gone as not found', function()
+            state.completedRows = 0
+            state.blocker = nil
+
+            local result = call('lab.analysis.complete', analyst(), { id = 5 })
+
+            assert.are.equal('not_found', result.__err)
+        end)
+
+        it('files the profile it obtained in the trace index', function()
+            -- 8.8: a new crime-scene profile joins the trace index, without a
+            -- subject -- that is what makes a later hit a lead and not a
+            -- lookup (8.1.3).
+            local result = call('lab.analysis.complete', analyst(), { id = 5 })
+
+            assert.are.equal('profile_obtained', result.resultCode)
+            assert.are.equal('dna_trace', state.indexed[1].indexKind)
+            assert.are.equal(1, state.indexed[1].evidenceId)
+        end)
+
+        it('files nothing when the sample gave no profile', function()
+            state.facts.quality = 5
+
+            local result = call('lab.analysis.complete', analyst(), { id = 5 })
+
+            assert.are.equal('no_profile', result.resultCode)
+            assert.are.same({}, state.indexed)
+        end)
+
+        it('files nothing from an analysis that is itself a search', function()
+            state.facts.analysis = 'print_search'
+            state.indexHits = 2
+
+            local result = call('lab.analysis.complete', analyst(), { id = 5 })
+
+            assert.are.equal('candidate_match', result.resultCode)
+            assert.are.same({}, state.indexed)
+        end)
+    end)
+
+    describe('where a route may be called from', function()
+        it('keeps lab work at the lab terminal', function()
+            -- 1.4 limits analysis and technical review to the lab terminal, and
+            -- 8.7 makes the turnaround the time an analyst spends at it.
+            for _, name in ipairs({ 'lab.analysis.start', 'lab.analysis.complete' }) do
+                assert.is_true(routes[name].context.onDuty)
+                assert.are.equal('lab_terminal', routes[name].context.accessPoint)
+            end
+        end)
+
+        it('lets a request be raised from the case it comes from, on duty', function()
+            assert.is_true(routes['lab.request.create'].context.onDuty)
+            assert.is_nil(routes['lab.request.create'].context.accessPoint)
+        end)
+    end)
+
+    describe('scene.release', function()
+        it('audits the reason the perimeter came down', function()
+            -- 8.4 puts a checklist in front of a release and `fpd_scenes` has
+            -- no column for it, so the audit log is where it is kept.
+            local detail = routes['scene.release'].auditDetail({ id = 1, reason = ' Processed ' })
+
+            assert.are.equal('Processed', detail.reason)
         end)
     end)
 end)

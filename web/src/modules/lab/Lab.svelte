@@ -1,5 +1,32 @@
-<script lang="ts">
+<script module lang="ts">
   import { nui } from '../../lib/nui';
+
+  /**
+   * The lab terminal this interface was opened from (spec 3.10).
+   *
+   * `lab.analysis.start` and `lab.analysis.complete` carry
+   * `accessPoint = 'lab_terminal'`, so the call has to name the terminal it is
+   * made at and the server checks the analyst is standing there. The id is a
+   * claim, never a grant.
+   *
+   * Module scope rather than the component, for the same reason as the evidence
+   * page: the game pushes `fredpd:open` once when the terminal is opened, while
+   * this page exists only while Lab is the module on screen. An analyst who
+   * opens the terminal and then picks Lab off the rail would mount after the
+   * message and never see it.
+   */
+  let openedAt: number | null = null;
+
+  nui.on('fredpd:open', (message) => {
+    openedAt = typeof message['placementId'] === 'number' ? message['placementId'] : null;
+  });
+
+  nui.on('fredpd:close', () => {
+    openedAt = null;
+  });
+</script>
+
+<script lang="ts">
   import { t } from '../../lib/i18n';
   import { LAB_ANALYSES, LAB_ANALYSIS_STATUSES } from '@fredpd/schema';
   import { fieldList, type Failure } from '../shared/failure';
@@ -84,7 +111,7 @@
   }
 
   async function start(id: number): Promise<void> {
-    await submit('lab.analysis.start', { id });
+    await submit('lab.analysis.start', { id, placementId: openedAt ?? undefined });
   }
 
   async function complete(event: SubmitEvent): Promise<void> {
@@ -93,6 +120,7 @@
 
     const done = await submit('lab.analysis.complete', {
       id: selectedId,
+      placementId: openedAt ?? undefined,
       observations: observations.trim() || undefined,
     });
 

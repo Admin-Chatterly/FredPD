@@ -605,6 +605,61 @@ function Repo.indexHits(agencyId, indexKind, profile, referencesOnly)
     return db().scalar(query, { agencyId, indexKind, profile }) or 0
 end
 
+--- Files the profile a DNA analysis obtained in the trace index (8.8).
+---
+--- The profile is copied from `fpd_biometrics` to `fpd_forensic_index` inside
+--- the statement, so the value never exists in a Lua variable and cannot be
+--- carried into a response by accident -- the same rule `indexHits` follows in
+--- the other direction.
+---
+--- What goes in is an *unidentified* crime-scene profile: `identifier` is left
+--- NULL deliberately, because a trace entry that named its subject would turn
+--- every later search into a lookup and make confirmation meaningless (8.1.3,
+--- 8.8). The entry is tied to the item it came from, which is what gives the
+--- profile its provenance and what the CHECK on the table requires.
+---
+--- Idempotent: an item already in the index is not filed twice, so a second
+--- analysis of the same sample -- or a retry -- adds nothing.
+---
+--- @param indexKind string from `service.traceIndexFor`, never from input
+--- @return number rows written
+function Repo.indexTraceProfile(agencyId, evidenceId, indexKind, discordId)
+    return db().execute(
+        [[INSERT INTO fpd_forensic_index (index_kind, profile, evidence_id, agency_id, added_by)
+          SELECT ?, b.dna_profile, e.id, e.agency_id, ?
+            FROM fpd_evidence e
+            JOIN fpd_evidence_owner o ON o.evidence_id = e.id
+            JOIN fpd_biometrics b ON b.identifier = o.identifier
+           WHERE e.id = ? AND e.agency_id = ?
+             AND NOT EXISTS (SELECT 1 FROM fpd_forensic_index x
+                              WHERE x.evidence_id = e.id
+                                AND x.index_kind = ?
+                                AND x.removed_at IS NULL)]],
+        { indexKind, discordId, evidenceId, agencyId, indexKind }
+    )
+end
+
+--- Why a completion wrote nothing.
+---
+--- `completeAnalysis` has three conditions in one UPDATE -- the row is this
+--- agency's, it is still in progress, and its timer has elapsed -- so zero rows
+--- alone does not say which of them failed. Asking afterwards is the only way
+--- to tell an analyst whose work was cancelled from one who is early, and the
+--- elapsed test is evaluated by the database so it is the same clock the UPDATE
+--- used rather than a second opinion from Lua.
+---
+--- @return table|nil { status, elapsed } or nil when the analysis is not ours
+function Repo.completionBlocker(agencyId, analysisId)
+    return db().single(
+        [[SELECT a.status,
+                 (a.due_at IS NOT NULL AND a.due_at <= CURRENT_TIMESTAMP(3)) AS elapsed
+            FROM fpd_lab_analyses a
+            JOIN fpd_lab_requests r ON r.id = a.request_id
+           WHERE r.agency_id = ? AND a.id = ?]],
+        { agencyId, analysisId }
+    )
+end
+
 --- Records the result and closes the request when nothing is left outstanding.
 ---
 --- `due_at <= CURRENT_TIMESTAMP(3)` is in the WHERE clause rather than checked

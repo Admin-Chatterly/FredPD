@@ -327,12 +327,18 @@ export const schemas = {
 
   LabAnalysisStart: {
     id: { type: 'integer', required: true, min: 1 },
+    // The lab terminal the analyst is working at. Required because the route
+    // carries `accessPoint = 'lab_terminal'`, and that condition fails closed
+    // without it. A claim, not a grant: the server checks they are standing
+    // there.
+    placementId: { type: 'integer', required: true, min: 1 },
   },
 
   // Observations are how the analyst worked. The conclusion is not here and
   // never will be: the server computes it (8.7).
   LabAnalysisComplete: {
     id: { type: 'integer', required: true, min: 1 },
+    placementId: { type: 'integer', required: true, min: 1 },
     observations: { type: 'string', required: false, max: 1024 },
   },
 

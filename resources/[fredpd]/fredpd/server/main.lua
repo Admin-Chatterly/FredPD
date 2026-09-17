@@ -23,6 +23,22 @@ local REQUIRED_TABLES <const> = {
     'fpd_intel_orgs',
     'fpd_intel_notes',
     'fpd_intel_cases',
+
+    -- Migration 0002. Without these listed, a server that applied 0001 and
+    -- stopped boots clean and reports every table present, then fails on the
+    -- first evidence call with a raw SQL error naming a table the operator has
+    -- never heard of. Printing which migration is missing is the entire job of
+    -- this check.
+    'fpd_biometrics',
+    'fpd_weapon_signatures',
+    'fpd_scenes',
+    'fpd_scene_entries',
+    'fpd_evidence',
+    'fpd_evidence_owner',
+    'fpd_custody_log',
+    'fpd_lab_requests',
+    'fpd_lab_analyses',
+    'fpd_forensic_index',
 }
 
 --- Returns the names of any dependency that is not started.

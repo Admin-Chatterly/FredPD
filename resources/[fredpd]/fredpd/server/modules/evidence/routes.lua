@@ -87,23 +87,49 @@ end
 --- Note what is absent: no destination here sets `in_property`. Everything
 --- entering the property room goes through `evidence.intake`, at the terminal,
 --- which is the only place a storage location is assigned (8.6).
+---
+--- `at` is where the officer has to be standing. A check-out to the lab, the
+--- court or an investigator takes the item out of property-room storage, and
+--- 8.6 puts that at the counter beside intake -- the same section that makes
+--- the storage stashes open only at the property room access point. It cannot
+--- be a context condition on the route, because it is true of three
+--- destinations and not of the fourth: a locker deposit is the collecting
+--- officer putting the item into a temporary locker (8.6), which is the one
+--- transfer that happens away from the counter, and there is no placement kind
+--- for a locker to check them against. So the check is per destination, in the
+--- handler, against the same server-side placement test the route layer uses.
 local TRANSFER <const> = {
     locker = { status = 'in_locker', action = 'deposit', from = { 'collected' } },
-    lab = { status = 'at_lab', action = 'checkout', from = { 'in_property' } },
-    court = { status = 'checked_out', action = 'checkout', from = { 'in_property' } },
-    investigator = { status = 'checked_out', action = 'checkout', from = { 'in_property' } },
+    lab = {
+        status = 'at_lab', action = 'checkout',
+        from = { 'in_property' }, at = 'property_terminal',
+    },
+    court = {
+        status = 'checked_out', action = 'checkout',
+        from = { 'in_property' }, at = 'property_terminal',
+    },
+    investigator = {
+        status = 'checked_out', action = 'checkout',
+        from = { 'in_property' }, at = 'property_terminal',
+    },
 }
 
---- Statuses an item may be accepted into the property room from.
----
---- `released` and `destroyed` are terminal and deliberately not here: an item
---- whose disposition has been carried out does not come back.
-local INTAKE_FROM <const> = { 'collected', 'in_locker', 'checked_out', 'at_lab' }
+--- Statuses an item may be accepted into the property room from (8.6). Both
+--- halves of the two-step intake read it, so it lives in the service.
+local INTAKE_FROM <const> = service.INTAKE_FROM
 
 --- Which index an analysis searches, and against which hidden profile.
 ---
 --- `referencesOnly` is the difference between a comparison and a search: a
 --- reference entry names its subject, a trace entry does not (8.8).
+---
+--- There is deliberately no `dna` entry. 8.7 fixes what a DNA analysis may
+--- conclude -- profile obtained, partial profile, mixture, no profile -- and
+--- none of those are things an index can answer; "candidate match" is the
+--- language of a database search, which is what `print_search` and `ballistics`
+--- are. What 8.8 asks of DNA is the other direction: the profile the lab
+--- obtained is filed as an unidentified crime-scene trace, which
+--- `lab.analysis.complete` does below.
 local ANALYSIS_INDEX <const> = {
     print_comparison = { kind = 'fingerprint', profile = 'fingerprint', referencesOnly = true },
     print_search = { kind = 'fingerprint', profile = 'fingerprint' },
@@ -169,6 +195,14 @@ route.define({
     sensitive = true,
     audit = 'evidence.scene.released',
     subjectType = 'scene',
+    auditDetail = function(input)
+        -- 8.4 puts a checklist in front of a release, and the reason is what
+        -- the officer signs it off with. `fpd_scenes` has no column for it --
+        -- a scene records who released it and when -- so the audit log is
+        -- where it is kept, which is also the log that cannot be edited
+        -- afterwards (invariant 11).
+        return { reason = text(input.reason) }
+    end,
     handler = function(session, input)
         local scene = repo.getScene(session.agencyId, input.id)
         if not scene then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
@@ -244,6 +278,27 @@ route.define({
         local trace = FredPD.Evidence.claimTrace(session.src, input.traceKey)
         if not trace then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
 
+        -- Every trace is left by somebody or by something: 8.3.4 makes the
+        -- owner the source player's hidden identifier, and a casing carries the
+        -- weapon instead. One with neither is a bug in the generation pipeline,
+        -- which is what `ck_fpd_evidence_owner_one` says by refusing to store
+        -- it. Refused here rather than in the transaction, so the officer is
+        -- told the trace cannot be attributed instead of being shown a generic
+        -- server error -- and so the item is not written at all, which is the
+        -- right outcome: an item with no owner would be analysed against an
+        -- empty profile and come back as an exclusion that means nothing.
+        local owner = service.ownerOf(trace)
+
+        if not owner then
+            -- The grid handed over something it should never produce. The
+            -- console is where an operator can see it; the type and the key
+            -- name the trace and disclose nobody.
+            print(('[fredpd] evidence.collect: unattributed trace %s (%s)')
+                :format(tostring(input.traceKey), tostring(trace.type)))
+
+            return route.refuse(FredPD.ErrorCode.INVALID, { traceKey = 'unattributed' })
+        end
+
         -- Contamination is read from the entry log, not from the collecting
         -- officer's word for it (8.4): anyone who walked the perimeter without
         -- protective equipment degrades everything taken from it.
@@ -267,7 +322,7 @@ route.define({
             description = text(input.description),
             quality = quality,
             fromParty = scene and scene.sceneNumber or nil,
-        }, trace.owner or {}, session.discordId)
+        }, owner, session.discordId)
 
         if not item then return route.refuse(FredPD.ErrorCode.INTERNAL) end
 
@@ -306,6 +361,18 @@ route.define({
         -- match, the paperwork is wrong. The item does not move, and the reason
         -- goes into the chain where the officer who brought it can read it.
         if not input.accepted then
+            -- The same states the accept path allows, checked before anything
+            -- is written. The accept path enforces them inside its UPDATE; a
+            -- rejection changes no status, so without this it would accept an
+            -- item in any state at all -- including released and destroyed,
+            -- which `INTAKE_FROM` deliberately excludes. The chain is
+            -- append-only (invariant 11), so an entry written against an item
+            -- whose disposition has already been carried out can never be
+            -- taken back.
+            if not service.canIntake(item.status) then
+                return route.refuse(FredPD.ErrorCode.CONFLICT, { status = item.status })
+            end
+
             repo.appendCustody({
                 evidenceId = input.id,
                 action = 'intake',
@@ -346,6 +413,8 @@ route.define({
     name = 'evidence.transfer',
     perm = 'evidence.item.transfer',
     schema = 'EvidenceTransfer',
+    -- The access point is not here because it depends on the destination: see
+    -- `TRANSFER` above and the check at the top of the handler.
     context = { onDuty = true },
     writes = true,
     sensitive = true,
@@ -358,6 +427,21 @@ route.define({
         local move = TRANSFER[input.destination]
         if not move then
             return route.refuse(FredPD.ErrorCode.INVALID, { destination = 'not_allowed' })
+        end
+
+        -- A check-out empties a storage location, so it happens at the property
+        -- room counter (8.6). The client names the placement it is using and
+        -- the server checks the player is genuinely within its radius (3.10) --
+        -- without this an item could be taken out of the vault from anywhere in
+        -- the world, which is the one thing a property room is for.
+        if move.at then
+            if type(input.placementId) ~= 'number' then
+                return route.refuse(FredPD.ErrorCode.CONTEXT, { placementId = 'required' })
+            end
+
+            if not FredPD.Core.placements.playerIsAt(session.src, input.placementId, move.at) then
+                return route.refuse(FredPD.ErrorCode.CONTEXT, { placementId = 'not_allowed' })
+            end
         end
 
         local item = repo.getEvidence(session.agencyId, input.id)
@@ -465,6 +549,10 @@ route.define({
     name = 'lab.request.create',
     perm = 'lab.request.create',
     schema = 'LabRequestCreate',
+    -- On duty, but from anywhere: a request comes from a case, raised by the
+    -- investigator working it (8.7), and 1.4 limits the lab terminal to the
+    -- analysis itself. Asking for work is not doing it.
+    context = { onDuty = true },
     writes = true,
     limit = { per = 10, window = 60 },
     audit = 'lab.request.created',
@@ -551,6 +639,11 @@ route.define({
     name = 'lab.analysis.start',
     perm = 'lab.analysis.perform',
     schema = 'LabAnalysisStart',
+    -- Analysis happens at the lab bench: 1.4 limits "analysis, technical
+    -- review" to the lab terminal, and 8.7 makes the turnaround the time the
+    -- analyst spends on it. A clock that could be started from a car would be a
+    -- countdown, not a workload.
+    context = { onDuty = true, accessPoint = 'lab_terminal' },
     writes = true,
     audit = 'lab.analysis.started',
     subjectType = 'lab_analysis',
@@ -581,6 +674,8 @@ route.define({
     name = 'lab.analysis.complete',
     perm = 'lab.analysis.perform',
     schema = 'LabAnalysisComplete',
+    -- Where the analysis was started, and for the same reason (1.4, 8.7).
+    context = { onDuty = true, accessPoint = 'lab_terminal' },
     writes = true,
     -- This is the moment a result comes into existence. Spec 4.2: a release
     -- needs a permission snapshot that is actually current.
@@ -643,7 +738,38 @@ route.define({
         -- The timer is checked in the UPDATE against the database's clock, so an
         -- analyst who calls this early changes nothing and is told to wait.
         if repo.completeAnalysis(session.agencyId, input.id, result, text(input.observations)) == 0 then
-            return route.refuse(FredPD.ErrorCode.CONFLICT, { dueAt = 'not_elapsed' })
+            -- Three conditions in one statement, so zero rows does not say
+            -- which. An analysis cancelled under the analyst, or finished by
+            -- the automatic mode while they were writing, must not be reported
+            -- as a turnaround that has not elapsed: that is a wait which will
+            -- never end, and they would sit there for it.
+            local blocker = repo.completionBlocker(session.agencyId, input.id)
+
+            if not blocker then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+
+            if blocker.status ~= 'in_progress' then
+                return route.refuse(FredPD.ErrorCode.CONFLICT, { status = blocker.status })
+            end
+
+            -- MariaDB answers a boolean expression with 1 and 0.
+            if not (blocker.elapsed == true or blocker.elapsed == 1) then
+                return route.refuse(FredPD.ErrorCode.CONFLICT, { dueAt = 'not_elapsed' })
+            end
+
+            -- In progress, due, and still nothing written: the transaction did
+            -- not commit. That is a server fault and is reported as one rather
+            -- than as something the analyst did wrong.
+            return route.refuse(FredPD.ErrorCode.INTERNAL)
+        end
+
+        -- 8.8: the profile the lab obtained joins the trace index as an
+        -- unidentified crime-scene profile, which is what later correlations
+        -- and confirmations search. The copy happens inside the statement, so
+        -- the profile itself never reaches this file.
+        local indexKind = service.traceIndexFor(facts.analysis, result)
+
+        if indexKind then
+            repo.indexTraceProfile(session.agencyId, facts.evidenceId, indexKind, session.discordId)
         end
 
         return { id = input.id, analysis = facts.analysis, resultCode = result }

@@ -88,6 +88,30 @@ FredPD.Config.server = {
         window = 60,
     },
 
+    --- The forensic lab (spec 8.7).
+    ---
+    --- How long an analysis takes, in real minutes, counted from the moment an
+    --- analyst starts it at the lab terminal. The due time is written to the
+    --- database, so timers survive a restart and nobody can shorten one.
+    ---
+    --- Priority is a multiplier on whatever is set here: `routine` is the full
+    --- time, `expedited` half of it and `urgent` a quarter. An analysis that is
+    --- not listed takes 30 minutes.
+    ---
+    --- Longer is better than shorter. The wait is the mechanic -- it is what
+    --- makes a lab request a decision about which items matter rather than a
+    --- button pressed on everything collected.
+    lab = {
+        analysisMinutes = {
+            dna = 45,
+            print_comparison = 20,
+            print_search = 25,
+            ballistics = 40,
+            gsr = 15,
+            drug_id = 10,
+        },
+    },
+
     --- The gateway is a separate Node service for media, PDF rendering and
     --- scheduled jobs. None of that exists yet and FXServer never calls it, so
     --- it is off and you do not need to deploy anything (ADR-010). When it

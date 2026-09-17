@@ -122,6 +122,67 @@ function Evidence.parseIds(list, max)
     return ids
 end
 
+-- -----------------------------------------------------------------------------
+-- Attribution (8.3.4) and intake (8.6)
+-- -----------------------------------------------------------------------------
+
+--- A string, or nil when there is nothing in it.
+local function filled(value)
+    if type(value) ~= 'string' then return nil end
+
+    local text = value:match('^%s*(.-)%s*$')
+    return text ~= '' and text or nil
+end
+
+--- The owner a collected trace is filed under, or nil when it has none.
+---
+--- 8.3.4: the owner of a trace is always its source -- the person whose hidden
+--- identifier it carries, or the weapon whose serial it does. A trace with
+--- neither is a bug in the generation pipeline rather than an unattributed
+--- item, which is exactly what `ck_fpd_evidence_owner_one` says by refusing to
+--- store one. Answering nil here lets the route refuse the collection cleanly
+--- instead of driving the insert into that constraint, where the officer would
+--- be shown a generic internal error for a trace that simply has no owner.
+---
+--- A blank identifier counts as absent. It would satisfy the CHECK while
+--- attributing the trace to nobody, which is worse than having no owner row:
+--- the lab would then compare a sample against an empty profile and report an
+--- exclusion that means nothing.
+---
+--- @param trace table|nil as the grid handed it over
+--- @return table|nil { identifier, weaponSerial }
+function Evidence.ownerOf(trace)
+    local owner = type(trace) == 'table' and trace.owner or nil
+    if type(owner) ~= 'table' then return nil end
+
+    local identifier = filled(owner.identifier)
+    local weaponSerial = filled(owner.weaponSerial)
+
+    if not identifier and not weaponSerial then return nil end
+
+    return { identifier = identifier, weaponSerial = weaponSerial }
+end
+
+--- Statuses the property room may accept an item from (8.6).
+---
+--- `released` and `destroyed` are terminal and deliberately absent: an item
+--- whose disposition has been carried out does not come back.
+---
+--- The list lives here rather than in the route because both halves of the
+--- two-step intake need it -- the accept path as the `from` list of its UPDATE,
+--- and the rejection path as a gate before it writes to a chain that can never
+--- be corrected (invariant 11).
+Evidence.INTAKE_FROM = { 'collected', 'in_locker', 'checked_out', 'at_lab' }
+
+--- May the property room record a decision about an item in this state?
+function Evidence.canIntake(status)
+    for index = 1, #Evidence.INTAKE_FROM do
+        if Evidence.INTAKE_FROM[index] == status then return true end
+    end
+
+    return false
+end
+
 --- Render data for a piece of uncollected evidence lying in the world (8.1.6).
 ---
 --- Everything a client needs to draw it and nothing else. No owner, no id that
@@ -390,6 +451,29 @@ function Evidence.resultFor(analysis, facts)
         indexHits = facts.indexHits,
         hasWeapon = facts.hasWeapon,
     })
+end
+
+--- Which forensic index a finished analysis adds its own profile to (8.8).
+---
+--- Only DNA, and only when a profile actually came out of the sample. 8.8's
+--- trace indexes hold *unidentified crime-scene profiles*, so what goes in is a
+--- profile the lab obtained, not the hidden truth behind an item nobody has
+--- analysed. A partial profile still goes in -- a partial is searchable, and
+--- 8.1.3 has already decided that a hit off any of these is a lead needing
+--- confirmation, not an identification.
+---
+--- A mixture does not: 8.7 defines it as more than one contributor, and a
+--- profile of two people is not a profile of either.
+---
+--- @return string|nil the `fpd_forensic_index.index_kind` to file it under
+function Evidence.traceIndexFor(analysis, resultCode)
+    if analysis ~= 'dna' then return nil end
+
+    if resultCode == 'profile_obtained' or resultCode == 'partial_profile' then
+        return 'dna_trace'
+    end
+
+    return nil
 end
 
 --- Is this result one a court may hear as an identification?
