@@ -59,6 +59,49 @@ describe('perms', function()
         end)
     end)
 
+    describe('expandAncestry', function()
+        local groups = {
+            patrol_basic = { permissions = { 'page.records' } },
+            patrol = { inherits = 'patrol_basic', permissions = {} },
+            supervisor = { inherits = 'patrol', permissions = {} },
+            air = { permissions = {} },
+        }
+
+        it('walks the chain the group stands on', function()
+            -- Holding `supervisor`, which extends `patrol`, really does put an
+            -- officer in patrol, so a vehicle gated to patrol opens for them.
+            assert.are.same(
+                { supervisor = true, patrol = true, patrol_basic = true },
+                perms.expandAncestry('supervisor', groups)
+            )
+        end)
+
+        it('does not walk downwards', function()
+            -- The direction that matters for a gate: being in `patrol` does not
+            -- put an officer in `supervisor`.
+            local held = perms.expandAncestry('patrol', groups)
+
+            assert.is_true(held.patrol)
+            assert.is_nil(held.supervisor)
+        end)
+
+        it('returns a group with no parent as itself', function()
+            assert.are.same({ air = true }, perms.expandAncestry('air', groups))
+        end)
+
+        it('returns nothing for a group that does not exist', function()
+            -- A fleet row naming a deleted or misspelt group. Nobody is in it,
+            -- so the gate holds shut.
+            assert.are.same({}, perms.expandAncestry('ghost', groups))
+        end)
+
+        it('survives a cycle', function()
+            local cyclic = { a = { inherits = 'b' }, b = { inherits = 'a' } }
+
+            assert.are.same({ a = true, b = true }, perms.expandAncestry('a', cyclic))
+        end)
+    end)
+
     describe('computeEffective', function()
         local groupPermissions = {
             patrol = { ['page.records'] = true, ['garage.vehicle.draw'] = true },

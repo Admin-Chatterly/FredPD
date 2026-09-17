@@ -60,6 +60,33 @@ function Perms.expandGroup(groupKey, groups, seen)
     return result
 end
 
+--- Every group a group stands for: itself and everything it inherits.
+---
+--- Membership, not permissions. A vehicle gated to `patrol` is drawable by a
+--- supervisor because `supervisor` inherits `patrol` -- the supervisor really is
+--- in the patrol bundle -- but not by a dispatcher who happens to hold the same
+--- permission keys by another route. That distinction is the whole point of a
+--- gate: "the air unit" means the people in it, not the people who could do
+--- what it does.
+---
+--- @param groupKey string
+--- @param groups table group key -> { inherits = string|nil, ... }
+--- @param seen table|nil guards against a cycle in the inheritance chain
+--- @return table set of group keys
+function Perms.expandAncestry(groupKey, groups, seen)
+    seen = seen or {}
+
+    if seen[groupKey] then return seen end
+    if not groups[groupKey] then return seen end
+
+    seen[groupKey] = true
+
+    local inherits = groups[groupKey].inherits
+    if inherits then Perms.expandAncestry(inherits, groups, seen) end
+
+    return seen
+end
+
 --- The union of every permission granted by a set of Discord roles in one agency.
 ---
 --- @param roleIds table list of Discord role ids the member holds
@@ -139,8 +166,10 @@ function Perms.reload()
     -- Expand inheritance once here, so a permission check is a table lookup
     -- rather than a walk up the chain on every route call (spec 12).
     local groupPermissions = {}
+    local groupAncestry = {}
     for groupKey in pairs(groups) do
         groupPermissions[groupKey] = Perms.expandGroup(groupKey, groups)
+        groupAncestry[groupKey] = Perms.expandAncestry(groupKey, groups)
     end
 
     local mapRows = db.query('SELECT discord_role_id, group_key, agency_id FROM fpd_role_map')
@@ -157,6 +186,7 @@ function Perms.reload()
     end
 
     cache.groupPermissions = groupPermissions
+    cache.groupAncestry = groupAncestry
     cache.roleMap = roleMap
     cache.loadedAt = os.time()
 
@@ -177,6 +207,40 @@ function Perms.memberRoles(discordId)
     if not ok or type(roles) ~= 'table' then return {}, row.age end
 
     return roles, row.age
+end
+
+--- The groups a member is in, in one agency.
+---
+--- Membership rather than permissions, and the two answer different questions.
+--- `effectiveFor` says what an officer may *do*; this says which bundles they
+--- are *in*, which is what a gate on a group means. A dispatcher who happens to
+--- hold every key the air unit holds is still not in the air unit.
+---
+--- A group the member holds brings the groups it inherits with it: holding
+--- `supervisor`, which extends `patrol`, really does put them in patrol.
+---
+--- @return table set of group keys
+function Perms.groupsFor(discordId, agencyId)
+    local roleIds = Perms.memberRoles(discordId)
+    local rolesToGroups = cache.roleMap[agencyId] or {}
+    local ancestry = cache.groupAncestry or {}
+    local held = {}
+
+    for index = 1, #roleIds do
+        local groupKeys = rolesToGroups[tostring(roleIds[index])]
+
+        for position = 1, #(groupKeys or {}) do
+            local key = groupKeys[position]
+
+            -- Precomputed at reload; a group the cache has never heard of
+            -- contributes only itself, so a gate naming it still fails closed.
+            for ancestor in pairs(ancestry[key] or { [key] = true }) do
+                held[ancestor] = true
+            end
+        end
+    end
+
+    return held
 end
 
 --- Effective permissions for a member in one agency.

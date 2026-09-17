@@ -45,6 +45,15 @@ local function gateChecks(session)
     for index = 1, #roles do heldRoles[tostring(roles[index])] = true end
 
     local groupAnswers = {}
+    local groupsHeld = nil
+
+    -- Read on the first group gate rather than up front: most fleets gate by
+    -- role or not at all, and this is a second pass over the role map that
+    -- those calls have no use for.
+    local function membership()
+        groupsHeld = groupsHeld or FredPD.Core.perms.groupsFor(session.discordId, session.agencyId)
+        return groupsHeld
+    end
 
     return {
         hasPermission = permissionChecker(session),
@@ -54,31 +63,29 @@ local function gateChecks(session)
             return heldRoles[tostring(roleId)] == true
         end,
 
-        --- Does this session hold everything the group grants?
+        --- Is this session *in* the group?
         ---
-        --- Asked of the permission model that already exists rather than of a
-        --- second one: a group is a set of permission keys, the session carries
-        --- the set it holds, and `perms.missing` is the comparison the admin
-        --- screen already uses for "may this actor grant this group". Nothing
-        --- here asks which Discord roles produced the session's permissions,
-        --- because that is not what the gate means.
+        --- Membership, not "holds everything the group grants". Those look
+        --- interchangeable and are not, and the difference runs the wrong way:
+        --- a group whose keys every officer already holds -- a unit group with
+        --- no permissions of its own, or one whose keys all sit in `patrol` --
+        --- is satisfied by everybody, so the gate that was meant to narrow the
+        --- vehicle to one unit opens it to the whole department. A gate on "the
+        --- air unit" means the people in the air unit, not the people who could
+        --- do what it does.
         ---
-        --- Fails closed twice over. A group the cache has never heard of --
-        --- renamed, deleted, or a typo the editor was not there to catch when
-        --- the row was written -- answers nil, and a group that grants nothing
-        --- answers an empty set: neither can distinguish one officer from
-        --- another, so neither opens the vehicle.
+        --- Membership carries inheritance with it: holding `supervisor`, which
+        --- extends `patrol`, really does put an officer in patrol. It does not
+        --- run the other way, and a dispatcher who happens to hold the same
+        --- keys is still not in the unit.
+        ---
+        --- Fails closed on a group the role map has never mapped -- renamed,
+        --- deleted, or a typo in the fleet row -- because nobody is in it.
         satisfiesGroup = function(groupKey)
             local answer = groupAnswers[groupKey]
             if answer ~= nil then return answer end
 
-            local permissions = FredPD.Core.perms.permissionsOf(groupKey)
-
-            if not permissions or next(permissions) == nil then
-                answer = false
-            else
-                answer = #FredPD.Core.perms.missing(permissions, session.permissions) == 0
-            end
+            answer = membership()[groupKey] == true
 
             groupAnswers[groupKey] = answer
             return answer

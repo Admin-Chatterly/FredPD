@@ -496,6 +496,16 @@ describe('garage routes', function()
             return (options.groups or {})[groupKey]
         end
 
+        -- The groups this officer is *in*. Stubbed at the database boundary
+        -- like memberRoles: what `groupsFor` computes from the role map and the
+        -- inheritance chain is perms_spec's business, and what the gate does
+        -- with the answer is this file's.
+        FredPD.Core.perms.groupsFor = function(_discordId, _agencyId)
+            local held = {}
+            for _, key in ipairs(options.memberships or {}) do held[key] = true end
+            return held
+        end
+
         FredPD.Core.agencies = {
             get = function(_id) return options.agency end,
         }
@@ -559,8 +569,10 @@ describe('garage routes', function()
         }
     end
 
-    --- `detectives` grants one key; `swat` grants two, so a session holding only
-    --- the first satisfies neither.
+    --- What each group grants. The gate does not read these -- it asks who is
+    --- *in* the group -- but the fleet editor validates a group key against
+    --- them, and keeping them here is what lets a test hold every key of a
+    --- group it is not a member of.
     local GROUPS <const> = {
         detectives = { ['records.person.view'] = true },
         swat = { ['records.person.view'] = true, ['garage.tactical'] = true },
@@ -588,16 +600,33 @@ describe('garage routes', function()
             assert.is_nil(listed.fbi)
         end)
 
-        it('lists the group-gated vehicle to the officer who satisfies the group', function()
+        it('lists the group-gated vehicle to a member of the group', function()
             local routes, session = wire({
-                fleet = gatedFleet(), groups = GROUPS, holds = { 'records.person.view' },
+                fleet = gatedFleet(), groups = GROUPS, memberships = { 'detectives' },
             })
 
             local listed = models(routes['garage.fleet'].handler(session, {}))
 
             assert.is_true(listed.fbi)
-            -- `swat` grants a second key this session does not hold, so the
-            -- vehicle gated on it stays out of the list.
+            -- Not a member of `swat`, so the vehicle gated on it stays out.
+            assert.is_nil(listed.riot)
+        end)
+
+        it('does not open a group gate to an officer who merely holds its keys', function()
+            -- The defect this replaced: asking whether the session's
+            -- permissions are a superset of the group's opens a unit vehicle to
+            -- everyone the moment the unit's keys are ones every officer
+            -- already has -- which is exactly true of a unit group carrying no
+            -- permissions of its own.
+            local routes, session = wire({
+                fleet = gatedFleet(), groups = GROUPS,
+                holds = { 'records.person.view', 'garage.tactical' },
+                memberships = {},
+            })
+
+            local listed = models(routes['garage.fleet'].handler(session, {}))
+
+            assert.is_nil(listed.fbi)
             assert.is_nil(listed.riot)
         end)
 
@@ -611,7 +640,7 @@ describe('garage routes', function()
 
             -- The group, without the role.
             local groupRoutes, groupSession = wire({
-                fleet = gatedFleet(), groups = GROUPS,
+                fleet = gatedFleet(), groups = GROUPS, memberships = { 'swat' },
                 holds = { 'records.person.view', 'garage.tactical' },
             })
 
@@ -698,9 +727,10 @@ describe('garage routes', function()
             assert.are.equal('draw', calls.logged[1].action)
         end)
 
-        it('draws the group-gated vehicle for a session holding everything it grants', function()
+        it('draws the group-gated vehicle for a member of the group', function()
             local routes, session = wire({
-                fleet = gatedFleet(), groups = GROUPS, holds = { 'records.person.view' },
+                fleet = gatedFleet(), groups = GROUPS, memberships = { 'detectives' },
+                holds = { 'records.person.view' },
                 agency = { id = 'lspd', shortName = 'LSPD' },
             })
 
