@@ -25,6 +25,10 @@
       "offDuty": "Ur tjänst",
       "signedInAs": "Inloggad som {name}",
       "permissionsStale": "Behörigheterna är inaktuella"
+    },
+    "unbuilt": {
+      "title": "Inte byggd ännu",
+      "body": "Din behörighet öppnar modulen, men den är ännu inte byggd i den här versionen av FredPD. Det saknas ingenting i din behörighet — det finns bara ingenting här än."
     }
   },
   "error": {
@@ -52,6 +56,32 @@
     "discordFailed": "Discord gick inte att nå. Kontrollera token och guild-id i config/server.lua.",
     "noRoles": "Du har inga roller i den Discord-servern. Ge dig själv en och kör uppstarten igen.",
     "failed": "Uppstarten kunde inte sparas i databasen. Anledningen finns i serverkonsolen."
+  },
+  "form": {
+    "cancel": "Avbryt"
+  },
+  "fieldError": {
+    "required": "Måste fyllas i.",
+    "exists": "Finns redan.",
+    "unknown": "Inget värde som servern känner igen.",
+    "cycle": "Då skulle gruppen ärva från sig själv.",
+    "not_group_key": "Endast små bokstäver, siffror och understreck.",
+    "not_permission_key": "Det är ingen behörighetsnyckel.",
+    "not_model": "Det är inget spawn-namn för ett fordon.",
+    "not_locale_key": "Det är ingen textnyckel.",
+    "not_certification": "Det är ingen certifiering.",
+    "not_snowflake": "Ett roll-ID i Discord består bara av siffror.",
+    "not_integer": "Endast heltal.",
+    "not_allowed": "Det går inte att göra härifrån.",
+    "not_supported": "Laboratoriet utför inte den analysen.",
+    "not_elapsed": "Handläggningstiden har inte löpt ut ännu.",
+    "nothing_to_change": "Ingenting ändrades.",
+    "protected": "Den här är skyddad och kan inte ändras.",
+    "would_lock_out": "Då skulle ingen längre kunna administrera FredPD.",
+    "inherited_by_groups": "Andra grupper ärver från den.",
+    "mapped_to_roles": "Discord-roller är fortfarande kopplade till den.",
+    "too_many": "För många poster på en gång.",
+    "released": "Avspärrningen är redan hävd."
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -101,189 +131,10 @@
     "noVehicle": "Det finns inget fordon här att lämna tillbaka.",
     "unknownModel": "Fordonsmodellen finns inte på den här servern."
   },
-  "admin": {
-    "roleMap": {
-      "title": "Discord-roller",
-      "intro": "Koppla en Discord-roll till en behörighetsgrupp. Rollerna är den enda källan till behörighet; här avgörs vad var och en ger.",
-      "roleId": "Roll-ID i Discord",
-      "roleName": "Namn (för visning)",
-      "group": "Behörighetsgrupp",
-      "add": "Lägg till koppling",
-      "remove": "Ta bort",
-      "empty": "Inga roller är kopplade än. Innan någon är det har ingen behörighet.",
-      "snapshotAge": "Discord synkades senast för {seconds} s sedan",
-      "snapshotMissing": "Discord har aldrig synkats. Kontrollera tjänsten.",
-      "added": "Kopplingen är tillagd.",
-      "removed": "Kopplingen är borttagen.",
-      "confirmRemove": "Ta bort kopplingen? Den som bara hade behörighet genom den förlorar den omedelbart."
-    },
-    "fleet": {
-      "title": "Fordonspark",
-      "intro": "Vad fordonsparken erbjuder och vem som får ta ut det. Ett fordon utan spärr kan tas ut av alla som får ta ut fordon.",
-      "empty": "Inga fordon i fordonsparken.",
-      "new": "Lägg till fordon",
-      "add": "Lägg till",
-      "edit": "Ändra fordon",
-      "save": "Spara",
-      "remove": "Ta bort",
-      "removeConfirm": "Fordonet tas bort ur fordonsparkens meny. Redan uttagna fordon påverkas inte.",
-      "vehicle": "Fordon",
-      "model": "Modell",
-      "modelPlaceholder": "police3",
-      "labelKey": "Namnnyckel",
-      "labelKeyPlaceholder": "fleet.patrol_sedan",
-      "permission": "Behörighet",
-      "certification": "Behörighetsbevis",
-      "livery": "Dekor",
-      "sortOrder": "Ordning",
-      "enabled": "Tillgängligt",
-      "on": "Ja",
-      "off": "Nej",
-      "gating": "Vem får ta ut det",
-      "noGate": "Alla som får ta ut fordon",
-      "requiredGroup": "Behörighetsgrupp",
-      "requiredDiscordRole": "Discord-roll"
-    },
-    "groups": {
-      "title": "Behörighetsgrupper",
-      "intro": "En grupp är en samling behörighetsnycklar. En Discord-roll ger en grupp; rollkopplingen avgör vilken.",
-      "empty": "Inga grupper ännu.",
-      "new": "Ny grupp",
-      "create": "Skapa",
-      "save": "Spara",
-      "delete": "Ta bort",
-      "deleteConfirm": "Gruppen tas bort från alla Discord-roller som är kopplade till den.",
-      "key": "Nyckel",
-      "keyPlaceholder": "patrol_supervisor",
-      "name": "Namn",
-      "description": "Beskrivning",
-      "inherits": "Ärver",
-      "inheritsNone": "Inget",
-      "permissions": "Behörigheter",
-      "permissionsIntro": "En nyckel du inte själv har kan inte läggas i en grupp. Servern nekar skrivningen oavsett vad som visas här.",
-      "effective": "Sammanlagd",
-      "locked": "Inte din att tilldela",
-      "notEditable": "Gruppen ger mer än du själv har, så du kan inte ändra den.",
-      "column": {
-        "own": "Egna",
-        "effective": "Sammanlagda",
-        "roles": "Roller"
-      }
-    },
-    "tab": {
-      "rolemap": "Rollkoppling",
-      "groups": "Grupper",
-      "fleet": "Fordonspark"
-    }
-  },
-  "intel": {
-    "tab": {
-      "log": "Underrättelselogg",
-      "people": "Personer",
-      "orgs": "Organisationer",
-      "cases": "Ärenden"
-    },
-    "search": {
-      "placeholder": "Sök i registret",
-      "empty": "Ingen träff.",
-      "results": "{count} träffar"
-    },
-    "log": {
-      "empty": "Inga underrättelser inlagda än.",
-      "compose": "Lägg in underrättelse",
-      "body": "Vad som iakttagits",
-      "bodyPlaceholder": "Svart skåpbil utan registreringsskyltar, parkerad på Alta Street två gånger denna vecka.",
-      "tags": "Taggar",
-      "tagsPlaceholder": "narkotika, vapen",
-      "source": "Källa",
-      "confidence": "Tillförlitlighet",
-      "post": "Lägg in",
-      "posted": "Inlagd.",
-      "allTags": "Alla",
-      "filtered": "Filtrerat på {tag}",
-      "attachedTo": "Gäller"
-    },
-    "source": {
-      "informant": "Informatör",
-      "wiretap": "Telefonavlyssning",
-      "surveillance": "Spaning",
-      "patrol": "Patrull",
-      "tip": "Tips",
-      "other": "Övrigt",
-      "protected": "Skyddad källa",
-      "none": "Ingen källa angiven"
-    },
-    "confidence": {
-      "low": "Låg",
-      "medium": "Medel",
-      "high": "Hög"
-    },
-    "person": {
-      "unknown": "Okänd person",
-      "new": "Ny person",
-      "name": "Namn",
-      "alias": "Alias",
-      "description": "Signalement",
-      "status": "Status",
-      "empty": "Ingen i registret än.",
-      "notes": "Underrättelser",
-      "vehicles": "Fordon",
-      "orgs": "Organisationer",
-      "associates": "Kontakter",
-      "cases": "Ärenden",
-      "noteCount": "{count} poster",
-      "plates": "Registreringsnummer",
-      "confirmed": "Bekräftad",
-      "suspected": "Misstänkt"
-    },
-    "personStatus": {
-      "unknown": "Okänd",
-      "poi": "Person av intresse",
-      "active_investigation": "Under utredning",
-      "warrant": "Efterlyst",
-      "cleared": "Avskriven",
-      "incarcerated": "Frihetsberövad",
-      "deceased": "Avliden"
-    },
-    "org": {
-      "new": "Ny organisation",
-      "name": "Namn",
-      "territory": "Område",
-      "members": "{count} medlemmar",
-      "empty": "Inga organisationer i registret än.",
-      "roster": "Medlemmar"
-    },
-    "orgType": {
-      "gang": "Gäng",
-      "cartel": "Kartell",
-      "business": "Företag",
-      "crew": "Liga",
-      "other": "Övrigt"
-    },
-    "orgStatus": {
-      "active": "Aktiv",
-      "disbanded": "Upplöst",
-      "dormant": "Vilande"
-    },
-    "case": {
-      "new": "Nytt ärende",
-      "title": "Rubrik",
-      "description": "Beskrivning",
-      "empty": "Inga ärenden än.",
-      "linked": "{people} personer, {orgs} organisationer",
-      "links": "Kopplat till ärendet"
-    },
-    "caseStatus": {
-      "open": "Öppet",
-      "closed": "Avslutat",
-      "cold": "Kallt"
-    },
-    "action": {
-      "save": "Spara",
-      "cancel": "Avbryt",
-      "create": "Skapa",
-      "back": "Tillbaka"
-    }
+  "fleet": {
+    "patrol_sedan": "Patrullbil",
+    "riot": "Piketbuss",
+    "helicopter": "Helikopter"
   },
   "evidence": {
     "empty": "Inget bevismaterial matchar.",
@@ -322,7 +173,7 @@
       "casing": "Patronhylsa",
       "bullet": "Projektil",
       "magazine": "Magasin",
-      "gsr": "Krutstänk",
+      "gsr": "Skottrester",
       "footwear": "Skoavtryck",
       "glove_mark": "Handskavtryck eller fibrer",
       "drug_residue": "Narkotikarester",
@@ -487,13 +338,194 @@
       "no_profile": "Ingen DNA-profil",
       "identification": "Identifiering",
       "exclusion": "Uteslutning",
-      "inconclusive": "Inkonklusivt",
+      "inconclusive": "Ej utslagsgivande",
       "insufficient": "Otillräckligt för jämförelse",
       "candidate_match": "Träff i register, kräver bekräftelse",
       "no_match": "Ingen träff"
     }
   },
-  "form": {
-    "cancel": "Avbryt"
+  "intel": {
+    "tab": {
+      "log": "Underrättelselogg",
+      "people": "Personer",
+      "orgs": "Organisationer",
+      "cases": "Ärenden"
+    },
+    "search": {
+      "placeholder": "Sök i registret",
+      "empty": "Ingen träff.",
+      "results": "{count} träffar"
+    },
+    "log": {
+      "empty": "Inga underrättelser inlagda än.",
+      "compose": "Lägg in underrättelse",
+      "body": "Vad som iakttagits",
+      "bodyPlaceholder": "Svart skåpbil utan registreringsskyltar, parkerad på Alta Street två gånger denna vecka.",
+      "tags": "Taggar",
+      "tagsPlaceholder": "narkotika, vapen",
+      "source": "Källa",
+      "confidence": "Tillförlitlighet",
+      "post": "Lägg in",
+      "posted": "Inlagd.",
+      "allTags": "Alla",
+      "filtered": "Filtrerat på {tag}",
+      "attachedTo": "Gäller"
+    },
+    "source": {
+      "informant": "Informatör",
+      "wiretap": "Telefonavlyssning",
+      "surveillance": "Spaning",
+      "patrol": "Patrull",
+      "tip": "Tips",
+      "other": "Övrigt",
+      "protected": "Skyddad källa",
+      "none": "Ingen källa angiven"
+    },
+    "confidence": {
+      "low": "Låg",
+      "medium": "Medel",
+      "high": "Hög"
+    },
+    "person": {
+      "unknown": "Okänd person",
+      "new": "Ny person",
+      "name": "Namn",
+      "alias": "Alias",
+      "description": "Signalement",
+      "status": "Status",
+      "empty": "Ingen i registret än.",
+      "notes": "Underrättelser",
+      "vehicles": "Fordon",
+      "orgs": "Organisationer",
+      "associates": "Kontakter",
+      "cases": "Ärenden",
+      "noteCount": "{count} poster",
+      "plates": "Registreringsnummer",
+      "confirmed": "Bekräftad",
+      "suspected": "Misstänkt"
+    },
+    "personStatus": {
+      "unknown": "Okänd",
+      "poi": "Person av intresse",
+      "active_investigation": "Under utredning",
+      "warrant": "Efterlyst",
+      "cleared": "Avskriven",
+      "incarcerated": "Frihetsberövad",
+      "deceased": "Avliden"
+    },
+    "org": {
+      "new": "Ny organisation",
+      "name": "Namn",
+      "territory": "Område",
+      "members": "{count} medlemmar",
+      "empty": "Inga organisationer i registret än.",
+      "roster": "Medlemmar"
+    },
+    "orgType": {
+      "gang": "Gäng",
+      "cartel": "Kartell",
+      "business": "Företag",
+      "crew": "Liga",
+      "other": "Övrigt"
+    },
+    "orgStatus": {
+      "active": "Aktiv",
+      "disbanded": "Upplöst",
+      "dormant": "Vilande"
+    },
+    "case": {
+      "new": "Nytt ärende",
+      "title": "Rubrik",
+      "description": "Beskrivning",
+      "empty": "Inga ärenden än.",
+      "linked": "{people} personer, {orgs} organisationer",
+      "links": "Kopplat till ärendet"
+    },
+    "caseStatus": {
+      "open": "Öppet",
+      "closed": "Avslutat",
+      "cold": "Kallt"
+    },
+    "action": {
+      "save": "Spara",
+      "cancel": "Avbryt",
+      "create": "Skapa",
+      "back": "Tillbaka"
+    }
+  },
+  "admin": {
+    "roleMap": {
+      "title": "Discord-roller",
+      "intro": "Koppla en Discord-roll till en behörighetsgrupp. Rollerna är den enda källan till behörighet; här avgörs vad var och en ger.",
+      "roleId": "Roll-ID i Discord",
+      "roleName": "Namn (för visning)",
+      "group": "Behörighetsgrupp",
+      "add": "Lägg till koppling",
+      "remove": "Ta bort",
+      "empty": "Inga roller är kopplade än. Innan någon är det har ingen behörighet.",
+      "snapshotAge": "Discord synkades senast för {seconds} s sedan",
+      "snapshotMissing": "Discord har aldrig synkats. Kontrollera tjänsten.",
+      "added": "Kopplingen är tillagd.",
+      "removed": "Kopplingen är borttagen.",
+      "confirmRemove": "Ta bort kopplingen? Den som bara hade behörighet genom den förlorar den omedelbart."
+    },
+    "fleet": {
+      "title": "Fordonspark",
+      "intro": "Vad fordonsparken erbjuder och vem som får ta ut det. Ett fordon utan spärr kan tas ut av alla som får ta ut fordon.",
+      "empty": "Inga fordon i fordonsparken.",
+      "new": "Lägg till fordon",
+      "add": "Lägg till",
+      "edit": "Ändra fordon",
+      "save": "Spara",
+      "remove": "Ta bort",
+      "removeConfirm": "Fordonet tas bort ur fordonsparkens meny. Redan uttagna fordon påverkas inte.",
+      "vehicle": "Fordon",
+      "model": "Modell",
+      "modelPlaceholder": "police3",
+      "labelKey": "Namnnyckel",
+      "labelKeyPlaceholder": "fleet.patrol_sedan",
+      "permission": "Behörighet",
+      "certification": "Behörighetsbevis",
+      "livery": "Dekor",
+      "sortOrder": "Ordning",
+      "enabled": "Tillgängligt",
+      "on": "Ja",
+      "off": "Nej",
+      "gating": "Vem får ta ut det",
+      "noGate": "Alla som får ta ut fordon",
+      "requiredGroup": "Behörighetsgrupp",
+      "requiredDiscordRole": "Discord-roll"
+    },
+    "groups": {
+      "title": "Behörighetsgrupper",
+      "intro": "En grupp är en samling behörighetsnycklar. En Discord-roll ger en grupp; rollkopplingen avgör vilken.",
+      "empty": "Inga grupper ännu.",
+      "new": "Ny grupp",
+      "create": "Skapa",
+      "save": "Spara",
+      "delete": "Ta bort",
+      "deleteConfirm": "Gruppen tas bort från alla Discord-roller som är kopplade till den.",
+      "key": "Nyckel",
+      "keyPlaceholder": "patrol_supervisor",
+      "name": "Namn",
+      "description": "Beskrivning",
+      "inherits": "Ärver",
+      "inheritsNone": "Inget",
+      "permissions": "Behörigheter",
+      "permissionsIntro": "En nyckel du inte själv har kan inte läggas i en grupp. Servern nekar skrivningen oavsett vad som visas här.",
+      "effective": "Sammanlagd",
+      "locked": "Inte din att tilldela",
+      "notEditable": "Gruppen ger mer än du själv har, så du kan inte ändra den.",
+      "column": {
+        "own": "Egna",
+        "effective": "Sammanlagda",
+        "roles": "Roller"
+      }
+    },
+    "tab": {
+      "rolemap": "Rollkoppling",
+      "groups": "Grupper",
+      "fleet": "Fordonspark"
+    }
   }
 }

@@ -6,13 +6,26 @@
 local isOpen = false
 
 --- Shows or hides the NUI and moves keyboard and mouse focus with it.
+---
+--- `placement` is the placement the interface was opened from, when it was
+--- opened from one at all. The NUI needs it because a route with an
+--- `accessPoint` context condition -- `evidence.intake` at the property room
+--- terminal (spec 8.6) -- takes a `placementId`, and the server then checks the
+--- player is standing at that placement. The id is a *claim*, never a grant:
+--- naming a terminal you are not at fails the check on the server.
+---
 --- @param open boolean
-local function setOpen(open)
+--- @param placement table|nil
+local function setOpen(open, placement)
     if open == isOpen then return end
 
     isOpen = open
     SetNuiFocus(open, open)
-    SendNUIMessage({ type = open and 'fredpd:open' or 'fredpd:close' })
+    SendNUIMessage({
+        type = open and 'fredpd:open' or 'fredpd:close',
+        placementId = open and placement and placement.id or nil,
+        placementKind = open and placement and placement.kind or nil,
+    })
 end
 
 --- The NUI asks to be closed (Escape, or the title bar) rather than closing
@@ -75,6 +88,34 @@ local NUI_ROUTES <const> = {
     'intel.vehicle.delete',
     'intel.evidence.add',
     'intel.evidence.delete',
+
+    -- Crime scenes, evidence and the chain of custody (spec 8).
+    'scene.create',
+    'scene.release',
+    'scene.list',
+    'evidence.collect',
+    'evidence.list',
+    'evidence.get',
+    'evidence.custody',
+    'evidence.intake',
+    'evidence.transfer',
+
+    -- The forensic lab (spec 8.7).
+    'lab.request.create',
+    'lab.queue',
+    'lab.analysis.start',
+    'lab.analysis.complete',
+
+    -- Administration: permission groups and the motor pool fleet.
+    'admin.group.list',
+    'admin.group.create',
+    'admin.group.update',
+    'admin.group.delete',
+    'admin.permission.list',
+    'garage.fleet.manage',
+    'garage.fleet.add',
+    'garage.fleet.update',
+    'garage.fleet.remove',
 }
 
 for _, name in ipairs(NUI_ROUTES) do
@@ -98,8 +139,8 @@ for _, kind in ipairs({
     'dispatch_console',
     'courthouse_terminal',
 }) do
-    FredPD.Client.placements.registerAction(kind, function()
-        setOpen(true)
+    FredPD.Client.placements.registerAction(kind, function(placement)
+        setOpen(true, placement)
     end)
 end
 

@@ -81,6 +81,20 @@
   type AdminTab = (typeof ADMIN_TABS)[number];
 
   let adminTab = $state<AdminTab>('rolemap');
+
+  /**
+   * The rail entries that have a screen behind them today.
+   *
+   * `session.allowedModules()` on the server derives the rail from `page.*`
+   * permissions, and it lists every module the spec plans — so a patrol group
+   * has opened Records and got a blank panel since M1. The permission is not
+   * wrong and must not be trimmed to match what is built: it says what the
+   * officer is cleared for. What was missing is the interface saying so.
+   *
+   * A module joins this list when its page is imported above; until then the
+   * rail entry draws the placeholder.
+   */
+  const BUILT = new Set(['evidence', 'lab', 'intel', 'admin']);
 </script>
 
 <div class="flex h-full flex-col bg-[var(--color-panel)] text-[var(--color-ink)]">
@@ -154,6 +168,18 @@
         {:else}
           <Fleet />
         {/if}
+      {:else if current !== null && !BUILT.has(current)}
+        <!-- A module the session is cleared for that has no screen yet. Saying
+             so is not the same as saying "forbidden": the officer's access is
+             intact and the text has to make that difference plain, because the
+             two look identical from an empty panel (spec 6.6). -->
+        <section class="max-w-prose border border-[var(--color-border)] p-4">
+          <h2 class="text-sm font-semibold">{t(`shell.module.${current}`)}</h2>
+          <p class="mt-2 text-xs font-semibold text-[var(--color-ink-muted)]">
+            {t('shell.unbuilt.title')}
+          </p>
+          <p class="mt-1 text-xs text-[var(--color-ink-muted)]">{t('shell.unbuilt.body')}</p>
+        </section>
       {/if}
     </main>
   </div>

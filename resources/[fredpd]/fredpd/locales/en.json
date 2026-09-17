@@ -25,6 +25,10 @@
       "offDuty": "Off duty",
       "signedInAs": "Signed in as {name}",
       "permissionsStale": "Permissions out of date"
+    },
+    "unbuilt": {
+      "title": "Not built yet",
+      "body": "Your permissions open this module, but it has not been built into this version of FredPD. Nothing is missing from your access — there is nothing here yet."
     }
   },
   "error": {
@@ -52,6 +56,32 @@
     "discordFailed": "Discord could not be reached. Check the token and the guild id in config/server.lua.",
     "noRoles": "You hold no roles in that Discord server. Give yourself one, then run setup again.",
     "failed": "Setup could not be written to the database. The server console has the reason."
+  },
+  "form": {
+    "cancel": "Cancel"
+  },
+  "fieldError": {
+    "required": "Required.",
+    "exists": "Already exists.",
+    "unknown": "Not a value this server knows.",
+    "cycle": "That would make a group inherit from itself.",
+    "not_group_key": "Lower-case letters, digits and underscores only.",
+    "not_permission_key": "Not a permission key.",
+    "not_model": "Not a vehicle spawn name.",
+    "not_locale_key": "Not a locale key.",
+    "not_certification": "Not a certification name.",
+    "not_snowflake": "A Discord role ID is digits only.",
+    "not_integer": "Whole numbers only.",
+    "not_allowed": "Not allowed from here.",
+    "not_supported": "The lab does not perform that analysis.",
+    "not_elapsed": "The turnaround time has not passed yet.",
+    "nothing_to_change": "Nothing was changed.",
+    "protected": "This one is protected and cannot be changed.",
+    "would_lock_out": "That would leave nobody able to administer FredPD.",
+    "inherited_by_groups": "Other groups inherit from it.",
+    "mapped_to_roles": "Discord roles still map to it.",
+    "too_many": "Too many items at once.",
+    "released": "The scene has already been released."
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -101,189 +131,10 @@
     "noVehicle": "No vehicle here to return.",
     "unknownModel": "That vehicle model is not available on this server."
   },
-  "admin": {
-    "roleMap": {
-      "title": "Discord roles",
-      "intro": "Map a Discord role to a permission group. Roles are the only source of access; this decides what each one grants.",
-      "roleId": "Discord role ID",
-      "roleName": "Name (for display)",
-      "group": "Permission group",
-      "add": "Add mapping",
-      "remove": "Remove",
-      "empty": "No roles mapped yet. Until one is, nobody has access.",
-      "snapshotAge": "Discord last synced {seconds} s ago",
-      "snapshotMissing": "Discord has never synced. Check the gateway.",
-      "added": "Mapping added.",
-      "removed": "Mapping removed.",
-      "confirmRemove": "Remove this mapping? Anyone who had access only through it loses it immediately."
-    },
-    "fleet": {
-      "title": "Motor pool fleet",
-      "intro": "What the motor pool offers, and who may draw it. A vehicle with no gate is drawable by anyone who may draw at all.",
-      "empty": "No vehicles in the fleet.",
-      "new": "Add vehicle",
-      "add": "Add",
-      "edit": "Edit vehicle",
-      "save": "Save",
-      "remove": "Remove",
-      "removeConfirm": "Removing the vehicle takes it out of the motor pool menu. Vehicles already drawn are unaffected.",
-      "vehicle": "Vehicle",
-      "model": "Model",
-      "modelPlaceholder": "police3",
-      "labelKey": "Name key",
-      "labelKeyPlaceholder": "fleet.patrol_sedan",
-      "permission": "Permission",
-      "certification": "Certification",
-      "livery": "Livery",
-      "sortOrder": "Order",
-      "enabled": "Available",
-      "on": "Yes",
-      "off": "No",
-      "gating": "Who may draw it",
-      "noGate": "Anyone who may draw",
-      "requiredGroup": "Permission group",
-      "requiredDiscordRole": "Discord role"
-    },
-    "groups": {
-      "title": "Permission groups",
-      "intro": "A group is a bundle of permission keys. A Discord role grants a group; the role map decides which.",
-      "empty": "No groups yet.",
-      "new": "New group",
-      "create": "Create",
-      "save": "Save",
-      "delete": "Delete",
-      "deleteConfirm": "Deleting the group removes it from every Discord role mapped to it.",
-      "key": "Key",
-      "keyPlaceholder": "patrol_supervisor",
-      "name": "Name",
-      "description": "Description",
-      "inherits": "Inherits",
-      "inheritsNone": "Nothing",
-      "permissions": "Permissions",
-      "permissionsIntro": "A key you do not hold yourself cannot be put into a group. The server refuses the write regardless of what is shown here.",
-      "effective": "Effective",
-      "locked": "Not yours to grant",
-      "notEditable": "This group grants more than you hold, so you cannot edit it.",
-      "column": {
-        "own": "Own",
-        "effective": "Effective",
-        "roles": "Roles"
-      }
-    },
-    "tab": {
-      "rolemap": "Role map",
-      "groups": "Groups",
-      "fleet": "Fleet"
-    }
-  },
-  "intel": {
-    "tab": {
-      "log": "Intelligence log",
-      "people": "People",
-      "orgs": "Organizations",
-      "cases": "Cases"
-    },
-    "search": {
-      "placeholder": "Search the register",
-      "empty": "Nothing matched.",
-      "results": "{count} results"
-    },
-    "log": {
-      "empty": "No intelligence logged yet.",
-      "compose": "Log intelligence",
-      "body": "What was observed",
-      "bodyPlaceholder": "Black van, no plates, parked on Alta Street twice this week.",
-      "tags": "Tags",
-      "tagsPlaceholder": "narcotics, weapons",
-      "source": "Source",
-      "confidence": "Confidence",
-      "post": "Log it",
-      "posted": "Logged.",
-      "allTags": "All",
-      "filtered": "Filtered by {tag}",
-      "attachedTo": "About"
-    },
-    "source": {
-      "informant": "Informant",
-      "wiretap": "Wiretap",
-      "surveillance": "Surveillance",
-      "patrol": "Patrol",
-      "tip": "Tip",
-      "other": "Other",
-      "protected": "Protected source",
-      "none": "No source given"
-    },
-    "confidence": {
-      "low": "Low",
-      "medium": "Medium",
-      "high": "High"
-    },
-    "person": {
-      "unknown": "Unknown person",
-      "new": "New person",
-      "name": "Name",
-      "alias": "Alias",
-      "description": "Description",
-      "status": "Status",
-      "empty": "Nobody in the register yet.",
-      "notes": "Intelligence",
-      "vehicles": "Vehicles",
-      "orgs": "Organizations",
-      "associates": "Associates",
-      "cases": "Cases",
-      "noteCount": "{count} entries",
-      "plates": "Plates",
-      "confirmed": "Confirmed",
-      "suspected": "Suspected"
-    },
-    "personStatus": {
-      "unknown": "Unknown",
-      "poi": "Person of interest",
-      "active_investigation": "Under investigation",
-      "warrant": "Wanted",
-      "cleared": "Cleared",
-      "incarcerated": "In custody",
-      "deceased": "Deceased"
-    },
-    "org": {
-      "new": "New organization",
-      "name": "Name",
-      "territory": "Territory",
-      "members": "{count} members",
-      "empty": "No organizations in the register yet.",
-      "roster": "Members"
-    },
-    "orgType": {
-      "gang": "Gang",
-      "cartel": "Cartel",
-      "business": "Business",
-      "crew": "Crew",
-      "other": "Other"
-    },
-    "orgStatus": {
-      "active": "Active",
-      "disbanded": "Disbanded",
-      "dormant": "Dormant"
-    },
-    "case": {
-      "new": "New case",
-      "title": "Title",
-      "description": "Description",
-      "empty": "No cases yet.",
-      "linked": "{people} people, {orgs} organizations",
-      "links": "Linked to this case"
-    },
-    "caseStatus": {
-      "open": "Open",
-      "closed": "Closed",
-      "cold": "Cold"
-    },
-    "action": {
-      "save": "Save",
-      "cancel": "Cancel",
-      "create": "Create",
-      "back": "Back"
-    }
+  "fleet": {
+    "patrol_sedan": "Patrol sedan",
+    "riot": "Riot van",
+    "helicopter": "Helicopter"
   },
   "evidence": {
     "empty": "No evidence items match.",
@@ -493,7 +344,188 @@
       "no_match": "No match"
     }
   },
-  "form": {
-    "cancel": "Cancel"
+  "intel": {
+    "tab": {
+      "log": "Intelligence log",
+      "people": "People",
+      "orgs": "Organizations",
+      "cases": "Cases"
+    },
+    "search": {
+      "placeholder": "Search the register",
+      "empty": "Nothing matched.",
+      "results": "{count} results"
+    },
+    "log": {
+      "empty": "No intelligence logged yet.",
+      "compose": "Log intelligence",
+      "body": "What was observed",
+      "bodyPlaceholder": "Black van, no plates, parked on Alta Street twice this week.",
+      "tags": "Tags",
+      "tagsPlaceholder": "narcotics, weapons",
+      "source": "Source",
+      "confidence": "Confidence",
+      "post": "Log it",
+      "posted": "Logged.",
+      "allTags": "All",
+      "filtered": "Filtered by {tag}",
+      "attachedTo": "About"
+    },
+    "source": {
+      "informant": "Informant",
+      "wiretap": "Wiretap",
+      "surveillance": "Surveillance",
+      "patrol": "Patrol",
+      "tip": "Tip",
+      "other": "Other",
+      "protected": "Protected source",
+      "none": "No source given"
+    },
+    "confidence": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
+    "person": {
+      "unknown": "Unknown person",
+      "new": "New person",
+      "name": "Name",
+      "alias": "Alias",
+      "description": "Description",
+      "status": "Status",
+      "empty": "Nobody in the register yet.",
+      "notes": "Intelligence",
+      "vehicles": "Vehicles",
+      "orgs": "Organizations",
+      "associates": "Associates",
+      "cases": "Cases",
+      "noteCount": "{count} entries",
+      "plates": "Plates",
+      "confirmed": "Confirmed",
+      "suspected": "Suspected"
+    },
+    "personStatus": {
+      "unknown": "Unknown",
+      "poi": "Person of interest",
+      "active_investigation": "Under investigation",
+      "warrant": "Wanted",
+      "cleared": "Cleared",
+      "incarcerated": "In custody",
+      "deceased": "Deceased"
+    },
+    "org": {
+      "new": "New organization",
+      "name": "Name",
+      "territory": "Territory",
+      "members": "{count} members",
+      "empty": "No organizations in the register yet.",
+      "roster": "Members"
+    },
+    "orgType": {
+      "gang": "Gang",
+      "cartel": "Cartel",
+      "business": "Business",
+      "crew": "Crew",
+      "other": "Other"
+    },
+    "orgStatus": {
+      "active": "Active",
+      "disbanded": "Disbanded",
+      "dormant": "Dormant"
+    },
+    "case": {
+      "new": "New case",
+      "title": "Title",
+      "description": "Description",
+      "empty": "No cases yet.",
+      "linked": "{people} people, {orgs} organizations",
+      "links": "Linked to this case"
+    },
+    "caseStatus": {
+      "open": "Open",
+      "closed": "Closed",
+      "cold": "Cold"
+    },
+    "action": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "create": "Create",
+      "back": "Back"
+    }
+  },
+  "admin": {
+    "roleMap": {
+      "title": "Discord roles",
+      "intro": "Map a Discord role to a permission group. Roles are the only source of access; this decides what each one grants.",
+      "roleId": "Discord role ID",
+      "roleName": "Name (for display)",
+      "group": "Permission group",
+      "add": "Add mapping",
+      "remove": "Remove",
+      "empty": "No roles mapped yet. Until one is, nobody has access.",
+      "snapshotAge": "Discord last synced {seconds} s ago",
+      "snapshotMissing": "Discord has never synced. Check the gateway.",
+      "added": "Mapping added.",
+      "removed": "Mapping removed.",
+      "confirmRemove": "Remove this mapping? Anyone who had access only through it loses it immediately."
+    },
+    "fleet": {
+      "title": "Motor pool fleet",
+      "intro": "What the motor pool offers, and who may draw it. A vehicle with no gate is drawable by anyone who may draw at all.",
+      "empty": "No vehicles in the fleet.",
+      "new": "Add vehicle",
+      "add": "Add",
+      "edit": "Edit vehicle",
+      "save": "Save",
+      "remove": "Remove",
+      "removeConfirm": "Removing the vehicle takes it out of the motor pool menu. Vehicles already drawn are unaffected.",
+      "vehicle": "Vehicle",
+      "model": "Model",
+      "modelPlaceholder": "police3",
+      "labelKey": "Name key",
+      "labelKeyPlaceholder": "fleet.patrol_sedan",
+      "permission": "Permission",
+      "certification": "Certification",
+      "livery": "Livery",
+      "sortOrder": "Order",
+      "enabled": "Available",
+      "on": "Yes",
+      "off": "No",
+      "gating": "Who may draw it",
+      "noGate": "Anyone who may draw",
+      "requiredGroup": "Permission group",
+      "requiredDiscordRole": "Discord role"
+    },
+    "groups": {
+      "title": "Permission groups",
+      "intro": "A group is a bundle of permission keys. A Discord role grants a group; the role map decides which.",
+      "empty": "No groups yet.",
+      "new": "New group",
+      "create": "Create",
+      "save": "Save",
+      "delete": "Delete",
+      "deleteConfirm": "Deleting the group removes it from every Discord role mapped to it.",
+      "key": "Key",
+      "keyPlaceholder": "patrol_supervisor",
+      "name": "Name",
+      "description": "Description",
+      "inherits": "Inherits",
+      "inheritsNone": "Nothing",
+      "permissions": "Permissions",
+      "permissionsIntro": "A key you do not hold yourself cannot be put into a group. The server refuses the write regardless of what is shown here.",
+      "effective": "Effective",
+      "locked": "Not yours to grant",
+      "notEditable": "This group grants more than you hold, so you cannot edit it.",
+      "column": {
+        "own": "Own",
+        "effective": "Effective",
+        "roles": "Roles"
+      }
+    },
+    "tab": {
+      "rolemap": "Role map",
+      "groups": "Groups",
+      "fleet": "Fleet"
+    }
   }
 }

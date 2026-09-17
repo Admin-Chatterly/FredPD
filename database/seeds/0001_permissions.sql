@@ -119,6 +119,14 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     -- and visibly (spec 4.3, Appendix C).
     ('admin', 'page.admin'),
     ('admin', 'admin.permissions.edit'),
+
+    -- Editing the groups themselves, not just which role gets which group.
+    -- Held apart from `admin.permissions.edit` on purpose: mapping a role to an
+    -- existing bundle and authoring what a bundle is worth are different
+    -- powers, and a server that wants one without the other must be able to
+    -- say so.
+    ('admin', 'admin.groups.edit'),
+
     ('admin', 'admin.placement.edit'),
     ('admin', 'admin.branding.edit'),
     ('admin', 'admin.audit.view'),
