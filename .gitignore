@@ -38,3 +38,7 @@ Thumbs.db
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# Release bundles built locally. The published artifact comes from the release
+# workflow, which builds from a clean checkout at the tag.
+dist-release/
