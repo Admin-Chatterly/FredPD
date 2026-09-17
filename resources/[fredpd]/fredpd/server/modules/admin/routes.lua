@@ -182,7 +182,10 @@ route.define({
 -- (the role map lets you, because at that moment it grants nothing), then edit
 -- `harmless` to carry `records.breakglass`. Checking creation but not editing
 -- would leave exactly that path open, so both are checked, and both are checked
--- against the *resulting* group including everything it inherits.
+-- against the *resulting* group including everything it inherits. An edit is
+-- checked against the group it starts from as well: a group above the editor's
+-- clearance is untouchable, so the same guard that stops them granting
+-- `records.breakglass` stops them taking it away from the group that has it.
 --
 -- Two consequences that are deliberate rather than accidental:
 --
@@ -445,15 +448,20 @@ local function ownPermissions(groupKey)
     return permissions
 end
 
---- Refuses when the group as proposed would grant more than the session holds.
+--- Refuses when the group, in the model given, grants more than the session holds.
 ---
---- `groups` is the whole model with the proposed change already applied, so
---- what is measured is the group as it would exist -- its own keys *and*
---- everything the inheritance chain adds -- rather than the fields that
---- happened to be in the request.
+--- `groups` is the whole model, so what is measured is the group in full -- its
+--- own keys *and* everything the inheritance chain adds -- rather than the
+--- fields that happened to be in the request. Which model is passed is the
+--- caller's decision, and an edit has to pass this twice: once against the
+--- model as it stands, and once with the proposed change applied. Measuring
+--- only the proposal answers "may they author this bundle?" and never "may they
+--- touch the bundle that is there?", and the second question is the one that
+--- stops an administrator emptying a group whose clearance is above their own.
 ---
+--- @param reason string|nil audit reason prefix; which of the two checks refused
 --- @return table|nil a refusal to return from the handler, or nil to proceed
-local function refuseEscalation(session, action, groups, key)
+local function refuseEscalation(session, action, groups, key, reason)
     local granted = FredPD.Core.perms.expandGroup(key, groups)
     local missing = FredPD.Core.perms.missing(granted, session.permissions)
 
@@ -462,7 +470,7 @@ local function refuseEscalation(session, action, groups, key)
     -- Named in the audit entry: "denied" on its own does not tell the next
     -- administrator which key the last one reached for.
     FredPD.Core.audit.denied(
-        session, action, 'escalation:' .. missing[1], 'permission_group', key
+        session, action, (reason or 'escalation') .. ':' .. missing[1], 'permission_group', key
     )
 
     return route.refuse(FredPD.ErrorCode.FORBIDDEN)
@@ -777,6 +785,23 @@ route.define({
         local groups = loadGroupModel()
         local floorBefore = holdsFloor(groups)
 
+        -- The group as it stands, before a single field of the proposal is
+        -- applied. Without this the guard below only asks whether the *result*
+        -- is within the editor's own clearance, which every removal trivially
+        -- is: `permissions = {}` against `intel_command` expands to nothing, so
+        -- an administrator who was never cleared to author `records.breakglass`
+        -- or `intel.source.identity.view` could strip both from the group that
+        -- carries them -- and `inherits = ''` drops the inherited half the same
+        -- way, without touching a permission row. `admin.group.delete` refuses
+        -- exactly that (it checks the group it is about to remove), and
+        -- destroying a bundle through the editor is the same act by another
+        -- route. Reaching into the group at all is what is denied here, which is
+        -- also what makes the rename case in this module's header true.
+        local refusal = refuseEscalation(
+            session, 'admin.group.update', groups, input.key, 'escalation:existing'
+        )
+        if refusal then return refusal end
+
         if inherits and not groups[inherits] then
             return route.refuse(FredPD.ErrorCode.INVALID, { inherits = 'unknown' })
         end
@@ -795,10 +820,10 @@ route.define({
             return route.refuse(FredPD.ErrorCode.INVALID, { inherits = 'cycle' })
         end
 
-        -- Measured against the group as it would be, not against what changed:
+        -- And again against the group as it would be, not against what changed:
         -- an edit that leaves a permission in place is still an administrator
         -- signing their name under the whole bundle.
-        local refusal = refuseEscalation(session, 'admin.group.update', groups, input.key)
+        refusal = refuseEscalation(session, 'admin.group.update', groups, input.key)
         if refusal then return refusal end
 
         -- Renaming `admin` is refused because the seed, the documentation and

@@ -525,10 +525,42 @@ describe('admin group editor', function()
     end)
 
     describe('escalation', function()
-        it('refuses an administrator authoring a group worth more than they hold', function()
-            local session = helper.session({ permissions = { ['page.*'] = true, ['admin.*'] = true } })
+        --- An administrator with the editor and nothing an intelligence officer
+        --- has -- the seeded `admin` group, which deliberately carries neither
+        --- `records.breakglass` nor `intel.source.identity.view` (spec 4.3,
+        --- Appendix C).
+        local function editor()
+            return helper.session({ permissions = { ['page.*'] = true, ['admin.*'] = true } })
+        end
 
-            local result = call('admin.group.update', session, {
+        --- The bundle that is above that administrator, in two halves: the keys
+        --- the group holds itself, and the keys it inherits.
+        local function seedIntelCommand()
+            state.groups.intel_base = { key = 'intel_base', name = 'Intel base', version = 4 }
+            state.permissions.intel_base = { 'intel.source.identity.view' }
+
+            state.groups.intel_command = {
+                key = 'intel_command',
+                name = 'Intel command',
+                inherits = 'intel_base',
+                version = 5,
+            }
+            state.permissions.intel_command = { 'page.intel', 'records.breakglass' }
+        end
+
+        --- Nothing written, anywhere: not the group's own rows, not its version,
+        --- and not the model lock on `admin`.
+        local function assertUntouched()
+            assert.are.same({ 'page.intel', 'records.breakglass' }, state.permissions.intel_command)
+            assert.are.same({ 'intel.source.identity.view' }, state.permissions.intel_base)
+            assert.are.equal('intel_base', state.groups.intel_command.inherits)
+            assert.are.equal(5, state.groups.intel_command.version)
+            assert.are.equal(7, state.groups.admin.version)
+            assert.are.equal(0, #state.writes)
+        end
+
+        it('refuses an administrator authoring a group worth more than they hold', function()
+            local result = call('admin.group.update', editor(), {
                 key = 'patrol',
                 version = 2,
                 permissions = { 'records.breakglass' },
@@ -537,6 +569,90 @@ describe('admin group editor', function()
             assert.are.equal('forbidden', result.__err)
             assert.are.equal('admin.group.update:escalation:records.breakglass', denials[1])
             assert.are.same({ 'page.records' }, state.permissions.patrol)
+        end)
+
+        it('refuses emptying a group that already carries more than they hold', function()
+            -- The result is within the editor's own clearance -- it grants
+            -- nothing at all -- so measuring only the proposal lets this
+            -- through, and every officer mapped to the group loses the bundle.
+            seedIntelCommand()
+
+            local result = call('admin.group.update', editor(), {
+                key = 'intel_command',
+                version = 5,
+                permissions = {},
+            })
+
+            assert.are.equal('forbidden', result.__err)
+            assert.are.equal('admin.group.update:escalation:existing:records.breakglass', denials[1])
+            assertUntouched()
+        end)
+
+        it('refuses removing the one key from it they are not cleared to author', function()
+            seedIntelCommand()
+
+            local result = call('admin.group.update', editor(), {
+                key = 'intel_command',
+                version = 5,
+                permissions = { 'page.intel' },
+            })
+
+            assert.are.equal('forbidden', result.__err)
+            assertUntouched()
+        end)
+
+        it('refuses cutting it loose from the group it inherits the rest from', function()
+            -- No permission row is touched, and the group still grants only what
+            -- the editor holds afterwards. The bundle is gutted all the same.
+            seedIntelCommand()
+
+            local result = call('admin.group.update', editor(), {
+                key = 'intel_command',
+                version = 5,
+                inherits = '',
+                permissions = { 'page.intel' },
+            })
+
+            assert.are.equal('forbidden', result.__err)
+            assertUntouched()
+        end)
+
+        it('refuses a rename of it, as the delete route refuses a delete', function()
+            -- The module says reaching into such a group at all is what is
+            -- denied: a rename today is an edit tomorrow.
+            seedIntelCommand()
+
+            local renamed = call('admin.group.update', editor(), {
+                key = 'intel_command',
+                version = 5,
+                name = 'Renamed',
+            })
+
+            assert.are.equal('forbidden', renamed.__err)
+            assert.are.equal('Intel command', state.groups.intel_command.name)
+            assertUntouched()
+
+            -- The same refusal the other route already gave, so the two agree.
+            local deleted = call('admin.group.delete', editor(), { key = 'intel_command' })
+
+            assert.are.equal('forbidden', deleted.__err)
+            assert.is_truthy(state.groups.intel_command)
+        end)
+
+        it('still lets them edit a group that is within their own clearance', function()
+            -- The guard is about the bundle, not about editing being dangerous:
+            -- a group they could author, they may also empty.
+            seedIntelCommand()
+
+            local result = call('admin.group.update', editor(), {
+                key = 'patrol',
+                version = 2,
+                permissions = {},
+            })
+
+            assert.is_nil(result.__err)
+            assert.are.same({}, state.permissions.patrol)
+            assert.are.same({}, denials)
         end)
     end)
 end)
