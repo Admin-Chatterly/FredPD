@@ -4,9 +4,9 @@ Teknisk guide för dig som sätter upp FredPD på servern. Handboken för polise
 finns i [`handbok.sv.md`](handbok.sv.md).
 
 > **Läge just nu:** M0 är klart och M1 pågår. Det som fungerar i dag är
-> behörigheter, placeringar i världen, den interna polischatten och
-> fordonsdepån. Register, ledningscentral, bevis, laboratorium och domstol
-> kommer i M2–M6 (se avsnitt 17 i `FredPD.md`).
+> behörigheter, placeringar i världen, den interna polischatten, fordonsdepån
+> och **underrättelsemodulen** (avsnitt 11b). Register, ledningscentral, bevis,
+> laboratorium och domstol kommer i M2–M6 (se avsnitt 17 i `FredPD.md`).
 >
 > **Discord-boten är ännu inte byggd.** Tills den är det måste rollerna föras in
 > för hand i `fpd_discord_members` — se steg 6. Utan den raden får ingen
@@ -91,6 +91,9 @@ förrän du gjort det — vilket är rätt utgångsläge.
 | `command` | `supervisor` | Loggboken, personal |
 | `dispatch` | `patrol_basic` | Ledningsplatsen |
 | `admin` | — | Konfigurera FredPD |
+| `intel_analyst` | — | Läsa och skriva underrättelseregistret |
+| `intel_handler` | `intel_analyst` | Dessutom se skyddade källor och slå ihop dubbletter |
+| `intel_command` | `intel_handler` | Dessutom radera poster ur registret |
 
 `admin` ärver medvetet **inte** `patrol`. Att administrera systemet är inte
 samma sak som att vara behörig att läsa register. Behöver du båda sakerna ger du
@@ -344,6 +347,28 @@ testdata utan spelserver. Frågeparametrar: `?locale=sv`, `?latency=400`,
 
 ---
 
+## 11b. Underrättelsemodulen
+
+Underrättelseregistret — personer, organisationer, uppgifter, fordon, ärenden
+och kopplingarna mellan dem — ligger i serverns egen databas (`fpd_intel_*`,
+migration 0003). Det som tidigare låg i PD-Span finns nu här och sparas på
+servern.
+
+Den befintliga datan i PD-Span flyttas **inte** över: modulen börjar tom och
+registret byggs upp i spelet.
+
+Två saker skiljer den från PD-Span, båda avsiktligt:
+
+- **Skyddade källor.** En uppgift från en informatör, telefonavlyssning eller
+  spaning visar *att* den har en källa, men inte vilken, för den som saknar
+  `intel.source.view`. Själva uppgiften är fortfarande läsbar. I PD-Span såg
+  alla med ett konto varje källa.
+- **Läsningar loggas.** Att öppna en person eller lista registret hamnar i
+  loggboken. PD-Span kunde inte svara på vem som läst vad.
+
+Ge någon behörighet genom att koppla en Discord-roll till `intel_analyst`,
+`intel_handler` eller `intel_command` i MDT:n.
+
 ## 12. Vad som inte är byggt ännu
 
 Var beredd på det här — det är inte fel, det är kommande milstolpar:
@@ -352,8 +377,10 @@ Var beredd på det här — det är inte fel, det är kommande milstolpar:
 - **Migrationskörare.** Migrationerna körs för hand tills vidare.
 - **Flotteditor i gränssnittet.** `fpd_fleet` redigeras i databasen.
 - **Certifieringar** (M6). En flottrad med `certification` visas för ingen ännu.
-- **Register, ledningscentral, bevis, laboratorium, domstol, underrättelser** —
-  M2 till M6.
+- **Register, ledningscentral, bevis, laboratorium, domstol** — M2 till M6.
+- **Länkdiagrammet** (`/board` i PD-Span) är ännu inte byggt i MDT:n.
+- **Uppladdade bilder som bevis** kräver gateway-tjänstens mediadel, som inte är
+  byggd. Externa länkar (Medal, YouTube, Streamable, bildadresser) fungerar.
 - **Beslag** ligger kvar hos `p_policejob` och är inte tänkt att flytta.
 
 Ingenting av Lua-koden har ännu körts på en riktig FiveM-server. Logiken täcks av

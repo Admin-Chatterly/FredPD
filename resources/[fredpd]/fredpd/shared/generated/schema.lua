@@ -61,6 +61,66 @@ FredPD.PlacementInteraction = {
     ZONE = 'zone',
 }
 
+--- Person of interest status (spec 10).
+FredPD.IntelPersonStatus = {
+    UNKNOWN = 'unknown',
+    POI = 'poi',
+    ACTIVE_INVESTIGATION = 'active_investigation',
+    WARRANT = 'warrant',
+    CLEARED = 'cleared',
+    INCARCERATED = 'incarcerated',
+    DECEASED = 'deceased',
+}
+
+--- Organisation type (spec 10).
+FredPD.IntelOrgType = {
+    GANG = 'gang',
+    CARTEL = 'cartel',
+    BUSINESS = 'business',
+    CREW = 'crew',
+    OTHER = 'other',
+}
+
+--- Organisation status (spec 10).
+FredPD.IntelOrgStatus = {
+    ACTIVE = 'active',
+    DISBANDED = 'disbanded',
+    DORMANT = 'dormant',
+}
+
+--- Where a piece of intelligence came from (spec 10).
+FredPD.IntelSource = {
+    INFORMANT = 'informant',
+    WIRETAP = 'wiretap',
+    SURVEILLANCE = 'surveillance',
+    PATROL = 'patrol',
+    TIP = 'tip',
+    OTHER = 'other',
+}
+
+--- Confidence in a piece of intelligence (spec 10).
+FredPD.IntelConfidence = {
+    LOW = 'low',
+    MEDIUM = 'medium',
+    HIGH = 'high',
+}
+
+--- Case status (spec 10).
+FredPD.IntelCaseStatus = {
+    OPEN = 'open',
+    CLOSED = 'closed',
+    COLD = 'cold',
+}
+
+--- Record classification levels (spec 4.5).
+FredPD.Classification = {
+    OPEN = 'open',
+    INTERNAL = 'internal',
+    RESTRICTED = 'restricted',
+    CONFIDENTIAL = 'confidential',
+    SECRET = 'secret',
+}
+
 --- Route input schemas (spec 3.5). The route layer validates against these and
 --- drops any key not listed, so a handler never sees a field it did not ask for.
 FredPD.Schema = {
@@ -134,5 +194,172 @@ FredPD.Schema = {
     GarageReturn = {
         placementId = { type = 'integer', required = true, min = 1 },
         plate = { type = 'string', required = true, max = 16 },
+    },
+
+    IntelId = {
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
+    IntelSearch = {
+        term = { type = 'string', required = true, min = 2, max = 128 },
+        perType = { type = 'integer', required = false, min = 1, max = 25 },
+    },
+
+    IntelPersonList = {
+        search = { type = 'string', required = false, max = 128 },
+        status = { type = 'enum', required = false, values = { 'unknown', 'poi', 'active_investigation', 'warrant', 'cleared', 'incarcerated', 'deceased' } },
+        tag = { type = 'string', required = false, max = 64 },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    IntelPersonCreate = {
+        name = { type = 'string', required = false, max = 191 },
+        alias = { type = 'string', required = false, max = 191 },
+        description = { type = 'string', required = false, max = 4000 },
+        status = { type = 'enum', required = false, values = { 'unknown', 'poi', 'active_investigation', 'warrant', 'cleared', 'incarcerated', 'deceased' } },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    IntelPersonUpdate = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        name = { type = 'string', required = false, max = 191 },
+        alias = { type = 'string', required = false, max = 191 },
+        description = { type = 'string', required = false, max = 4000 },
+        status = { type = 'enum', required = false, values = { 'unknown', 'poi', 'active_investigation', 'warrant', 'cleared', 'incarcerated', 'deceased' } },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    IntelPersonMerge = {
+        keepId = { type = 'integer', required = true, min = 1 },
+        dropId = { type = 'integer', required = true, min = 1 },
+    },
+
+    IntelOrgList = {
+        search = { type = 'string', required = false, max = 128 },
+        tag = { type = 'string', required = false, max = 64 },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    IntelOrgCreate = {
+        name = { type = 'string', required = true, min = 1, max = 191 },
+        type = { type = 'enum', required = false, values = { 'gang', 'cartel', 'business', 'crew', 'other' } },
+        territory = { type = 'string', required = false, max = 191 },
+        status = { type = 'enum', required = false, values = { 'active', 'disbanded', 'dormant' } },
+        notes = { type = 'string', required = false, max = 4000 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    IntelOrgUpdate = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        name = { type = 'string', required = false, min = 1, max = 191 },
+        type = { type = 'enum', required = false, values = { 'gang', 'cartel', 'business', 'crew', 'other' } },
+        territory = { type = 'string', required = false, max = 191 },
+        status = { type = 'enum', required = false, values = { 'active', 'disbanded', 'dormant' } },
+        notes = { type = 'string', required = false, max = 4000 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    IntelNoteList = {
+        personId = { type = 'integer', required = false, min = 1 },
+        orgId = { type = 'integer', required = false, min = 1 },
+        caseId = { type = 'integer', required = false, min = 1 },
+        source = { type = 'enum', required = false, values = { 'informant', 'wiretap', 'surveillance', 'patrol', 'tip', 'other' } },
+        confidence = { type = 'enum', required = false, values = { 'low', 'medium', 'high' } },
+        tag = { type = 'string', required = false, max = 64 },
+        search = { type = 'string', required = false, max = 128 },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    IntelNoteCreate = {
+        personId = { type = 'integer', required = false, min = 1 },
+        orgId = { type = 'integer', required = false, min = 1 },
+        caseId = { type = 'integer', required = false, min = 1 },
+        body = { type = 'string', required = true, min = 1, max = 8000 },
+        source = { type = 'enum', required = false, values = { 'informant', 'wiretap', 'surveillance', 'patrol', 'tip', 'other' } },
+        confidence = { type = 'enum', required = false, values = { 'low', 'medium', 'high' } },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+        tags = { type = 'string[]', required = false, maxItems = 12, maxLength = 64 },
+    },
+
+    IntelNoteUpdate = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        body = { type = 'string', required = false, min = 1, max = 8000 },
+        source = { type = 'enum', required = false, values = { 'informant', 'wiretap', 'surveillance', 'patrol', 'tip', 'other' } },
+        confidence = { type = 'enum', required = false, values = { 'low', 'medium', 'high' } },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+        tags = { type = 'string[]', required = false, maxItems = 12, maxLength = 64 },
+    },
+
+    IntelVehicleCreate = {
+        personId = { type = 'integer', required = false, min = 1 },
+        plate = { type = 'string', required = false, max = 16 },
+        model = { type = 'string', required = false, max = 64 },
+        color = { type = 'string', required = false, max = 64 },
+        notes = { type = 'string', required = false, max = 2000 },
+    },
+
+    IntelCaseList = {
+        status = { type = 'enum', required = false, values = { 'open', 'closed', 'cold' } },
+        search = { type = 'string', required = false, max = 128 },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    IntelCaseCreate = {
+        title = { type = 'string', required = true, min = 1, max = 191 },
+        description = { type = 'string', required = false, max = 8000 },
+        status = { type = 'enum', required = false, values = { 'open', 'closed', 'cold' } },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    IntelCaseUpdate = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        title = { type = 'string', required = false, min = 1, max = 191 },
+        description = { type = 'string', required = false, max = 8000 },
+        status = { type = 'enum', required = false, values = { 'open', 'closed', 'cold' } },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    IntelCaseLinkAdd = {
+        caseId = { type = 'integer', required = true, min = 1 },
+        personId = { type = 'integer', required = false, min = 1 },
+        orgId = { type = 'integer', required = false, min = 1 },
+        role = { type = 'string', required = false, max = 191 },
+    },
+
+    IntelMembershipSet = {
+        personId = { type = 'integer', required = true, min = 1 },
+        orgId = { type = 'integer', required = true, min = 1 },
+        role = { type = 'string', required = false, max = 191 },
+        isConfirmed = { type = 'boolean', required = false },
+    },
+
+    IntelMembershipRemove = {
+        personId = { type = 'integer', required = true, min = 1 },
+        orgId = { type = 'integer', required = true, min = 1 },
+    },
+
+    IntelAssociateSet = {
+        personId = { type = 'integer', required = true, min = 1 },
+        associateId = { type = 'integer', required = true, min = 1 },
+        relationship = { type = 'string', required = false, max = 191 },
+        isConfirmed = { type = 'boolean', required = false },
+    },
+
+    IntelAssociateRemove = {
+        personId = { type = 'integer', required = true, min = 1 },
+        associateId = { type = 'integer', required = true, min = 1 },
+    },
+
+    IntelEvidenceAdd = {
+        personId = { type = 'integer', required = false, min = 1 },
+        orgId = { type = 'integer', required = false, min = 1 },
+        caseId = { type = 'integer', required = false, min = 1 },
+        url = { type = 'string', required = false, max = 1024 },
+        storagePath = { type = 'string', required = false, max = 512 },
+        caption = { type = 'string', required = false, max = 512 },
     },
 }

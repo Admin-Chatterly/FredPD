@@ -19,6 +19,10 @@ local REQUIRED_TABLES <const> = {
     'fpd_chat_messages',
     'fpd_fleet',
     'fpd_motorpool_log',
+    'fpd_intel_persons',
+    'fpd_intel_orgs',
+    'fpd_intel_notes',
+    'fpd_intel_cases',
 }
 
 --- Returns the names of any dependency that is not started.

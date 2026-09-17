@@ -26,7 +26,8 @@ for f in database/seeds/*.sql;      do mysql -u root fredpd < "$f"; done
 ## Seeds
 
 `seeds/` holds code tables that ship with the product rather than data a server
-invents: permission groups now, the penal code and disposition codes later.
+invents: permission groups (0001) and the intelligence groups (0002) now, the
+penal code and disposition codes later.
 Seeds are idempotent — re-running one must not duplicate rows.
 
 Note that the seeds create the permission **groups** but map no Discord roles to
@@ -36,7 +37,7 @@ correct default — and why the bootstrap below exists.
 
 ## Bootstrap
 
-Three rows, once, to get from an empty database to something you can administer
+Four rows, once, to get from an empty database to something you can administer
 from inside the game. Everything after this is configured in the MDT.
 
 ```sql

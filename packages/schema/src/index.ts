@@ -14,12 +14,31 @@ export type { ErrorCode } from './errors';
 
 export {
   ACCESS_POINTS,
+  CLASSIFICATIONS,
+  INTEL_CASE_STATUSES,
+  INTEL_CONFIDENCE,
+  INTEL_ORG_STATUSES,
+  INTEL_ORG_TYPES,
+  INTEL_PERSON_STATUSES,
+  INTEL_SOURCES,
   PLACEMENT_ACCESS_POINTS,
   PLACEMENT_INTERACTIONS,
   PLACEMENT_KINDS,
   UNIT_STATUSES,
 } from './enums';
-export type { AccessPoint, PlacementInteraction, PlacementKind, UnitStatus } from './enums';
+export type {
+  AccessPoint,
+  Classification,
+  IntelCaseStatus,
+  IntelConfidence,
+  IntelOrgStatus,
+  IntelOrgType,
+  IntelPersonStatus,
+  IntelSource,
+  PlacementInteraction,
+  PlacementKind,
+  UnitStatus,
+} from './enums';
 
 export { schemas } from './schemas';
 export type { FieldSpec, Schema, SchemaName } from './schemas';

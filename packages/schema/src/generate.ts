@@ -2,7 +2,19 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { ACCESS_POINTS, PLACEMENT_INTERACTIONS, PLACEMENT_KINDS, UNIT_STATUSES } from './enums';
+import {
+  ACCESS_POINTS,
+  CLASSIFICATIONS,
+  INTEL_CASE_STATUSES,
+  INTEL_CONFIDENCE,
+  INTEL_ORG_STATUSES,
+  INTEL_ORG_TYPES,
+  INTEL_PERSON_STATUSES,
+  INTEL_SOURCES,
+  PLACEMENT_INTERACTIONS,
+  PLACEMENT_KINDS,
+  UNIT_STATUSES,
+} from './enums';
 import { ERROR_CODES } from './errors';
 import { schemas, type FieldSpec, type Schema } from './schemas';
 
@@ -53,6 +65,11 @@ function fieldTable(spec: FieldSpec): string {
   if ('max' in spec && spec.max !== undefined) parts.push(`max = ${spec.max}`);
   if (spec.type === 'enum') parts.push(`values = ${luaList(spec.values)}`);
 
+  if (spec.type === 'string[]') {
+    if (spec.maxItems !== undefined) parts.push(`maxItems = ${spec.maxItems}`);
+    if (spec.maxLength !== undefined) parts.push(`maxLength = ${spec.maxLength}`);
+  }
+
   return `{ ${parts.join(', ')} }`;
 }
 
@@ -82,6 +99,13 @@ const enums = [
     PLACEMENT_INTERACTIONS,
     'How a placement is reached in the world (spec 3.10).',
   ),
+  enumTable('IntelPersonStatus', INTEL_PERSON_STATUSES, 'Person of interest status (spec 10).'),
+  enumTable('IntelOrgType', INTEL_ORG_TYPES, 'Organisation type (spec 10).'),
+  enumTable('IntelOrgStatus', INTEL_ORG_STATUSES, 'Organisation status (spec 10).'),
+  enumTable('IntelSource', INTEL_SOURCES, 'Where a piece of intelligence came from (spec 10).'),
+  enumTable('IntelConfidence', INTEL_CONFIDENCE, 'Confidence in a piece of intelligence (spec 10).'),
+  enumTable('IntelCaseStatus', INTEL_CASE_STATUSES, 'Case status (spec 10).'),
+  enumTable('Classification', CLASSIFICATIONS, 'Record classification levels (spec 4.5).'),
 ].join('\n');
 
 const schemaBody = Object.entries(schemas)

@@ -103,5 +103,114 @@
       "removed": "Mapping removed.",
       "confirmRemove": "Remove this mapping? Anyone who had access only through it loses it immediately."
     }
+  },
+  "intel": {
+    "tab": {
+      "log": "Intelligence log",
+      "people": "People",
+      "orgs": "Organizations",
+      "cases": "Cases"
+    },
+    "search": {
+      "placeholder": "Search the register",
+      "empty": "Nothing matched.",
+      "results": "{count} results"
+    },
+    "log": {
+      "empty": "No intelligence logged yet.",
+      "compose": "Log intelligence",
+      "body": "What was observed",
+      "bodyPlaceholder": "Black van, no plates, parked on Alta Street twice this week.",
+      "tags": "Tags",
+      "tagsPlaceholder": "narcotics, weapons",
+      "source": "Source",
+      "confidence": "Confidence",
+      "post": "Log it",
+      "posted": "Logged.",
+      "allTags": "All",
+      "filtered": "Filtered by {tag}",
+      "attachedTo": "About"
+    },
+    "source": {
+      "informant": "Informant",
+      "wiretap": "Wiretap",
+      "surveillance": "Surveillance",
+      "patrol": "Patrol",
+      "tip": "Tip",
+      "other": "Other",
+      "protected": "Protected source",
+      "none": "No source given"
+    },
+    "confidence": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
+    "person": {
+      "unknown": "Unknown person",
+      "new": "New person",
+      "name": "Name",
+      "alias": "Alias",
+      "description": "Description",
+      "status": "Status",
+      "empty": "Nobody in the register yet.",
+      "notes": "Intelligence",
+      "vehicles": "Vehicles",
+      "orgs": "Organizations",
+      "associates": "Associates",
+      "cases": "Cases",
+      "noteCount": "{count} entries",
+      "plates": "Plates",
+      "confirmed": "Confirmed",
+      "suspected": "Suspected"
+    },
+    "personStatus": {
+      "unknown": "Unknown",
+      "poi": "Person of interest",
+      "active_investigation": "Under investigation",
+      "warrant": "Wanted",
+      "cleared": "Cleared",
+      "incarcerated": "In custody",
+      "deceased": "Deceased"
+    },
+    "org": {
+      "new": "New organization",
+      "name": "Name",
+      "territory": "Territory",
+      "members": "{count} members",
+      "empty": "No organizations in the register yet.",
+      "roster": "Members"
+    },
+    "orgType": {
+      "gang": "Gang",
+      "cartel": "Cartel",
+      "business": "Business",
+      "crew": "Crew",
+      "other": "Other"
+    },
+    "orgStatus": {
+      "active": "Active",
+      "disbanded": "Disbanded",
+      "dormant": "Dormant"
+    },
+    "case": {
+      "new": "New case",
+      "title": "Title",
+      "description": "Description",
+      "empty": "No cases yet.",
+      "linked": "{people} people, {orgs} organizations",
+      "links": "Linked to this case"
+    },
+    "caseStatus": {
+      "open": "Open",
+      "closed": "Closed",
+      "cold": "Cold"
+    },
+    "action": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "create": "Create",
+      "back": "Back"
+    }
   }
 }

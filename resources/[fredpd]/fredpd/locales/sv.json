@@ -103,5 +103,114 @@
       "removed": "Kopplingen är borttagen.",
       "confirmRemove": "Ta bort kopplingen? Den som bara hade behörighet genom den förlorar den omedelbart."
     }
+  },
+  "intel": {
+    "tab": {
+      "log": "Underrättelselogg",
+      "people": "Personer",
+      "orgs": "Organisationer",
+      "cases": "Ärenden"
+    },
+    "search": {
+      "placeholder": "Sök i registret",
+      "empty": "Ingen träff.",
+      "results": "{count} träffar"
+    },
+    "log": {
+      "empty": "Inga underrättelser inlagda än.",
+      "compose": "Lägg in underrättelse",
+      "body": "Vad som iakttagits",
+      "bodyPlaceholder": "Svart skåpbil utan registreringsskyltar, parkerad på Alta Street två gånger denna vecka.",
+      "tags": "Taggar",
+      "tagsPlaceholder": "narkotika, vapen",
+      "source": "Källa",
+      "confidence": "Tillförlitlighet",
+      "post": "Lägg in",
+      "posted": "Inlagd.",
+      "allTags": "Alla",
+      "filtered": "Filtrerat på {tag}",
+      "attachedTo": "Gäller"
+    },
+    "source": {
+      "informant": "Informatör",
+      "wiretap": "Telefonavlyssning",
+      "surveillance": "Spaning",
+      "patrol": "Patrull",
+      "tip": "Tips",
+      "other": "Övrigt",
+      "protected": "Skyddad källa",
+      "none": "Ingen källa angiven"
+    },
+    "confidence": {
+      "low": "Låg",
+      "medium": "Medel",
+      "high": "Hög"
+    },
+    "person": {
+      "unknown": "Okänd person",
+      "new": "Ny person",
+      "name": "Namn",
+      "alias": "Alias",
+      "description": "Signalement",
+      "status": "Status",
+      "empty": "Ingen i registret än.",
+      "notes": "Underrättelser",
+      "vehicles": "Fordon",
+      "orgs": "Organisationer",
+      "associates": "Kontakter",
+      "cases": "Ärenden",
+      "noteCount": "{count} poster",
+      "plates": "Registreringsnummer",
+      "confirmed": "Bekräftad",
+      "suspected": "Misstänkt"
+    },
+    "personStatus": {
+      "unknown": "Okänd",
+      "poi": "Person av intresse",
+      "active_investigation": "Under utredning",
+      "warrant": "Efterlyst",
+      "cleared": "Avskriven",
+      "incarcerated": "Frihetsberövad",
+      "deceased": "Avliden"
+    },
+    "org": {
+      "new": "Ny organisation",
+      "name": "Namn",
+      "territory": "Område",
+      "members": "{count} medlemmar",
+      "empty": "Inga organisationer i registret än.",
+      "roster": "Medlemmar"
+    },
+    "orgType": {
+      "gang": "Gäng",
+      "cartel": "Kartell",
+      "business": "Företag",
+      "crew": "Liga",
+      "other": "Övrigt"
+    },
+    "orgStatus": {
+      "active": "Aktiv",
+      "disbanded": "Upplöst",
+      "dormant": "Vilande"
+    },
+    "case": {
+      "new": "Nytt ärende",
+      "title": "Rubrik",
+      "description": "Beskrivning",
+      "empty": "Inga ärenden än.",
+      "linked": "{people} personer, {orgs} organisationer",
+      "links": "Kopplat till ärendet"
+    },
+    "caseStatus": {
+      "open": "Öppet",
+      "closed": "Avslutat",
+      "cold": "Kallt"
+    },
+    "action": {
+      "save": "Spara",
+      "cancel": "Avbryt",
+      "create": "Skapa",
+      "back": "Tillbaka"
+    }
   }
 }

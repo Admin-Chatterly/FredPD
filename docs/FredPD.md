@@ -1033,7 +1033,11 @@ Decay times, success rates and caps are configured per type.
 
 ### 10.1 Status
 
-PD-Span's code and data model are not described in this spec yet. The first integration task is an inventory by Claude Code (10.5). Until then this section defines the target and the contract.
+The inventory (10.5) is done: `docs/pd-span-inventory.md`. It found that PD-Span is a Next.js application on Supabase rather than a FiveM resource, so option 1 of 10.3 was taken in its reframed form — **the data model is ported into the monorepo as the `intel` module and the interface is rebuilt**, rather than a resource being merged or a bridge being written.
+
+The register now lives in the server's own MariaDB (`fpd_intel_*`, migration 0003) and persists there. The existing PD-Span data is deliberately **not** migrated: the module starts empty and the register is built up in game.
+
+That makes the bridge contract in 10.4 unnecessary — there is no second system to bridge to. It is kept below as a record of what was considered.
 
 ### 10.2 What "directly integrated" means
 
@@ -1207,7 +1211,7 @@ Unauthenticated call, missing permission, failed context condition, invalid type
 | Motor pool | `fpd_fleet`, `fpd_motorpool_log` |
 | Forensics | `fpd_bio_identity` (hidden), `fpd_weapon_signatures` (hidden), `fpd_scenes`, `fpd_scene_log`, `fpd_scene_photos`, `fpd_evidence_world`, `fpd_evidence_items`, `fpd_custody`, `fpd_storage_locations`, `fpd_audits`, `fpd_lab_requests`, `fpd_lab_results`, `fpd_dna_index`, `fpd_print_index`, `fpd_ballistic_index`, `fpd_leads` |
 | Surveillance | `fpd_surv_sessions`, `fpd_surv_devices`, `fpd_surv_product_log` |
-| Intelligence | Defined after the PD-Span inventory (section 10.5) |
+| Intelligence | `fpd_intel_persons`, `fpd_intel_orgs`, `fpd_intel_memberships`, `fpd_intel_associates`, `fpd_intel_notes`, `fpd_intel_note_tags`, `fpd_intel_vehicles`, `fpd_intel_cases`, `fpd_intel_case_links`, `fpd_intel_evidence` |
 | Media | `fpd_media` (hash, type, size, owner record, access control reference) |
 
 ### 13.3 Retention jobs
@@ -1501,7 +1505,7 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Property room | `evidence.item.view`, `evidence.item.intake`, `evidence.item.transfer`, `evidence.item.checkout`, `evidence.item.release`, `evidence.item.dispose`, `evidence.item.reseal`, `evidence.audit.run` |
 | Lab | `lab.request.create`, `lab.queue.view`, `lab.analysis.perform`, `lab.analysis.review`, `lab.report.release` |
 | Surveillance | `surv.phone.intercept`, `surv.radio.monitor`, `surv.device.deploy`, `surv.device.listen`, `surv.tracker.deploy`, `surv.tracker.view`, `surv.log.view` |
-| Intelligence | `intel.module.open`, `intel.report.create`, `intel.report.view`, `intel.surveillance.log`, `intel.source.view`, `intel.source.manage`, `intel.source.identity.view`, `intel.operation.approve` |
+| Intelligence | `intel.module.open`, `intel.report.create`, `intel.report.view`, `intel.report.edit`, `intel.person.view`, `intel.person.edit`, `intel.person.merge`, `intel.org.view`, `intel.org.edit`, `intel.case.view`, `intel.case.edit`, `intel.evidence.add`, `intel.record.delete`, `intel.surveillance.log`, `intel.source.view`, `intel.source.manage`, `intel.source.identity.view`, `intel.operation.approve` |
 | Personnel | `personnel.view`, `personnel.hire`, `personnel.promote`, `personnel.discipline`, `personnel.equipment.assign`, `ia.case.view`, `ia.case.manage`, `uof.review`, `policy.manage`, `policy.ack` |
 | Communications | `comms.message.send`, `comms.bulletin.post`, `comms.pdchat.send`, `comms.pdchat.view`, `comms.pdchat.all` |
 | Motor pool | `garage.vehicle.draw`, `garage.vehicle.return`, `garage.fleet.edit` |

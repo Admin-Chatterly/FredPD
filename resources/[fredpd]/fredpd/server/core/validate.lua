@@ -64,6 +64,32 @@ local function checkField(spec, value)
         return true, nil, value
     end
 
+    if spec.type == 'string[]' then
+        if type(value) ~= 'table' then return false, 'type' end
+
+        -- A table with any non-array key is an object, not a list. JSON turns an
+        -- empty array and an empty object into the same Lua table, so only a
+        -- non-empty one can be told apart -- and a wrong shape must not slip
+        -- through as an empty list.
+        local count = 0
+        for _ in pairs(value) do count = count + 1 end
+        if count ~= #value then return false, 'type' end
+
+        if spec.maxItems and #value > spec.maxItems then return false, 'too_many' end
+
+        local cleaned = {}
+
+        for index = 1, #value do
+            local entry = value[index]
+            if type(entry) ~= 'string' then return false, 'type' end
+            if spec.maxLength and #entry > spec.maxLength then return false, 'too_long' end
+
+            cleaned[index] = entry
+        end
+
+        return true, nil, cleaned
+    end
+
     -- An unknown type in the schema is a generator bug, and failing closed is
     -- the only safe answer.
     return false, 'unknown_type'

@@ -9,7 +9,8 @@ Required by spec **10.5**. Source imported at `vendor/pd-span/`
 | Spec sections | 10 (integration), 0 and 11 (security review) |
 | Blocks | M0 (this inventory), M5 (intelligence module) |
 | Recommendation | **Option 1, with a caveat** — port the data model, rewrite the UI. See §9. |
-| PD-Span status | **Live, with real intelligence in it** (confirmed 2026-09-17). Everything in §8 is a migration of real data, not a formality. |
+| PD-Span status | **Live, with real intelligence in it** (confirmed 2026-09-17). |
+| Outcome | **Built.** Option 1 taken in its reframed form: the data model is ported to MariaDB as the `intel` module (migration 0003). The existing data is **not** migrated — §8 is retained as a record, not a plan. |
 
 ## 1. The headline finding
 
@@ -177,10 +178,20 @@ Two more observations worth carrying into M5:
   all. FredPD's master name index (7.3) assumes a known person, so this needs a
   deliberate answer rather than being lost in the port (§8).
 
-## 8. Data migration plan
+## 8. Data migration plan (not being carried out)
 
-**PD-Span is live and holds real intelligence.** That changes this section from
-a checklist into the riskiest part of M5. Three consequences follow, and they
+> **Decided 2026-09-17: the existing data is not migrated.** The `intel` module
+> starts empty and the register is rebuilt in game. Nothing below is scheduled;
+> it is kept because it is the analysis that would be needed if that is ever
+> revisited, and because the reasoning about identity reconciliation is worth
+> having written down before somebody proposes a quick import.
+>
+> Practically, this removed the riskiest work in the port. It also means the
+> schema carries no `span_uuid` columns: keying an import on the old ids would
+> be an `ALTER`, not a redesign.
+
+**PD-Span is live and holds real intelligence.** That would have made this
+section the riskiest part of the work. Three consequences follow, and they
 are the reason the steps below are ordered the way they are:
 
 1. **There is no acceptable data-loss window.** The migration must be
@@ -305,13 +316,15 @@ porting.
 
 1. ~~Is PD-Span live with real data?~~ **Answered: yes.** §8 is rewritten
    around that, and it is why the migration is rehearsed rather than run.
-2. **Roughly how much data, and how far back?** Row counts for `people`,
-   `notes` and `evidence` would turn §9's estimate for the migration tooling
-   (6–10 h) from a guess into a number — a few hundred rows and a few hundred
-   thousand are different pieces of work.
-3. **Who grades the imported intelligence?** Step 4 needs a named analyst role,
-   or the backlog sits at "not evaluated" indefinitely.
+2. ~~How much data, and how far back?~~ **Moot:** the data is not migrated.
+3. ~~Who grades the imported intelligence?~~ **Moot** for the same reason. The
+   graded fields (A–F reliability, 1–6 credibility) exist on `fpd_intel_notes`
+   and stay NULL until an analyst uses them; nothing arrives pre-graded.
 4. **Do unidentified persons stay separate from the master name index?** §7's
-   last point — this is a product decision, not a technical one.
-5. **Is there a cutover date to work back from?** It decides whether the
-   temporary read-only bridge in §9 is worth building at all.
+   last point, and still open. The schema takes the cautious side for now:
+   `fpd_intel_persons.master_person_id` is where an intelligence subject gets
+   tied to a confirmed person record once M2 builds one, and it is NULL until
+   somebody decides it should not be.
+5. **When does PD-Span get switched off?** It is now a second system holding
+   intelligence that FredPD does not know about. Leaving it running
+   indefinitely is the outcome nobody chooses but everybody ends up with.

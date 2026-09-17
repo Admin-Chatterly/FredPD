@@ -4,6 +4,7 @@
   import type { ErrorCode } from '@fredpd/schema';
   import type { Session } from './lib/types';
   import RoleMap from './modules/admin/RoleMap.svelte';
+  import Intel from './modules/intel/Intel.svelte';
 
   /**
    * The application shell (spec 6.3). M1 fills in the command line, tabs and
@@ -105,6 +106,8 @@
         <p class="text-sm text-[var(--color-ink-muted)]">{t('app.loading')}</p>
       {:else if error}
         <p class="text-sm">{t(`error.${error}`)}</p>
+      {:else if current === 'intel'}
+        <Intel />
       {:else if session && current === 'admin'}
         <RoleMap agencyId={session.agencyId} />
       {/if}

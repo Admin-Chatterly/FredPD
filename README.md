@@ -38,9 +38,12 @@ Working today:
   delivered only to officers who may read it (spec 7.26, ADR-007).
 - **Agency motor pool** with an attendant ped, permission-gated vehicles and a
   log of every draw and return (spec 7.31).
+- **The intelligence register** — people, organizations, the intel log, vehicles,
+  cases and the links between them — ported from PD-Span onto the server's own
+  MariaDB, so it persists in the game database (spec 10, migration 0003).
 
-Records, dispatch, evidence, lab, court and intelligence follow in M2–M6; see
-the roadmap in spec section 17.
+Records, dispatch, evidence, lab and court follow in M2–M6; see the roadmap in
+spec section 17.
 
 ## Layout
 

@@ -1,4 +1,14 @@
-import { PLACEMENT_INTERACTIONS, PLACEMENT_KINDS } from './enums';
+import {
+  CLASSIFICATIONS,
+  INTEL_CASE_STATUSES,
+  INTEL_CONFIDENCE,
+  INTEL_ORG_STATUSES,
+  INTEL_ORG_TYPES,
+  INTEL_PERSON_STATUSES,
+  INTEL_SOURCES,
+  PLACEMENT_INTERACTIONS,
+  PLACEMENT_KINDS,
+} from './enums';
 
 /**
  * Route input schemas (spec 3.5).
@@ -17,7 +27,10 @@ export type FieldSpec =
   | { type: 'number'; required?: boolean; min?: number; max?: number }
   | { type: 'integer'; required?: boolean; min?: number; max?: number }
   | { type: 'boolean'; required?: boolean }
-  | { type: 'enum'; required?: boolean; values: readonly string[] };
+  | { type: 'enum'; required?: boolean; values: readonly string[] }
+  // A list of strings, each bounded. `maxItems` is what stops one note
+  // arriving with ten thousand tags and turning a write into a table scan.
+  | { type: 'string[]'; required?: boolean; maxItems?: number; maxLength?: number };
 
 export type Schema = Readonly<Record<string, FieldSpec>>;
 
@@ -110,6 +123,184 @@ export const schemas = {
   GarageReturn: {
     placementId: { type: 'integer', required: true, min: 1 },
     plate: { type: 'string', required: true, max: 16 },
+  },
+  // -------------------------------------------------------------- intelligence
+
+  /** Every route that addresses one record by id. */
+  IntelId: {
+    id: { type: 'integer', required: true, min: 1 },
+  },
+
+  IntelSearch: {
+    term: { type: 'string', required: true, min: 2, max: 128 },
+    perType: { type: 'integer', required: false, min: 1, max: 25 },
+  },
+
+  IntelPersonList: {
+    search: { type: 'string', required: false, max: 128 },
+    status: { type: 'enum', required: false, values: INTEL_PERSON_STATUSES },
+    tag: { type: 'string', required: false, max: 64 },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  IntelPersonCreate: {
+    // Every field is optional, deliberately: a person of interest can be
+    // nothing but a description, which is how a tip enters the register
+    // before anyone knows who it concerns (spec 10).
+    name: { type: 'string', required: false, max: 191 },
+    alias: { type: 'string', required: false, max: 191 },
+    description: { type: 'string', required: false, max: 4000 },
+    status: { type: 'enum', required: false, values: INTEL_PERSON_STATUSES },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
+  IntelPersonUpdate: {
+    id: { type: 'integer', required: true, min: 1 },
+    // Optimistic locking: a stale version affects no rows and the officer is
+    // told to reload rather than silently overwriting somebody else's edit.
+    version: { type: 'integer', required: true, min: 1 },
+    name: { type: 'string', required: false, max: 191 },
+    alias: { type: 'string', required: false, max: 191 },
+    description: { type: 'string', required: false, max: 4000 },
+    status: { type: 'enum', required: false, values: INTEL_PERSON_STATUSES },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
+  IntelPersonMerge: {
+    keepId: { type: 'integer', required: true, min: 1 },
+    dropId: { type: 'integer', required: true, min: 1 },
+  },
+
+  IntelOrgList: {
+    search: { type: 'string', required: false, max: 128 },
+    tag: { type: 'string', required: false, max: 64 },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  IntelOrgCreate: {
+    name: { type: 'string', required: true, min: 1, max: 191 },
+    type: { type: 'enum', required: false, values: INTEL_ORG_TYPES },
+    territory: { type: 'string', required: false, max: 191 },
+    status: { type: 'enum', required: false, values: INTEL_ORG_STATUSES },
+    notes: { type: 'string', required: false, max: 4000 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
+  IntelOrgUpdate: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    name: { type: 'string', required: false, min: 1, max: 191 },
+    type: { type: 'enum', required: false, values: INTEL_ORG_TYPES },
+    territory: { type: 'string', required: false, max: 191 },
+    status: { type: 'enum', required: false, values: INTEL_ORG_STATUSES },
+    notes: { type: 'string', required: false, max: 4000 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
+  IntelNoteList: {
+    personId: { type: 'integer', required: false, min: 1 },
+    orgId: { type: 'integer', required: false, min: 1 },
+    caseId: { type: 'integer', required: false, min: 1 },
+    source: { type: 'enum', required: false, values: INTEL_SOURCES },
+    confidence: { type: 'enum', required: false, values: INTEL_CONFIDENCE },
+    tag: { type: 'string', required: false, max: 64 },
+    search: { type: 'string', required: false, max: 128 },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  IntelNoteCreate: {
+    // All three targets optional: a note may attach to a person, an
+    // organisation, a case, any combination, or nothing at all.
+    personId: { type: 'integer', required: false, min: 1 },
+    orgId: { type: 'integer', required: false, min: 1 },
+    caseId: { type: 'integer', required: false, min: 1 },
+    body: { type: 'string', required: true, min: 1, max: 8000 },
+    source: { type: 'enum', required: false, values: INTEL_SOURCES },
+    confidence: { type: 'enum', required: false, values: INTEL_CONFIDENCE },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+    tags: { type: 'string[]', required: false, maxItems: 12, maxLength: 64 },
+  },
+
+  IntelNoteUpdate: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    body: { type: 'string', required: false, min: 1, max: 8000 },
+    source: { type: 'enum', required: false, values: INTEL_SOURCES },
+    confidence: { type: 'enum', required: false, values: INTEL_CONFIDENCE },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+    tags: { type: 'string[]', required: false, maxItems: 12, maxLength: 64 },
+  },
+
+  IntelVehicleCreate: {
+    personId: { type: 'integer', required: false, min: 1 },
+    plate: { type: 'string', required: false, max: 16 },
+    model: { type: 'string', required: false, max: 64 },
+    color: { type: 'string', required: false, max: 64 },
+    notes: { type: 'string', required: false, max: 2000 },
+  },
+
+  IntelCaseList: {
+    status: { type: 'enum', required: false, values: INTEL_CASE_STATUSES },
+    search: { type: 'string', required: false, max: 128 },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  IntelCaseCreate: {
+    title: { type: 'string', required: true, min: 1, max: 191 },
+    description: { type: 'string', required: false, max: 8000 },
+    status: { type: 'enum', required: false, values: INTEL_CASE_STATUSES },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
+  IntelCaseUpdate: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    title: { type: 'string', required: false, min: 1, max: 191 },
+    description: { type: 'string', required: false, max: 8000 },
+    status: { type: 'enum', required: false, values: INTEL_CASE_STATUSES },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
+  IntelCaseLinkAdd: {
+    caseId: { type: 'integer', required: true, min: 1 },
+    // Exactly one of these; the handler refuses anything else, and the
+    // database would refuse it too.
+    personId: { type: 'integer', required: false, min: 1 },
+    orgId: { type: 'integer', required: false, min: 1 },
+    role: { type: 'string', required: false, max: 191 },
+  },
+
+  IntelMembershipSet: {
+    personId: { type: 'integer', required: true, min: 1 },
+    orgId: { type: 'integer', required: true, min: 1 },
+    role: { type: 'string', required: false, max: 191 },
+    isConfirmed: { type: 'boolean', required: false },
+  },
+
+  IntelMembershipRemove: {
+    personId: { type: 'integer', required: true, min: 1 },
+    orgId: { type: 'integer', required: true, min: 1 },
+  },
+
+  IntelAssociateSet: {
+    personId: { type: 'integer', required: true, min: 1 },
+    associateId: { type: 'integer', required: true, min: 1 },
+    relationship: { type: 'string', required: false, max: 191 },
+    isConfirmed: { type: 'boolean', required: false },
+  },
+
+  IntelAssociateRemove: {
+    personId: { type: 'integer', required: true, min: 1 },
+    associateId: { type: 'integer', required: true, min: 1 },
+  },
+
+  IntelEvidenceAdd: {
+    personId: { type: 'integer', required: false, min: 1 },
+    orgId: { type: 'integer', required: false, min: 1 },
+    caseId: { type: 'integer', required: false, min: 1 },
+    url: { type: 'string', required: false, max: 1024 },
+    storagePath: { type: 'string', required: false, max: 512 },
+    caption: { type: 'string', required: false, max: 512 },
   },
 } as const satisfies Record<string, Schema>;
 

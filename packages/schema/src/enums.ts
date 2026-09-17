@@ -74,3 +74,60 @@ export const PLACEMENT_ACCESS_POINTS: Partial<Record<PlacementKind, AccessPoint>
   dispatch_console: 'dispatch',
   courthouse_terminal: 'courthouse',
 };
+
+/**
+ * Intelligence vocabularies (spec 10), carried over from PD-Span verbatim so
+ * the meaning of an existing note does not shift under the port.
+ */
+
+/** How a person of interest stands in the register. */
+export const INTEL_PERSON_STATUSES = [
+  'unknown',
+  'poi',
+  'active_investigation',
+  'warrant',
+  'cleared',
+  'incarcerated',
+  'deceased',
+] as const;
+
+export type IntelPersonStatus = (typeof INTEL_PERSON_STATUSES)[number];
+
+export const INTEL_ORG_TYPES = ['gang', 'cartel', 'business', 'crew', 'other'] as const;
+export type IntelOrgType = (typeof INTEL_ORG_TYPES)[number];
+
+export const INTEL_ORG_STATUSES = ['active', 'disbanded', 'dormant'] as const;
+export type IntelOrgStatus = (typeof INTEL_ORG_STATUSES)[number];
+
+/**
+ * Where a piece of intelligence came from. The first three are protected: a
+ * note from one of them hides its source from readers without
+ * `intel.source.view` (spec 10.6).
+ */
+export const INTEL_SOURCES = [
+  'informant',
+  'wiretap',
+  'surveillance',
+  'patrol',
+  'tip',
+  'other',
+] as const;
+
+export type IntelSource = (typeof INTEL_SOURCES)[number];
+
+export const INTEL_CONFIDENCE = ['low', 'medium', 'high'] as const;
+export type IntelConfidence = (typeof INTEL_CONFIDENCE)[number];
+
+export const INTEL_CASE_STATUSES = ['open', 'closed', 'cold'] as const;
+export type IntelCaseStatus = (typeof INTEL_CASE_STATUSES)[number];
+
+/** Record classification levels (spec 4.5). */
+export const CLASSIFICATIONS = [
+  'open',
+  'internal',
+  'restricted',
+  'confidential',
+  'secret',
+] as const;
+
+export type Classification = (typeof CLASSIFICATIONS)[number];
