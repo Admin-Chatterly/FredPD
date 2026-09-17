@@ -584,7 +584,10 @@ describe('admin group editor', function()
             })
 
             assert.are.equal('forbidden', result.__err)
-            assert.are.equal('admin.group.update:escalation:existing:records.breakglass', denials[1])
+            -- Which key is named is whichever the set yields first; that it says
+            -- the refusal was about the group as it *stands* is the point.
+            assert.are.equal(1, #denials)
+            assert.is_truthy(denials[1]:find('admin.group.update:escalation:existing:', 1, true))
             assertUntouched()
         end)
 
