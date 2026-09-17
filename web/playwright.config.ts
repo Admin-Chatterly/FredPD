@@ -38,7 +38,11 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: `pnpm vite --port ${PORT} --strictPort`,
+    // `--host 127.0.0.1` is not optional on a CI runner. Left to itself Vite
+    // binds `localhost`, which can resolve to ::1 only, while Playwright polls
+    // 127.0.0.1 and waits out the full timeout. It passes locally either way,
+    // so this is the kind of difference only CI finds.
+    command: `pnpm vite --port ${PORT} --strictPort --host 127.0.0.1`,
     url: `http://127.0.0.1:${PORT}`,
     reuseExistingServer: !process.env['CI'],
     timeout: 120_000,
