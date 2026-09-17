@@ -131,3 +131,160 @@ export const CLASSIFICATIONS = [
 ] as const;
 
 export type Classification = (typeof CLASSIFICATIONS)[number];
+
+// ---------------------------------------------------------------- evidence
+
+/**
+ * The evidence types of spec 8.2, one key per row of that table.
+ *
+ * The `fpd_evidence.type` column carries no CHECK: the type of a trace is
+ * decided by the server's own grid when it is collected, never by the call
+ * (8.3.6), so the database is not where a wrong value would come from. This
+ * list is what the *interface* may filter and report on, and what a route will
+ * accept as a filter — which is the only place a client's opinion about a type
+ * matters.
+ */
+export const EVIDENCE_TYPES = [
+  'print',
+  'blood',
+  'dna_touch',
+  'casing',
+  'bullet',
+  'magazine',
+  'gsr',
+  'footwear',
+  'glove_mark',
+  'drug_residue',
+  'tool_mark',
+  'digital',
+] as const;
+
+export type EvidenceType = (typeof EVIDENCE_TYPES)[number];
+
+/**
+ * How an item is packaged at collection — the "collected as" column of 8.2.
+ *
+ * Packaging is the officer's choice and the one thing about a collection the
+ * client genuinely decides, which is why it is the field `evidence.collect`
+ * validates most strictly: the wrong container degrades a sample (8.5).
+ */
+export const EVIDENCE_PACKAGING = [
+  'envelope',
+  'swab_box',
+  'lift_card',
+  'bag',
+  'gsr_kit',
+  'tape_lift',
+  'cast',
+  'photo',
+  'field_test_kit',
+  'evidence_bag',
+] as const;
+
+export type EvidencePackaging = (typeof EVIDENCE_PACKAGING)[number];
+
+/** `ck_fpd_evidence_seal`. */
+export const EVIDENCE_SEAL_STATES = ['sealed', 'broken', 'resealed'] as const;
+export type EvidenceSealState = (typeof EVIDENCE_SEAL_STATES)[number];
+
+/** `ck_fpd_evidence_status`. Where an item is, not what it proves. */
+export const EVIDENCE_STATUSES = [
+  'collected',
+  'in_locker',
+  'in_property',
+  'checked_out',
+  'at_lab',
+  'released',
+  'destroyed',
+] as const;
+
+export type EvidenceStatus = (typeof EVIDENCE_STATUSES)[number];
+
+/**
+ * Where a transfer can send an item (8.6). Not the same list as the statuses:
+ * a destination is an instruction, and the server derives the resulting status
+ * from it. An officer asks for `court`; the row becomes `checked_out`.
+ */
+export const EVIDENCE_DESTINATIONS = ['locker', 'lab', 'court', 'investigator'] as const;
+export type EvidenceDestination = (typeof EVIDENCE_DESTINATIONS)[number];
+
+/** `fpd_custody_log.action`. Append-only, so this list only ever grows. */
+export const CUSTODY_ACTIONS = [
+  'collect',
+  'deposit',
+  'intake',
+  'transfer',
+  'checkout',
+  'checkin',
+  'release',
+  'destroy',
+] as const;
+
+export type CustodyAction = (typeof CUSTODY_ACTIONS)[number];
+
+/** `ck_fpd_scenes_status`. */
+export const SCENE_STATUSES = ['open', 'released'] as const;
+export type SceneStatus = (typeof SCENE_STATUSES)[number];
+
+// --------------------------------------------------------------------- lab
+
+/** The analyses of spec 8.7, mirroring the `fpd_lab_analyses.analysis` comment. */
+export const LAB_ANALYSES = [
+  'dna',
+  'print_comparison',
+  'print_search',
+  'ballistics',
+  'gsr',
+  'drug_id',
+] as const;
+
+/** Named `Kind` so it cannot be confused with the `LabAnalysis` row the NUI holds. */
+export type LabAnalysisKind = (typeof LAB_ANALYSES)[number];
+
+/** `ck_fpd_lab_requests_priority`. Priority moves the queue, never the result. */
+export const LAB_PRIORITIES = ['routine', 'expedited', 'urgent'] as const;
+export type LabPriority = (typeof LAB_PRIORITIES)[number];
+
+/** `ck_fpd_lab_requests_status`. */
+export const LAB_REQUEST_STATUSES = ['queued', 'in_progress', 'complete', 'cancelled'] as const;
+export type LabRequestStatus = (typeof LAB_REQUEST_STATUSES)[number];
+
+/**
+ * `ck_fpd_lab_analyses_status`. Longer than the request's list by two states:
+ * an analysis is reviewed and then released, and only a released one may have
+ * its result read (8.11).
+ */
+export const LAB_ANALYSIS_STATUSES = [
+  'queued',
+  'in_progress',
+  'complete',
+  'reviewed',
+  'released',
+  'cancelled',
+] as const;
+
+export type LabAnalysisStatus = (typeof LAB_ANALYSIS_STATUSES)[number];
+
+/**
+ * `ck_fpd_lab_analyses_result` — the standard result language of 8.7.
+ *
+ * These are legal statements, not UI labels, and the distinctions are the whole
+ * point: a `candidate_match` is a register hit to be followed up, an
+ * `identification` is an examiner's conclusion, and the two must never be
+ * spelled the same way in any language. The server computes which one applies;
+ * nothing a client sends can choose it (invariant 1).
+ */
+export const LAB_RESULT_CODES = [
+  'profile_obtained',
+  'partial_profile',
+  'mixture',
+  'no_profile',
+  'identification',
+  'exclusion',
+  'inconclusive',
+  'insufficient',
+  'candidate_match',
+  'no_match',
+] as const;
+
+export type LabResultCode = (typeof LAB_RESULT_CODES)[number];
