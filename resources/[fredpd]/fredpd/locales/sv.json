@@ -40,10 +40,12 @@
     "internal": "Något gick fel på servern. Felet har loggats."
   },
   "setup": {
-    "done": "FredPD är klart. {agency} skapad, {roles} Discord-roll(er) kopplade till administration.",
+    "done": "FredPD är klart. {agency} skapad; Discord-rollen {role} ger nu administration.",
     "alreadyDone": "FredPD är redan uppsatt. Hantera behörigheter under Administration i MDT:n.",
     "busy": "Uppstarten pågår redan. Vänta ett ögonblick och försök igen.",
     "badCode": "Fel uppstartskod. Den skrivs ut i serverkonsolen när resursen startar.",
+    "noRole": "Ange vilken Discord-roll som ska ge administration: /fredpd setup <kod> <roll-id>. Serverkonsolen listar dina roller.",
+    "roleNotHeld": "Du har inte den Discord-rollen. Serverkonsolen listar dem du har.",
     "noSeed": "Behörighetsgrupperna saknas. Kör database/seeds/0001_permissions.sql och försök igen.",
     "noDiscord": "Ingen Discord-identitet. Starta Discord och anslut igen — FredPD identifierar poliser via Discord-konto.",
     "noToken": "Ingen Discord-bottoken i config/server.lua. Lägg in en, starta om resursen och försök igen.",

@@ -192,20 +192,37 @@ Ingen SQL. Starta resursen och läs konsolen:
 ```
 [fredpd] ------------------------------------------------------------
 [fredpd] This install is not set up yet.
-[fredpd] Join the server, then type this in the game chat:
-[fredpd]     /fredpd setup K7M2QX
-[fredpd] Or run `fredpd_setup` here in the console while you are in game.
-[fredpd] ------------------------------------------------------------
+[fredpd] Join the server, then run one of these:
+[fredpd]   in the game chat:   /fredpd setup K7M2QXR4PT9B <discord role id>
+[fredpd]   in this console:    fredpd_setup <player id> <discord role id>
+...
 ```
 
-Gå in i spelet och skriv `/fredpd setup K7M2QX` i chatten. Då skapas
-myndigheten, du läggs in i personalregistret med det Discord-ID FiveM redan
-känner dig som, och **alla** dina Discord-roller kopplas till `admin`-gruppen.
+Gå in i spelet. Kör sedan `fredpd_setup <ditt spelar-id>` i konsolen — den
+listar dina Discord-roller med namn:
+
+```
+[fredpd] Discord roles held by Rami:
+[fredpd]   1284…0021  Serverchef
+[fredpd]   1284…0044  Polis
+[fredpd]   1284…0100  Medlem
+```
+
+Välj **en** roll och kör `fredpd_setup <spelar-id> 1284…0021`, eller i spelet
+`/fredpd setup K7M2QXR4PT9B 1284…0021`.
+
+> **Välj rätt roll.** Alla som har den rollen blir FredPD-administratörer, med
+> rätt att läsa loggboken och dela ut behörigheter vidare. Välj en lednings-
+> eller stabsroll — aldrig `Medlem`, `Whitelistad` eller något annat som hela
+> servern har. Uppstarten accepterar bara en roll du själv har, så ett
+> feltryck kan inte ge bort administration till något helt annat.
+
+Då skapas myndigheten, du läggs in i personalregistret med det Discord-ID FiveM
+redan känner dig som, knuten till den karaktär du står på, och den valda rollen
+kopplas till `admin`-gruppen.
 
 Koden skrivs bara ut i serverkonsolen. Det är hela poängen: på en publik server
-ska inte den första som gissar kommandot bli administratör. Har du konsolen
-framme går det lika bra att köra `fredpd_setup` där medan du är inne i spelet —
-då behövs ingen kod.
+ska inte den första som gissar kommandot bli administratör.
 
 Uppstarten vägrar så fort det finns någon i `fpd_officers`. Det finns exakt en
 första gång.

@@ -148,8 +148,11 @@ describe('setup', function()
     end)
 
     describe('generateSetupCode', function()
-        it('is six characters', function()
-            assert.are.equal(6, #admin.generateSetupCode())
+        it('is twelve characters', function()
+            -- 32^12 is about 2^60. Six characters was 2^30, which is within
+            -- reach of reproducing `math.random`'s clock-derived state rather
+            -- than guessing its output.
+            assert.are.equal(12, #admin.generateSetupCode())
         end)
 
         it('avoids the characters people misread off a console', function()
@@ -162,7 +165,7 @@ describe('setup', function()
 
         it('draws every character from the alphabet', function()
             local code = admin.generateSetupCode(function() return 1 end)
-            assert.are.equal('222222', code)
+            assert.are.equal('222222222222', code)
         end)
     end)
 
@@ -188,33 +191,40 @@ describe('setup', function()
 
     describe('bootstrapStatements', function()
         local agency = { id = 'lspd', name = 'Los Santos PD', shortName = 'LSPD' }
-        local officer = { discordId = '900', callsign = nil, name = 'A. Lindqvist' }
+        local officer = {
+            discordId = '900',
+            identifier = 'char1:license:abc',
+            callsign = nil,
+            name = 'A. Lindqvist',
+        }
 
         it('creates the agency, the officer, and one mapping per role', function()
-            local statements = admin.bootstrapStatements(agency, officer, { '111', '222' })
+            local statements = admin.bootstrapStatements(agency, officer, { '111' })
 
-            assert.are.equal(4, #statements)
+            assert.are.equal(3, #statements)
             assert.is_truthy(statements[1].query:find('fpd_agencies'))
             assert.is_truthy(statements[2].query:find('fpd_officers'))
             assert.is_truthy(statements[3].query:find('fpd_role_map'))
-            assert.is_truthy(statements[4].query:find('fpd_role_map'))
         end)
 
-        it('maps every role the officer holds, not just the first', function()
-            -- FredPD cannot see Discord's role hierarchy, so "their highest
-            -- role" is not a thing it can pick. Mapping all of them is what
-            -- makes setup work whatever the roles are called.
-            local statements = admin.bootstrapStatements(agency, officer, { '111', '222', '333' })
-
-            assert.are.equal('111', statements[3].values[1])
-            assert.are.equal('222', statements[4].values[1])
-            assert.are.equal('333', statements[5].values[1])
-        end)
-
-        it('binds the officer to the configured agency', function()
+        it('binds the officer to the character they are on', function()
+            -- Spec 4.1. Session.open only enforces the binding when
+            -- `identifier` is set, so a NULL here would let the one account
+            -- holding `admin` open FredPD from a criminal alt.
             local statements = admin.bootstrapStatements(agency, officer, { '111' })
 
-            assert.are.same({ '900', 'lspd', nil, 'A. Lindqvist' }, statements[2].values)
+            assert.are.same(
+                { '900', 'lspd', 'char1:license:abc', nil, 'A. Lindqvist' },
+                statements[2].values
+            )
+            assert.is_truthy(statements[2].query:find('identifier'))
+        end)
+
+        it('maps the named role to admin, in the named agency', function()
+            local statements = admin.bootstrapStatements(agency, officer, { '111' })
+
+            assert.are.same({ '111', 'lspd', '900' }, statements[3].values)
+            assert.is_truthy(statements[3].query:find("'admin'"))
         end)
 
         it('is parameterized throughout', function()

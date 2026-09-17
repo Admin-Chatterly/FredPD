@@ -217,9 +217,10 @@ RegisterCommand('fredpd', function(_source, args)
     if args[1] == 'placement' then
         Editor.open()
     elseif args[1] == 'setup' then
-        -- First-run setup. The code comes from the server console, so this is
-        -- only useful to whoever is running the server (see bootstrap.lua).
-        TriggerServerEvent('fredpd:setup', args[2] or '')
+        -- First-run setup: /fredpd setup <code> <discord role id>. Both come
+        -- from the server console, so this is only useful to whoever is running
+        -- the server (see bootstrap.lua).
+        TriggerServerEvent('fredpd:setup', args[2] or '', args[3] or '')
     else
         TriggerEvent('fredpd:toggleInterface')
     end

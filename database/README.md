@@ -57,13 +57,20 @@ correct default — and why the bootstrap below exists.
 setup command it prints to the console (ADR-010):
 
 ```
-/fredpd setup <code>        in the game chat, with the code from the console
-fredpd_setup                or in the server console, while you are in game
+fredpd_setup <player id>                     lists that player's Discord roles
+fredpd_setup <player id> <discord role id>   runs setup
+/fredpd setup <code> <discord role id>       the same, from the game chat
 ```
 
 That creates the agency, puts you on the roster using the Discord id FiveM
-already knows you by, and maps every Discord role you hold to the `admin` group.
-Everything after it is configured in the MDT.
+already knows you by — bound to the character you are on (spec 4.1) — and maps
+the **one** role you named to the `admin` group. Everything after it is
+configured in the MDT.
+
+Name a staff or command role. Everyone holding it becomes a FredPD
+administrator, with `admin.audit.view` and `admin.permissions.edit`, so a role
+the whole server holds would hand the whole server the audit log. Setup only
+accepts a role you hold yourself, which also means `@everyone` cannot be named.
 
 Setup refuses once `fpd_officers` has any row, so there is exactly one first run.
 The code exists so that on a public server the first player to guess the command

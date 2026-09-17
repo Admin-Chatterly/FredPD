@@ -40,10 +40,12 @@
     "internal": "Something went wrong on the server. The error has been logged."
   },
   "setup": {
-    "done": "FredPD is set up. {agency} created, {roles} Discord role(s) mapped to administration.",
+    "done": "FredPD is set up. {agency} created; the Discord role {role} now grants administration.",
     "alreadyDone": "FredPD is already set up. Manage permissions from Administration in the MDT.",
     "busy": "Setup is already running. Wait a moment and try again.",
     "badCode": "Wrong setup code. It is printed in the server console when the resource starts.",
+    "noRole": "Name the Discord role that should grant administration: /fredpd setup <code> <role id>. The server console lists your roles.",
+    "roleNotHeld": "You do not hold that Discord role. The server console lists the ones you do.",
     "noSeed": "The permission groups are missing. Apply database/seeds/0001_permissions.sql, then try again.",
     "noDiscord": "No Discord identity. Start Discord and reconnect — FredPD identifies officers by Discord account.",
     "noToken": "No Discord bot token in config/server.lua. Add one, restart the resource and try again.",

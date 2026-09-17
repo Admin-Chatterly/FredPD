@@ -110,10 +110,11 @@ Four steps, and no convars:
 3. **Edit** `resources/[fredpd]/fredpd/config/server.lua` — a Discord bot token,
    your guild id, and your agency's name. That is the only file to edit, and the
    only configuration there is.
-4. **Run the setup command** the console prints on first start: `/fredpd setup
-   <code>` in game, or `fredpd_setup` in the server console. It creates the
-   agency, puts you on the roster, and maps your Discord roles to
-   administration.
+4. **Run the setup command** the console prints on first start. In the console,
+   `fredpd_setup <player id>` lists your Discord roles; `fredpd_setup <player
+   id> <role id>` then creates the agency, puts you on the roster, and makes
+   that one role grant administration. `/fredpd setup <code> <role id>` does the
+   same from the game chat.
 
 Everything after that is configured from inside the game: Discord roles from
 **Administration** in the MDT, and world positions with `/fredpd placement`.

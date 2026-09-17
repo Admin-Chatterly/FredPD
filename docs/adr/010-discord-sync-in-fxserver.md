@@ -52,8 +52,19 @@ in `server_scripts` and absent from `files {}` — so the token never reaches a
 client, which is what invariant 7 is actually about. Convars still win when set,
 for hosts that template their configuration.
 
-First-run setup becomes `/fredpd setup <code>` in game, or `fredpd_setup` in the
-server console, replacing the four hand-written bootstrap rows.
+First-run setup becomes `fredpd_setup <player id> <role id>` in the server
+console, or `/fredpd setup <code> <role id>` in game, replacing the four
+hand-written bootstrap rows. It maps exactly **one** named Discord role to
+`admin`, and only one the operator actually holds.
+
+That last part is not a detail. Setup originally mapped every role the operator
+held, on the reasoning that FredPD cannot see Discord's role hierarchy and so
+cannot pick their "highest". The security review found what that means on a real
+server: an operator holds `@Staff` *and* `@Member`, `@Member` is mapped to
+`admin` alongside it, and every member of the community silently gains
+`admin.permissions.edit` and `admin.audit.view` — the audit log being a list of
+Discord ids that spec 11.4 restricts to administrators. Making the operator name
+the role costs one console round-trip and removes the failure entirely.
 
 ## Consequences
 
@@ -74,8 +85,24 @@ server console, replacing the four hand-written bootstrap rows.
 - **Setup is one client-triggered state change outside `route()`**, which
   invariant 3 otherwise forbids. It has to be: a route opens a session first,
   and a session needs an `fpd_officers` row that by definition does not exist
-  yet. It is bounded by refusing once any officer exists, by requiring a code
-  printed only to the server console, and by being audited including refusals.
+  yet. It is bounded by refusing once any officer exists, by a 12-character code
+  printed only to the server console, by a rate limit taken before the code is
+  checked, by a lock held across its Discord call, and by being audited
+  including every refusal.
+- **A complete guild walk now clears anyone it did not see.** A member who was
+  kicked or left is simply absent from the member list, so nothing would
+  otherwise touch their row: their roles would stand while `synced_at` merely
+  aged, and neither staleness tier blocks *reads*. An officer removed from
+  Discord mid-shift would have kept reading files until they disconnected. Only
+  a walk that reached the end of the guild sweeps — a failed or truncated one
+  has enumerated nobody, and clearing on that would revoke the department over
+  one bad response.
+- **A member-level 404 is verified against the guild** before it is believed. On
+  that endpoint 404 means both "not in this guild" and "this guild is not one
+  the bot can see", and writing an empty role list for the second would give
+  every connecting player a *fresh* row saying they hold nothing — so the outage
+  tiers would never fire, and a kicked bot would look like a healthy sync of a
+  department where nobody has any roles.
 
 ## Alternatives considered
 

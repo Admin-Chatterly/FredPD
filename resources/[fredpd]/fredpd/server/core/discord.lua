@@ -256,6 +256,50 @@ function Discord.enabled()
     return Discord.isConfigured(config())
 end
 
+--- Can the bot see the configured guild at all?
+---
+--- Used to tell a member-level 404 apart from a guild-level one. Cheap, and
+--- only ever called on that path.
+function Discord.guildIsVisible()
+    local status = getWithBackoff(('/guilds/%s'):format(config().guildId))
+    return status == 200
+end
+
+--- The guild's roles, as a list of { id, name }, highest position first.
+---
+--- Setup prints these so an operator can pick the role that will grant
+--- administration. Ordering by position puts the roles that mean something --
+--- staff, command -- at the top, and `@everyone` at the bottom where it belongs.
+--- @return table|nil roles, nil on failure
+function Discord.guildRoles()
+    if not Discord.enabled() then return nil end
+
+    local status, body = getWithBackoff(('/guilds/%s/roles'):format(config().guildId))
+
+    if status ~= 200 or type(body) ~= 'table' then
+        print(('[fredpd] discord: could not read the guild roles -- %s'):format(explain(status)))
+        return nil
+    end
+
+    local roles = {}
+
+    for index = 1, #body do
+        local role = body[index]
+
+        if type(role) == 'table' and type(role.id) == 'string' then
+            roles[#roles + 1] = {
+                id = role.id,
+                name = tostring(role.name or role.id),
+                position = tonumber(role.position) or 0,
+            }
+        end
+    end
+
+    table.sort(roles, function(left, right) return left.position > right.position end)
+
+    return roles
+end
+
 --- Refreshes one member, on connect.
 ---
 --- A player who is not in the guild is not an error: they hold no roles, which
@@ -276,9 +320,22 @@ function Discord.refreshOne(discordId, force)
     )
 
     if status == 404 then
-        -- Not in the guild. Storing an empty list makes that a fact with a
-        -- timestamp, rather than a missing row indistinguishable from a sync
-        -- that never ran.
+        -- 404 means two different things on this endpoint: "this user is not in
+        -- the guild" and "this guild is not one the bot can see". Storing an
+        -- empty role list for the second would be catastrophic in a quiet way:
+        -- a kicked bot or a mistyped guild id would give every connecting
+        -- player a *fresh* row saying they hold nothing, so the staleness tiers
+        -- in spec 4.2 would never fire and the outage would look like a healthy
+        -- sync of a department where nobody has any roles.
+        --
+        -- One extra call, only on this path, tells the two apart.
+        if not Discord.guildIsVisible() then
+            print(('[fredpd] discord: %s'):format(explain(404)))
+            return false
+        end
+
+        -- Genuinely not in the guild. An empty list with a timestamp is a fact;
+        -- a missing row is indistinguishable from a sync that never ran.
         store({ { discordId = discordId, roles = {} } })
         lastRefreshedAt[discordId] = os.time()
         return true
@@ -294,13 +351,43 @@ function Discord.refreshOne(discordId, force)
     return true
 end
 
+--- Empties the roles of everybody the walk did not see.
+---
+--- A member who was kicked, banned or left is simply absent from the member
+--- list, so nothing upserts their row and it keeps its old roles while its
+--- `synced_at` ages. The staleness tiers narrow what they may *change*, but
+--- neither tier blocks reads -- so an officer removed from Discord mid-shift
+--- would keep reading files for as long as they stayed connected.
+---
+--- Only safe after a walk that reached the end of the guild. A walk that failed
+--- or hit MAX_PAGES has not enumerated anybody, and clearing on that would
+--- revoke the whole department over one bad response.
+---
+--- This still honours spec 4.2: a complete enumeration that did not contain
+--- someone *is* Discord telling us they hold nothing here.
+--- @param startedAt string database timestamp taken before the walk
+local function clearMembersNotSeenSince(startedAt)
+    return FredPD.Core.db.execute(
+        [[UPDATE fpd_discord_members
+             SET roles = '[]', synced_at = NOW()
+           WHERE synced_at < ? AND roles <> '[]']],
+        { startedAt }
+    )
+end
+
 --- Refreshes the whole guild, page by page.
 --- @return number|nil members refreshed, nil on failure
 function Discord.refreshAll()
     if not Discord.enabled() then return nil end
 
+    -- The database's clock, not FXServer's: `store` stamps rows with `NOW()`,
+    -- and comparing those against a local `os.time()` would misjudge anyone
+    -- whose row was written during the walk whenever the two clocks disagree.
+    local startedAt = FredPD.Core.db.scalar('SELECT NOW(3)')
+
     local after = nil
     local total = 0
+    local walkedToTheEnd = false
 
     for _ = 1, MAX_PAGES do
         local path = ('/guilds/%s/members?limit=%d'):format(config().guildId, PAGE_SIZE)
@@ -313,17 +400,36 @@ function Discord.refreshAll()
             return nil
         end
 
-        if #body == 0 then break end
+        if #body == 0 then
+            walkedToTheEnd = true
+            break
+        end
 
         total = total + store(Discord.rowsFrom(body))
 
         -- A page shorter than the limit is the last one. Checking the cursor as
         -- well means a page of members Discord sent without a `user` object
-        -- ends the walk instead of requesting the same page forever.
+        -- ends the walk instead of requesting the same page forever -- but that
+        -- case has *not* enumerated the guild, so it must not sweep.
         local cursor = Discord.cursorFrom(body)
-        if #body < PAGE_SIZE or not cursor then break end
+
+        if #body < PAGE_SIZE then
+            walkedToTheEnd = true
+            break
+        end
+
+        if not cursor then break end
 
         after = cursor
+    end
+
+    if walkedToTheEnd and startedAt then
+        local departed = clearMembersNotSeenSince(startedAt)
+
+        if departed > 0 then
+            print(('[fredpd] discord: %d member(s) are no longer in the guild and now hold nothing')
+                :format(departed))
+        end
     end
 
     return total
