@@ -965,6 +965,86 @@ export const schemas = {
     serial: { type: 'string', required: false, max: 64 },
   },
 
+
+  // The unified query and hot-file hits (spec 7.2).
+  QueryRun: {
+    // What the officer typed, before the service normalises it. The floor is
+    // `MIN_TERM` (query/service.lua): one character matches most of every
+    // register and answers nothing, and the handler refuses a shorter term
+    // anyway. The ceiling is the column every query is logged into --
+    // `fpd_query_log.term VARCHAR(191) NOT NULL` (0005:892) -- because 7.2 logs
+    // every query verbatim, including one that found nothing, and a term the
+    // log cannot hold is a query that cannot be logged. `normalizeTerm` only
+    // ever shortens, so 191 in is 191 stored.
+    term: { type: 'string', required: true, min: 2, max: 191 },
+    // The six names of 7.2, plus `serial`, which is what 7.2 calls a firearm
+    // query. A bounded string rather than an enum on purpose: the stored value
+    // is fixed by `ck_fpd_query_log_type` (0005:911, shipped) and spells a
+    // serial query `firearm`, so `Query.canonicalType` resolves the alias to it
+    // and the handler answers `not_allowed` for anything else -- one set, in
+    // the service, rather than an enum that would have to carry the alias too.
+    // Absent means "derive it from the term", which is the ordinary case.
+    type: { type: 'string', required: false, max: 16 },
+    // `registry.fetchWindow` clamps a page to 1..100 and over-fetches three
+    // times it, because access filtering removes rows after the query. Fifty
+    // here rather than a hundred: a unified query fans out across three
+    // registers, so the window is paid three times over for one page.
+    limit: { type: 'integer', required: false, min: 1, max: 50 },
+    // 7.2: a query that reaches restricted data carries a reason or a case
+    // number, and the route refuses the result without one. Widths are
+    // `fpd_query_log.reason VARCHAR(255)` and `case_number VARCHAR(32)`
+    // (0005:896-897). Neither carries a `min`: the handler treats a blank
+    // string as "not given", so an empty box must reach it rather than being
+    // refused as too short.
+    reason: { type: 'string', required: false, max: 255 },
+    caseNumber: { type: 'string', required: false, max: 32 },
+  },
+  QueryHitConfirm: {
+    // The query that raised the lead (7.2), so the log can say afterwards
+    // whether an officer acted on a confirmed record or on an unconfirmed one.
+    // Optional, because a hit can also be confirmed from a record page where no
+    // query ran. `fpd_query_log.id` is BIGINT UNSIGNED AUTO_INCREMENT, and the
+    // handler refuses an id that is not this officer's own -- otherwise a
+    // confirmation could be attached to somebody else's query.
+    queryId: { type: 'integer', required: false, min: 1 },
+    // Which hot file. `ck_fpd_hotfile_confirmations_hit_type` (0006) allows
+    // vehicle_flag, firearm and person_caution; `Query.HIT_TYPES` is the copy
+    // the handler checks against, answering `not_allowed`.
+    hitType: { type: 'string', required: true, max: 24 },
+    // The flag, firearm or caution row the hit came from.
+    hitId: { type: 'integer', required: true, min: 1 },
+    // The three real answers (`ck_fpd_hotfile_confirmations_outcome`, 0006):
+    // confirmed, not_confirmed, unable. `unable` is not `not_confirmed` --
+    // nobody answered, which is the fact an officer is asked about afterwards.
+    outcome: { type: 'string', required: true, max: 16 },
+    // What it was confirmed against. `fpd_hotfile_confirmations.case_number`
+    // VARCHAR(32) and `detail` VARCHAR(512); a `confirmed` outcome needs one of
+    // the two, refused by the handler and again by `ck_..._against`.
+    caseNumber: { type: 'string', required: false, max: 32 },
+    detail: { type: 'string', required: false, max: 512 },
+    // The kind of hit, the record it sits on, who confirmed it and when are all
+    // absent and must stay absent (invariant 1): each is read off the record or
+    // off the session. A client that could name the kind could file a
+    // confirmation saying a vehicle was confirmed stolen when the flag on it
+    // says something else.
+  },
+  QueryLog: {
+    // "What have I run." It takes the session's own Discord id rather than the
+    // field below (invariant 1) and wins over it in the handler, so it cannot
+    // become a way to ask about somebody else by sending their id alongside.
+    mine: { type: 'boolean', required: false },
+    // Whose history to read, for the misuse-investigation view behind
+    // `query.log.view`. `fpd_query_log.discord_id VARCHAR(32)` (0005:887).
+    discordId: { type: 'string', required: false, max: 32 },
+    // One of the six names (`ck_fpd_query_log_type`), resolved through
+    // `Query.canonicalType` so `serial` filters on `firearm` and anything
+    // unrecognised filters on nothing.
+    queryType: { type: 'string', required: false, max: 16 },
+    // `Repo.queryLog` clamps to 1..200; the same ceiling here so a client
+    // asking for more is told rather than silently given 200.
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
 } as const satisfies Record<string, Schema>;
 
 export type SchemaName = keyof typeof schemas;

@@ -689,4 +689,28 @@ FredPD.Schema = {
         id = { type = 'integer', required = false, min = 1 },
         serial = { type = 'string', required = false, max = 64 },
     },
+
+    QueryRun = {
+        term = { type = 'string', required = true, min = 2, max = 191 },
+        type = { type = 'string', required = false, max = 16 },
+        limit = { type = 'integer', required = false, min = 1, max = 50 },
+        reason = { type = 'string', required = false, max = 255 },
+        caseNumber = { type = 'string', required = false, max = 32 },
+    },
+
+    QueryHitConfirm = {
+        queryId = { type = 'integer', required = false, min = 1 },
+        hitType = { type = 'string', required = true, max = 24 },
+        hitId = { type = 'integer', required = true, min = 1 },
+        outcome = { type = 'string', required = true, max = 16 },
+        caseNumber = { type = 'string', required = false, max = 32 },
+        detail = { type = 'string', required = false, max = 512 },
+    },
+
+    QueryLog = {
+        mine = { type = 'boolean', required = false },
+        discordId = { type = 'string', required = false, max = 32 },
+        queryType = { type = 'string', required = false, max = 16 },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
 }

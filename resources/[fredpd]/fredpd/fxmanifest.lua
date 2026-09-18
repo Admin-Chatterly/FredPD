@@ -64,6 +64,11 @@ server_scripts {
     'server/modules/registry/repo.lua',
     'server/modules/registry/routes.lua',
 
+    -- The unified query (spec 7.2) reads all three registers, so it loads last.
+    'server/modules/query/service.lua',
+    'server/modules/query/repo.lua',
+    'server/modules/query/routes.lua',
+
     'server/modules/placements/service.lua',
     'server/modules/placements/repo.lua',
     'server/modules/placements/routes.lua',

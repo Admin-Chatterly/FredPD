@@ -92,7 +92,11 @@
     "unattributed": "ingen ägare registrerad för spåret",
     "format": "inte ett datum i formatet ÅÅÅÅ-MM-DD",
     "field_forbidden": "du saknar behörighet för den här uppgiften",
-    "clearance": "över din behörighetsnivå"
+    "clearance": "över din behörighetsnivå",
+    "destroyed": "registrerat som förstört",
+    "lost": "anmält förkommet",
+    "seized": "i polisens förvar",
+    "stolen": "anmält stulet"
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -589,5 +593,341 @@
         "returned": "Återlämnat"
       }
     }
+  },
+  "query": {
+    "type": {
+      "person": "Person",
+      "plate": "Registreringsnummer",
+      "vin": "VIN",
+      "firearm": "Vapennummer",
+      "phone": "Telefonnummer",
+      "address": "Adress"
+    },
+    "source": {
+      "person": "Personregister",
+      "vehicle": "Fordonsregister",
+      "firearm": "Vapenregister"
+    },
+    "hit": {
+      "vehicle_flag": "Fordonsmarkering",
+      "firearm": "Vapen",
+      "person_caution": "Personvarning"
+    },
+    "caution": {
+      "armed": "Beväpnad",
+      "violent": "Våldsam",
+      "officer_safety": "Personalsäkerhet"
+    },
+    "status": {
+      "unconfirmed": "Obekräftad träff",
+      "confirmed": "Bekräftad träff"
+    },
+    "confirm": {
+      "confirmed": "Bekräftad",
+      "not_confirmed": "Ej bekräftad",
+      "unable": "Inget svar från registerhållande myndighet"
+    }
+  },
+  "access": {
+    "unit": {
+      "homicide": "Mordroteln",
+      "internal_affairs": "Internutredningen",
+      "narcotics": "Narkotikaroteln",
+      "records": "Registerenheten"
+    }
+  },
+  "records": {
+    "aliasKind": {
+      "alias": "Alias",
+      "former": "Tidigare namn",
+      "maiden": "Flicknamn",
+      "moniker": "Öknamn"
+    },
+    "authority": {
+      "caseNumber": "Ärendenummer",
+      "intro": "En sökning som når skyddade poster kräver ett skäl eller ett ärendenummer. Båda skrivs till sökloggen.",
+      "reason": "Skäl",
+      "reasonPlaceholder": "Varför sökningen görs",
+      "title": "Sökbefogenhet"
+    },
+    "biometric": {
+      "dna": "DNA",
+      "fingerprint": "Fingeravtryck",
+      "notOnFile": "Saknas i register",
+      "onFile": "Finns i register"
+    },
+    "cautionKind": {
+      "armed": "Beväpnad",
+      "gang": "Gängkoppling",
+      "mental_health": "Psykisk ohälsa",
+      "officer_safety": "Egen säkerhet",
+      "violent": "Våldsam"
+    },
+    "classification": {
+      "confidential": "Konfidentiell",
+      "internal": "Intern",
+      "open": "Öppen",
+      "restricted": "Begränsad",
+      "secret": "Hemlig"
+    },
+    "descriptor": {
+      "build": "Kroppsbyggnad",
+      "complexion": "Hy",
+      "eyes": "Ögon",
+      "glasses": "Glasögon",
+      "hair": "Hår",
+      "hairStyle": "Frisyr",
+      "height": "Längd (cm)",
+      "notes": "Anteckningar",
+      "weight": "Vikt (kg)"
+    },
+    "field": {
+      "ownerIdentifier": "Registrerad ägare",
+      "restricted": "Undanhållen — du saknar behörighet för uppgiften"
+    },
+    "firearm": {
+      "assign": {
+        "intro": "Lämna tjänstemannen tom för att återlämna vapnet till förrådet.",
+        "submit": "Registrera tilldelning",
+        "title": "Tilldela eller återlämna"
+      },
+      "detail": {
+        "none": "Välj ett serienummer för att öppna posten."
+      },
+      "edit": {
+        "intro": "Serienummer, ägare, status och tilldelning har egna åtgärder, så att ägarhistoriken aldrig kan avvika från posten.",
+        "submit": "Spara vapen",
+        "title": "Redigera vapen"
+      },
+      "empty": "Inget vapen matchar.",
+      "event": {
+        "empty": "Inga händelser registrerade.",
+        "event": "Händelse",
+        "from": "Från",
+        "occurred": "Inträffade",
+        "recordedBy": "Registrerad av",
+        "to": "Till"
+      },
+      "events": "Ägarhistorik",
+      "field": {
+        "assignedOfficer": "Tilldelad",
+        "calibre": "Kaliber",
+        "make": "Fabrikat",
+        "model": "Modell",
+        "ownerParty": "Innehavare (ej i register)",
+        "serial": "Serienummer",
+        "status": "Status",
+        "type": "Typ"
+      },
+      "register": {
+        "submit": "Registrera vapen",
+        "title": "Registrera ett vapen"
+      },
+      "search": {
+        "term": "Serienummer",
+        "termPlaceholder": "Ett serienummer eller början av ett"
+      },
+      "status": {
+        "submit": "Registrera status",
+        "title": "Ändra status"
+      },
+      "trace": {
+        "intro": "En spårning följer vapnet tillbaka till den första posten i registret. Den kräver egen behörighet.",
+        "links": "{count} händelser i kedjan.",
+        "noOrigin": "Registret saknar öppningshändelse för vapnet.",
+        "origin": "Fördes in i registret som {event} den {moment}, till {party}.",
+        "run": "Kör spårning",
+        "title": "Spårningsrapport"
+      },
+      "transfer": {
+        "fromParty": "Från",
+        "intro": "En överlåtelse kräver en mottagare: en person i registret eller en namngiven part utanför det.",
+        "submit": "Registrera överlåtelse",
+        "title": "Överlåtelse",
+        "toIdentifier": "Till identifierare",
+        "toParty": "Till (ej i register)",
+        "toPersonId": "Till person (post-id)"
+      }
+    },
+    "form": {
+      "any": "Alla",
+      "notStated": "Ej angivet",
+      "serverDefault": "Låt servern avgöra",
+      "unchanged": "Lämna oförändrad"
+    },
+    "hit": {
+      "body": "Bekräfta träffen innan du agerar på den.",
+      "column": "Efterlysning",
+      "confirm": "Bekräfta träff",
+      "confirmed": "Bekräftad på den här skärmen. Bekräftelsen registreras inte.",
+      "inResults": "{count} av posterna har en träff i efterlysningsregistret.",
+      "title": "Träff i efterlysningsregistret"
+    },
+    "no": "Nej",
+    "person": {
+      "alias": {
+        "empty": "Inga alias registrerade."
+      },
+      "aliases": "Alias",
+      "biometric": {
+        "empty": "Inget i register."
+      },
+      "biometrics": "Biometri",
+      "caution": {
+        "add": "Lägg till varning",
+        "cancel": "Återta",
+        "detail": "Detalj",
+        "expires": "Upphör om (dagar)",
+        "expiresAt": "Upphör {moment}",
+        "expiresPlaceholder": "0 = aldrig",
+        "kind": "Typ",
+        "noExpiry": "Upphör inte",
+        "sourceCase": "Källärende",
+        "title": "Varningar och markeringar"
+      },
+      "cautions": "Varningar",
+      "column": {
+        "alias": "Matchat alias",
+        "cautions": "Varningar",
+        "name": "Namn",
+        "number": "Registernummer"
+      },
+      "descriptor": {
+        "empty": "Inget signalement registrerat."
+      },
+      "descriptors": "Signalement",
+      "detail": {
+        "none": "Välj ett registernummer för att öppna personen."
+      },
+      "edit": {
+        "submit": "Spara post",
+        "title": "Redigera post"
+      },
+      "empty": "Ingen person matchar.",
+      "field": {
+        "address": "Adress",
+        "classification": "Sekretessnivå",
+        "dateOfBirth": "Födelsedatum",
+        "deceased": "Avliden",
+        "firstName": "Förnamn",
+        "lastName": "Efternamn",
+        "middleName": "Mellannamn",
+        "missing": "Saknad",
+        "phone": "Telefon",
+        "sex": "Kön"
+      },
+      "firearm": {
+        "empty": "Inga vapen registrerade."
+      },
+      "firearms": "Registrerade vapen",
+      "photo": {
+        "case": "Källärende",
+        "description": "Beskrivning",
+        "empty": "Inga fotografier registrerade.",
+        "kind": "Typ",
+        "location": "Placering på kroppen",
+        "note": "Fotografier levereras via mediegatewayen och visas inte på den här skärmen.",
+        "taken": "Tagen"
+      },
+      "photos": "Fotografier",
+      "search": {
+        "term": "Namn, alias eller registernummer",
+        "termPlaceholder": "Minst två tecken"
+      },
+      "unnamed": "Inget namn registrerat",
+      "vehicle": {
+        "empty": "Inga fordon registrerade."
+      },
+      "vehicles": "Registrerade fordon"
+    },
+    "photoKind": {
+      "field": "Fältfoto",
+      "mark": "Märke",
+      "mugshot": "Anhållningsfoto",
+      "scar": "Ärr",
+      "tattoo": "Tatuering"
+    },
+    "restricted": {
+      "body": "Du får veta att posten finns, inte mer. Enheten ovan avgör om du ska få tillgång.",
+      "contact": "Kontakta {unit}",
+      "title": "Skyddad post"
+    },
+    "search": {
+      "run": "Sök",
+      "term": "Sökterm"
+    },
+    "sex": {
+      "female": "Kvinna",
+      "male": "Man",
+      "other": "Annat",
+      "unknown": "Okänt"
+    },
+    "tab": {
+      "firearms": "Vapen",
+      "persons": "Personer",
+      "vehicles": "Fordon"
+    },
+    "vehicle": {
+      "column": {
+        "plate": "Registreringsnummer"
+      },
+      "detail": {
+        "none": "Välj ett registreringsnummer för att öppna posten."
+      },
+      "edit": {
+        "submit": "Spara fordon",
+        "title": "Redigera fordon"
+      },
+      "empty": "Inget fordon matchar.",
+      "field": {
+        "colour": "Färg",
+        "colourSecondary": "Andra färg",
+        "insurance": "Försäkring",
+        "insuranceExpires": "Försäkring upphör",
+        "model": "Modell",
+        "plate": "Registreringsnummer",
+        "registration": "Registrering",
+        "registrationExpires": "Registrering upphör",
+        "vin": "Chassinummer"
+      },
+      "flag": {
+        "add": "Lägg till markering",
+        "clear": "Ta bort markering",
+        "detail": "Detalj",
+        "empty": "Inga markeringar gäller.",
+        "expires": "Upphör",
+        "expiresIn": "Upphör om (sekunder)",
+        "expiresInPlaceholder": "0 = aldrig",
+        "kind": "Typ",
+        "submit": "Lägg till markering"
+      },
+      "flags": "Gällande markeringar",
+      "plate": {
+        "change": "Byt registreringsnummer",
+        "empty": "Ingen registreringshistorik.",
+        "from": "Innehavd från",
+        "new": "Nytt registreringsnummer",
+        "reason": "Skäl",
+        "submit": "Byt registreringsnummer",
+        "until": "Innehavd till"
+      },
+      "plates": "Registreringshistorik",
+      "register": {
+        "intro": "Chassinumret genereras av registret och kan inte anges här.",
+        "reason": "Skäl",
+        "submit": "Registrera fordon",
+        "title": "Registrera ett fordon"
+      },
+      "search": {
+        "term": "Registreringsnummer eller chassinummer",
+        "termPlaceholder": "Ett registreringsnummer eller början av ett"
+      }
+    },
+    "withheld": {
+      "action": "Ange ett skäl",
+      "body": "Sökningen träffade poster du är behörig att läsa men öppnade dem inte, eftersom den nådde skyddade uppgifter utan angivet skäl. Ange ett skäl eller ett ärendenummer ovan och sök igen.",
+      "title": "Poster undanhållna"
+    },
+    "yes": "Ja"
   }
 }

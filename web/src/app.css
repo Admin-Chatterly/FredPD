@@ -13,6 +13,21 @@
   --color-ink-muted: #5a626d;
   --color-accent: #1b4f9c;
 
+  /*
+   * The four semantic colours of spec 6.2. Absent until now, which is why a
+   * hot-file banner could not be the red 6.4 requires without a hardcoded hex
+   * that web/CLAUDE.md forbids.
+   *
+   * `alert` is a warrant or an officer-safety flag. `caution` is pending or
+   * expiring. `clear` is approved, available, no hits. `focus` is the keyboard
+   * ring, and is separate from `accent` on purpose: an agency overrides its own
+   * colour and must not be able to make the focus ring invisible.
+   */
+  --color-alert: #b3261e;
+  --color-caution: #a15c00;
+  --color-clear: #1e6b3a;
+  --color-focus: #2f6fdb;
+
   --font-sans: 'Segoe UI', 'Inter', system-ui, sans-serif;
   --font-mono: 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
 }
@@ -25,6 +40,16 @@
   --color-ink: #e6e9ee;
   --color-ink-muted: #949dab;
   --color-accent: #6ea8ff;
+
+  /*
+   * Lightened just enough to hold 4.5:1 against the night paper (#1c2027),
+   * which is what 6.2 asks for. The daylight values sit at roughly 3:1 there
+   * and would fail the one reading that has to survive a night shift.
+   */
+  --color-alert: #f2837c;
+  --color-caution: #e0a33a;
+  --color-clear: #63c07f;
+  --color-focus: #7aa7f0;
 }
 
 html,

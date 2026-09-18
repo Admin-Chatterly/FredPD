@@ -6,6 +6,7 @@
   import RoleMap from './modules/admin/RoleMap.svelte';
   import Groups from './modules/admin/Groups.svelte';
   import Fleet from './modules/admin/Fleet.svelte';
+  import Records from './modules/records/Records.svelte';
   import Evidence from './modules/evidence/Evidence.svelte';
   import Lab from './modules/lab/Lab.svelte';
   import Intel from './modules/intel/Intel.svelte';
@@ -94,7 +95,7 @@
    * A module joins this list when its page is imported above; until then the
    * rail entry draws the placeholder.
    */
-  const BUILT = new Set(['evidence', 'lab', 'intel', 'admin']);
+  const BUILT = new Set(['records', 'evidence', 'lab', 'intel', 'admin']);
 </script>
 
 <div class="flex h-full flex-col bg-[var(--color-panel)] text-[var(--color-ink)]">
@@ -141,6 +142,8 @@
         <p class="text-sm">{t(`error.${error}`)}</p>
       {:else if current === 'intel'}
         <Intel />
+      {:else if current === 'records'}
+        <Records />
       {:else if current === 'evidence'}
         <Evidence />
       {:else if current === 'lab'}

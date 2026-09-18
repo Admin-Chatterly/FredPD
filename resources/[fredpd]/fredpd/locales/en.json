@@ -92,7 +92,11 @@
     "unattributed": "no owner on record for this trace",
     "format": "not a date in YYYY-MM-DD form",
     "field_forbidden": "you are not cleared for this field",
-    "clearance": "above your clearance"
+    "clearance": "above your clearance",
+    "destroyed": "recorded as destroyed",
+    "lost": "reported lost",
+    "seized": "in police custody",
+    "stolen": "reported stolen"
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -589,5 +593,341 @@
         "returned": "Returned"
       }
     }
+  },
+  "query": {
+    "type": {
+      "person": "Person",
+      "plate": "Plate",
+      "vin": "VIN",
+      "firearm": "Firearm serial",
+      "phone": "Phone number",
+      "address": "Address"
+    },
+    "source": {
+      "person": "Name index",
+      "vehicle": "Vehicle register",
+      "firearm": "Firearm register"
+    },
+    "hit": {
+      "vehicle_flag": "Vehicle flag",
+      "firearm": "Firearm",
+      "person_caution": "Person caution"
+    },
+    "caution": {
+      "armed": "Armed",
+      "violent": "Violent",
+      "officer_safety": "Officer safety"
+    },
+    "status": {
+      "unconfirmed": "Unconfirmed hit",
+      "confirmed": "Confirmed hit"
+    },
+    "confirm": {
+      "confirmed": "Confirmed",
+      "not_confirmed": "Not confirmed",
+      "unable": "No answer from the holding agency"
+    }
+  },
+  "access": {
+    "unit": {
+      "homicide": "Homicide",
+      "internal_affairs": "Internal Affairs",
+      "narcotics": "Narcotics",
+      "records": "Records"
+    }
+  },
+  "records": {
+    "aliasKind": {
+      "alias": "Alias",
+      "former": "Former name",
+      "maiden": "Maiden name",
+      "moniker": "Moniker"
+    },
+    "authority": {
+      "caseNumber": "Case number",
+      "intro": "A query that reaches restricted records needs a reason or a case number. Both are written to the query log.",
+      "reason": "Reason",
+      "reasonPlaceholder": "Why this query is being run",
+      "title": "Query authority"
+    },
+    "biometric": {
+      "dna": "DNA",
+      "fingerprint": "Fingerprints",
+      "notOnFile": "Not on file",
+      "onFile": "On file"
+    },
+    "cautionKind": {
+      "armed": "Armed",
+      "gang": "Gang affiliation",
+      "mental_health": "Mental health",
+      "officer_safety": "Officer safety",
+      "violent": "Violent"
+    },
+    "classification": {
+      "confidential": "Confidential",
+      "internal": "Internal",
+      "open": "Open",
+      "restricted": "Restricted",
+      "secret": "Secret"
+    },
+    "descriptor": {
+      "build": "Build",
+      "complexion": "Complexion",
+      "eyes": "Eyes",
+      "glasses": "Glasses",
+      "hair": "Hair",
+      "hairStyle": "Hairstyle",
+      "height": "Height (cm)",
+      "notes": "Notes",
+      "weight": "Weight (kg)"
+    },
+    "field": {
+      "ownerIdentifier": "Registered keeper",
+      "restricted": "Withheld — you are not cleared for this field"
+    },
+    "firearm": {
+      "assign": {
+        "intro": "Leave the officer blank to return the weapon to the armoury.",
+        "submit": "Record assignment",
+        "title": "Issue or return"
+      },
+      "detail": {
+        "none": "Select a serial number to open the record."
+      },
+      "edit": {
+        "intro": "The serial, the owner, the status and the assignment each have their own action, so the ownership history can never disagree with the record.",
+        "submit": "Save firearm",
+        "title": "Edit firearm"
+      },
+      "empty": "No firearm matches.",
+      "event": {
+        "empty": "No events on record.",
+        "event": "Event",
+        "from": "From",
+        "occurred": "Occurred",
+        "recordedBy": "Recorded by",
+        "to": "To"
+      },
+      "events": "Ownership history",
+      "field": {
+        "assignedOfficer": "Issued to",
+        "calibre": "Calibre",
+        "make": "Make",
+        "model": "Model",
+        "ownerParty": "Keeper (not on file)",
+        "serial": "Serial number",
+        "status": "Status",
+        "type": "Type"
+      },
+      "register": {
+        "submit": "Register firearm",
+        "title": "Register a firearm"
+      },
+      "search": {
+        "term": "Serial number",
+        "termPlaceholder": "A serial number, or the start of one"
+      },
+      "status": {
+        "submit": "Record status",
+        "title": "Change status"
+      },
+      "trace": {
+        "intro": "A trace follows the weapon back to the first entry in the register. It needs its own permission.",
+        "links": "{count} events in the chain.",
+        "noOrigin": "The register holds no opening event for this weapon.",
+        "origin": "Entered the register as {event} on {moment}, to {party}.",
+        "run": "Run trace",
+        "title": "Trace report"
+      },
+      "transfer": {
+        "fromParty": "From",
+        "intro": "A transfer needs somewhere for the weapon to go: a person on file, or a named party outside it.",
+        "submit": "Record transfer",
+        "title": "Transfer",
+        "toIdentifier": "To identifier",
+        "toParty": "To (not on file)",
+        "toPersonId": "To person (record id)"
+      }
+    },
+    "form": {
+      "any": "Any",
+      "notStated": "Not stated",
+      "serverDefault": "Leave to the server",
+      "unchanged": "Leave unchanged"
+    },
+    "hit": {
+      "body": "Confirm this hit before acting on it.",
+      "column": "Hot file",
+      "confirm": "Confirm hit",
+      "confirmed": "Confirmed on this screen. The confirmation is not recorded.",
+      "inResults": "{count} of these records carry a hot-file hit.",
+      "title": "Hot-file hit"
+    },
+    "no": "No",
+    "person": {
+      "alias": {
+        "empty": "No aliases on record."
+      },
+      "aliases": "Aliases",
+      "biometric": {
+        "empty": "Nothing on file."
+      },
+      "biometrics": "Biometrics",
+      "caution": {
+        "add": "Add caution",
+        "cancel": "Withdraw",
+        "detail": "Detail",
+        "expires": "Expires in (days)",
+        "expiresAt": "Expires {moment}",
+        "expiresPlaceholder": "0 = never",
+        "kind": "Kind",
+        "noExpiry": "Does not expire",
+        "sourceCase": "Source case",
+        "title": "Cautions and flags"
+      },
+      "cautions": "Cautions",
+      "column": {
+        "alias": "Matched alias",
+        "cautions": "Cautions",
+        "name": "Name",
+        "number": "Record number"
+      },
+      "descriptor": {
+        "empty": "No description on record."
+      },
+      "descriptors": "Description",
+      "detail": {
+        "none": "Select a record number to open the person."
+      },
+      "edit": {
+        "submit": "Save record",
+        "title": "Edit record"
+      },
+      "empty": "No person matches.",
+      "field": {
+        "address": "Address",
+        "classification": "Classification",
+        "dateOfBirth": "Date of birth",
+        "deceased": "Deceased",
+        "firstName": "First name",
+        "lastName": "Last name",
+        "middleName": "Middle name",
+        "missing": "Missing",
+        "phone": "Phone",
+        "sex": "Sex"
+      },
+      "firearm": {
+        "empty": "No firearms registered."
+      },
+      "firearms": "Registered firearms",
+      "photo": {
+        "case": "Source case",
+        "description": "Description",
+        "empty": "No photographs on record.",
+        "kind": "Kind",
+        "location": "Body location",
+        "note": "Photographs are served through the media gateway and are not shown on this screen.",
+        "taken": "Taken"
+      },
+      "photos": "Photographs",
+      "search": {
+        "term": "Name, alias or record number",
+        "termPlaceholder": "At least two characters"
+      },
+      "unnamed": "No name on record",
+      "vehicle": {
+        "empty": "No vehicles registered."
+      },
+      "vehicles": "Registered vehicles"
+    },
+    "photoKind": {
+      "field": "Field photo",
+      "mark": "Mark",
+      "mugshot": "Mugshot",
+      "scar": "Scar",
+      "tattoo": "Tattoo"
+    },
+    "restricted": {
+      "body": "You may be told this record exists, and nothing more. The unit above decides whether you are given access.",
+      "contact": "Contact {unit}",
+      "title": "Restricted record"
+    },
+    "search": {
+      "run": "Search",
+      "term": "Search term"
+    },
+    "sex": {
+      "female": "Female",
+      "male": "Male",
+      "other": "Other",
+      "unknown": "Unknown"
+    },
+    "tab": {
+      "firearms": "Firearms",
+      "persons": "Persons",
+      "vehicles": "Vehicles"
+    },
+    "vehicle": {
+      "column": {
+        "plate": "Plate"
+      },
+      "detail": {
+        "none": "Select a plate to open the record."
+      },
+      "edit": {
+        "submit": "Save vehicle",
+        "title": "Edit vehicle"
+      },
+      "empty": "No vehicle matches.",
+      "field": {
+        "colour": "Colour",
+        "colourSecondary": "Second colour",
+        "insurance": "Insurance",
+        "insuranceExpires": "Insurance expires",
+        "model": "Model",
+        "plate": "Plate",
+        "registration": "Registration",
+        "registrationExpires": "Registration expires",
+        "vin": "VIN"
+      },
+      "flag": {
+        "add": "Add flag",
+        "clear": "Clear flag",
+        "detail": "Detail",
+        "empty": "No flags in force.",
+        "expires": "Expires",
+        "expiresIn": "Expires in (seconds)",
+        "expiresInPlaceholder": "0 = never",
+        "kind": "Kind",
+        "submit": "Add flag"
+      },
+      "flags": "Flags in force",
+      "plate": {
+        "change": "Change plate",
+        "empty": "No plate history.",
+        "from": "Held from",
+        "new": "New plate",
+        "reason": "Reason",
+        "submit": "Change plate",
+        "until": "Held until"
+      },
+      "plates": "Plate history",
+      "register": {
+        "intro": "The VIN is generated by the register and cannot be given here.",
+        "reason": "Reason",
+        "submit": "Register vehicle",
+        "title": "Register a vehicle"
+      },
+      "search": {
+        "term": "Plate or VIN",
+        "termPlaceholder": "A plate, or the start of one"
+      }
+    },
+    "withheld": {
+      "action": "Give a reason",
+      "body": "This search matched records you are cleared to read but did not open them, because it reached restricted data without a reason. Give a reason or a case number above and run the search again.",
+      "title": "Records withheld"
+    },
+    "yes": "Yes"
   }
 }

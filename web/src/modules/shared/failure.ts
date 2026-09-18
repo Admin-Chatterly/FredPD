@@ -79,6 +79,15 @@ const REASONS = new Set([
   'clearance',
   'field_forbidden',
   'format',
+
+  // The four firearm statuses a transfer refuses, arriving as the `status`
+  // field code (registry/routes.lua). A weapon that is lost, stolen, seized or
+  // destroyed cannot be transferred, because the transfer would write
+  // `registered` over the fact.
+  'lost',
+  'stolen',
+  'seized',
+  'destroyed',
 ]);
 
 export interface FieldMessage {

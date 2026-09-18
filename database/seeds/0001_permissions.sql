@@ -102,6 +102,19 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('patrol', 'query.person.run'),
     ('patrol', 'query.vehicle.run'),
 
+    -- The unified query (7.2). Running one is the most ordinary thing an
+    -- officer does, and confirming a hot-file hit is part of the same act: a
+    -- hit is a lead until somebody confirms it, so an officer who can raise one
+    -- and not confirm it can only ever act on unconfirmed leads.
+    ('patrol', 'query.run'),
+    ('patrol', 'query.hit.confirm'),
+
+    -- Reading somebody else's query history is the misuse investigation, not
+    -- ordinary work. Your own history needs no key beyond being able to query:
+    -- the route asks for `query.person.run` and requires this one the moment
+    -- the question stops being about the caller.
+    ('command', 'query.log.view'),
+
     -- The registers (spec 7.2-7.5). Reading them is ordinary patrol work: an
     -- officer who may run a plate has to be able to open what the plate
     -- returns, or the query answers a question nobody can follow up.

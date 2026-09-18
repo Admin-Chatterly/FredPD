@@ -119,6 +119,11 @@ local NUI_ROUTES <const> = {
     'firearm.assign',
     'firearm.trace',
 
+    -- The unified query and hot-file hits (spec 7.2).
+    'query.run',
+    'query.hit.confirm',
+    'query.log',
+
     -- Crime scenes, evidence and the chain of custody (spec 8).
     'scene.create',
     'scene.release',
