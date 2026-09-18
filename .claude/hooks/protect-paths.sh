@@ -33,12 +33,32 @@ relative="${file_path#"$repo_root"/}"
 
 case "$relative" in
   database/migrations/*.sql)
-    # Only an *existing* migration is protected: adding a new one is the
-    # entire point of the folder.
+    # Only a *committed* migration is protected. Adding a new one is the entire
+    # point of the folder, and a migration written minutes ago and not yet
+    # committed has not shipped -- it is still being drafted, and MariaDB
+    # rejecting a constraint is the ordinary way that drafting goes.
+    #
+    # The test used to be `[ -f ]`, which blocked the draft too: the author
+    # could create the file but never correct it, which is not what invariant 8
+    # protects. Invariant 8 is about migrations other servers have already
+    # applied, and "in git" is the closest available proxy for that.
+    #
+    # Fails closed. If git cannot answer -- not a repository, no HEAD yet --
+    # an existing file is treated as shipped, because the cost of blocking a
+    # legitimate edit is a second migration and the cost of allowing an
+    # illegitimate one is a schema that silently differs between servers.
     if [ -f "$file_path" ]; then
-      echo "Blocked: $relative has already shipped." >&2
-      echo "database/migrations/ is append-only (invariant 8). Add a new numbered migration instead -- do not edit this one, not even a comment." >&2
-      exit 2
+      if ! git -C "$repo_root" rev-parse --git-dir >/dev/null 2>&1; then
+        echo "Blocked: $relative exists and this is not a git repository." >&2
+        echo "database/migrations/ is append-only (invariant 8), and without git there is no way to tell a draft from a shipped migration. Add a new numbered migration instead." >&2
+        exit 2
+      fi
+
+      if git -C "$repo_root" ls-files --error-unmatch "$relative" >/dev/null 2>&1; then
+        echo "Blocked: $relative has already shipped." >&2
+        echo "database/migrations/ is append-only (invariant 8). Add a new numbered migration instead -- do not edit this one, not even a comment." >&2
+        exit 2
+      fi
     fi
     ;;
 

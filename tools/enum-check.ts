@@ -101,6 +101,15 @@ const PAIRED: Record<string, keyof typeof enums> = {
   ck_fpd_hotlist_reason: 'HOTLIST_REASONS',
   ck_fpd_broadcasts_kind: 'BROADCAST_KINDS',
   ck_fpd_brott_grad: 'BROTT_GRADER',
+
+  // Anmälan och förundersökning (0009).
+  ck_fpd_anmalan_status: 'ANMALAN_STATUSES',
+  ck_fpd_anmalan_class: 'CLASSIFICATIONS',
+  ck_fpd_anmalan_personer_roll: 'ANMALAN_ROLLER',
+  ck_fpd_anmalan_brott_stage: 'BROTT_STAGES',
+  ck_fpd_fu_status: 'FU_STATUSES',
+  ck_fpd_fu_ledare_kind: 'FU_LEDARE_KINDS',
+  ck_fpd_fu_class: 'CLASSIFICATIONS',
 };
 
 /**
@@ -112,6 +121,14 @@ const PAIRED: Record<string, keyof typeof enums> = {
  * point of the list — "no enum" is exactly what a forgotten enum looks like too.
  */
 const UNPAIRED: Record<string, string> = {
+  // The status a version snapshot was taken at (0009). The same four values as
+  // `ck_fpd_anmalan_status`, and deliberately not paired with the enum: this
+  // column is written by `Repo.transition` from the row it just moved, inside
+  // the same transaction, and no route input carries it. Pairing it would
+  // claim a client sends a version's status, which is the one thing that must
+  // never be true of an append-only version table.
+  ck_fpd_anmalan_versions_status: 'the status a snapshot was taken at; copied from the row by the transition, never sent',
+
   // Access control internals (0005). The stub modes and the grantee kind are
   // read and written by `modules/access`, never by a route: what a client sends
   // is a record and a compartment, and the module decides the rest.

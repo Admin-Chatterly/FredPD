@@ -1036,4 +1036,91 @@ FredPD.Schema = {
         forberedelse = { type = 'boolean', required = false },
         preskriptionYears = { type = 'integer', required = false, min = 1, max = 100 },
     },
+
+    AnmalanList = {
+        status = { type = 'enum', required = false, values = { 'utkast', 'inlamnad', 'atersand', 'godkand' } },
+        mine = { type = 'boolean', required = false },
+        fuId = { type = 'integer', required = false, min = 1 },
+        includeSupplements = { type = 'boolean', required = false },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    AnmalanGet = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = false, min = 1 },
+    },
+
+    AnmalanReturn = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = false, min = 1 },
+        note = { type = 'string', required = false, max = 2000 },
+    },
+
+    AnmalanCreate = {
+        title = { type = 'string', required = true, min = 1, max = 191 },
+        parentId = { type = 'integer', required = false, min = 1 },
+        fuId = { type = 'integer', required = false, min = 1 },
+        callId = { type = 'integer', required = false, min = 1 },
+        handelseforlopp = { type = 'string', required = false, max = 60000 },
+        occurredAt = { type = 'string', required = false, max = 32 },
+        occurredPlace = { type = 'string', required = false, max = 191 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    AnmalanUpdate = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        title = { type = 'string', required = false, min = 1, max = 191 },
+        handelseforlopp = { type = 'string', required = false, max = 60000 },
+        occurredAt = { type = 'string', required = false, max = 32 },
+        occurredPlace = { type = 'string', required = false, max = 191 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+        fuId = { type = 'integer', required = false, min = 1 },
+    },
+
+    AnmalanCharges = {
+        id = { type = 'integer', required = true, min = 1 },
+        brottIds = { type = 'string[]', required = true, maxItems = 25, maxLength = 20 },
+        stages = { type = 'string[]', required = false, maxItems = 25, maxLength = 16 },
+        personIds = { type = 'string[]', required = false, maxItems = 25, maxLength = 20 },
+    },
+
+    AnmalanPerson = {
+        id = { type = 'integer', required = true, min = 1 },
+        personId = { type = 'integer', required = true, min = 1 },
+        roll = { type = 'enum', required = true, values = { 'misstankt', 'malsagande', 'vittne', 'anmalare', 'annan' } },
+        note = { type = 'string', required = false, max = 255 },
+    },
+
+    FuList = {
+        status = { type = 'enum', required = false, values = { 'inledd', 'slutdelgiven', 'redovisad', 'nedlagd' } },
+        mine = { type = 'boolean', required = false },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    FuGet = {
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
+    FuCreate = {
+        title = { type = 'string', required = true, min = 1, max = 191 },
+        fuLedare = { type = 'string', required = false, max = 32 },
+        ledareKind = { type = 'enum', required = false, values = { 'polis', 'aklagare' } },
+        intelCaseId = { type = 'integer', required = false, min = 1 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    FuAssign = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        fuLedare = { type = 'string', required = true, min = 1, max = 32 },
+        ledareKind = { type = 'enum', required = true, values = { 'polis', 'aklagare' } },
+    },
+
+    FuDecision = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        reason = { type = 'string', required = false, max = 128 },
+        note = { type = 'string', required = false, max = 2000 },
+    },
 }

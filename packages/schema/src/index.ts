@@ -14,8 +14,11 @@ export type { ErrorCode } from './errors';
 
 export {
   ACCESS_POINTS,
+  ANMALAN_ROLLER,
+  ANMALAN_STATUSES,
   BROADCAST_KINDS,
   BROTT_GRADER,
+  BROTT_STAGES,
   CALL_DISPOSITIONS,
   CALL_LINK_KINDS,
   CALL_LINK_ROLES,
@@ -34,6 +37,8 @@ export {
   FIREARM_EVENTS,
   FIREARM_STATUSES,
   FIREARM_TYPES,
+  FU_LEDARE_KINDS,
+  FU_STATUSES,
   HOTLIST_REASONS,
   INTEL_CASE_STATUSES,
   INTEL_CONFIDENCE,
@@ -61,8 +66,11 @@ export {
 } from './enums';
 export type {
   AccessPoint,
+  AnmalanRoll,
+  AnmalanStatus,
   BroadcastKind,
   BrottGrad,
+  BrottStage,
   CallDisposition,
   CallLinkKind,
   CallLinkRole,
@@ -81,6 +89,8 @@ export type {
   FirearmEvent,
   FirearmStatus,
   FirearmType,
+  FuLedareKind,
+  FuStatus,
   HotlistReason,
   IntelCaseStatus,
   IntelConfidence,

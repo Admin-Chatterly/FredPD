@@ -177,6 +177,12 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     -- somebody through every future stop.
     ('supervisor', 'rms.person.caution.edit'),
 
+    -- Anmälan (spec 7.7). Reading and writing one is the core of patrol work:
+    -- an officer who attends an incident writes the anmälan for it, and one who
+    -- cannot read them cannot follow up the incident they attended.
+    ('patrol', 'rms.anmalan.view'),
+    ('patrol', 'rms.anmalan.create'),
+
     -- Brottskatalogen (spec 7.10). Reading it is patrol work by necessity
     -- rather than by rank: an officer who cannot list the offences cannot
     -- write a charge, so the charging screen would be empty for everyone who
@@ -184,6 +190,27 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     -- it is the statute -- so there is nothing here that a lower rank should
     -- not see.
     ('patrol', 'rms.brott.view'),
+
+    -- Approving an anmälan, and editing somebody else's draft. Supervisor
+    -- grants, because both are oversight rather than work.
+    --
+    -- `rms.anmalan.approve` does **not** let its holder approve their own
+    -- anmälan. That rule lives in `Anmalan.canApprove` and no permission
+    -- reaches it, deliberately: the whole value of an approval step is that a
+    -- second person looked, and on a small server the supervisor is also the
+    -- author of half the reports. A grant that let the check be skipped is a
+    -- grant that would be given to the one person who most wanted it.
+    ('supervisor', 'rms.anmalan.approve'),
+    ('supervisor', 'rms.anmalan.edit.any'),
+
+    -- Förundersökningen (spec 7.8). Opening and leading an investigation is
+    -- investigator work; `inv.fu.assign` is the supervisor half, and it is what
+    -- lets a stalled investigation be reassigned when its ledare has left --
+    -- otherwise unreachable, because every decision belongs to the ledare.
+    ('patrol', 'inv.fu.view'),
+    ('supervisor', 'inv.fu.open'),
+    ('supervisor', 'inv.fu.lead'),
+    ('command', 'inv.fu.assign'),
 
     -- The two field-level grants of spec 4.5. Without a group holding them the
     -- fields are not protected, they are invisible: the routes read the

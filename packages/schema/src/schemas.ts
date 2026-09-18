@@ -1,4 +1,6 @@
 import {
+  ANMALAN_ROLLER,
+  ANMALAN_STATUSES,
   BROADCAST_KINDS,
   BROTT_GRADER,
   CALL_DISPOSITIONS,
@@ -14,6 +16,8 @@ import {
   EVIDENCE_TYPES,
   FIREARM_STATUSES,
   FIREARM_TYPES,
+  FU_LEDARE_KINDS,
+  FU_STATUSES,
   HOTLIST_REASONS,
   INTEL_CASE_STATUSES,
   INTEL_CONFIDENCE,
@@ -1858,6 +1862,167 @@ export const schemas = {
     forsok: { type: 'boolean', required: false },
     forberedelse: { type: 'boolean', required: false },
     preskriptionYears: { type: 'integer', required: false, min: 1, max: 100 },
+  },
+
+  // ----------------------------------------------------------------- anmälan
+
+  /**
+   * The Records list (spec 7.7).
+   *
+   * `mine` is a filter the client asks for; the identity it filters on is the
+   * session's own, taken on the server (invariant 1). There is deliberately no
+   * `createdBy` field: an officer id arriving in input is an attack, not a
+   * field, and a list route that accepted one would answer "show me what that
+   * officer has been writing" to anybody who could type a Discord id.
+   *
+   * `includeSupplements` is off by default because a tilläggsuppgift belongs
+   * under its parent; a flat list mixing them in reads as duplicates of
+   * reports the officer has already seen.
+   */
+  AnmalanList: {
+    status: { type: 'enum', required: false, values: ANMALAN_STATUSES },
+    mine: { type: 'boolean', required: false },
+    fuId: { type: 'integer', required: false, min: 1 },
+    includeSupplements: { type: 'boolean', required: false },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  /** One anmälan by id, and the shape every transition route takes. */
+  AnmalanGet: {
+    id: { type: 'integer', required: true, min: 1 },
+    /**
+     * Optimistic locking. Absent on a plain read; required in practice on a
+     * transition, where a stale version is the difference between "approve
+     * what I reviewed" and "approve whatever it says now".
+     */
+    version: { type: 'integer', required: false, min: 1 },
+  },
+
+  /** Returning an anmälan carries the supervisor's reason. */
+  AnmalanReturn: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: false, min: 1 },
+    /**
+     * Free text, not a locale key: this is one officer writing to another
+     * about this particular report, which is the one kind of string that
+     * cannot be a key. Bounded, because it is rendered in a panel.
+     */
+    note: { type: 'string', required: false, max: 2000 },
+  },
+
+  /**
+   * Writing an anmälan. `parentId` makes it a tilläggsuppgift.
+   *
+   * `handelseforlopp` is **editor JSON** (invariant 10), arriving as a string
+   * and stored in a JSON column that refuses anything else — which is what
+   * stops raw HTML reaching the record, at the database rather than on trust.
+   */
+  AnmalanCreate: {
+    title: { type: 'string', required: true, min: 1, max: 191 },
+    parentId: { type: 'integer', required: false, min: 1 },
+    fuId: { type: 'integer', required: false, min: 1 },
+    callId: { type: 'integer', required: false, min: 1 },
+    handelseforlopp: { type: 'string', required: false, max: 60000 },
+    occurredAt: { type: 'string', required: false, max: 32 },
+    occurredPlace: { type: 'string', required: false, max: 191 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
+  AnmalanUpdate: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    title: { type: 'string', required: false, min: 1, max: 191 },
+    handelseforlopp: { type: 'string', required: false, max: 60000 },
+    occurredAt: { type: 'string', required: false, max: 32 },
+    occurredPlace: { type: 'string', required: false, max: 191 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+    fuId: { type: 'integer', required: false, min: 1 },
+  },
+
+  /**
+   * The charge list, as three parallel lists.
+   *
+   * Parallel rather than nested because the validator is flat, and the server
+   * refuses the request unless they line up — a charge silently attributed to
+   * the wrong misstänkt is worse than a refusal the officer can see.
+   *
+   * `brottIds` keeps its duplicates: three counts of one offence is three
+   * entries, which is what BrB 26:2 computes over. `personIds` may carry an
+   * empty string for a count against nobody in particular, which is the
+   * ordinary case rather than an incomplete record.
+   */
+  AnmalanCharges: {
+    id: { type: 'integer', required: true, min: 1 },
+    brottIds: { type: 'string[]', required: true, maxItems: 25, maxLength: 20 },
+    /**
+     * Not an enum field, because the validator has no enum-list type. The
+     * server checks each entry against `BROTT_STAGES` *and* against the
+     * catalogue row it applies to (`Anmalan.stageIsAvailable`), which is the
+     * stricter test anyway: `forsok` is a valid stage everywhere and a valid
+     * charge only where the statute makes the attempt punishable.
+     */
+    stages: { type: 'string[]', required: false, maxItems: 25, maxLength: 16 },
+    personIds: { type: 'string[]', required: false, maxItems: 25, maxLength: 20 },
+  },
+
+  AnmalanPerson: {
+    id: { type: 'integer', required: true, min: 1 },
+    personId: { type: 'integer', required: true, min: 1 },
+    roll: { type: 'enum', required: true, values: ANMALAN_ROLLER },
+    note: { type: 'string', required: false, max: 255 },
+  },
+
+  // --------------------------------------------------------- förundersökning
+
+  FuList: {
+    status: { type: 'enum', required: false, values: FU_STATUSES },
+    /** The investigations this session leads. Identity from the session. */
+    mine: { type: 'boolean', required: false },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  FuGet: {
+    id: { type: 'integer', required: true, min: 1 },
+  },
+
+  FuCreate: {
+    title: { type: 'string', required: true, min: 1, max: 191 },
+    /**
+     * Who leads it. Absent means the officer opening it, which is the ordinary
+     * case — an FU with no ledare is not a state RB allows.
+     */
+    fuLedare: { type: 'string', required: false, max: 32 },
+    ledareKind: { type: 'enum', required: false, values: FU_LEDARE_KINDS },
+    intelCaseId: { type: 'integer', required: false, min: 1 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
+  /**
+   * Reassigning an investigation. Both fields, always: setting the person
+   * without the capacity leaves the row claiming a prosecutor leads it as a
+   * police officer, and the tvångsmedel rules read that column.
+   */
+  FuAssign: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    fuLedare: { type: 'string', required: true, min: 1, max: 32 },
+    ledareKind: { type: 'enum', required: true, values: FU_LEDARE_KINDS },
+  },
+
+  /**
+   * A decision in a förundersökning: slutdelge, redovisa or lägg ned.
+   *
+   * `reason` is a **locale key**, not a sentence (invariant 6): a nedläggning
+   * is quoted afterwards, and "brott kan ej styrkas" has to read the same way
+   * every time and in both languages. The free text beside it is the
+   * FU-ledare's own note on this particular case, which is the half that
+   * cannot be a key.
+   */
+  FuDecision: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    reason: { type: 'string', required: false, max: 128 },
+    note: { type: 'string', required: false, max: 2000 },
   },
 
 } as const satisfies Record<string, Schema>;

@@ -783,6 +783,117 @@ for (const resource of resources) {
   }
 }
 
+
+// ---------------------------- 9: a namespace member a caller reaches for exists
+
+console.log('wiring: every FredPD.Repo/Modules member a file calls is defined there');
+
+/**
+ * The bug this exists for.
+ *
+ * `registry/routes.lua` bound both halves of the access module — `local access
+ * = FredPD.Repo.access` and `local accessRules = FredPD.Modules.access` — and
+ * then called `access.canClassify(...)`. `canClassify` is a pure decision and
+ * lives on the service; the repo has never carried it. So the call raised
+ * "attempt to call a nil value" inside the handler's pcall, which the route
+ * layer turns into `internal` — and every write route that classifies a record
+ * answered `internal` on every call, with nothing in the message naming the
+ * cause. Five routes, shipped, and no test saw it, because busted loads
+ * services and the routes need FXServer.
+ *
+ * **Narrow on purpose**, like check 8. Three gates before a call counts:
+ *
+ *   * the alias is bound at column 0 to a literal `FredPD.Repo.x` or
+ *     `FredPD.Modules.x`, so an alias built at runtime is never guessed at;
+ *   * exactly one file in the tree publishes that namespace, so a namespace
+ *     filled in two places is left alone rather than half-checked;
+ *   * the member is absent from that file in every form a member is written —
+ *     `function T.member`, `T.member =`, and a key in the returned table.
+ *
+ * Anything that does not clear all three is skipped. A false positive here
+ * would send somebody to "fix" working code, which is worse than the gap.
+ */
+
+/** Which file publishes each FredPD.Repo.x / FredPD.Modules.x, when exactly one does. */
+const publisher = new Map<string, { path: string; source: string } | null>();
+
+for (const file of await walk(RESOURCES)) {
+  if (!file.endsWith('.lua') || NOT_LOADED.test(file)) continue;
+
+  const source = withoutComments(await readFile(file, 'utf8'));
+
+  for (const match of source.matchAll(
+    /^(FredPD\.(?:Repo|Modules)\.[A-Za-z0-9_]+)\s*=(?!=)/gm,
+  )) {
+    const namespace = match[1];
+    if (namespace === undefined) continue;
+
+    // Seen twice: ambiguous, so this namespace is not checked at all.
+    publisher.set(namespace, publisher.has(namespace) ? null : { path: file, source });
+  }
+}
+
+/** Does this file define `member` on the table it publishes? */
+function defines(source: string, member: string): boolean {
+  const escaped = member.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  return (
+    new RegExp(`function\\s+[A-Za-z_][A-Za-z0-9_]*\\.${escaped}\\s*\\(`).test(source) ||
+    new RegExp(`[A-Za-z_][A-Za-z0-9_]*\\.${escaped}\\s*=(?!=)`).test(source) ||
+    new RegExp(`\\b${escaped}\\s*=\\s*function`).test(source)
+  );
+}
+
+for (const file of await walk(RESOURCES)) {
+  if (!file.endsWith('.lua') || NOT_LOADED.test(file)) continue;
+
+  const source = withoutComments(await readFile(file, 'utf8'));
+  const shown = relative(REPO, file);
+
+  /** alias -> namespace, for aliases bound at column 0 to a literal namespace. */
+  const aliases = new Map<string, string>();
+
+  for (const match of source.matchAll(
+    /^local\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:<const>\s*)?=\s*(FredPD\.(?:Repo|Modules)\.[A-Za-z0-9_]+)\s*$/gm,
+  )) {
+    const alias = match[1];
+    const namespace = match[2];
+    if (alias !== undefined && namespace !== undefined) aliases.set(alias, namespace);
+  }
+
+  for (const [alias, namespace] of aliases) {
+    const owner = publisher.get(namespace);
+
+    // Unknown or filled in more than one place: not this check's business.
+    if (!owner) continue;
+
+    // The file that publishes a namespace calls itself through its own local,
+    // which is not this alias — but skip it anyway rather than reason about it.
+    if (owner.path === file) continue;
+
+    const seen = new Set<string>();
+
+    // The lookbehind matters: `\\b` also matches after a dot, so a fully
+    // qualified `FredPD.Repo.brott.byIds(...)` would be read as a call on an
+    // alias named `brott` and reported against the wrong namespace.
+    for (const call of source.matchAll(
+      new RegExp(`(?<![.\\w])${alias}\\.([A-Za-z0-9_]+)\\s*\\(`, 'g'),
+    )) {
+      const member = call[1];
+      if (member === undefined || seen.has(member)) continue;
+      seen.add(member);
+
+      if (defines(owner.source, member)) continue;
+
+      fail(
+        `${shown}: calls ${alias}.${member}(), but ${relative(REPO, owner.path)} — which fills ` +
+          `${namespace} — does not define ${member}. The call raises "attempt to call a nil ` +
+          `value" inside the handler's pcall, which surfaces as \`internal\` and names nothing`,
+      );
+    }
+  }
+}
+
 if (failures > 0) {
   console.error(`\nwiring check failed: ${failures} problem${failures === 1 ? '' : 's'}`);
   process.exit(1);

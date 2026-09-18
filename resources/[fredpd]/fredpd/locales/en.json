@@ -108,7 +108,20 @@
     "disabled": "switched off",
     "straffskala": "Not a valid sentencing range.",
     "incomplete_citation": "A citation needs the statute, chapter and section, or none of them.",
-    "over_max": "A fixed term cannot exceed eighteen years."
+    "over_max": "A fixed term cannot exceed eighteen years.",
+    "under_review": "This report is with a supervisor and cannot be edited.",
+    "not_author": "You did not write this report.",
+    "own_report": "You cannot approve a report you wrote.",
+    "not_submitted": "This report has not been submitted.",
+    "not_submittable": "This report cannot be submitted from its current state.",
+    "locked": "Approved and locked.",
+    "not_ledare": "You are not leading this investigation.",
+    "fu_closed": "This investigation is closed.",
+    "self_parent": "A supplemental cannot be its own parent.",
+    "too_deep": "The supplemental chain is too long.",
+    "length_mismatch": "The lists do not line up.",
+    "stage_unavailable": "The statute does not make that stage punishable for this offence.",
+    "over_clearance": "Above your clearance."
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -1496,5 +1509,90 @@
       "vapenbrott": "Firearms offence",
       "grovt_vapenbrott": "Aggravated firearms offence"
     }
+  },
+  "anmalan": {
+    "status": {
+      "utkast": "Draft",
+      "inlamnad": "Submitted",
+      "atersand": "Returned",
+      "godkand": "Approved"
+    },
+    "roll": {
+      "misstankt": "Suspect",
+      "malsagande": "Injured party",
+      "vittne": "Witness",
+      "anmalare": "Reporting party",
+      "annan": "Other"
+    },
+    "stage": {
+      "fullbordat": "Completed",
+      "forsok": "Attempt",
+      "forberedelse": "Preparation",
+      "stampling": "Conspiracy"
+    },
+    "column": {
+      "number": "Report number",
+      "title": "Title",
+      "status": "Status",
+      "created": "Written",
+      "author": "Author",
+      "occurred": "Occurred",
+      "place": "Place",
+      "fu": "Investigation"
+    },
+    "action": {
+      "create": "New report",
+      "submit": "Submit for approval",
+      "approve": "Approve",
+      "atersand": "Return with comments",
+      "supplement": "Add supplemental"
+    },
+    "section": {
+      "brott": "Offences",
+      "personer": "People",
+      "handelseforlopp": "Narrative",
+      "versions": "Versions",
+      "supplements": "Supplementals"
+    },
+    "empty": "No reports match.",
+    "locked": "Approved and locked. Add a supplemental to amend it.",
+    "ownReport": "You cannot approve a report you wrote.",
+    "returnedNote": "Returned by the supervisor: {note}",
+    "aklagareIndicated": "The offences charged normally place this investigation under a prosecutor."
+  },
+  "fu": {
+    "status": {
+      "inledd": "Opened",
+      "slutdelgiven": "Disclosed to the suspect",
+      "redovisad": "Reported to the prosecutor",
+      "nedlagd": "Discontinued"
+    },
+    "ledareKind": {
+      "polis": "Police investigation leader",
+      "aklagare": "Prosecutor"
+    },
+    "column": {
+      "number": "Case number",
+      "title": "Title",
+      "status": "Status",
+      "ledare": "Led by",
+      "opened": "Opened",
+      "closed": "Closed"
+    },
+    "action": {
+      "create": "Open investigation",
+      "slutdelge": "Disclose the material",
+      "redovisa": "Report to the prosecutor",
+      "lagg_ned": "Discontinue",
+      "assign": "Reassign"
+    },
+    "reason": {
+      "brott_kan_ej_styrkas": "The offence cannot be proven",
+      "spaningsuppslag_saknas": "No further investigative leads",
+      "ej_brott": "No offence was committed",
+      "atalsunderlatelse": "Waiver of prosecution",
+      "annan": "Other, stated below"
+    },
+    "empty": "No investigations match."
   }
 }

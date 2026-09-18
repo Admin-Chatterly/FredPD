@@ -96,6 +96,16 @@ local REQUIRED_TABLES <const> = {
     -- add to an anmälan, which is the point at which an incident is already
     -- half-written.
     'fpd_brott',
+
+    -- Migration 0009. Anmälan och förundersökning (spec 7.7, 7.8). Listed in
+    -- full for the reason the dispatch tables are: a half-applied migration
+    -- fails in the middle of writing a report rather than at boot, with the
+    -- incident already half-typed.
+    'fpd_forundersokning',
+    'fpd_anmalan',
+    'fpd_anmalan_brott',
+    'fpd_anmalan_personer',
+    'fpd_anmalan_versions',
 }
 
 --- Columns a migration added to a table that already existed, which the table

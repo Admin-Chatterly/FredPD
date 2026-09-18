@@ -83,6 +83,13 @@ server_scripts {
     'server/modules/brott/repo.lua',
     'server/modules/brott/routes.lua',
 
+    -- Anmälan och förundersökning (spec 7.7, 7.8). After brott, whose service
+    -- it reads for the straffskala and the charge expansion, and after access,
+    -- whose two halves every read here goes through.
+    'server/modules/anmalan/service.lua',
+    'server/modules/anmalan/repo.lua',
+    'server/modules/anmalan/routes.lua',
+
     'server/modules/placements/service.lua',
     'server/modules/placements/repo.lua',
     'server/modules/placements/routes.lua',

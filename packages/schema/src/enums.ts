@@ -879,3 +879,96 @@ export const BROTT_GRADER = [
 ] as const;
 
 export type BrottGrad = (typeof BROTT_GRADER)[number];
+
+/**
+ * `ck_fpd_anmalan_status` — where an anmälan is in the approval workflow
+ * (spec 7.7), in the order a report moves through them.
+ *
+ * `godkand` is terminal: `Anmalan.nextStatus` has no row for it, so nothing
+ * moves an approved anmälan anywhere. That is 7.7's locking rule expressed as
+ * a data structure rather than as a condition somebody has to remember on four
+ * write paths. An approved report is amended by a **tilläggsuppgift** — its own
+ * row, with its own number and its own approval — never edited in place.
+ *
+ * Labels are `anmalan.status.<value>` in both locale files (invariant 6).
+ */
+export const ANMALAN_STATUSES = [
+  'utkast',
+  'inlamnad',
+  'atersand',
+  'godkand',
+] as const;
+
+export type AnmalanStatus = (typeof ANMALAN_STATUSES)[number];
+
+/**
+ * `ck_fpd_anmalan_personer_roll` — what a person is on an anmälan (spec 7.7).
+ *
+ * Not a translation of the US set. **`malsagande`** is the injured party and
+ * carries rights a "victim" does not have in a US report — to be heard, and to
+ * bring a claim alongside the prosecution — so it is a role with legal
+ * consequence rather than a label. **`anmalare`** is whoever reported the
+ * offence, very often the same person in a second role, which is why the
+ * primary key in 0009 carries the role alongside the person.
+ *
+ * Labels are `anmalan.roll.<value>` in both locale files.
+ */
+export const ANMALAN_ROLLER = [
+  'misstankt',
+  'malsagande',
+  'vittne',
+  'anmalare',
+  'annan',
+] as const;
+
+export type AnmalanRoll = (typeof ANMALAN_ROLLER)[number];
+
+/**
+ * `ck_fpd_anmalan_brott_stage` — how far a charged offence got (BrB 23).
+ *
+ * Försök, förberedelse and stämpling are punishable only where the statute
+ * says so, which is why the catalogue stores `forsok` and `forberedelse` per
+ * offence and why `Anmalan.stageIsAvailable` checks a stage against the row
+ * before it is written. A charging screen offering "försök till" on an offence
+ * where it does not exist produces a charge that cannot be filed, and the
+ * officer finds out from a prosecutor rather than from the screen.
+ */
+export const BROTT_STAGES = [
+  'fullbordat',
+  'forsok',
+  'forberedelse',
+  'stampling',
+] as const;
+
+export type BrottStage = (typeof BROTT_STAGES)[number];
+
+/**
+ * `ck_fpd_fu_status` — the förundersökning lifecycle (spec 7.8).
+ *
+ * Two endings, and they are not the same ending. **Nedläggning** is a decision
+ * that the investigation stops. **Redovisning** is handing the finished
+ * investigation to the åklagare, and it follows **slutdelgivning** (RB 23:18a),
+ * where the misstänkt and their försvarare are given the material and a chance
+ * to respond. An FU may be lagd ned from either open state.
+ */
+export const FU_STATUSES = [
+  'inledd',
+  'slutdelgiven',
+  'redovisad',
+  'nedlagd',
+] as const;
+
+export type FuStatus = (typeof FU_STATUSES)[number];
+
+/**
+ * `ck_fpd_fu_ledare_kind` — in what capacity the förundersökning is led.
+ *
+ * Not cosmetic. RB gives the åklagare powers a police FU-ledare does not have,
+ * and the tvångsmedel module reads this column to decide whether a decision may
+ * be taken at all. A row naming a prosecutor as its ledare while recording the
+ * capacity as `polis` is a row that will be read the wrong way in court, which
+ * is why `Repo.fuAssign` writes both columns together or neither.
+ */
+export const FU_LEDARE_KINDS = ['polis', 'aklagare'] as const;
+
+export type FuLedareKind = (typeof FU_LEDARE_KINDS)[number];

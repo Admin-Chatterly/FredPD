@@ -108,7 +108,20 @@
     "disabled": "avstängd",
     "straffskala": "Ingen giltig straffskala.",
     "incomplete_citation": "Ett lagrum kräver balk, kapitel och paragraf — eller inget alls.",
-    "over_max": "Tidsbestämt fängelse kan inte överstiga arton år."
+    "over_max": "Tidsbestämt fängelse kan inte överstiga arton år.",
+    "under_review": "Anmälan är hos befäl och kan inte ändras.",
+    "not_author": "Du har inte upprättat den här anmälan.",
+    "own_report": "Du kan inte godkänna en anmälan du själv har upprättat.",
+    "not_submitted": "Anmälan är inte inlämnad.",
+    "not_submittable": "Anmälan kan inte lämnas in i nuvarande status.",
+    "locked": "Godkänd och låst.",
+    "not_ledare": "Du är inte förundersökningsledare i ärendet.",
+    "fu_closed": "Förundersökningen är avslutad.",
+    "self_parent": "En tilläggsuppgift kan inte vara sin egen moderanmälan.",
+    "too_deep": "Kedjan av tilläggsuppgifter är för lång.",
+    "length_mismatch": "Listorna stämmer inte överens.",
+    "stage_unavailable": "Lagen gör inte det stadiet straffbart för det här brottet.",
+    "over_clearance": "Över din behörighet."
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -1496,5 +1509,90 @@
       "vapenbrott": "Vapenbrott",
       "grovt_vapenbrott": "Grovt vapenbrott"
     }
+  },
+  "anmalan": {
+    "status": {
+      "utkast": "Utkast",
+      "inlamnad": "Inlämnad",
+      "atersand": "Återsänd",
+      "godkand": "Godkänd"
+    },
+    "roll": {
+      "misstankt": "Misstänkt",
+      "malsagande": "Målsägande",
+      "vittne": "Vittne",
+      "anmalare": "Anmälare",
+      "annan": "Annan"
+    },
+    "stage": {
+      "fullbordat": "Fullbordat",
+      "forsok": "Försök",
+      "forberedelse": "Förberedelse",
+      "stampling": "Stämpling"
+    },
+    "column": {
+      "number": "K-nummer",
+      "title": "Rubrik",
+      "status": "Status",
+      "created": "Upprättad",
+      "author": "Upprättad av",
+      "occurred": "Inträffade",
+      "place": "Brottsplats",
+      "fu": "Förundersökning"
+    },
+    "action": {
+      "create": "Ny anmälan",
+      "submit": "Lämna in för granskning",
+      "approve": "Godkänn",
+      "atersand": "Återsänd med kommentar",
+      "supplement": "Lägg till tilläggsuppgift"
+    },
+    "section": {
+      "brott": "Brott",
+      "personer": "Personer",
+      "handelseforlopp": "Händelseförlopp",
+      "versions": "Versioner",
+      "supplements": "Tilläggsuppgifter"
+    },
+    "empty": "Inga anmälningar matchar.",
+    "locked": "Godkänd och låst. Lägg till en tilläggsuppgift för att komplettera.",
+    "ownReport": "Du kan inte godkänna en anmälan du själv har upprättat.",
+    "returnedNote": "Återsänd av befäl: {note}",
+    "aklagareIndicated": "Brotten som anges gör normalt åklagare till förundersökningsledare."
+  },
+  "fu": {
+    "status": {
+      "inledd": "Inledd",
+      "slutdelgiven": "Slutdelgiven",
+      "redovisad": "Redovisad till åklagare",
+      "nedlagd": "Nedlagd"
+    },
+    "ledareKind": {
+      "polis": "Polisiär förundersökningsledare",
+      "aklagare": "Åklagare"
+    },
+    "column": {
+      "number": "Ärendenummer",
+      "title": "Rubrik",
+      "status": "Status",
+      "ledare": "Förundersökningsledare",
+      "opened": "Inledd",
+      "closed": "Avslutad"
+    },
+    "action": {
+      "create": "Inled förundersökning",
+      "slutdelge": "Slutdelge materialet",
+      "redovisa": "Redovisa till åklagare",
+      "lagg_ned": "Lägg ned",
+      "assign": "Byt förundersökningsledare"
+    },
+    "reason": {
+      "brott_kan_ej_styrkas": "Brott kan ej styrkas",
+      "spaningsuppslag_saknas": "Spaningsuppslag saknas",
+      "ej_brott": "Gärningen är ej brott",
+      "atalsunderlatelse": "Åtalsunderlåtelse",
+      "annan": "Annat skäl, anges nedan"
+    },
+    "empty": "Inga förundersökningar matchar."
   }
 }

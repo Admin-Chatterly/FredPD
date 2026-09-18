@@ -218,7 +218,15 @@ end
 ---
 --- @return table|nil a refusal to return from the handler, or nil to proceed
 local function refuseClassification(session, level)
-    if access.canClassify(access.reader(session), level) then return nil end
+    -- `accessRules`, not `access`. `canClassify` is a pure decision and lives on
+    -- `FredPD.Modules.access`; `FredPD.Repo.access` is the database half and has
+    -- never carried it. Calling it on the repo raised "attempt to call a nil
+    -- value" inside the handler's pcall, so all five write routes that classify
+    -- a record -- vehicle.register, vehicle.update, firearm.register,
+    -- firearm.update, firearm.status -- answered `internal` on every call,
+    -- whether or not a classification was sent. The reader still comes from the
+    -- repo, which is where it is built.
+    if accessRules.canClassify(access.reader(session), level) then return nil end
 
     return route.refuse(FredPD.ErrorCode.FORBIDDEN, { classification = 'clearance' })
 end

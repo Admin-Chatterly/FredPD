@@ -148,6 +148,26 @@ local NUI_ROUTES <const> = {
     'brott.version',
     'brott.retire',
 
+    -- Anmälan och förundersökning (spec 7.7, 7.8).
+    'anmalan.list',
+    'anmalan.get',
+    'anmalan.versions',
+    'anmalan.create',
+    'anmalan.update',
+    'anmalan.submit',
+    'anmalan.atersand',
+    'anmalan.approve',
+    'anmalan.charges.set',
+    'anmalan.person.set',
+    'anmalan.person.remove',
+    'fu.list',
+    'fu.get',
+    'fu.create',
+    'fu.assign',
+    'fu.slutdelge',
+    'fu.redovisa',
+    'fu.lagg_ned',
+
     -- Crime scenes, evidence and the chain of custody (spec 8).
     'scene.create',
     'scene.release',
