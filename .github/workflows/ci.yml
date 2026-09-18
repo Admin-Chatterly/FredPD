@@ -120,14 +120,50 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # The rocks, cached across runs. `luarocks install busted` resolves a
+      # dependency tree of eight rocks, several of which are fetched from
+      # GitHub rather than from luarocks.org, and any one of those downloads
+      # failing takes the whole job down before a single test has run -- which
+      # it has: mediator_lua once 404'd mid-install and reported as "Lua checks
+      # and tests" failing, on a commit whose tests were fine.
+      #
+      # Keyed on the workflow file, so changing a pinned version busts it.
+      - name: Cache the Lua rocks
+        id: rocks
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/lib/luarocks
+            /usr/local/share/lua
+            /usr/local/lib/lua
+            /usr/local/bin/busted
+            /usr/local/bin/luacheck
+          key: luarocks-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}
+
       - name: Install the Lua toolchain
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends lua5.4 liblua5.4-dev luarocks
-          # luarocks defaults to 5.1; the resources are Lua 5.4 and use <const>,
-          # so busted has to be built against 5.4 or every spec fails to parse.
-          sudo luarocks install luacheck
-          sudo luarocks --lua-version=5.4 --lua-dir=/usr install busted
+
+      # Skipped entirely on a cache hit. On a miss, retried: a transient fetch
+      # failure is the common case and a second attempt costs a minute, where a
+      # red build costs a re-run and somebody reading the log to find out it was
+      # never about their change.
+      - name: Install busted and luacheck
+        if: steps.rocks.outputs.cache-hit != 'true'
+        run: |
+          for attempt in 1 2 3; do
+            # luarocks defaults to 5.1; the resources are Lua 5.4 and use
+            # <const>, so busted has to be built against 5.4 or every spec fails
+            # to parse.
+            sudo luarocks install luacheck \
+              && sudo luarocks --lua-version=5.4 --lua-dir=/usr install busted \
+              && exit 0
+            echo "rock install attempt $attempt failed; retrying"
+            sleep $((attempt * 10))
+          done
+          echo '::error::Could not install the Lua toolchain after three attempts.'
+          exit 1
 
       - uses: pnpm/action-setup@v4
 
