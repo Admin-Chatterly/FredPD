@@ -10,8 +10,11 @@
 -- also why a group you do not want is harmless: an unmapped group grants
 -- nobody anything.
 --
--- Groups here cover what exists today (M1 and the intelligence register).
--- Later milestones add their own.
+-- Groups here cover what exists today (M1, the records and forensics work of
+-- M2 and M3, the intelligence register, and M4 dispatch). Later milestones add
+-- their own. No new *group* was needed for dispatch: Appendix C already maps
+-- the Dispatcher role to `dispatch`, and the officer half of CAD belongs to the
+-- patrol groups that already exist.
 
 -- -----------------------------------------------------------------------------
 -- Platform groups
@@ -174,9 +177,109 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('command', 'admin.audit.view'),
     ('command', 'page.personnel'),
 
-    -- Dispatch.
+    -- -------------------------------------------------------------------------
+    -- Dispatch, the map and ALPR (spec 7.16-7.18, M4)
+    --
+    -- Two audiences, not one. A dispatcher works the console; an officer works
+    -- the same calls from the car. Everything the officer does there -- take a
+    -- call, report progress, press the button, clear with a disposition -- is
+    -- granted to `patrol` below and not to `dispatch`, because M4's acceptance
+    -- criterion is a P1 run end to end and a P1 only a dispatcher can touch
+    -- never leaves the console. Appendix F is the same split written as a
+    -- command line: `ATT`, `ST` and `CLR` are typed by the officer.
+    -- -------------------------------------------------------------------------
+
+    -- Reading dispatch is reading. The pending queue, a call card, the unit
+    -- board, the live map and the broadcast board are gated on `page.dispatch`
+    -- and on nothing else, which is why it sits here rather than at `dispatch`:
+    -- an officer who cannot see the queue has nothing to self-assign to, and
+    -- 4.4 says the page declares what it needs and the routes enforce the same
+    -- rule -- so the rail key and the read key are one key, not two.
+    ('patrol_basic', 'page.dispatch'),
+
+    -- The panic button and the officer's own status, at the lowest group there
+    -- is. Both move the presser's own row and nothing else: `cad.unit.status`
+    -- sets your unit's status and reports your progress on a call,
+    -- `cad.emergency` raises the P1 at the position the server reads off your
+    -- ped. Neither names another officer, so neither can be turned on somebody
+    -- else (invariant 1).
+    --
+    -- This is the one place the "a trainee changes no record" line above is
+    -- crossed, deliberately: an emergency call is a record, and the aspirant in
+    -- the passenger seat is the person with the least experience and the most
+    -- reason to press it. A panic button a trainee cannot press is a panic
+    -- button that fails the only shift it was needed on.
+    --
+    -- `dispatch` inherits both through `patrol_basic` and can use neither: the
+    -- handlers read the caller's `fpd_units` row and a dispatcher at a console
+    -- has none, so the inherited key grants nothing rather than something odd.
+    ('patrol_basic', 'cad.unit.status'),
+    ('patrol_basic', 'cad.emergency'),
+
+    -- Patrol works calls. Self-assignment is 7.16's own word for it, clearing
+    -- with a disposition is `CLR` in Appendix F, and the narrative log is where
+    -- what actually happened gets written -- an officer who can attend a call
+    -- but not add a line to it leaves dispatch typing up the radio by hand.
+    --
+    -- `cad.call.link` is held apart from `cad.call.note` because linking
+    -- reaches into the registers: the handler runs the same access check
+    -- `rms.person.view` would (invariant 4), and a department that wants field
+    -- units narrating calls without touching the master name index can say so.
+    ('patrol', 'cad.call.self_assign'),
+    ('patrol', 'cad.call.clear'),
+    ('patrol', 'cad.call.note'),
+    ('patrol', 'cad.call.link'),
+
+    -- Plate reads (7.18). An officer whose car raised a hotlist banner has to
+    -- be able to open the read behind it, or the banner is a reason to stop a
+    -- car that nobody can account for afterwards. Reading the file is logged
+    -- like any other query, and 11.4 is why the reads are swept at 30 days.
+    ('patrol', 'alpr.read.view'),
+
+    -- A field supervisor (Appendix A) manages units and puts out a lookout from
+    -- the car, which is why neither key is pinned to the console in the
+    -- schemas. `cad.unit.manage` is also the key the handler
+    -- reads for 7.16's supervisor acknowledgement: an emergency call cannot be
+    -- cleared without one, and the people who hold this key -- supervisor,
+    -- command, dispatch -- are exactly the people who may give it. A separate
+    -- `cad.emergency.ack` key would have been a fifth CAD permission that
+    -- answers the same question this one already answers.
+    ('supervisor', 'cad.unit.manage'),
+    ('supervisor', 'cad.broadcast'),
+
+    -- Putting a plate on the hotlist is putting a red banner in front of an
+    -- officer about to stop a car, so it sits a rank up from reading one.
+    ('supervisor', 'alpr.hotlist.manage'),
+
+    -- The dispatcher. `page.dispatch` is inherited from `patrol_basic` and
+    -- granted again here on purpose: the console is this group's whole job, and
+    -- it must not stop working because somebody edits an inheritance edge.
+    --
+    -- `cad.console.open` is what the dispatch console placement calls; the two
+    -- create-and-assign routes are pinned to that placement (3.10), so a
+    -- dispatcher raises and dispatches calls standing at it. Clearing, noting
+    -- and linking are not pinned, because a dispatcher does them for a unit
+    -- that is on the radio right now.
+    --
+    -- `cad.call.self_assign` is absent and the two inherited from
+    -- `patrol_basic` are unusable here, for the same reason: a dispatcher is
+    -- not a unit, has no `fpd_units` row and has nowhere to be dispatched to.
     ('dispatch', 'page.dispatch'),
     ('dispatch', 'cad.console.open'),
+    ('dispatch', 'cad.call.create'),
+    ('dispatch', 'cad.call.dispatch'),
+    ('dispatch', 'cad.call.clear'),
+    ('dispatch', 'cad.call.note'),
+    ('dispatch', 'cad.call.link'),
+    ('dispatch', 'cad.unit.manage'),
+    ('dispatch', 'cad.broadcast'),
+
+    -- Dispatch does not inherit `patrol`, so the two ALPR keys are granted
+    -- again rather than picked up: a dispatcher checks a read against a call
+    -- and is usually the person who puts a stolen plate on the list in the
+    -- first place.
+    ('dispatch', 'alpr.read.view'),
+    ('dispatch', 'alpr.hotlist.manage'),
 
     -- Administration configures the system: permissions, placements, fleet.
     -- Note what is absent: no record clearance, no compartments. An admin who

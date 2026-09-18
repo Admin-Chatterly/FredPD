@@ -96,7 +96,16 @@
     "destroyed": "registrerat som förstört",
     "lost": "anmält förkommet",
     "seized": "i polisens förvar",
-    "stolen": "anmält stulet"
+    "stolen": "anmält stulet",
+    "call_cleared": "händelsen är redan avslutad",
+    "call_cancelled": "händelsen är återkallad",
+    "already_assigned": "redan knuten till händelsen",
+    "not_assigned": "inte knuten till händelsen",
+    "off_duty": "inte i tjänst",
+    "unavailable": "inte disponibel för utlarmning",
+    "no_unit": "inte inloggad på någon enhet",
+    "needs_acknowledgement": "kräver kvittens från befäl",
+    "disabled": "avstängd"
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -1030,6 +1039,400 @@
       "keybind": "Brottsplatsverktyg",
       "clearMarkers": "Ta bort markörer",
       "clearMarkersHint": "Tar bort alla markörer du placerat på brottsplatsen"
+    }
+  },
+  "cad": {
+    "title": "Ledningscentral",
+    "intro": "Händelser i kö, enheterna på tavlan och kartan. En händelse arbetas från operatörsplatsen eller från bilen.",
+    "empty": "Inga händelser.",
+    "tab": {
+      "queue": "Kö",
+      "board": "Enheter",
+      "map": "Karta",
+      "broadcasts": "Utskick",
+      "alpr": "Skyltavläsningar"
+    },
+    "console": {
+      "title": "Operatörsplats",
+      "away": "Att upprätta och larma ut händelser görs vid operatörsplatsen. Allt annat på den här skärmen fungerar varifrån som helst."
+    },
+    "queue": {
+      "title": "Väntande händelser",
+      "empty": "Inget väntar.",
+      "waiting": "Väntat {duration}",
+      "stacked": "{count} väntar",
+      "unassigned": "Ingen enhet"
+    },
+    "board": {
+      "title": "Enheter",
+      "empty": "Ingen enhet inloggad.",
+      "inStatus": "{duration} i status",
+      "noAssignment": "Ingen tilldelning"
+    },
+    "column": {
+      "number": "Händelsenummer",
+      "type": "Typ",
+      "priority": "Prioritet",
+      "status": "Status",
+      "location": "Plats",
+      "beat": "Område",
+      "units": "Enheter",
+      "received": "Inkom",
+      "age": "Väntat",
+      "caller": "Anmälare",
+      "callerPhone": "Anmälarens nummer",
+      "disposition": "Avslutskod",
+      "callsign": "Anropssignal",
+      "officer": "Polis",
+      "unitStatus": "Status",
+      "timeInStatus": "Tid i status",
+      "assignment": "Tilldelning",
+      "vehicle": "Fordon",
+      "details": "Uppgifter",
+      "lead": "Ledande enhet",
+      "source": "Ursprung"
+    },
+    "filter": {
+      "status": "Status",
+      "priority": "Prioritet",
+      "beat": "Område",
+      "type": "Typ",
+      "mine": "Mina händelser",
+      "any": "Alla",
+      "apply": "Filtrera",
+      "search": "Sök",
+      "searchPlaceholder": "Händelsenummer, plats eller anmälare"
+    },
+    "priority": {
+      "p1": "Prio 1 — livshotande eller pågående",
+      "p2": "Prio 2 — brådskande",
+      "p3": "Prio 3 — rutin",
+      "p4": "Prio 4 — endast anmälan eller inbokat"
+    },
+    "priorityShort": {
+      "p1": "Prio 1",
+      "p2": "Prio 2",
+      "p3": "Prio 3",
+      "p4": "Prio 4"
+    },
+    "callStatus": {
+      "pending": "Väntar",
+      "dispatched": "Utlarmad",
+      "en_route": "På väg",
+      "on_scene": "På plats",
+      "cleared": "Avslutad",
+      "cancelled": "Återkallad"
+    },
+    "callType": {
+      "alarm": "Larm",
+      "assault": "Misshandel",
+      "backup": "Begäran om förstärkning",
+      "burglary": "Inbrott",
+      "disturbance": "Ordningsstörning",
+      "domestic": "Våld i nära relation",
+      "drugs": "Narkotika",
+      "missing_person": "Försvunnen person",
+      "officer_emergency": "Polis i nöd",
+      "pursuit": "Förföljande",
+      "robbery": "Rån",
+      "shots_fired": "Skottlossning",
+      "stolen_vehicle": "Stulet fordon",
+      "suspicious": "Misstänkt iakttagelse",
+      "theft": "Stöld",
+      "traffic_collision": "Trafikolycka",
+      "traffic_stop": "Fordonskontroll",
+      "warrant_service": "Verkställighet av efterlysning",
+      "weapons": "Vapen",
+      "welfare_check": "Kontroll av person",
+      "other": "Övrigt"
+    },
+    "disposition": {
+      "report_taken": "Anmälan upprättad",
+      "arrest_made": "Gripande",
+      "citation_issued": "Ordningsbot utfärdad",
+      "warning_given": "Tillsägelse",
+      "handled_on_scene": "Åtgärdat på plats",
+      "assistance_rendered": "Bistånd lämnat",
+      "gone_on_arrival": "Avviken vid framkomst",
+      "unable_to_locate": "Kunde inte påträffas",
+      "unfounded": "Obefogat",
+      "referred": "Överlämnat",
+      "duplicate": "Dubblett",
+      "cancelled": "Återkallad"
+    },
+    "unitStatus": {
+      "off_duty": "Ur tjänst",
+      "available": "Tillgänglig",
+      "en_route": "På väg",
+      "on_scene": "På plats",
+      "busy": "Upptagen",
+      "transporting": "Transport",
+      "at_station": "På station",
+      "out_of_service": "Ej disponibel",
+      "emergency": "Nödlarm"
+    },
+    "linkKind": {
+      "person": "Person",
+      "vehicle": "Fordon"
+    },
+    "linkRole": {
+      "caller": "Anmälare",
+      "victim": "Målsägande",
+      "suspect": "Misstänkt",
+      "witness": "Vittne",
+      "involved": "Inblandad"
+    },
+    "logKind": {
+      "created": "Upprättad",
+      "note": "Anteckning",
+      "dispatched": "Utlarmad",
+      "unit_joined": "Enhet tillagd",
+      "unit_left": "Enhet borttagen",
+      "lead_changed": "Ledande enhet ändrad",
+      "unit_status": "Enhetsstatus",
+      "call_status": "Händelsestatus",
+      "linked": "Kopplad",
+      "unlinked": "Koppling borttagen",
+      "cleared": "Avslutad"
+    },
+    "log": {
+      "created": "Händelsen upprättad.",
+      "created_external": "Händelsen upprättad av {resource}.",
+      "dispatched": "{callsign} utlarmad.",
+      "self_assigned": "{callsign} knöt sig till händelsen.",
+      "unit_joined": "{callsign} tillagd på händelsen.",
+      "unit_left": "{callsign} borttagen från händelsen.",
+      "lead_changed": "{callsign} är nu ledande enhet.",
+      "unit_status": "{callsign}: {status}.",
+      "call_status": "Händelsen är {status}.",
+      "priority_changed": "Prioriteten ändrad från {from} till {to}.",
+      "linked": "{label} kopplad som {role}.",
+      "unlinked": "{label} frikopplad.",
+      "cleared": "Händelsen avslutad: {disposition}.",
+      "cancelled": "Händelsen återkallad: {disposition}.",
+      "acknowledged": "Nödlarmet kvitterat av {callsign}.",
+      "welfare_check": "Ingen statusändring från {callsign} på {minutes} minuter.",
+      "report_created": "Anmälan {number} upprättad från händelsen."
+    },
+    "card": {
+      "title": "Händelse {number}",
+      "none": "Välj en händelse för att öppna den.",
+      "narrative": "Händelseförlopp",
+      "units": "Enheter",
+      "links": "Personer och fordon",
+      "hazards": "Riskuppgifter för platsen",
+      "noHazards": "Inga riskuppgifter för platsen.",
+      "noLinks": "Inget kopplat till händelsen.",
+      "noUnits": "Ingen enhet på händelsen."
+    },
+    "time": {
+      "received": "Inkom",
+      "dispatched": "Utlarmad",
+      "enRoute": "På väg",
+      "onScene": "På plats",
+      "cleared": "Avslutad",
+      "none": "Inte ännu"
+    },
+    "note": {
+      "title": "Lägg till i händelseförloppet",
+      "placeholder": "Vad som sades över radion, med anmälarens egna ord där de spelar roll.",
+      "submit": "Lägg till rad",
+      "empty": "Inget loggat än."
+    },
+    "create": {
+      "title": "Ny händelse",
+      "intro": "En händelse som kommer per telefon inträffar där anmälaren säger. Händelsenummer, tid och område sätts av servern.",
+      "type": "Typ",
+      "priority": "Prioritet",
+      "location": "Plats",
+      "locationPlaceholder": "Gata, adress eller korsning",
+      "beat": "Område",
+      "callerName": "Anmälare",
+      "callerPhone": "Anmälarens nummer",
+      "details": "Vad anmälaren uppger",
+      "submit": "Upprätta händelse"
+    },
+    "dispatch": {
+      "title": "Larma ut enheter",
+      "intro": "De föreslagna enheterna är de närmaste tillgängliga. Den ledande enheten är den som svarar för händelsen.",
+      "units": "Enheter",
+      "lead": "Ledande enhet",
+      "recommended": "Närmaste tillgängliga",
+      "noRecommendation": "Ingen tillgänglig enhet att föreslå.",
+      "distance": "{distance} bort",
+      "add": "Larma ut",
+      "remove": "Ta av händelsen",
+      "makeLead": "Gör till ledande enhet",
+      "submit": "Larma ut"
+    },
+    "selfAssign": {
+      "action": "Knyt till händelsen",
+      "confirm": "Knyta din enhet till händelse {number}?",
+      "done": "Knuten till {number}."
+    },
+    "status": {
+      "title": "Min status",
+      "submit": "Sätt status",
+      "changed": "Status satt till {status}.",
+      "callProgress": "Rapportera på händelsen"
+    },
+    "manage": {
+      "title": "Hantera enhet",
+      "intro": "Att ändra en annan enhets status, anropssignal eller område loggas på ditt namn och på enhetens.",
+      "unit": "Enhet",
+      "status": "Status",
+      "callsign": "Anropssignal",
+      "beat": "Område",
+      "reason": "Skäl",
+      "submit": "Spara enhet"
+    },
+    "clear": {
+      "title": "Avsluta händelsen",
+      "intro": "Avslutskoden säger vad händelsen ledde till och läses tillbaka månader senare. Händelsen stängs för alla enheter på den.",
+      "disposition": "Avslutskod",
+      "note": "Avslutande rad",
+      "submit": "Avsluta händelsen",
+      "needsAcknowledgement": "Ett nödlarm kan inte avslutas förrän ett befäl har kvitterat det."
+    },
+    "emergency": {
+      "button": "Nödlarm",
+      "title": "Nödlarm",
+      "confirm": "Utlösa nödlarm på din position? Alla enheter i närheten larmas.",
+      "sent": "Nödlarm utlöst. Enheter är på väg.",
+      "banner": "{callsign} — nödlarm vid {location}",
+      "bannerNoLocation": "{callsign} — nödlarm",
+      "acknowledge": "Kvittera",
+      "acknowledged": "Kvitterat av {callsign}",
+      "notAcknowledged": "Inte kvitterat",
+      "respond": "Rycker ut"
+    },
+    "welfare": {
+      "title": "Kontroll av enhet",
+      "body": "{callsign} har varit på plats på {number} i {minutes} minuter utan statusändring.",
+      "prompt": "Kontrollera enheten",
+      "dismiss": "Sett"
+    },
+    "broadcast": {
+      "title": "Utskick",
+      "empty": "Inget ute.",
+      "create": "Nytt utskick",
+      "kind": "Typ",
+      "headline": "Rubrik",
+      "body": "Meddelande",
+      "plate": "Registreringsnummer",
+      "expiresIn": "Gäller i",
+      "expiresInHint": "Minuter. Lämnas fältet tomt gäller myndighetens standardtid.",
+      "expires": "Upphör",
+      "cancel": "Ta ur luften",
+      "cancelled": "Ur luften",
+      "submit": "Skicka utskick",
+      "fromCall": "Från händelse {number}"
+    },
+    "broadcastKind": {
+      "bolo": "Spaningsuppdrag",
+      "attempt_to_locate": "Eftersök",
+      "all_units": "Till alla enheter",
+      "information": "Information"
+    },
+    "map": {
+      "title": "Karta",
+      "units": "Enheter",
+      "calls": "Händelser",
+      "beats": "Områden",
+      "legend": "Teckenförklaring",
+      "follow": "Följ enhet",
+      "center": "Centrera på händelsen",
+      "positionAge": "Positionen {duration} gammal",
+      "noPosition": "Ingen position",
+      "empty": "Inget att visa på kartan än.",
+      "closed": "Kartan är stängd. Positioner skickas bara medan den är öppen."
+    },
+    "beat": {
+      "title": "Områden",
+      "none": "Inget område",
+      "unassigned": "Ingen tilldelning",
+      "kind": {
+        "beat": "Område",
+        "district": "Distrikt"
+      }
+    },
+    "report": {
+      "create": "Upprätta anmälan från händelsen",
+      "intro": "Anmälan öppnas förifylld från händelsen: plats, tid, enheter och de personer och fordon som är kopplade till den.",
+      "created": "Anmälan {number} upprättad från händelsen."
+    },
+    "source": {
+      "dispatcher": "Upprättad av ledningscentralen",
+      "phone": "Inringd",
+      "export": "Upprättad av {resource}",
+      "panic": "Nödlarm",
+      "alpr": "Skyltavläsning"
+    }
+  },
+  "alpr": {
+    "title": "Skyltavläsningar",
+    "intro": "Varje registreringsskylt en patrull passerat, med tid, plats och enhet. Avläsningar sparas i trettio dagar och raderas sedan.",
+    "empty": "Ingen avläsning matchar.",
+    "column": {
+      "plate": "Registreringsnummer",
+      "time": "Avläst",
+      "unit": "Enhet",
+      "callsign": "Anropssignal",
+      "location": "Plats",
+      "camera": "Kamera",
+      "reason": "Grund",
+      "note": "Uppgift",
+      "case": "Ärende",
+      "hit": "Träff",
+      "expires": "Upphör",
+      "added": "Registrerad",
+      "addedBy": "Registrerad av"
+    },
+    "filter": {
+      "plate": "Registreringsnummer",
+      "unit": "Enhet",
+      "since": "Sedan",
+      "sinceHours": "{hours} tim",
+      "hitsOnly": "Endast träffar",
+      "any": "Alla",
+      "apply": "Filtrera"
+    },
+    "camera": {
+      "front": "Fram",
+      "rear": "Bak",
+      "fixed": "Fast kamera"
+    },
+    "hit": {
+      "title": "Träff på bevakningslista",
+      "banner": "{plate} — {reason}",
+      "advice": "Bekräfta uppgiften innan du agerar på den.",
+      "dismiss": "Stäng",
+      "none": "Inga träffar."
+    },
+    "hotlist": {
+      "title": "Bevakningslista",
+      "intro": "En skylt på listan sätter en varning framför en polis som är på väg att stoppa ett fordon. Varje post säger vem som lagt in den och varför, och upphör att gälla.",
+      "empty": "Inga skyltar bevakas.",
+      "add": "Lägg till skylt",
+      "remove": "Ta bort skylt",
+      "removeConfirm": "Ta bort {plate} från bevakningslistan?",
+      "plate": "Registreringsnummer",
+      "reason": "Grund",
+      "note": "Uppgift",
+      "case": "Ärendenummer",
+      "expiresIn": "Gäller i",
+      "expiresInHint": "Minuter. Lämnas fältet tomt gäller den tills någon tar bort den.",
+      "silent": "Tyst",
+      "silentHint": "Träffen loggas och enheten får ingen varning.",
+      "submit": "Lägg till i bevakningslistan"
+    },
+    "reason": {
+      "stolen_vehicle": "Stulet fordon",
+      "wanted_person": "Efterlyst person",
+      "warrant": "Efterlysning",
+      "bolo": "Spaningsuppdrag",
+      "investigation": "Utredning",
+      "other": "Övrigt"
     }
   }
 }

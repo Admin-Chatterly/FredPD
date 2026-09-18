@@ -534,7 +534,7 @@ CREATE TABLE IF NOT EXISTS `fpd_call_units` (
 -- **Invariant 6 is enforced by the schema, not by discipline.** A log has two
 -- kinds of line: what a person typed, which is content, and what the system
 -- recorded, which is user-facing text. `body` holds the first. `message_key`
--- plus `message_args` hold the second -- `cad.log.unitAssigned` with
+-- plus `message_args` hold the second -- `cad.log.dispatched` with
 -- `{"callsign": "3A-12"}` -- and the NUI renders it in the reader's language.
 -- The CHECK makes the wrong one impossible to store: a generated line with an
 -- English sentence in `body` would be a Swedish dispatcher reading English, and
@@ -549,7 +549,8 @@ CREATE TABLE IF NOT EXISTS `fpd_call_log` (
     `agency_id`    VARCHAR(32)     NOT NULL,
     `call_id`      BIGINT UNSIGNED NOT NULL,
 
-    `entry_type`   VARCHAR(16)     NOT NULL COMMENT 'note | status | unit | priority | link | disposition | system',
+    `entry_type`   VARCHAR(16)     NOT NULL
+                                   COMMENT 'The event that happened; the list is ck_fpd_call_log_type below',
     `body`         VARCHAR(2048)   NULL COMMENT 'What a person typed. Content, not UI text',
     `message_key`  VARCHAR(128)    NULL COMMENT 'Locale key for a generated line (invariant 6)',
     `message_args` JSON            NULL COMMENT 'Placeholder values for message_key',
@@ -745,18 +746,27 @@ CREATE TABLE IF NOT EXISTS `fpd_units` (
 -- removed: "what was out on the air at the time" is a question asked after an
 -- arrest, and the answer has to survive the shift it was asked about.
 --
--- Not to be confused with `fpd_bolos` (M2, spec 7.13), which is the enforcement
--- record with a subject, a case and a lifecycle. A broadcast is the *message*:
+-- Not to be confused with the enforcement BOLO of spec 7.13 -- a record with a
+-- subject, a case and a lifecycle, which is M2 and which no migration has
+-- built yet; what exists today is the vehicle flag `fpd_vehicle_flags.kind =
+-- 'bolo'` (0005). A broadcast is the *message*:
 -- it may carry a BOLO, a road closure or a briefing note, and it expires on its
 -- own without anything happening to the record behind it.
 CREATE TABLE IF NOT EXISTS `fpd_broadcasts` (
     `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `agency_id`    VARCHAR(32)     NOT NULL,
 
-    `kind`         VARCHAR(16)     NOT NULL DEFAULT 'all_units',
+    `kind`         VARCHAR(24)     NOT NULL DEFAULT 'all_units'
+                                   COMMENT 'Widest member is attempt_to_locate, 17 chars',
     `priority`     TINYINT UNSIGNED NOT NULL DEFAULT 3 COMMENT 'Same 1-4 scale as a call',
     `title`        VARCHAR(191)    NOT NULL,
     `body`         VARCHAR(2048)   NOT NULL,
+    -- The plate a lookout is for. Content, like `title` and `body`: it is
+    -- what a unit matches an ALPR read against by eye, and it is not a
+    -- hotlist entry -- a banner is `fpd_hotlist`, under its own permission
+    -- (7.18). No index: the board is read whole through the live index, and
+    -- one here would cost every insert to serve a lookup nothing performs.
+    `plate`        VARCHAR(16)     NULL COMMENT 'Upper-cased and trimmed on write',
     `call_id`      BIGINT UNSIGNED NULL COMMENT 'The call it came out of, when there was one',
 
     `expires_at`   DATETIME(3)     NULL COMMENT 'NULL runs until it is cancelled',
@@ -783,6 +793,8 @@ CREATE TABLE IF NOT EXISTS `fpd_broadcasts` (
         ('bolo', 'all_units', 'attempt_to_locate', 'information')),
     CONSTRAINT `ck_fpd_broadcasts_priority` CHECK (`priority` BETWEEN 1 AND 4),
     CONSTRAINT `ck_fpd_broadcasts_body` CHECK (CHAR_LENGTH(TRIM(`body`)) > 0),
+    CONSTRAINT `ck_fpd_broadcasts_plate` CHECK (
+        `plate` IS NULL OR CHAR_LENGTH(TRIM(`plate`)) > 0),
     -- An expiry before the broadcast was written is a message that was never on
     -- the air, which is a typed date, not an intention.
     CONSTRAINT `ck_fpd_broadcasts_expiry` CHECK (
@@ -926,3 +938,22 @@ CREATE TABLE IF NOT EXISTS `fpd_alpr_reads` (
     CONSTRAINT `ck_fpd_alpr_reads_camera` CHECK (
         `camera` IS NULL OR `camera` IN ('front', 'rear', 'fixed'))
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------------------------
+-- The counter a call number is allocated from (Appendix D, ADR-012)
+-- -----------------------------------------------------------------------------
+
+-- `fpd_counters.year` is the sequence's SCOPE, not a year. 0005 declared it
+-- SMALLINT UNSIGNED because every sequence then in existence was year-scoped or
+-- unscoped. A call number restarts daily -- Appendix D gives `{YYMMDD}-{####}`
+-- -- so its scope value is the day key 260918, which does not fit in 65535 and
+-- is rejected outright under strict mode. The first call of the day would fail
+-- to allocate a number, which is the first thing a dispatcher does.
+--
+-- MODIFY rather than a new column: the meaning is unchanged for every existing
+-- row (0 unscoped, YYYY year-scoped) and only the range grows. Idempotent, so
+-- CI's second pass over this file is a no-op. 0005 has shipped and is not
+-- edited (invariant 8).
+ALTER TABLE `fpd_counters`
+    MODIFY COLUMN `year` MEDIUMINT UNSIGNED NOT NULL DEFAULT 0
+    COMMENT 'Scope key: 0 = never restarts, YYYY = year-scoped, YYMMDD = day-scoped (calls)';

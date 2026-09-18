@@ -272,12 +272,27 @@ route.define({
 --- The templated entries in Appendix B -- `rms.report.view.<type>`,
 --- `clearance.<level>`, `compartment.<name>` -- are patterns, not keys, and are
 --- left out. The editor offers keys; a clearance is not one of them.
+---
+--- **Every other key in Appendix B belongs here, and being in the seed is not a
+--- substitute.** The union above is a floor only for keys this list already
+--- holds: a key that lives solely in `database/seeds/0001_permissions.sql` is
+--- offered by the editor only for as long as some group still carries it. Clear
+--- it from the last group -- a department deciding trainees should not have the
+--- panic button -- and the key is in no row and in no catalogue, so it leaves
+--- the editor and there is no in-game way to grant it to anyone again. That is
+--- how `cad.call.note`, `cad.call.link`, `cad.unit.status`, `cad.emergency`,
+--- `query.run` and `query.hit.confirm` were one save away from being lost.
+--- Appendix B, the seed and this list are the three places a permission has to
+--- appear, and no tool compares them: `tools/wiring-check.ts` only checks that
+--- a route's own `perm` is granted to some group in the seed, which the six
+--- above all passed. Adding a key means editing all three by hand.
 local PERMISSION_CATALOGUE <const> = {
     -- Pages
     'page.query', 'page.dispatch', 'page.records', 'page.evidence', 'page.lab',
     'page.intel', 'page.court', 'page.personnel', 'page.stats', 'page.admin', 'page.comms',
 
     -- Queries
+    'query.run', 'query.hit.confirm',
     'query.person.run', 'query.vehicle.run', 'query.firearm.run', 'query.phone.run',
     'query.address.run', 'query.log.view',
 
@@ -312,7 +327,9 @@ local PERMISSION_CATALOGUE <const> = {
 
     -- Dispatch
     'cad.call.create', 'cad.call.dispatch', 'cad.call.self_assign', 'cad.call.clear',
-    'cad.unit.manage', 'cad.broadcast', 'cad.console.open',
+    'cad.call.note', 'cad.call.link',
+    'cad.unit.manage', 'cad.unit.status', 'cad.emergency',
+    'cad.broadcast', 'cad.console.open',
     'alpr.read.view', 'alpr.hotlist.manage',
 
     -- Forensics

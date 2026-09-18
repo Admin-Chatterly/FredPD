@@ -34,12 +34,15 @@ FredPD.AccessPoint = {
 
 --- Unit status (spec 7.1).
 FredPD.UnitStatus = {
+    OFF_DUTY = 'off_duty',
     AVAILABLE = 'available',
     EN_ROUTE = 'en_route',
     ON_SCENE = 'on_scene',
     BUSY = 'busy',
+    TRANSPORTING = 'transporting',
+    AT_STATION = 'at_station',
     OUT_OF_SERVICE = 'out_of_service',
-    PANIC = 'panic',
+    EMERGENCY = 'emergency',
 }
 
 --- What a world placement opens (spec 3.10).
@@ -119,6 +122,142 @@ FredPD.Classification = {
     RESTRICTED = 'restricted',
     CONFIDENTIAL = 'confidential',
     SECRET = 'secret',
+}
+
+--- What an officer may set on their own unit (spec 7.16; Appendix F's ST).
+FredPD.SelfSetUnitStatus = {
+    AVAILABLE = 'available',
+    EN_ROUTE = 'en_route',
+    ON_SCENE = 'on_scene',
+    BUSY = 'busy',
+    TRANSPORTING = 'transporting',
+    AT_STATION = 'at_station',
+    OUT_OF_SERVICE = 'out_of_service',
+}
+
+--- What a supervisor may set on somebody else (spec 7.16).
+FredPD.SupervisorUnitStatus = {
+    OFF_DUTY = 'off_duty',
+    AVAILABLE = 'available',
+    EN_ROUTE = 'en_route',
+    ON_SCENE = 'on_scene',
+    BUSY = 'busy',
+    TRANSPORTING = 'transporting',
+    AT_STATION = 'at_station',
+    OUT_OF_SERVICE = 'out_of_service',
+}
+
+--- The progress a unit reports on a call (spec 7.16).
+FredPD.CallProgressStatus = {
+    EN_ROUTE = 'en_route',
+    ON_SCENE = 'on_scene',
+}
+
+--- Call priority P1-P4 (Appendix E).
+FredPD.CallPriority = {
+    P1 = 1,
+    P2 = 2,
+    P3 = 3,
+    P4 = 4,
+}
+
+--- The call lifecycle (spec 7.16, Appendix E).
+FredPD.CallStatus = {
+    PENDING = 'pending',
+    DISPATCHED = 'dispatched',
+    EN_ROUTE = 'en_route',
+    ON_SCENE = 'on_scene',
+    CLEARED = 'cleared',
+    CANCELLED = 'cancelled',
+}
+
+--- What a call is (spec 7.16).
+FredPD.CallType = {
+    ALARM = 'alarm',
+    ASSAULT = 'assault',
+    BACKUP = 'backup',
+    BURGLARY = 'burglary',
+    DISTURBANCE = 'disturbance',
+    DOMESTIC = 'domestic',
+    DRUGS = 'drugs',
+    MISSING_PERSON = 'missing_person',
+    OFFICER_EMERGENCY = 'officer_emergency',
+    PURSUIT = 'pursuit',
+    ROBBERY = 'robbery',
+    SHOTS_FIRED = 'shots_fired',
+    STOLEN_VEHICLE = 'stolen_vehicle',
+    SUSPICIOUS = 'suspicious',
+    THEFT = 'theft',
+    TRAFFIC_COLLISION = 'traffic_collision',
+    TRAFFIC_STOP = 'traffic_stop',
+    WARRANT_SERVICE = 'warrant_service',
+    WEAPONS = 'weapons',
+    WELFARE_CHECK = 'welfare_check',
+    OTHER = 'other',
+}
+
+--- How a call ended (spec 7.16).
+FredPD.CallDisposition = {
+    REPORT_TAKEN = 'report_taken',
+    ARREST_MADE = 'arrest_made',
+    CITATION_ISSUED = 'citation_issued',
+    WARNING_GIVEN = 'warning_given',
+    HANDLED_ON_SCENE = 'handled_on_scene',
+    ASSISTANCE_RENDERED = 'assistance_rendered',
+    GONE_ON_ARRIVAL = 'gone_on_arrival',
+    UNABLE_TO_LOCATE = 'unable_to_locate',
+    UNFOUNDED = 'unfounded',
+    REFERRED = 'referred',
+    DUPLICATE = 'duplicate',
+    CANCELLED = 'cancelled',
+}
+
+--- What a line in the narrative log is (spec 7.16).
+FredPD.CallLogKind = {
+    CREATED = 'created',
+    NOTE = 'note',
+    DISPATCHED = 'dispatched',
+    UNIT_JOINED = 'unit_joined',
+    UNIT_LEFT = 'unit_left',
+    LEAD_CHANGED = 'lead_changed',
+    UNIT_STATUS = 'unit_status',
+    CALL_STATUS = 'call_status',
+    LINKED = 'linked',
+    UNLINKED = 'unlinked',
+    CLEARED = 'cleared',
+}
+
+--- What can be linked to a call (spec 7.16).
+FredPD.CallLinkKind = {
+    PERSON = 'person',
+    VEHICLE = 'vehicle',
+}
+
+--- How a person or vehicle is involved (spec 7.16).
+FredPD.CallLinkRole = {
+    CALLER = 'caller',
+    VICTIM = 'victim',
+    SUSPECT = 'suspect',
+    WITNESS = 'witness',
+    INVOLVED = 'involved',
+}
+
+--- What a dispatch broadcast is (spec 7.16).
+FredPD.BroadcastKind = {
+    BOLO = 'bolo',
+    ATTEMPT_TO_LOCATE = 'attempt_to_locate',
+    ALL_UNITS = 'all_units',
+    INFORMATION = 'information',
+}
+
+--- Why a plate is on the ALPR hotlist (spec 7.18).
+FredPD.HotlistReason = {
+    STOLEN_VEHICLE = 'stolen_vehicle',
+    WANTED_PERSON = 'wanted_person',
+    WARRANT = 'warrant',
+    BOLO = 'bolo',
+    INVESTIGATION = 'investigation',
+    OTHER = 'other',
 }
 
 --- Route input schemas (spec 3.5). The route layer validates against these and
@@ -729,5 +868,143 @@ FredPD.Schema = {
         action = { type = 'enum', required = true, values = { 'wipe', 'weapon', 'clean', 'wash', 'pickup' } },
         traceKey = { type = 'string', required = false, max = 64 },
         netId = { type = 'integer', required = false, min = 1 },
+    },
+
+    CallCreate = {
+        placementId = { type = 'integer', required = true, min = 1 },
+        type = { type = 'enum', required = true, values = { 'alarm', 'assault', 'backup', 'burglary', 'disturbance', 'domestic', 'drugs', 'missing_person', 'officer_emergency', 'pursuit', 'robbery', 'shots_fired', 'stolen_vehicle', 'suspicious', 'theft', 'traffic_collision', 'traffic_stop', 'warrant_service', 'weapons', 'welfare_check', 'other' } },
+        priority = { type = 'integer', required = true, min = 1, max = 4 },
+        locationText = { type = 'string', required = true, min = 1, max = 191 },
+        beatId = { type = 'integer', required = false, min = 1 },
+        callerName = { type = 'string', required = false, max = 191 },
+        callerPhone = { type = 'string', required = false, max = 32 },
+        details = { type = 'string', required = false, max = 1000 },
+    },
+
+    CallList = {
+        status = { type = 'enum', required = false, values = { 'pending', 'dispatched', 'en_route', 'on_scene', 'cleared', 'cancelled' } },
+        priority = { type = 'integer', required = false, min = 1, max = 4 },
+        beatId = { type = 'integer', required = false, min = 1 },
+        mine = { type = 'boolean', required = false },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    CallGet = {
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
+    CallDispatch = {
+        placementId = { type = 'integer', required = true, min = 1 },
+        callId = { type = 'integer', required = true, min = 1 },
+        officerIds = { type = 'string[]', required = false, maxItems = 12, maxLength = 20 },
+        removeOfficerIds = { type = 'string[]', required = false, maxItems = 12, maxLength = 20 },
+        leadOfficerId = { type = 'string', required = false, min = 1, max = 20 },
+    },
+
+    CallSelfAssign = {
+        callId = { type = 'integer', required = true, min = 1 },
+    },
+
+    CallStatus = {
+        callId = { type = 'integer', required = true, min = 1 },
+        status = { type = 'enum', required = true, values = { 'en_route', 'on_scene' } },
+    },
+
+    CallClear = {
+        callId = { type = 'integer', required = true, min = 1 },
+        disposition = { type = 'enum', required = true, values = { 'report_taken', 'arrest_made', 'citation_issued', 'warning_given', 'handled_on_scene', 'assistance_rendered', 'gone_on_arrival', 'unable_to_locate', 'unfounded', 'referred', 'duplicate', 'cancelled' } },
+        note = { type = 'string', required = false, max = 1000 },
+    },
+
+    CallAcknowledge = {
+        callId = { type = 'integer', required = true, min = 1 },
+    },
+
+    CallNote = {
+        callId = { type = 'integer', required = true, min = 1 },
+        body = { type = 'string', required = true, min = 1, max = 1000 },
+    },
+
+    CallLink = {
+        callId = { type = 'integer', required = true, min = 1 },
+        kind = { type = 'enum', required = true, values = { 'person', 'vehicle' } },
+        targetId = { type = 'integer', required = true, min = 1 },
+        role = { type = 'enum', required = false, values = { 'caller', 'victim', 'suspect', 'witness', 'involved' } },
+        remove = { type = 'boolean', required = false },
+    },
+
+    UnitList = {
+        status = { type = 'enum', required = false, values = { 'off_duty', 'available', 'en_route', 'on_scene', 'busy', 'transporting', 'at_station', 'out_of_service', 'emergency' } },
+        beatId = { type = 'integer', required = false, min = 1 },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    UnitStatus = {
+        status = { type = 'enum', required = true, values = { 'available', 'en_route', 'on_scene', 'busy', 'transporting', 'at_station', 'out_of_service' } },
+    },
+
+    UnitManage = {
+        officerId = { type = 'integer', required = true, min = 1 },
+        status = { type = 'enum', required = false, values = { 'off_duty', 'available', 'en_route', 'on_scene', 'busy', 'transporting', 'at_station', 'out_of_service' } },
+        callsign = { type = 'string', required = false, max = 32 },
+        beatId = { type = 'integer', required = false, min = 1 },
+        reason = { type = 'string', required = false, max = 255 },
+    },
+
+    Emergency = {
+
+    },
+
+    BroadcastCreate = {
+        kind = { type = 'enum', required = true, values = { 'bolo', 'attempt_to_locate', 'all_units', 'information' } },
+        priority = { type = 'integer', required = false, min = 1, max = 4 },
+        title = { type = 'string', required = true, min = 1, max = 128 },
+        body = { type = 'string', required = true, min = 1, max = 2000 },
+        plate = { type = 'string', required = false, max = 16 },
+        expiresInMinutes = { type = 'integer', required = false, min = 5, max = 10080 },
+    },
+
+    BroadcastCancel = {
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
+    BroadcastList = {
+        includeExpired = { type = 'boolean', required = false },
+        kind = { type = 'enum', required = false, values = { 'bolo', 'attempt_to_locate', 'all_units', 'information' } },
+        callId = { type = 'integer', required = false, min = 1 },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    BeatList = {
+
+    },
+
+    MapView = {
+        subscribe = { type = 'boolean', required = false },
+    },
+
+    AlprReadList = {
+        plate = { type = 'string', required = false, min = 2, max = 16 },
+        officerId = { type = 'integer', required = false, min = 1 },
+        sinceHours = { type = 'integer', required = false, min = 1, max = 720 },
+        hitsOnly = { type = 'boolean', required = false },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    AlprHotlistEdit = {
+        plate = { type = 'string', required = true, min = 2, max = 16 },
+        remove = { type = 'boolean', required = false },
+        reason = { type = 'enum', required = false, values = { 'stolen_vehicle', 'wanted_person', 'warrant', 'bolo', 'investigation', 'other' } },
+        note = { type = 'string', required = false, max = 255 },
+        caseNumber = { type = 'string', required = false, max = 32 },
+        silent = { type = 'boolean', required = false },
+        expiresInMinutes = { type = 'integer', required = false, min = 5, max = 43200 },
+    },
+
+    AlprHotlistList = {
+        plate = { type = 'string', required = false, min = 2, max = 16 },
+        reason = { type = 'enum', required = false, values = { 'stolen_vehicle', 'wanted_person', 'warrant', 'bolo', 'investigation', 'other' } },
+        includeExpired = { type = 'boolean', required = false },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
     },
 }

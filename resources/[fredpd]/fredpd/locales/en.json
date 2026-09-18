@@ -96,7 +96,16 @@
     "destroyed": "recorded as destroyed",
     "lost": "reported lost",
     "seized": "in police custody",
-    "stolen": "reported stolen"
+    "stolen": "reported stolen",
+    "call_cleared": "the call is already closed",
+    "call_cancelled": "the call was cancelled",
+    "already_assigned": "already on this call",
+    "not_assigned": "not on this call",
+    "off_duty": "not on duty",
+    "unavailable": "not available for dispatch",
+    "no_unit": "not signed on to a unit",
+    "needs_acknowledgement": "needs a supervisor's acknowledgement",
+    "disabled": "switched off"
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -1030,6 +1039,400 @@
       "keybind": "Scene tools",
       "clearMarkers": "Clear markers",
       "clearMarkersHint": "Removes every marker you have placed at this scene"
+    }
+  },
+  "cad": {
+    "title": "Dispatch",
+    "intro": "Calls waiting, the units on the board, and the map. A call is worked from the console or from the car.",
+    "empty": "No calls.",
+    "tab": {
+      "queue": "Queue",
+      "board": "Units",
+      "map": "Map",
+      "broadcasts": "Broadcasts",
+      "alpr": "Plate reads"
+    },
+    "console": {
+      "title": "Dispatch console",
+      "away": "Raising and assigning calls is done standing at the dispatch console. Everything else on this screen works from anywhere."
+    },
+    "queue": {
+      "title": "Pending calls",
+      "empty": "Nothing pending.",
+      "waiting": "Waiting {duration}",
+      "stacked": "{count} waiting",
+      "unassigned": "No unit"
+    },
+    "board": {
+      "title": "Units",
+      "empty": "No unit signed on.",
+      "inStatus": "{duration} in status",
+      "noAssignment": "Unassigned"
+    },
+    "column": {
+      "number": "Call number",
+      "type": "Type",
+      "priority": "Priority",
+      "status": "Status",
+      "location": "Location",
+      "beat": "Beat",
+      "units": "Units",
+      "received": "Received",
+      "age": "Waiting",
+      "caller": "Caller",
+      "callerPhone": "Caller number",
+      "disposition": "Disposition",
+      "callsign": "Callsign",
+      "officer": "Officer",
+      "unitStatus": "Status",
+      "timeInStatus": "Time in status",
+      "assignment": "Assignment",
+      "vehicle": "Vehicle",
+      "details": "Details",
+      "lead": "Lead unit",
+      "source": "Source"
+    },
+    "filter": {
+      "status": "Status",
+      "priority": "Priority",
+      "beat": "Beat",
+      "type": "Type",
+      "mine": "My calls",
+      "any": "Any",
+      "apply": "Apply",
+      "search": "Search",
+      "searchPlaceholder": "Call number, location or caller"
+    },
+    "priority": {
+      "p1": "Priority 1 — life-threatening or in progress",
+      "p2": "Priority 2 — urgent",
+      "p3": "Priority 3 — routine",
+      "p4": "Priority 4 — report only or scheduled"
+    },
+    "priorityShort": {
+      "p1": "P1",
+      "p2": "P2",
+      "p3": "P3",
+      "p4": "P4"
+    },
+    "callStatus": {
+      "pending": "Pending",
+      "dispatched": "Dispatched",
+      "en_route": "En route",
+      "on_scene": "On scene",
+      "cleared": "Cleared",
+      "cancelled": "Cancelled"
+    },
+    "callType": {
+      "alarm": "Alarm",
+      "assault": "Assault",
+      "backup": "Backup requested",
+      "burglary": "Burglary",
+      "disturbance": "Disturbance",
+      "domestic": "Domestic violence",
+      "drugs": "Drugs",
+      "missing_person": "Missing person",
+      "officer_emergency": "Officer in distress",
+      "pursuit": "Pursuit",
+      "robbery": "Robbery",
+      "shots_fired": "Shots fired",
+      "stolen_vehicle": "Stolen vehicle",
+      "suspicious": "Suspicious observation",
+      "theft": "Theft",
+      "traffic_collision": "Traffic collision",
+      "traffic_stop": "Traffic stop",
+      "warrant_service": "Warrant service",
+      "weapons": "Weapons",
+      "welfare_check": "Welfare check",
+      "other": "Other"
+    },
+    "disposition": {
+      "report_taken": "Report taken",
+      "arrest_made": "Arrest made",
+      "citation_issued": "Citation issued",
+      "warning_given": "Warning given",
+      "handled_on_scene": "Handled on scene",
+      "assistance_rendered": "Assistance rendered",
+      "gone_on_arrival": "Gone on arrival",
+      "unable_to_locate": "Unable to locate",
+      "unfounded": "Unfounded",
+      "referred": "Referred on",
+      "duplicate": "Duplicate call",
+      "cancelled": "Cancelled"
+    },
+    "unitStatus": {
+      "off_duty": "Off duty",
+      "available": "Available",
+      "en_route": "En route",
+      "on_scene": "On scene",
+      "busy": "Busy",
+      "transporting": "Transporting",
+      "at_station": "At station",
+      "out_of_service": "Out of service",
+      "emergency": "Emergency"
+    },
+    "linkKind": {
+      "person": "Person",
+      "vehicle": "Vehicle"
+    },
+    "linkRole": {
+      "caller": "Reporting party",
+      "victim": "Victim",
+      "suspect": "Suspect",
+      "witness": "Witness",
+      "involved": "Involved"
+    },
+    "logKind": {
+      "created": "Created",
+      "note": "Note",
+      "dispatched": "Dispatched",
+      "unit_joined": "Unit added",
+      "unit_left": "Unit removed",
+      "lead_changed": "Lead unit changed",
+      "unit_status": "Unit status",
+      "call_status": "Call status",
+      "linked": "Linked",
+      "unlinked": "Unlinked",
+      "cleared": "Cleared"
+    },
+    "log": {
+      "created": "Call created.",
+      "created_external": "Call raised by {resource}.",
+      "dispatched": "{callsign} dispatched.",
+      "self_assigned": "{callsign} attached themselves to the call.",
+      "unit_joined": "{callsign} added to the call.",
+      "unit_left": "{callsign} taken off the call.",
+      "lead_changed": "{callsign} is now the lead unit.",
+      "unit_status": "{callsign}: {status}.",
+      "call_status": "Call is {status}.",
+      "priority_changed": "Priority changed from {from} to {to}.",
+      "linked": "{label} linked as {role}.",
+      "unlinked": "{label} unlinked.",
+      "cleared": "Call cleared: {disposition}.",
+      "cancelled": "Call cancelled: {disposition}.",
+      "acknowledged": "Emergency acknowledged by {callsign}.",
+      "welfare_check": "No change of status from {callsign} for {minutes} minutes.",
+      "report_created": "Report {number} created from this call."
+    },
+    "card": {
+      "title": "Call {number}",
+      "none": "Select a call to open it.",
+      "narrative": "Narrative",
+      "units": "Units",
+      "links": "Persons and vehicles",
+      "hazards": "Premise hazards",
+      "noHazards": "No hazards recorded for this location.",
+      "noLinks": "Nothing linked to this call.",
+      "noUnits": "No unit on this call."
+    },
+    "time": {
+      "received": "Received",
+      "dispatched": "Dispatched",
+      "enRoute": "En route",
+      "onScene": "On scene",
+      "cleared": "Cleared",
+      "none": "Not yet"
+    },
+    "note": {
+      "title": "Add to the narrative",
+      "placeholder": "What was said on the radio, in the caller's words where they matter.",
+      "submit": "Add line",
+      "empty": "Nothing logged yet."
+    },
+    "create": {
+      "title": "New call",
+      "intro": "A call taken by phone happens where the caller says it does. The call number, the time and the beat are set by the server.",
+      "type": "Type",
+      "priority": "Priority",
+      "location": "Location",
+      "locationPlaceholder": "Street, premise or cross street",
+      "beat": "Beat",
+      "callerName": "Caller",
+      "callerPhone": "Caller number",
+      "details": "What the caller said",
+      "submit": "Create call"
+    },
+    "dispatch": {
+      "title": "Dispatch units",
+      "intro": "The recommended units are the closest available ones. The lead unit is the one that answers for the call.",
+      "units": "Units",
+      "lead": "Lead unit",
+      "recommended": "Closest available",
+      "noRecommendation": "No unit available to recommend.",
+      "distance": "{distance} away",
+      "add": "Dispatch",
+      "remove": "Take off call",
+      "makeLead": "Make lead unit",
+      "submit": "Dispatch"
+    },
+    "selfAssign": {
+      "action": "Attach to call",
+      "confirm": "Attach your unit to call {number}?",
+      "done": "Attached to {number}."
+    },
+    "status": {
+      "title": "My status",
+      "submit": "Set status",
+      "changed": "Status set to {status}.",
+      "callProgress": "Report on call"
+    },
+    "manage": {
+      "title": "Manage unit",
+      "intro": "Changing another unit's status, callsign or beat is logged against your name and the unit's.",
+      "unit": "Unit",
+      "status": "Status",
+      "callsign": "Callsign",
+      "beat": "Beat",
+      "reason": "Reason",
+      "submit": "Save unit"
+    },
+    "clear": {
+      "title": "Clear call",
+      "intro": "A disposition says what came of the call and is read back months later. The call closes for every unit on it.",
+      "disposition": "Disposition",
+      "note": "Closing line",
+      "submit": "Clear call",
+      "needsAcknowledgement": "An emergency call cannot be cleared until a supervisor has acknowledged it."
+    },
+    "emergency": {
+      "button": "Emergency",
+      "title": "Emergency",
+      "confirm": "Raise an emergency call at your position? Every unit in range is alerted.",
+      "sent": "Emergency call raised. Units are on the way.",
+      "banner": "{callsign} — emergency at {location}",
+      "bannerNoLocation": "{callsign} — emergency",
+      "acknowledge": "Acknowledge",
+      "acknowledged": "Acknowledged by {callsign}",
+      "notAcknowledged": "Not acknowledged",
+      "respond": "Respond"
+    },
+    "welfare": {
+      "title": "Welfare check",
+      "body": "{callsign} has been on scene at {number} for {minutes} minutes with no change of status.",
+      "prompt": "Check on the unit",
+      "dismiss": "Seen"
+    },
+    "broadcast": {
+      "title": "Broadcasts",
+      "empty": "Nothing on the air.",
+      "create": "New broadcast",
+      "kind": "Kind",
+      "headline": "Title",
+      "body": "Message",
+      "plate": "Plate",
+      "expiresIn": "Stands for",
+      "expiresInHint": "Minutes. Left empty it takes the agency default.",
+      "expires": "Expires",
+      "cancel": "Take off the air",
+      "cancelled": "Off the air",
+      "submit": "Send broadcast",
+      "fromCall": "From call {number}"
+    },
+    "broadcastKind": {
+      "bolo": "BOLO",
+      "attempt_to_locate": "Attempt to locate",
+      "all_units": "All units",
+      "information": "Information"
+    },
+    "map": {
+      "title": "Map",
+      "units": "Units",
+      "calls": "Calls",
+      "beats": "Beats",
+      "legend": "Legend",
+      "follow": "Follow unit",
+      "center": "Centre on call",
+      "positionAge": "Position {duration} old",
+      "noPosition": "No position",
+      "empty": "Nothing to show on the map yet.",
+      "closed": "The map is closed. Positions are only sent while it is open."
+    },
+    "beat": {
+      "title": "Beats",
+      "none": "No beat",
+      "unassigned": "Unassigned",
+      "kind": {
+        "beat": "Beat",
+        "district": "District"
+      }
+    },
+    "report": {
+      "create": "Create report from call",
+      "intro": "The report opens pre-filled from the call: location, time, units, and the persons and vehicles linked to it.",
+      "created": "Report {number} created from this call."
+    },
+    "source": {
+      "dispatcher": "Taken by dispatch",
+      "phone": "Phone call",
+      "export": "Raised by {resource}",
+      "panic": "Emergency button",
+      "alpr": "Plate read"
+    }
+  },
+  "alpr": {
+    "title": "Plate reads",
+    "intro": "Every plate a patrol car drove past, with the time, the place and the unit. Reads are kept for thirty days and then deleted.",
+    "empty": "No plate reads match.",
+    "column": {
+      "plate": "Plate",
+      "time": "Read",
+      "unit": "Unit",
+      "callsign": "Callsign",
+      "location": "Location",
+      "camera": "Camera",
+      "reason": "Reason",
+      "note": "Detail",
+      "case": "Case",
+      "hit": "Hit",
+      "expires": "Expires",
+      "added": "Added",
+      "addedBy": "Added by"
+    },
+    "filter": {
+      "plate": "Plate",
+      "unit": "Unit",
+      "since": "Since",
+      "sinceHours": "{hours} h",
+      "hitsOnly": "Hits only",
+      "any": "Any",
+      "apply": "Apply"
+    },
+    "camera": {
+      "front": "Front",
+      "rear": "Rear",
+      "fixed": "Fixed camera"
+    },
+    "hit": {
+      "title": "Hotlist hit",
+      "banner": "{plate} — {reason}",
+      "advice": "Confirm the entry before acting on it.",
+      "dismiss": "Dismiss",
+      "none": "No hits."
+    },
+    "hotlist": {
+      "title": "Hotlist",
+      "intro": "A plate on this list puts a banner in front of an officer about to stop a car. Every entry says who added it and why, and expires.",
+      "empty": "No plates listed.",
+      "add": "Add plate",
+      "remove": "Remove plate",
+      "removeConfirm": "Remove {plate} from the hotlist?",
+      "plate": "Plate",
+      "reason": "Reason",
+      "note": "Detail",
+      "case": "Case number",
+      "expiresIn": "Stands for",
+      "expiresInHint": "Minutes. Left empty it stands until somebody removes it.",
+      "silent": "Silent",
+      "silentHint": "The hit is logged and the unit is told nothing.",
+      "submit": "Add to hotlist"
+    },
+    "reason": {
+      "stolen_vehicle": "Stolen vehicle",
+      "wanted_person": "Wanted person",
+      "warrant": "Warrant",
+      "bolo": "BOLO",
+      "investigation": "Investigation",
+      "other": "Other"
     }
   }
 }

@@ -18,17 +18,119 @@ export const ACCESS_POINTS = [
 
 export type AccessPoint = (typeof ACCESS_POINTS)[number];
 
-/** Unit status (spec 7.1). Every change is timestamped server-side. */
+/**
+ * Unit status — the nine states of spec 7.1 and Appendix E, in the order a
+ * shift moves through them. Every change is timestamped server-side (7.1) into
+ * `fpd_units.status_since`, which is what "time in status" on the unit board is
+ * measured from, what the welfare-check timer reads (7.16), and what nothing a
+ * client sends can move (invariant 1). The column is deliberately not
+ * `ON UPDATE CURRENT_TIMESTAMP(3)`, because the AVL sweep writes the same row
+ * every second or two and an automatic stamp would reset the timer on every
+ * sweep — see `fpd_units` in 0007.
+ *
+ * The set is closed because the unit board, the recommendation of the closest
+ * available unit (7.16) and the map legend all branch on it: a tenth status
+ * invented by a route would be a unit that is neither dispatchable nor
+ * visibly unavailable. Labels live under `cad.unitStatus.<value>` in both
+ * locale files (invariant 6); the command-line codes of Appendix F (AV, ER,
+ * OS, BU, TR, ST, OOS) are aliases the command line resolves, not values.
+ *
+ * `off_duty` is a member rather than the absence of a row: `fpd_units` holds
+ * one row per officer, not per session (see the M4 data-model note), so a
+ * disconnect in the middle of a call leaves the callsign, the beat and the
+ * assignment in place and moves the status here. A vanishing row would take
+ * the unit off the call silently and the call log would never say when.
+ *
+ * `emergency` is Appendix E's spelling of what an officer's panic button puts
+ * them in. It is deliberately absent from `SELF_SET_UNIT_STATUSES` and from
+ * `SUPERVISOR_UNIT_STATUSES` below: the only way into it is `cad.emergency`,
+ * which raises the P1 call at the same time (7.16). A status route that could
+ * set it would produce an officer in distress with no call behind them, which
+ * is precisely the state dispatch cannot act on.
+ */
 export const UNIT_STATUSES = [
+  'off_duty',
   'available',
   'en_route',
   'on_scene',
   'busy',
+  'transporting',
+  'at_station',
   'out_of_service',
-  'panic',
+  'emergency',
 ] as const;
 
 export type UnitStatus = (typeof UNIT_STATUSES)[number];
+
+/**
+ * What an officer may set on themselves through `cad.unit.status`.
+ *
+ * The restriction is in the schema rather than in the handler so it fails at
+ * validation: `off_duty` is the sign-off path (7.1 duty integration), which
+ * has to release the assignment and the vehicle rather than only relabel the
+ * row, and `emergency` belongs to `cad.emergency` for the reason above.
+ */
+export const SELF_SET_UNIT_STATUSES = [
+  'available',
+  'en_route',
+  'on_scene',
+  'busy',
+  'transporting',
+  'at_station',
+  'out_of_service',
+] as const satisfies readonly UnitStatus[];
+
+/**
+ * What a supervisor or dispatcher may set on somebody else through
+ * `cad.unit.manage` — the same list plus `off_duty`, because signing a unit
+ * off is a thing a supervisor does at end of shift and to a unit that has
+ * gone quiet.
+ *
+ * Still no `emergency`: a supervisor cannot declare somebody else's panic,
+ * and clearing one is done by clearing the call (7.16 supervisor
+ * acknowledgement), which is `cad.call.clear`.
+ */
+export const SUPERVISOR_UNIT_STATUSES = [
+  'off_duty',
+  'available',
+  'en_route',
+  'on_scene',
+  'busy',
+  'transporting',
+  'at_station',
+  'out_of_service',
+] as const satisfies readonly UnitStatus[];
+
+/**
+ * The progress a unit reports *on a call* through `cad.call.status` (7.16:
+ * "en route, on scene").
+ *
+ * A subset of the unit statuses rather than a list of its own, because the
+ * two must never disagree. **There is no per-assignment status column**:
+ * `fpd_call_units` records who joined a call, when they joined, when they
+ * left and who had the lead, and nothing else (0007 says why — a unit's own
+ * en-route and on-scene moments are status changes, and every status change
+ * is already a line in `fpd_call_log` with an author and a time). So one
+ * write of this value moves exactly three things: `fpd_units.status` and
+ * `fpd_units.status_since` for the unit, the call's own `fpd_calls.status`,
+ * and the call's `en_route_at` or `on_scene_at` stamp when this unit is the
+ * first to get there.
+ *
+ * That is the whole list, and it is exactly the two members of both
+ * `UNIT_STATUSES` and `CALL_STATUSES`. Every other unit status is missing for
+ * the same reason: it would move `fpd_units.status` to a value
+ * `ck_fpd_calls_status` cannot hold, so the call's status would have nowhere
+ * to follow it and the card's timestamps would be left unexplained.
+ * `transporting` in particular is a *unit* state, not call progress — a unit
+ * taking a prisoner away from a scene sets it through `cad.unit.status`,
+ * stays on the call, and the log line says so.
+ */
+export const CALL_PROGRESS_STATUSES = [
+  'en_route',
+  'on_scene',
+] as const satisfies readonly UnitStatus[];
+
+export type CallProgressStatus = (typeof CALL_PROGRESS_STATUSES)[number];
 
 /**
  * What a world placement opens (spec 3.10, ADR-006).
@@ -452,3 +554,301 @@ export const FIREARM_EVENTS = [
 ] as const;
 
 export type FirearmEvent = (typeof FIREARM_EVENTS)[number];
+
+// ------------------------------------------------------------ dispatch (M4)
+
+/**
+ * Call priority, P1–P4 exactly as Appendix E fixes them:
+ *
+ * - `1` life-threatening or in progress — what the emergency button raises (7.16)
+ * - `2` urgent
+ * - `3` routine
+ * - `4` report only or scheduled
+ *
+ * Numbers rather than names, because the pending queue is *ordered* by this
+ * column: 7.16 stacks by priority and age, which is
+ * `ORDER BY priority ASC, received_at ASC` over an index in that order. A
+ * name would need a CASE expression on every poll and would not use the
+ * index, and the queue is polled by every dispatcher and every MDT (budget
+ * 12.1, route p95 < 50 ms).
+ *
+ * Stored in a `TINYINT UNSIGNED` under `ck_fpd_calls_priority`, so a field
+ * that carries one is an `integer` spec with `min: 1, max: 4` — the
+ * validator's `enum` type compares strings and would refuse the number 1.
+ * This list is here for the NUI's labels (`cad.priority.p1` … `p4`) and so
+ * nothing has to spell the bounds a second time.
+ *
+ * The set is closed at four because priority is the only thing that decides
+ * order: a fifth level would sort somewhere nobody chose, and every call
+ * carries one (the column is `NOT NULL`).
+ */
+export const CALL_PRIORITIES = [1, 2, 3, 4] as const;
+
+export type CallPriority = (typeof CALL_PRIORITIES)[number];
+
+/**
+ * `ck_fpd_calls_status` — the call lifecycle of Appendix E:
+ * Pending → Dispatched → En route → On scene → Cleared, or Cancelled.
+ *
+ * Closed because each member but `pending` is the visible half of a
+ * timestamp. 7.16's call card carries five of them — received, dispatched,
+ * en route, on scene, cleared — and the server sets the matching column in
+ * the same statement that moves the status, so the two can never disagree. A
+ * status with no column behind it would be a call whose card cannot say when
+ * it got there.
+ *
+ * The status is derived from the units, never sent: it is the furthest any
+ * assigned unit has got (`cad.call.status`), which is why a second unit being
+ * dispatched to a call that already has somebody on scene does not walk it
+ * backwards.
+ *
+ * `cancelled` is terminal beside `cleared`, not a step before it. Both are
+ * reached through `cad.call.clear` and both stamp `cleared_at`: a call
+ * cancelled before anybody rolled still leaves a log that has to say who
+ * closed it and when (11.3 — a record nobody can account for). Which of the
+ * two a clearing produces is decided by the disposition, below.
+ */
+export const CALL_STATUSES = [
+  'pending',
+  'dispatched',
+  'en_route',
+  'on_scene',
+  'cleared',
+  'cancelled',
+] as const;
+
+export type CallStatus = (typeof CALL_STATUSES)[number];
+
+/**
+ * `fpd_calls.type` — what the call is (7.16's call card "type").
+ *
+ * **There is no CHECK on that column** and this list is deliberately not
+ * paired with one in `tools/enum-check.ts`: 0007 leaves call types and
+ * dispositions unconstrained so an agency can add one without a migration,
+ * and the allowlist that refuses an unknown value lives with the module,
+ * where it fails at the call site with the value in the message. The column
+ * is `VARCHAR(32)`, so every member here has to fit in that.
+ *
+ * A closed enum rather than a free string or a code table, for three reasons
+ * that all cost something later if it is open: the type carries a locale key
+ * (`cad.callType.<value>`, invariant 6) and a free string cannot have one;
+ * the type is what the statistics (7.27) and the beat workload group by, and
+ * two dispatchers spelling "shots fired" differently make both meaningless;
+ * and the type drives the default priority the intake form offers, which
+ * needs a value it recognises.
+ *
+ * `officer_emergency` is on the list because the NUI and the map have to
+ * label it, not because anybody may choose it: `cad.emergency` is the only
+ * thing that writes it (7.16), and `cad.call.create` refuses it — a
+ * hand-raised officer-down call would ring the tone for a unit that never
+ * pressed anything.
+ *
+ * `other` is the escape hatch that keeps the rest honest. Without it a
+ * dispatcher would file the odd call under the nearest wrong type and the
+ * statistics would quietly absorb it.
+ */
+export const CALL_TYPES = [
+  'alarm',
+  'assault',
+  'backup',
+  'burglary',
+  'disturbance',
+  'domestic',
+  'drugs',
+  'missing_person',
+  'officer_emergency',
+  'pursuit',
+  'robbery',
+  'shots_fired',
+  'stolen_vehicle',
+  'suspicious',
+  'theft',
+  'traffic_collision',
+  'traffic_stop',
+  'warrant_service',
+  'weapons',
+  'welfare_check',
+  'other',
+] as const;
+
+export type CallType = (typeof CALL_TYPES)[number];
+
+/**
+ * `fpd_calls.disposition` — how a call ended (7.16: "clear with a disposition
+ * code").
+ *
+ * Unconstrained in the database for the reason given on `CALL_TYPES`: the
+ * constraint named `ck_fpd_calls_disposition` in 0007 is a *presence* check —
+ * a call whose status is `cleared` must carry some disposition — and says
+ * nothing about which values are legal. The vocabulary below is enforced by
+ * this schema on the way in and by the module's allowlist behind it.
+ *
+ * Closed because a disposition is a statement about what happened, read back
+ * months later by whoever asks why nothing came of a call. The list is the
+ * standard CAD one; each value has a locale key under
+ * `cad.disposition.<value>` and real Swedish wording (Appendix A: an
+ * `arrest_made` is a *gripande*, a `citation_issued` an *ordningsbot* — a
+ * machine gloss of either says something legally different).
+ *
+ * `cancelled` and `duplicate` are dispositions rather than a separate route:
+ * one clearing path means one place the log entry, the `cleared_at` stamp and
+ * the audit row are written. They are the two that leave the call
+ * `cancelled` instead of `cleared`; every other value clears it.
+ *
+ * `report_taken` is the one M4's acceptance criterion ends on — a dispatcher
+ * takes a P1 end to end *including report creation*. It records that a report
+ * was written, and nothing more: the report itself is created through the
+ * records module, pre-filled from the call (7.16), and the link between the
+ * two lives on the report.
+ */
+export const CALL_DISPOSITIONS = [
+  'report_taken',
+  'arrest_made',
+  'citation_issued',
+  'warning_given',
+  'handled_on_scene',
+  'assistance_rendered',
+  'gone_on_arrival',
+  'unable_to_locate',
+  'unfounded',
+  'referred',
+  'duplicate',
+  'cancelled',
+] as const;
+
+export type CallDisposition = (typeof CALL_DISPOSITIONS)[number];
+
+/**
+ * `ck_fpd_call_log_type`, on `fpd_call_log.entry_type` — what a line in the
+ * narrative log is (7.16).
+ *
+ * Each member is the *event that happened*, not a category of line: the
+ * locale keys and `fpd_call_log.message_key` are written from it, which is
+ * why `unit_joined` and `lead_changed` sit beside `note` rather than both
+ * collapsing into "unit". `tools/enum-check.ts` pairs this list with that
+ * constraint, so the two cannot drift again.
+ *
+ * No route accepts one of these and no schema below imports the list: the
+ * server picks the kind from what it just did, because the log is
+ * append-only (invariant 11) and a log line a client could label is a log
+ * line a client can dress up. `cad.call.note` writes a `note` and nothing
+ * else; every other kind is a side effect of a dispatch, a status, a link or
+ * a clearing.
+ *
+ * The list is here so the NUI can render each line with the right icon and
+ * locale key (`cad.logKind.<value>`), and so the migration's CHECK and the
+ * module have one spelling between them. The *sentence* a generated line
+ * renders as is a second, separate key, stored in `fpd_call_log.message_key`
+ * with its placeholder values in `message_args` — the `cad.log.*` family,
+ * which is longer than this list (`cad.log.self_assigned`,
+ * `cad.log.created_external`, `cad.log.acknowledged`, `cad.log.welfare_check`
+ * and `cad.log.report_created` all have no event of their own). The module
+ * chooses both: this value says what happened, the message key says how the
+ * line reads.
+ */
+export const CALL_LOG_KINDS = [
+  'created',
+  'note',
+  'dispatched',
+  'unit_joined',
+  'unit_left',
+  'lead_changed',
+  'unit_status',
+  'call_status',
+  'linked',
+  'unlinked',
+  'cleared',
+] as const;
+
+export type CallLogKind = (typeof CALL_LOG_KINDS)[number];
+
+/**
+ * `ck_fpd_call_links_target`, on `fpd_call_links.target_type` — what can hang
+ * off a call (7.16: "linked persons and vehicles").
+ *
+ * Two members and no more: each one names a register that exists
+ * (`fpd_persons`, `fpd_vehicles`) and `fpd_call_links.target_id` is the row in
+ * it. The link is polymorphic and carries **no** foreign key to that row —
+ * 0007 explains why, and the consequence is the repo's, not the database's:
+ * it checks the target belongs to the session's agency before writing, and
+ * reading the call card runs the same access check the register would
+ * (invariant 4). A third kind would need a third table to point at before it
+ * could mean anything.
+ */
+export const CALL_LINK_KINDS = ['person', 'vehicle'] as const;
+
+export type CallLinkKind = (typeof CALL_LINK_KINDS)[number];
+
+/**
+ * `ck_fpd_call_links_role` — how the person or vehicle is involved.
+ *
+ * The role is what the report pre-fill reads (7.16: create report from call),
+ * which is why it is an enum and not free text: a report's person rows carry
+ * the same vocabulary (Appendix A — *anmälare*, *målsägande*, *misstänkt*,
+ * *vittne*), and a free string here would have to be guessed at there.
+ *
+ * `involved` is the honest default for a vehicle seen leaving and for a
+ * person whose part is not yet known; a call is the earliest and least
+ * certain record in the suite, and forcing a stronger word this early is how
+ * a witness becomes a suspect in the file.
+ */
+export const CALL_LINK_ROLES = [
+  'caller',
+  'victim',
+  'suspect',
+  'witness',
+  'involved',
+] as const;
+
+export type CallLinkRole = (typeof CALL_LINK_ROLES)[number];
+
+/**
+ * `ck_fpd_broadcasts_kind` — what a dispatch broadcast is (7.16 [S]).
+ *
+ * These are radio traffic, not records: a `bolo` here is the message that
+ * goes out to every unit, and it is not the formal BOLO record of 7.13 with
+ * its subject, its expiry and its attempts. That record is [M2] in the spec
+ * and no migration has built it yet — what exists today is the vehicle-level
+ * flag `fpd_vehicle_flags.kind = 'bolo'` (0005), which is a fact about a
+ * registration rather than a message. Keeping the two apart is deliberate: a
+ * broadcast expires off the board on its own and leaves whatever it referred
+ * to untouched.
+ *
+ * Labels under `cad.broadcastKind.<value>`. `attempt_to_locate` is 7.13's
+ * second half; Swedish has no separate word and Appendix A's *spaningsuppdrag*
+ * covers both, so the two keys differ in wording rather than in vocabulary.
+ */
+export const BROADCAST_KINDS = [
+  'bolo',
+  'attempt_to_locate',
+  'all_units',
+  'information',
+] as const;
+
+export type BroadcastKind = (typeof BROADCAST_KINDS)[number];
+
+/**
+ * `ck_fpd_hotlist_reason` — why a plate is on the ALPR hotlist and what the
+ * hit banner says (7.18).
+ *
+ * The first three are 7.18's own list ("hotlist checks against BOLOs, stolen
+ * vehicles and warrants"). An enum rather than free text because the banner
+ * is a *reason to stop a car*: an officer acting on one has to be able to say
+ * afterwards which register it came from, and the wording of that has to be
+ * the same in both languages every time (invariant 6). The labels are
+ * `alpr.reason.<value>` in both locale files — the ALPR namespace, not the
+ * CAD one, because the banner they title is raised by a plate read.
+ *
+ * The free text beside it carries the detail (`fpd_hotlist.detail`, the
+ * `note` field of `AlprHotlistEdit`); this carries the ground.
+ */
+export const HOTLIST_REASONS = [
+  'stolen_vehicle',
+  'wanted_person',
+  'warrant',
+  'bolo',
+  'investigation',
+  'other',
+] as const;
+
+export type HotlistReason = (typeof HOTLIST_REASONS)[number];

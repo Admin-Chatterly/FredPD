@@ -4,7 +4,17 @@ import { fileURLToPath } from 'node:url';
 
 import {
   ACCESS_POINTS,
+  BROADCAST_KINDS,
+  CALL_DISPOSITIONS,
+  CALL_LINK_KINDS,
+  CALL_LINK_ROLES,
+  CALL_LOG_KINDS,
+  CALL_PRIORITIES,
+  CALL_PROGRESS_STATUSES,
+  CALL_STATUSES,
+  CALL_TYPES,
   CLASSIFICATIONS,
+  HOTLIST_REASONS,
   INTEL_CASE_STATUSES,
   INTEL_CONFIDENCE,
   INTEL_ORG_STATUSES,
@@ -13,6 +23,8 @@ import {
   INTEL_SOURCES,
   PLACEMENT_INTERACTIONS,
   PLACEMENT_KINDS,
+  SELF_SET_UNIT_STATUSES,
+  SUPERVISOR_UNIT_STATUSES,
   UNIT_STATUSES,
 } from './enums';
 import { ERROR_CODES } from './errors';
@@ -51,6 +63,22 @@ function enumTable(name: string, values: readonly string[], comment: string): st
   const entries = values
     .map((value) => `${INDENT}${constantName(value)} = ${luaString(value)},`)
     .join('\n');
+
+  return `--- ${comment}\nFredPD.${name} = {\n${entries}\n}\n`;
+}
+
+/**
+ * The one enumeration whose members are numbers rather than strings.
+ *
+ * `CALL_PRIORITIES` is 1–4 because `fpd_calls.priority` is a `TINYINT
+ * UNSIGNED` the pending queue is ordered by, so the values cannot be names.
+ * The constants are `P1`–`P4`, which is what Appendix E calls them and what
+ * the locale keys `cad.priority.p1`–`p4` are named after; the values stay
+ * numbers, so `FredPD.CallPriority.P1` can be written straight into a
+ * parameterized query.
+ */
+function numberTable(name: string, values: readonly number[], comment: string): string {
+  const entries = values.map((value) => `${INDENT}P${value} = ${value},`).join('\n');
 
   return `--- ${comment}\nFredPD.${name} = {\n${entries}\n}\n`;
 }
@@ -106,6 +134,36 @@ const enums = [
   enumTable('IntelConfidence', INTEL_CONFIDENCE, 'Confidence in a piece of intelligence (spec 10).'),
   enumTable('IntelCaseStatus', INTEL_CASE_STATUSES, 'Case status (spec 10).'),
   enumTable('Classification', CLASSIFICATIONS, 'Record classification levels (spec 4.5).'),
+
+  // Dispatch (spec 7.16-7.18, M4). The CAD module is Lua, and every list
+  // below is one the database also constrains or the log is written from, so
+  // a hand-copied second spelling is how `enroute` reached a CHECK while the
+  // code sent `en_route`. Generated, the two cannot disagree; changing one of
+  // these enums and running `pnpm enum:check` is what catches the rest.
+  enumTable(
+    'SelfSetUnitStatus',
+    SELF_SET_UNIT_STATUSES,
+    "What an officer may set on their own unit (spec 7.16; Appendix F's ST).",
+  ),
+  enumTable(
+    'SupervisorUnitStatus',
+    SUPERVISOR_UNIT_STATUSES,
+    'What a supervisor may set on somebody else (spec 7.16).',
+  ),
+  enumTable(
+    'CallProgressStatus',
+    CALL_PROGRESS_STATUSES,
+    'The progress a unit reports on a call (spec 7.16).',
+  ),
+  numberTable('CallPriority', CALL_PRIORITIES, 'Call priority P1-P4 (Appendix E).'),
+  enumTable('CallStatus', CALL_STATUSES, 'The call lifecycle (spec 7.16, Appendix E).'),
+  enumTable('CallType', CALL_TYPES, 'What a call is (spec 7.16).'),
+  enumTable('CallDisposition', CALL_DISPOSITIONS, 'How a call ended (spec 7.16).'),
+  enumTable('CallLogKind', CALL_LOG_KINDS, 'What a line in the narrative log is (spec 7.16).'),
+  enumTable('CallLinkKind', CALL_LINK_KINDS, 'What can be linked to a call (spec 7.16).'),
+  enumTable('CallLinkRole', CALL_LINK_ROLES, 'How a person or vehicle is involved (spec 7.16).'),
+  enumTable('BroadcastKind', BROADCAST_KINDS, 'What a dispatch broadcast is (spec 7.16).'),
+  enumTable('HotlistReason', HOTLIST_REASONS, 'Why a plate is on the ALPR hotlist (spec 7.18).'),
 ].join('\n');
 
 const schemaBody = Object.entries(schemas)

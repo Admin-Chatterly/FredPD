@@ -796,7 +796,44 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 - [S] Plain language or ten-codes (configurable per agency, localized).
 - [S] Broadcasts (BOLO, all-units messages).
 - **Based on:** PremierOne / HxGN OnCall / Mark43 CAD; ps-dispatch alerts; ox_mdt units and calls.
-- **Permissions:** `cad.call.create`, `cad.call.dispatch`, `cad.call.self_assign`, `cad.call.clear`, `cad.unit.manage`, `cad.broadcast`, `cad.console.open`.
+- **Permissions:** `cad.call.create`, `cad.call.dispatch`, `cad.call.self_assign`, `cad.call.clear`, `cad.call.note`, `cad.call.link`, `cad.unit.manage`, `cad.unit.status`, `cad.emergency`, `cad.broadcast`, `cad.console.open`. `cad.call.note`, `cad.call.link`, `cad.unit.status` and `cad.emergency` were added while building M4 and are explained under Appendix B. The reads — queue, call card, unit board, map, broadcast board — are gated on `page.dispatch` and have no key of their own.
+
+#### 7.16.1 The narrative log, and the locale key every generated line carries
+
+`fpd_call_log` has two kinds of line. A **note** is what a person typed: it goes
+in `body`, it is content, and it is never translated. Every **other** line is
+user-facing text the system wrote, so it goes in `message_key` plus
+`message_args` and the NUI renders it in the *reader's* language —
+`ck_fpd_call_log_content` makes the wrong one impossible to store. The i18n
+checker cannot see a key assembled at runtime, so this table is the only place
+the two halves are compared:
+
+| `entry_type` | `message_key` | `message_args` |
+|---|---|---|
+| `created` | `cad.log.created` | — |
+| `created` (from the `CreateCall` export) | `cad.log.created_external` | `resource` |
+| `note` | *none* — the text is in `body` | — |
+| `dispatched` | `cad.log.dispatched` | `callsign` |
+| `unit_joined` | `cad.log.unit_joined`, or `cad.log.self_assigned` on a self-assign | `callsign` |
+| `unit_left` | `cad.log.unit_left` | `callsign` |
+| `lead_changed` | `cad.log.lead_changed` | `callsign` |
+| `unit_status` | `cad.log.unit_status` | `callsign`, `status` |
+| `call_status` | `cad.log.call_status` | `status` |
+| `linked` | `cad.log.linked` | `label`, `role` |
+| `unlinked` | `cad.log.unlinked` | `label` |
+| `cleared` | `cad.log.cleared`, or `cad.log.cancelled` for a `duplicate` or `cancelled` disposition | `disposition` |
+
+**An argument that names a vocabulary carries the value, not a sentence.**
+`status`, `role` and `disposition` are stored as the enum member (`en_route`,
+`caller`, `arrest_made`) and the NUI resolves each through its own key —
+`cad.unitStatus.*`, `cad.callStatus.*`, `cad.linkRole.*`, `cad.disposition.*`.
+Writing the rendered label into `message_args` would put the dispatcher's
+language inside a Swedish officer's log line, which is invariant 6 defeated one
+level down. `callsign` and `label` are the two arguments that are genuinely
+data.
+
+The line's own label — the icon and the word beside the timestamp — is
+`cad.logKind.<entry_type>`, one key per value of `ck_fpd_call_log_type`.
 
 ### 7.17 Map, vehicle location, beats and geofences (M4)
 
@@ -810,6 +847,7 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 - [S] Plate reads from Wolfknight radar logged with time, place and unit.
 - [S] Hotlist checks against BOLOs, stolen vehicles and warrants; hit banner for the unit.
 - [S] Read retention (default 30 days) enforced by the gateway scheduler.
+- **Hotlist reasons** are `stolen_vehicle`, `wanted_person`, `warrant`, `bolo`, `investigation` and `other` — `ck_fpd_hotlist_reason` and `HOTLIST_REASONS`. The banner an officer reads before stopping a car is the reason's label, so each one has a key under **`alpr.reason.<value>`** (not `cad.*`: the hotlist, the reads and the hit banner are one screen and one namespace), and the free-text `note` beside it carries the detail.
 - **Permissions:** `alpr.read.view`, `alpr.hotlist.manage`.
 
 ### 7.19 Cameras (O, later)
@@ -1472,6 +1510,7 @@ Total: roughly 320–450 hours.
 | Phone, jail, billing, housing, appearance resources | Bridges | M2–M4 |
 | ~~Garage resource~~ | **Resolved.** FredPD owns the agency motor pool (7.31); impound stays with `p_policejob` | M1 — decided |
 | Dispatch alerts: built-in only or a ps-dispatch adapter | CAD scope | M4 |
+| Four call-log lines with no `entry_type`: `cad.log.acknowledged`, `cad.log.welfare_check`, `cad.log.report_created` (all three are features 7.16 names) and `cad.log.priority_changed` (which nothing names and no permission allows) | `ck_fpd_call_log_type` has eleven values and none of them fits these four, so either the CHECK grows, the lines ride on an existing value, or the strings go. Until it is settled they are keys no line can carry (7.16.1) | M4 |
 | Map tile source | Map module | M4 |
 | Retention periods per data type | Privacy and performance | M3 |
 | Lab turnaround times and success rates | Game balance | M3 |
@@ -1496,6 +1535,14 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Call (incident) | Händelse | |
 | Priority | Prioritet | Prio 1–4 |
 | Available / En route / On scene | Tillgänglig / På väg / På plats | |
+| Dispatched (a call) | Utlarmad | Utlarmning is the act |
+| Disposition (closing code) | Avslutskod | |
+| Beat / District | Område / Distrikt | |
+| Broadcast to all units | Utskick | |
+| Traffic stop | Fordonskontroll | |
+| Welfare check | Kontroll av person | |
+| Plate read (ALPR) | Skyltavläsning | |
+| Hotlist (plates) | Bevakningslista | |
 | Emergency button | Nödlarm | |
 | Shift / Briefing | Pass / Passgenomgång | |
 | Report (offence) | Anmälan | Brottsanmälan |
@@ -1556,14 +1603,14 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Area | Keys |
 |---|---|
 | Pages | `page.query`, `page.dispatch`, `page.records`, `page.evidence`, `page.lab`, `page.intel`, `page.court`, `page.personnel`, `page.stats`, `page.admin`, `page.comms` |
-| Queries | `query.person.run`, `query.vehicle.run`, `query.firearm.run`, `query.phone.run`, `query.address.run`, `query.log.view` |
+| Queries | `query.run`, `query.hit.confirm`, `query.person.run`, `query.vehicle.run`, `query.firearm.run`, `query.phone.run`, `query.address.run`, `query.log.view` |
 | Records | `rms.person.view`, `rms.person.edit`, `rms.person.photo.upload`, `rms.person.caution.edit`, `rms.vehicle.view`, `rms.vehicle.edit`, `rms.vehicle.flag`, `rms.firearm.view`, `rms.firearm.edit`, `rms.firearm.trace`, `rms.location.view`, `rms.location.hazard.edit` |
 | Reports | `rms.report.create`, `rms.report.edit.own`, `rms.report.submit`, `rms.report.approve`, `rms.report.return`, `rms.report.void`, `rms.report.view.<type>` |
 | Enforcement | `rms.arrest.create`, `rms.citation.issue`, `rms.citation.void`, `rms.bolo.create`, `rms.bolo.cancel`, `rms.bolo.view`, `rms.fi.create`, `rms.stops.create`, `rms.impound.create`, `rms.impound.release`, `rms.impound.hold.release`, `rms.warrant.serve` |
 | Investigations | `inv.case.create`, `inv.case.view`, `inv.case.edit`, `inv.case.assign`, `inv.case.close` |
 | Booking | `booking.create`, `booking.biometrics.capture`, `booking.release` |
 | Court | `court.warrant.request`, `court.warrant.review`, `court.warrant.recall`, `court.referral.review`, `court.calendar.manage`, `court.disposition.enter`, `court.discovery.issue`, `court.discovery.view`, `court.seal.order`, `court.citation.adjudicate`, `court.sentence.calculate` |
-| Dispatch | `cad.call.create`, `cad.call.dispatch`, `cad.call.self_assign`, `cad.call.clear`, `cad.unit.manage`, `cad.broadcast`, `cad.console.open`, `alpr.read.view`, `alpr.hotlist.manage` |
+| Dispatch | `cad.call.create`, `cad.call.dispatch`, `cad.call.self_assign`, `cad.call.clear`, `cad.call.note`, `cad.call.link`, `cad.unit.manage`, `cad.unit.status`, `cad.emergency`, `cad.broadcast`, `cad.console.open`, `alpr.read.view`, `alpr.hotlist.manage` |
 | Forensics | `forensics.scene.create`, `forensics.scene.release`, `forensics.evidence.collect`, `forensics.tools.use` |
 | Property room | `evidence.item.view`, `evidence.item.intake`, `evidence.item.transfer`, `evidence.item.checkout`, `evidence.item.release`, `evidence.item.dispose`, `evidence.item.reseal`, `evidence.audit.run` |
 | Lab | `lab.request.create`, `lab.queue.view`, `lab.analysis.perform`, `lab.analysis.review`, `lab.report.release` |
@@ -1575,6 +1622,35 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Statistics | `stats.view`, `stats.export` |
 | Administration | `admin.permissions.edit`, `admin.groups.edit`, `admin.penalcode.edit`, `admin.codetables.edit`, `admin.branding.edit`, `admin.audit.view`, `admin.retention.edit`, `admin.health.view`, `admin.placement.edit` |
 | Access | `records.breakglass`, `clearance.<level>`, `compartment.<name>`, `fields.mental_health.view`, `fields.victim_address.view` |
+
+**Reads have no key of their own where a page key already says the same thing.**
+The dispatch reads — the pending queue, a call card, the unit board, the live
+map (7.17) and the broadcast board — are gated on `page.dispatch` and on nothing
+else. 4.4 requires the page to declare what it needs and the routes to enforce
+the same rule, and a second `cad.call.view` beside it would be a key that is
+either always granted with the page or a rail entry that opens onto refusals.
+The same reasoning does *not* apply to the registers, where `rms.*.view` exists
+because a record can be above the reader's clearance (4.5).
+
+**Four dispatch keys were added building M4** and are not in 7.16's own list,
+because 7.16 lists what a dispatcher does and these are what an officer does:
+
+- `cad.unit.status` — set your own unit's status (Appendix F's `ST`), and report
+  your progress on a call you are assigned to. It names no officer: the row is
+  the session's own.
+- `cad.emergency` — the emergency button. Held apart from `cad.unit.status`
+  because it raises a P1 call as well as a status, and because a department
+  that has to take the button off one person must be able to do that without
+  taking their status keys with it.
+- `cad.call.note` — add a line to a call's narrative log.
+- `cad.call.link` — link a person or a vehicle to a call. Apart from
+  `cad.call.note` because it reaches into the registers, and the handler runs
+  the access check the register itself would.
+
+7.16's *"cannot be cleared without supervisor acknowledgement"* is checked with
+`cad.unit.manage` rather than an acknowledgement key of its own: the groups that
+hold it — supervisor, command, dispatch — are exactly the ones who may give the
+acknowledgement.
 
 ## Appendix C — Default role template
 
@@ -1605,18 +1681,46 @@ Discord role names are examples; the mapping uses role IDs.
 
 ## Appendix D — Numbering formats
 
-| Record | Format | Example |
-|---|---|---|
-| Person (master) | `P-{######}` | P-000431 |
-| Report | `{AGENCY}-{YY}-{######}` | LSPD-26-000123 |
-| Case | `{AGENCY}-C{YY}-{#####}` | LSPD-C26-00045 |
-| Call | `{YYMMDD}-{####}` | 260917-0042 |
-| Scene | `S{YY}-{#####}` | S26-00017 |
-| Evidence | `E{YY}-{######}` (Code 128 barcode) | E26-001234 |
-| Warrant | `W{YY}-{#####}` | W26-00088 |
-| Citation | `{AGENCY}-T{YY}-{######}` | LSPD-T26-000311 |
-| Booking | `B{YY}-{#####}` | B26-00102 |
-| Lab request | `L{YY}-{#####}` | L26-00031 |
+Every number here is allocated from `fpd_counters` under a row lock, inside the
+transaction that writes the record (13.1, `server/core/counters.lua`). The
+counter row is `(agency_id, kind, year)`, so the **scope** column decides how
+often a sequence restarts, and each format below has to be readable back to the
+row it came from.
+
+| Record | Counter `kind` | Scope (`year`) | Format | Example |
+|---|---|---|---|---|
+| Person (master) | `person` | `0` — never restarts | `P-{######}` | P-000431 |
+| Report | `report` | `YYYY` | `{AGENCY}-{YY}-{######}` | LSPD-26-000123 |
+| Case | `case` | `YYYY` | `{AGENCY}-C{YY}-{#####}` | LSPD-C26-00045 |
+| Call | `call` | `YYMMDD` — restarts daily | `{YYMMDD}-{####}` | 260917-0042 |
+| Scene | `scene` | `YYYY` | `{AGENCY}-S-{YYYY}-{####}` | LSPD-S-2026-0017 |
+| Evidence | `evidence` | `YYYY` | `{AGENCY}-{YYYY}-{######}` (Code 128 barcode) | LSPD-2026-001234 |
+| Warrant | `warrant` | `YYYY` | `W{YY}-{#####}` | W26-00088 |
+| Citation | `citation` | `YYYY` | `{AGENCY}-T{YY}-{######}` | LSPD-T26-000311 |
+| Booking | `booking` | `YYYY` | `B{YY}-{#####}` | B26-00102 |
+| Lab request | `lab_request` | `YYYY` | `L{YY}-{#####}` | L26-00031 |
+
+**The `year` column is a scope key, not a year.** It carries `0` for a sequence
+that never restarts, `YYYY` for a year-scoped one, and `YYMMDD` for the one
+day-scoped sequence in the suite. A call raised on 18 September 2026 counts in
+the row `(agency, 'call', 260918)` and the next day starts again at `0001`, so
+the module author passes the day key to `Counters.numberValues` and
+`Counters.transaction` as their `year` argument and does not have to invent an
+encoding. Six digits do not fit the `SMALLINT UNSIGNED` that 0005 declared, so
+migration 0007 widens the column; `YYYY` and `YYMMDD` values can never collide,
+because they sit under different `kind`s and are different magnitudes anyway.
+`{####}` caps a day at 9999 calls per agency, which is an order of magnitude
+above the busiest shift a server will have.
+
+**Where an agency appears, it is load-bearing.** `uq_fpd_scenes_number` and
+`uq_fpd_evidence_number` (0002) are unique over the number *alone*, not over
+`(agency_id, number)`, while the counter behind them is per agency — so two
+agencies allocating the same sequence in the same year would collide, and the
+second officer would see the insert fail. The scene and evidence formats
+therefore carry the agency and the full four-digit year, which is what
+`Evidence.numberPrefix` builds and what has shipped since M3. `fpd_calls` and
+`fpd_persons` are unique over `(agency_id, number)` instead, so a call number
+and a person number need no agency in them.
 
 ## Appendix E — Status tables
 

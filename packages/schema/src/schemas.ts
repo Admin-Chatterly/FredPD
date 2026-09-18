@@ -1,5 +1,11 @@
 import {
-
+  BROADCAST_KINDS,
+  CALL_DISPOSITIONS,
+  CALL_LINK_KINDS,
+  CALL_LINK_ROLES,
+  CALL_PROGRESS_STATUSES,
+  CALL_STATUSES,
+  CALL_TYPES,
   CLASSIFICATIONS,
   EVIDENCE_DESTINATIONS,
   EVIDENCE_PACKAGING,
@@ -7,6 +13,7 @@ import {
   EVIDENCE_TYPES,
   FIREARM_STATUSES,
   FIREARM_TYPES,
+  HOTLIST_REASONS,
   INTEL_CASE_STATUSES,
   INTEL_CONFIDENCE,
   INTEL_ORG_STATUSES,
@@ -21,6 +28,9 @@ import {
   PLACEMENT_INTERACTIONS,
   PLACEMENT_KINDS,
   SCENE_STATUSES,
+  SELF_SET_UNIT_STATUSES,
+  SUPERVISOR_UNIT_STATUSES,
+  UNIT_STATUSES,
   VEHICLE_FLAG_KINDS,
   VEHICLE_INSURANCE_STATUSES,
   VEHICLE_REGISTRATION_STATUSES,
@@ -1138,6 +1148,647 @@ export const schemas = {
     },
     traceKey: { type: 'string', required: false, max: 64 },
     netId: { type: 'integer', required: false, min: 1 },
+  },
+
+  // ----------------------------------------------------------- dispatch (M4)
+
+  /**
+   * Dispatch (spec 7.16, 7.17, 7.18). Four rules run through every schema in
+   * this section and are not repeated on each one.
+   *
+   * **No positions, anywhere.** Not on the emergency button, not on a unit
+   * status, not on an ALPR read. The server already holds every player's ped
+   * and reads the coordinates off it, exactly as the forensics grid does. A
+   * client route that reported "I am here" would be a client telling the
+   * server where a police unit is: trivially spoofable into a false alibi, and
+   * the one fact on the map that an officer has a motive to lie about
+   * (invariant 1). AVL positions are read server-side and pushed to sessions
+   * with the map open at 3.6's 1–2 second cadence.
+   *
+   * **No identities and no times.** No agency id, no call number, no author
+   * and no timestamp is an input field. Every one of them comes from the
+   * session or from the server clock; a call number in particular is
+   * allocated from `fpd_counters` under a row lock (13.1, ADR-012). The
+   * officer ids on this list are *subjects*, never actors — the units a
+   * dispatcher sends, the unit a supervisor manages, the unit whose reads are
+   * being filtered — and the actor is always the session (invariant 1).
+   *
+   * **A unit is `fpd_units.officer_id`, and there is no other id.** That
+   * column is the whole primary key of `fpd_units` (the table has no `id`
+   * column) and a foreign key to `fpd_officers.id`, so the same number
+   * identifies the officer on the roster and the unit on the board — which is
+   * the point: 0007 keeps one row per officer rather than per session, so a
+   * unit survives a reconnect. Every field below that names a unit is
+   * therefore called `officerId`, `officerIds` or `leadOfficerId` and is an
+   * `fpd_officers.id`, spelled as what it is.
+   *
+   * Two neighbouring identifiers are *not* this one and must not be sent:
+   * `fpd_units.discord_id` and `fpd_call_units.discord_id` are the identity
+   * the server resolves from the session and records as history (0007: "from
+   * the session, never from input"), and `fpd_call_units.id` is one row of
+   * one assignment, which nothing outside the module ever names. A dispatcher
+   * sends officer ids; the module looks up each one's `fpd_units` row and
+   * writes the `discord_id` and `callsign` it finds there.
+   *
+   * **`placementId` exactly where the console is required.** `cad.call.create`
+   * and `cad.call.dispatch` are run by a dispatcher at a `dispatch_console`
+   * placement (3.10), so both carry it and both routes pin
+   * `context = { accessPoint = 'dispatch_console' }` — the condition names the
+   * placement *kind*, as the property room and the lab do. It fails closed
+   * when `input.placementId` is missing, so a pinned route
+   * whose schema omits the field refuses every call it ever receives — that
+   * has shipped three times in this project. Everything an officer does in the
+   * field — self-assign, report progress, set their own status, press the
+   * button, clear a call — carries no `placementId` and is pinned to nothing,
+   * because an officer in a car is not standing at the console.
+   */
+
+  /**
+   * A dispatcher raising a call by hand (7.16 intake).
+   *
+   * There is no position here and none is missing: a call taken over the phone
+   * happens where the *caller* says it does, which is `locationText`, and a
+   * dispatcher who knows the district picks `beatId`. A call raised by another
+   * resource (the `CreateCall` export of section 14 — an alarm, a robbery
+   * script) comes in server-side with real coordinates and never touches this
+   * schema, which is why nothing here is shaped as though a session were
+   * behind every call.
+   */
+  CallCreate: {
+    placementId: { type: 'integer', required: true, min: 1 },
+    type: { type: 'enum', required: true, values: CALL_TYPES },
+    /**
+     * P1–P4 as an integer, not an enum: `CALL_PRIORITIES` explains why the
+     * column is numeric. Required because the intake form makes the dispatcher
+     * choose — a default would be a P3 nobody decided on, and the queue is
+     * ordered by exactly this.
+     */
+    priority: { type: 'integer', required: true, min: 1, max: 4 },
+    /** As the caller gave it. `fpd_calls.location_text VARCHAR(191)`. */
+    locationText: { type: 'string', required: true, min: 1, max: 191 },
+    /**
+     * The district, when the dispatcher knows it. An `fpd_beats.id`, not a
+     * position — a beat is a row, and naming one tells the server nothing
+     * about where anybody is standing. Calls that arrive with coordinates are
+     * tagged with their beat automatically instead (7.17), so this is only for
+     * the ones that do not.
+     */
+    beatId: { type: 'integer', required: false, min: 1 },
+    /** Who called it in. Free text: a caller is rarely on file yet. */
+    callerName: { type: 'string', required: false, max: 191 },
+    callerPhone: { type: 'string', required: false, max: 32 },
+    /**
+     * What the caller said, opening the narrative log. It is content, not UI
+     * text, so it is stored in `fpd_call_log.body` on the `created` line,
+     * beside that line's own `message_key` — `ck_fpd_call_log_content`
+     * requires the key on every entry that is not a `note` and says nothing
+     * about the body, which is exactly the row this needs. Bounded like every
+     * other note on this list: an unbounded narrative is a denial of service
+     * on the call card, which loads all of them.
+     */
+    details: { type: 'string', required: false, max: 1000 },
+  },
+
+  /**
+   * The pending queue (7.16 stacking), and the same route behind the call list
+   * an MDT shows. Not pinned: a unit reads the queue from the car.
+   */
+  CallList: {
+    /**
+     * Absent means the working set — everything not yet cleared or cancelled —
+     * which is what a queue is. Naming a terminal status is how the day's
+     * closed calls are reviewed.
+     */
+    status: { type: 'enum', required: false, values: CALL_STATUSES },
+    priority: { type: 'integer', required: false, min: 1, max: 4 },
+    beatId: { type: 'integer', required: false, min: 1 },
+    /**
+     * "Calls I am on", as a flag rather than an officer id: the server fills
+     * in the session's own unit, so this cannot become a way to ask which
+     * calls somebody else is working (invariant 1, as `LabQueue.mine`).
+     */
+    mine: { type: 'boolean', required: false },
+    /**
+     * The queue is ordered P1 first, oldest first, and it is read as
+     * `WHERE agency_id = ? AND queue_priority IS NOT NULL ORDER BY
+     * queue_priority, received_at` over `idx_fpd_calls_queue` — not as an
+     * order by `priority`, which would sort cleared calls in with the open
+     * ones. `queue_priority` is the stored generated column that is the
+     * priority while the call is open and NULL once it is closed, so a page
+     * is a range read rather than a sort of every call the server has ever
+     * taken (budget 12.1). A `status` filter above asks a different question
+     * and is answered by `idx_fpd_calls_status` instead. The ceiling matches
+     * the other list routes.
+     */
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  /** One call card. Not pinned: the card is the unit's copy of the call too. */
+  CallGet: {
+    id: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
+   * Assigning units to a call and setting the lead (7.16). Pinned to the
+   * console, so `placementId` is required.
+   *
+   * Add and remove rather than "here is the new set of units": a replacement
+   * set silently undoes a self-assignment that happened between the dispatcher
+   * loading the card and pressing save, and the call log would record the
+   * dispatcher removing a unit they never saw. The same reasoning as the
+   * `version` field on every editable record, expressed in the shape of the
+   * write instead.
+   */
+  CallDispatch: {
+    placementId: { type: 'integer', required: true, min: 1 },
+    callId: { type: 'integer', required: true, min: 1 },
+    /**
+     * The units being sent, as `fpd_units.officer_id` values (see the
+     * section preamble: that column is the unit's only identifier). They are
+     * strings because the validator has no integer-list type — the server
+     * parses and bounds them and refuses the whole dispatch if one entry is
+     * not an id (as `LabRequestCreate`). `maxLength` is 20 because a
+     * `BIGINT UNSIGNED` is at most twenty digits. The cap is a shift's worth
+     * of units: a dispatch that names more than twelve is a mistake or an
+     * attempt to write a call card nobody can render.
+     */
+    officerIds: { type: 'string[]', required: false, maxItems: 12, maxLength: 20 },
+    /** Units being taken off the call, same encoding and same cap. */
+    removeOfficerIds: { type: 'string[]', required: false, maxItems: 12, maxLength: 20 },
+    /**
+     * Transferring the lead is this field, not a route of its own (7.16
+     * "transfer lead unit"): one path onto the call means one place the log
+     * line and the audit row are written. The unit must be on the call after
+     * this dispatch is applied, which the handler checks — a schema cannot,
+     * and `uq_fpd_call_units_lead` only guarantees there is never more than
+     * one live lead, not that there is one at all.
+     */
+    leadOfficerId: { type: 'string', required: false, min: 1, max: 20 },
+  },
+
+  /**
+   * An officer taking a call themselves (7.16). Not pinned and carrying
+   * nothing but the call: which unit is assigned comes from the session, so an
+   * officer cannot attach somebody else to a call they do not want.
+   */
+  CallSelfAssign: {
+    callId: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
+   * A unit reporting its own progress on a call — en route, on scene (7.16).
+   *
+   * The call's own status and its `en_route_at` / `on_scene_at` stamps are
+   * derived from this by the server, never sent: a client that could set the
+   * call's status could put a call on scene with nobody there, and a client
+   * that could send the timestamp could decide how long the response took.
+   *
+   * One write, three rows deep: `fpd_units.status` and `status_since` for the
+   * unit, `fpd_calls.status` and the matching stamp for the call, and a line
+   * in `fpd_call_log`. There is no per-assignment status to move —
+   * `fpd_call_units` records who joined, who left and who has the lead, and
+   * carries no status column at all (0007 says why). A unit that goes
+   * `transporting` or `busy` while still on a call sets that through
+   * `cad.unit.status`, which is why neither is on `CALL_PROGRESS_STATUSES`.
+   *
+   * `FredPD.Schema.CallStatus` is this input shape; `FredPD.CallStatus` is
+   * the generated enum of the call lifecycle, and `FredPD.CallProgressStatus`
+   * is the two values this field accepts. Different namespaces, as
+   * `UnitStatus` already is.
+   */
+  CallStatus: {
+    callId: { type: 'integer', required: true, min: 1 },
+    status: { type: 'enum', required: true, values: CALL_PROGRESS_STATUSES },
+  },
+
+  /**
+   * Clearing with a disposition code (7.16). Not pinned: Appendix F's `CLR`
+   * is a command line an officer types in the car.
+   *
+   * A call raised by the emergency button cannot be cleared without supervisor
+   * acknowledgement (7.16), and that is `CallAcknowledge` below — a separate
+   * write by a separate person — not a field here: an `acknowledged: true`
+   * flag would be the officer in distress ticking their own box. The handler
+   * refuses the clearing with `needs_acknowledgement` while
+   * `fpd_calls.acknowledged_at` is NULL, so the officer reads why rather than
+   * meeting `ck_fpd_calls_panic_ack` as an `internal` error. Cancelling is
+   * refused on the same terms, or cancelling would be the way around it.
+   */
+  CallClear: {
+    callId: { type: 'integer', required: true, min: 1 },
+    disposition: { type: 'enum', required: true, values: CALL_DISPOSITIONS },
+    /** The closing line of the narrative log. */
+    note: { type: 'string', required: false, max: 1000 },
+  },
+
+  /**
+   * A supervisor acknowledging an emergency call (7.16: an emergency call
+   * "cannot be cleared without supervisor acknowledgement").
+   *
+   * The acknowledgement is a write of its own rather than a flag on
+   * `CallClear`, because the two are done by different people at different
+   * times: the officer in distress, or whoever is with them, clears the call
+   * when it is over, and a supervisor says they have seen it. A flag on the
+   * clearing would let the person clearing the call acknowledge it in the
+   * same breath, which is the one thing 7.16 is asking to be impossible —
+   * and `ck_fpd_calls_panic_ack` refuses the write in any case, so without
+   * this route a panic call could never be closed at all.
+   *
+   * It carries the call and nothing else. `fpd_calls.acknowledged_by` is the
+   * session's Discord id and `acknowledged_at` the server clock (invariant
+   * 1), and the log line is `cad.log.acknowledged` with the callsign, so
+   * there is no text to send either. The permission is `cad.unit.manage`,
+   * which Appendix B makes explicit: the groups that hold it — supervisor,
+   * command, dispatch — are exactly the ones who may give the
+   * acknowledgement, and a key of its own would answer a question this one
+   * already answers.
+   */
+  CallAcknowledge: {
+    callId: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
+   * Adding to the narrative log (7.16).
+   *
+   * The kind of the line is not a field: this route writes a `note` and the
+   * server writes every other kind from what it just did (`CALL_LOG_KINDS`).
+   * The log is append-only (invariant 11), and a line a client could label is
+   * a line a client can dress up as a status change that never happened.
+   */
+  CallNote: {
+    callId: { type: 'integer', required: true, min: 1 },
+    /**
+     * `fpd_call_log.body` is `VARCHAR(2048)`; this stops well short of it,
+     * and the bound is the point: a note with no maximum is a denial of
+     * service on the call card, which loads the whole log, and on every
+     * session subscribed to `call:<id>` (3.6). Stopping short of the column
+     * also means a note that is refused here was never truncated on the way
+     * to the database — the officer sees `too_long` and keeps their text.
+     */
+    body: { type: 'string', required: true, min: 1, max: 1000 },
+  },
+
+  /**
+   * Linking a person or a vehicle to a call (7.16), and unlinking one.
+   *
+   * `targetId` is a row in the register named by `kind` — `fpd_persons.id` or
+   * `fpd_vehicles.id` — and the handler runs the same access check the
+   * register itself would before the link is written or read back
+   * (invariant 4). A plate or a name is deliberately not accepted: a link is
+   * to a record, and creating records from a call card would be a second way
+   * into the master name index with none of 7.3's checks.
+   */
+  CallLink: {
+    callId: { type: 'integer', required: true, min: 1 },
+    kind: { type: 'enum', required: true, values: CALL_LINK_KINDS },
+    targetId: { type: 'integer', required: true, min: 1 },
+    /** Absent means `involved`, the column default. */
+    role: { type: 'enum', required: false, values: CALL_LINK_ROLES },
+    /**
+     * True removes the link. One route both ways, because the log line and
+     * the audit entry are the same shape either way and splitting them would
+     * mean two places to forget one.
+     */
+    remove: { type: 'boolean', required: false },
+  },
+
+  /**
+   * The unit board (7.16): every unit, status, assignment and time in status.
+   * Not pinned — the board is on the MDT as well as the console.
+   */
+  UnitList: {
+    /** Absent means every unit that is not `off_duty`, which is the board. */
+    status: { type: 'enum', required: false, values: UNIT_STATUSES },
+    beatId: { type: 'integer', required: false, min: 1 },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  /**
+   * An officer setting their own status (7.16, 7.1's F-keys). Not pinned, and
+   * it names no officer: the row is the session's own.
+   *
+   * `FredPD.Schema.UnitStatus` is this input shape; `FredPD.UnitStatus` is the
+   * enum table. Different namespaces, as `FirearmStatus` already is.
+   *
+   * The values are `SELF_SET_UNIT_STATUSES`, not the whole list: `off_duty`
+   * is the sign-off path and `emergency` belongs to `cad.emergency`, and
+   * leaving them out here makes both refusals happen in the validator rather
+   * than in a handler that could forget.
+   */
+  UnitStatus: {
+    status: { type: 'enum', required: true, values: SELF_SET_UNIT_STATUSES },
+  },
+
+  /**
+   * A supervisor or dispatcher changing somebody else's unit state (7.16).
+   *
+   * Not pinned, deliberately: a field supervisor (Appendix A, *yttre befäl*)
+   * does this from the MDT, and pinning it to the console would refuse every
+   * call they make. The permission is what limits it, which is invariant 2
+   * doing its job.
+   */
+  UnitManage: {
+    /**
+     * The unit being changed — the subject, never the actor. It is an
+     * `fpd_units.officer_id` (the preamble says why that is the only id a
+     * unit has); the actor is the session, which signs the call log line and
+     * the audit row (invariant 1).
+     */
+    officerId: { type: 'integer', required: true, min: 1 },
+    status: { type: 'enum', required: false, values: SUPERVISOR_UNIT_STATUSES },
+    /**
+     * `fpd_units.callsign VARCHAR(32)`, reassigned at briefing. The bound
+     * matches the column, and `fpd_officers.callsign` beside it: a shorter
+     * one here would refuse a callsign the roster already holds, with a
+     * `too_long` the supervisor cannot act on — there would be no legal way
+     * to type the unit's real name.
+     */
+    callsign: { type: 'string', required: false, max: 32 },
+    beatId: { type: 'integer', required: false, min: 1 },
+    /**
+     * Why. Not required by the validator because a callsign correction needs
+     * no essay, and required by the handler for the changes that read as
+     * discipline afterwards — taking a unit out of service, signing somebody
+     * off — because those are the ones an audit entry has to explain.
+     */
+    reason: { type: 'string', required: false, max: 255 },
+  },
+
+  /**
+   * The emergency button (7.16): a P1 call at the officer's position.
+   *
+   * It takes nothing at all, and that is the whole design. The position comes
+   * off the ped server-side, the call type and the priority are fixed by the
+   * server, the officer and their unit come from the session, and the
+   * timestamp is the server clock. There is no field a client could send that
+   * would make this call more accurate, and every field it could send —
+   * above all a position — is one an attacker would use to put a fake officer
+   * down on the other side of the map and empty a district.
+   *
+   * The schema exists rather than being omitted because a route that declares
+   * one has every key it did not ask for dropped before the handler runs; with
+   * an empty schema, that is every key (as `GroupList`).
+   */
+  Emergency: {},
+
+  /**
+   * A BOLO or an all-units message (7.16 [S]).
+   *
+   * Not pinned: a field supervisor puts out a lookout from the car as readily
+   * as dispatch does from the console.
+   */
+  BroadcastCreate: {
+    kind: { type: 'enum', required: true, values: BROADCAST_KINDS },
+    /**
+     * How loud it is, on the same P1–P4 scale as a call and under the same
+     * `ck_fpd_broadcasts_priority` bounds. A field rather than the column
+     * default, because `fpd_broadcasts.priority` is `NOT NULL` and without
+     * one every broadcast on the board would be a P3 nobody chose — a BOLO
+     * for a shooting suspect ranked with a road closure. Optional, so a
+     * routine notice needs no decision: absent takes the column's default
+     * of 3.
+     */
+    priority: { type: 'integer', required: false, min: 1, max: 4 },
+    /** `fpd_broadcasts.title VARCHAR(191)`; this stops short of it. */
+    title: { type: 'string', required: true, min: 1, max: 128 },
+    /**
+     * The message. Bounded, and stored as text rather than editor JSON: a
+     * broadcast is radio traffic that also has to render inside a hit banner
+     * (invariant 10 keeps raw HTML out of both).
+     */
+    body: { type: 'string', required: true, min: 1, max: 2000 },
+    /**
+     * The plate a lookout is for, when there is one — the primary use of a
+     * broadcast, and the field a unit matches an ALPR read against by eye.
+     * It lands in `fpd_broadcasts.plate`, a `VARCHAR(16)` column that 0007
+     * did not originally have and that is added by the same change as this
+     * comment; upper-cased and trimmed on write, like every other plate
+     * column in the suite. It puts the plate on the broadcast and
+     * nothing else: making an ALPR banner fire on that plate is a hotlist
+     * entry, written through `AlprHotlistEdit` under `alpr.hotlist.manage`,
+     * because a plate worth stopping a car over is a decision with its own
+     * permission (7.18). Whoever holds `cad.broadcast` does not thereby hold
+     * that one.
+     */
+    plate: { type: 'string', required: false, max: 16 },
+    /**
+     * How long it stands, in minutes, from five minutes to a week. In
+     * minutes rather than as a date because an absolute time would be a
+     * client-supplied timestamp (invariant 1): the server adds this to its
+     * own clock and writes `fpd_broadcasts.expires_at`, which
+     * `ck_fpd_broadcasts_expiry` then requires to be after `created_at`.
+     * That column is nullable — a standing BOLO runs until somebody takes it
+     * off the air — so absent here means the module applies the agency's
+     * configured default rather than "no expiry", and a board that nobody
+     * clears is the thing the default exists to prevent.
+     */
+    expiresInMinutes: { type: 'integer', required: false, min: 5, max: 10080 },
+  },
+
+  /**
+   * Taking a broadcast off the air (7.16 [S]).
+   *
+   * The counterpart to `AlprHotlistEdit.remove`, as a route of its own rather
+   * than a flag, because `BroadcastCreate` requires a title and a body and
+   * cancelling supplies neither. Nothing is deleted: the module stamps
+   * `fpd_broadcasts.cancelled_at` and `cancelled_by`, and the row stays, so
+   * "what was out on the air at the time" survives the shift it was asked
+   * about (0007). Without this shape the two columns, and the
+   * `cad.broadcast.cancel` and `cad.broadcast.cancelled` strings that name
+   * them, could never be reached at all.
+   */
+  BroadcastCancel: {
+    id: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
+   * The broadcast board (7.16 [S], 7.26): what is out on the air.
+   *
+   * A read, so it is gated on `page.dispatch` and on nothing else (Appendix
+   * B), and not pinned: the board is the first thing a unit reads coming on
+   * shift, from the car. The agency is the session's; nothing here names one.
+   *
+   * `idx_fpd_broadcasts_live` is `(agency_id, cancelled_at, expires_at)` and
+   * `idx_fpd_broadcasts_history` is `(agency_id, created_at)`, which is why
+   * `includeExpired` is a flag and not a date range: the live board and the
+   * history are two different index reads, and a window would be neither.
+   */
+  BroadcastList: {
+    /**
+     * Absent means what is on the air now — neither cancelled nor expired.
+     * True adds the ones that have come off it, which is how "what was out
+     * at the time" is answered after an arrest; nothing is ever deleted, so
+     * the history is complete (0007).
+     */
+    includeExpired: { type: 'boolean', required: false },
+    /** One kind at a time — the BOLO board without the briefing notes. */
+    kind: { type: 'enum', required: false, values: BROADCAST_KINDS },
+    /** The call a broadcast came out of, when the board is read from a card. */
+    callId: { type: 'integer', required: false, min: 1 },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  /**
+   * The beats and districts of one agency (7.17): the polygons the map draws,
+   * and the list the intake form's beat picker offers.
+   *
+   * It takes nothing at all. The agency comes from the session; the set is
+   * small — 0007 budgets the tagger against an agency that has drawn thirty
+   * districts — so there is nothing to page through, and the map needs all of
+   * it at once or it draws a district with a hole in it. There is no `kind`
+   * filter because a district *is* a beat with a lower precedence in the same
+   * table, and both are drawn; and no `enabled` filter, because a beat taken
+   * out of use is not drawn and not offered. `fpd_beats.enabled` is how a
+   * beat goes out of use without being deleted, and that is the point:
+   * `fpd_calls.beat_id` is `ON DELETE SET NULL`, so deleting a beat would
+   * quietly untag every call it had ever held.
+   *
+   * The polygons come back; no position goes out. A beat is a row, and asking
+   * for the beat map says nothing about where the asker is standing.
+   */
+  BeatList: {},
+
+  /**
+   * The map payload: units and calls, for a session with the map open (7.17).
+   *
+   * Positions travel one way. The answer carries where the units are, read
+   * server-side off their peds; the request carries nothing about where
+   * anybody is, and the subscription is what makes the 1–2 second AVL push
+   * legal at all — 3.6 pushes only to sessions with the map open, and budget
+   * 12.1 is why that matters at two hundred players.
+   *
+   * Every position in the answer has passed the same access check as a read
+   * (invariants 4 and 5): this is not a broadcast, and a session sees the
+   * units of the agencies it is allowed to see.
+   */
+  MapView: {
+    /**
+     * True or absent: "the map is open, subscribe me and send the snapshot".
+     * False: "it is closed, stop pushing". The close half is a field rather
+     * than a second route because a session that disappears without saying so
+     * is already handled by the session layer, and one route means one place
+     * the subscription is written.
+     */
+    subscribe: { type: 'boolean', required: false },
+  },
+
+  /**
+   * Plate reads (7.18 [S]). A read is written server-side from the radar
+   * bridge with the time, the place and the unit; this route only reads them
+   * back, and every field is a filter.
+   */
+  AlprReadList: {
+    plate: { type: 'string', required: false, min: 2, max: 16 },
+    /**
+     * Whose reads. An `fpd_units.officer_id`, which is the same number
+     * `fpd_alpr_reads.officer_id` carries — that column is nulled when the
+     * roster row goes, so filtering by it answers "the reads of an officer
+     * who is still on the roster", and the reads of one who is not are
+     * reached by plate and time like any other. Auditable, like any query.
+     */
+    officerId: { type: 'integer', required: false, min: 1 },
+    /**
+     * A window in hours rather than a pair of timestamps: reads are kept for
+     * thirty days by the retention job (7.18), so 720 is the whole file and
+     * anything older is gone. A client-supplied datetime would be a client
+     * choosing what "now" means, and the server would have to defend against
+     * a range that reads the table end to end.
+     */
+    sinceHours: { type: 'integer', required: false, min: 1, max: 720 },
+    /** Only the reads that raised a hotlist hit. */
+    hitsOnly: { type: 'boolean', required: false },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  /**
+   * Adding and removing a hotlist plate (7.18).
+   *
+   * One route both ways, for the same reason the vehicle hot file has one:
+   * a single path means one place the reason, the audit entry and the
+   * expiry are enforced. Putting a plate on the hotlist is putting a red
+   * banner in front of an officer about to stop a car, so it is written down
+   * or it does not happen.
+   */
+  AlprHotlistEdit: {
+    plate: { type: 'string', required: true, min: 2, max: 16 },
+    /**
+     * True removes the plate — which stamps `fpd_hotlist.cancelled_at` and
+     * `cancelled_by` and leaves the row, so a read that matched it still
+     * points at why (0007).
+     *
+     * `uq_fpd_hotlist_live` is `(agency_id, plate, reason, live)`, so one
+     * plate can be listed under two reasons at once — stolen, and wanted by
+     * an investigator. A removal that names a `reason` takes that entry; one
+     * that does not takes every live entry for the plate, which is what
+     * `alpr.hotlist.removeConfirm` asks about by plate alone.
+     */
+    remove: { type: 'boolean', required: false },
+    /**
+     * Why the banner fires. Optional here and required by the handler when
+     * adding, because a removal has nothing to justify — the schema cannot
+     * express "required unless `remove`".
+     */
+    reason: { type: 'enum', required: false, values: HOTLIST_REASONS },
+    /**
+     * The detail the banner shows under the reason, stored in
+     * `fpd_hotlist.detail` (`VARCHAR(512)`; this stops short of it).
+     */
+    note: { type: 'string', required: false, max: 255 },
+    /** `fpd_hotlist.case_number VARCHAR(32)`. */
+    caseNumber: { type: 'string', required: false, max: 32 },
+    /**
+     * The surveillance case (7.18, section 9), stored in
+     * `fpd_hotlist.silent`: the read is logged and the hit is recorded
+     * against the entry, and the unit is told nothing. Without this field the
+     * column could never be anything but its default of 0, and the two
+     * locale strings that explain it (`alpr.hotlist.silent` and
+     * `alpr.hotlist.silentHint`) would label a control that sets nothing.
+     *
+     * It is a flag on the entry rather than a separate list because the check
+     * an ALPR read runs is one query either way, and a second table would be
+     * a second place to forget the expiry. Who may set it is the handler's
+     * question, not the schema's: `alpr.hotlist.manage` puts a plate on the
+     * list, and a silent entry is the one a subject must not be able to
+     * discover — including when the subject is the officer reading the board.
+     */
+    silent: { type: 'boolean', required: false },
+    /**
+     * Optional expiry, in minutes, up to thirty days — the same horizon as
+     * read retention. Absent means it stands until somebody removes it, which
+     * is right for a stolen vehicle and wrong for a one-shift lookout.
+     */
+    expiresInMinutes: { type: 'integer', required: false, min: 5, max: 43200 },
+  },
+
+  /**
+   * The hotlist itself (7.18): which plates are listed, why, by whom and
+   * until when.
+   *
+   * This is the management screen behind `AlprHotlistEdit`, so it is read
+   * with `alpr.hotlist.manage` rather than with `alpr.read.view`: the reads
+   * file says which cars drove past a camera, and this says which cars an
+   * officer will be stopped from driving away in. An officer who holds only
+   * `alpr.read.view` still sees the entry behind a banner they were shown —
+   * that is part of the hit, not this list.
+   *
+   * A silent entry (`fpd_hotlist.silent`) is a surveillance target and is not
+   * part of that read: the whole point is that the subject learns nothing,
+   * and the subject is sometimes an officer with a login. Which rows come
+   * back is the handler's decision under section 9, not a filter here, and
+   * there is deliberately no `silent` field on this list to ask for them by.
+   */
+  AlprHotlistList: {
+    /** One plate, when the question is "is this car listed, and why". */
+    plate: { type: 'string', required: false, min: 2, max: 16 },
+    reason: { type: 'enum', required: false, values: HOTLIST_REASONS },
+    /**
+     * Absent means the live list — not cancelled, not expired — which is what
+     * `idx_fpd_hotlist_check` answers and what an entry has to be on to raise
+     * a banner. True adds the ones that have come off it, which is how an
+     * entry is reviewed before it is put back on.
+     */
+    includeExpired: { type: 'boolean', required: false },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
   },
 
 } as const satisfies Record<string, Schema>;

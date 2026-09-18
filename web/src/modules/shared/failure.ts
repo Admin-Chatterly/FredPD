@@ -88,6 +88,46 @@ const REASONS = new Set([
   'stolen',
   'seized',
   'destroyed',
+
+  // Dispatch (spec 7.16-7.18). A CAD refusal is read in a hurry, often by
+  // somebody holding a radio, so each of these says which fact stopped the
+  // write rather than that something did.
+  //
+  // `call_cleared` and `call_cancelled` are prefixed for the reason
+  // `scene_released` is: `cleared` is an intel person's status and `cancelled`
+  // is a lab request's, and the codes share one namespace whatever field
+  // carried them. A call the dispatcher already closed would otherwise be
+  // explained in the words of a register nobody was looking at.
+  'call_cleared',
+  'call_cancelled',
+
+  // The unit is already on this call, or is not on it. Both arrive on the
+  // dispatch form: adding a unit twice, taking one off that left, or naming a
+  // lead unit that the same dispatch did not put on the call.
+  'already_assigned',
+  'not_assigned',
+
+  // The officer behind the unit is signed off (7.1 duty state), and
+  // `unavailable` is the unit's own status refusing the work -- out of service,
+  // or already on something the dispatcher has not seen. Two codes because the
+  // fix differs: one is "sign on", the other is "clear what you are on".
+  'off_duty',
+  'unavailable',
+
+  // No `fpd_units` row at all: the session never signed on to a unit, so there
+  // is nothing to attach to a call, to move, or to put in distress. Different
+  // from `off_duty`, which is a unit that exists and is not working.
+  'no_unit',
+
+  // An emergency call cannot be cleared until a supervisor has acknowledged it
+  // (7.16). The refusal names the field so the card can say what is missing
+  // rather than greying the button out with no reason.
+  'needs_acknowledgement',
+
+  // A beat, a placement or a hotlist entry that exists but has been switched
+  // off. Distinct from `unknown`, because "there is no such beat" and "that
+  // district was retired last week" are different mistakes.
+  'disabled',
 ]);
 
 export interface FieldMessage {

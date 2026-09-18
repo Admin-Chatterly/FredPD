@@ -55,6 +55,14 @@ jobs:
       - name: Everything written is reachable
         run: pnpm wiring:check
 
+      # The database and the code have to agree about what a code value is.
+      # Nothing else compares them: the typecheck reads the TypeScript, the i18n
+      # check reads the locales, busted never touches SQL. A disagreement passes
+      # every other step here and fails at runtime as MariaDB error 4025, on the
+      # first write that happens to use the disputed value.
+      - name: Code values match their CHECK constraints
+        run: pnpm enum:check
+
       - name: Generated schema is current
         run: |
           pnpm schema:gen
