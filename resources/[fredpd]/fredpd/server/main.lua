@@ -69,6 +69,26 @@ local REQUIRED_TABLES <const> = {
     'fpd_firearms',
     'fpd_firearm_events',
     'fpd_query_log',
+
+    -- Migration 0006. Hot-file hit confirmation (spec 7.2): the record of
+    -- whether a lead was confirmed before an officer acted on it.
+    'fpd_hotfile_confirmations',
+
+    -- Migration 0007. Dispatch (spec 7.16-7.18). Listed in full rather than by
+    -- `fpd_calls` alone, because a half-applied dispatch migration fails in the
+    -- middle of a call rather than at boot: a dispatcher creates a P1, assigns
+    -- a unit, and the assignment is the statement that finds `fpd_call_units`
+    -- missing -- with the call already on the board and an officer already
+    -- driving.
+    'fpd_beats',
+    'fpd_calls',
+    'fpd_call_units',
+    'fpd_call_log',
+    'fpd_call_links',
+    'fpd_units',
+    'fpd_broadcasts',
+    'fpd_hotlist',
+    'fpd_alpr_reads',
 }
 
 --- Columns a migration added to a table that already existed, which the table

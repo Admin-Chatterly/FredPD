@@ -5,18 +5,36 @@ ESX server already uses (spec 3.3).
 
 ## Migrations
 
-`0001_fredpd.sql` is the schema as first released — all 23 tables, in
-foreign-key order. `0002_evidence.sql` adds the ten tables section 8 needs:
-hidden biometrics and weapon signatures, scenes, evidence and its owner,
-custody, the lab queue and the forensic indexes. `0003_fleet_gating.sql` lets a
-motor pool vehicle name the Discord role or permission group that opens it
-(7.31), and `0004_group_version.sql` gives permission groups the version column
-every other editable record already had, so two administrators editing one
-group cannot silently overwrite each other.
+**The current migration is `0007_dispatch.sql`. Apply every file up to and
+including it.** This list has been wrong before, and an operator who trusts a
+stale one applies `0001` and then spends an evening reading SQL errors about
+tables nobody told them existed. If you add a migration, add it here in the
+same commit.
+
+| File | What it adds |
+| --- | --- |
+| `0001_fredpd.sql` | The schema as first released — all 23 tables, in foreign-key order. |
+| `0002_evidence.sql` | The ten tables section 8 needs: hidden biometrics and weapon signatures, scenes, evidence and its owner, custody, the lab queue and the forensic indexes. |
+| `0003_fleet_gating.sql` | Lets a motor pool vehicle name the Discord role or permission group that opens it (7.31). |
+| `0004_group_version.sql` | Gives permission groups the version column every other editable record already had, so two administrators editing one group cannot silently overwrite each other. |
+| `0005_records.sql` | `fpd_counters` (every record number in the suite is allocated from it), the record-level access tables of 4.5, and the M2 records core: persons, vehicles, firearms and the query log. |
+| `0006_hotfile_confirmation.sql` | Hot-file hit confirmation (7.2): whether a lead was confirmed before an officer acted on it. |
+| `0007_dispatch.sql` | Dispatch (7.16–7.18): calls with their units, narrative log and links; the unit board and AVL; beat polygons; broadcasts; the ALPR hotlist and plate reads. |
 
 Apply all of them, in filename order. A server carrying only some of them
 refuses to start and names the tables it cannot find, rather than starting and
 failing later on a call nobody connects to the missing migration.
+
+Two of them change how an existing install behaves rather than only adding
+tables, so read these before upgrading a live server:
+
+- **`0005`** seeds `fpd_counters` from the evidence and scene numbers already in
+  the database, so numbering continues where it left off instead of colliding
+  with numbers that are already taken. The statements are idempotent.
+- **`0007`** adds no data and alters no existing table, but every table it
+  creates is checked at boot by `server/main.lua`. Once you are running a build
+  that contains it, a database without it refuses to start — which is the
+  intended failure, and it names the tables it could not find.
 
 `migrations/` is **append-only**. Invariant 8: a migration that has shipped is
 never edited, not even to fix a typo in a comment. Correct it with a new
