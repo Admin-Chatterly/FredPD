@@ -50,6 +50,36 @@ local ANMALAN_SELECT <const> = [[
       FROM fpd_anmalan
 ]]
 
+--- The same columns, minus the händelseförlopp.
+---
+--- A list row is a line in a table: a number, a title, a status and a date.
+--- `handelseforlopp` is the full Tiptap document -- kilobytes of editor JSON per
+--- report -- and shipping fifty of them to draw fifty *titles* is the whole of
+--- section 12's "never send the body to draw the list".
+---
+--- It is not only the wire. MariaDB has to read every matching row before it
+--- can take the newest fifty, so the column is read for the agency's entire
+--- history, not for the page: at 50k anmälningar that is 480 ms against 2.7 ms
+--- with the blob left out (0013 carries the measurements and the index that
+--- made the rest of the difference).
+---
+--- Deliberately a second constant rather than a column list assembled per call.
+--- A caller that could choose its columns is a caller that can ask for the blob
+--- by accident, and `anmalan.get` -- the one place the body *is* wanted -- has
+--- `ANMALAN_SELECT` right there.
+local ANMALAN_LIST_SELECT <const> = [[
+    SELECT id, agency_id AS agencyId, number, parent_id AS parentId,
+           fu_id AS fuId, call_id AS callId, title, status,
+           occurred_at AS occurredAt, occurred_place AS occurredPlace,
+           created_by AS createdBy, created_at AS createdAt,
+           submitted_by AS submittedBy, submitted_at AS submittedAt,
+           returned_by AS returnedBy, returned_at AS returnedAt,
+           returned_note AS returnedNote,
+           approved_by AS approvedBy, approved_at AS approvedAt,
+           classification, version, updated_at AS updatedAt
+      FROM fpd_anmalan
+]]
+
 local FU_SELECT <const> = [[
     SELECT id, agency_id AS agencyId, number, title, status,
            fu_ledare AS fuLedare, ledare_kind AS ledareKind,
@@ -123,14 +153,20 @@ function Repo.list(agencyId, filter, limit)
     values[#values + 1] = limit
 
     return FredPD.Core.db.query(
-        ANMALAN_SELECT .. ' WHERE ' .. table.concat(clauses, ' AND ')
+        ANMALAN_LIST_SELECT .. ' WHERE ' .. table.concat(clauses, ' AND ')
             .. ' ORDER BY created_at DESC LIMIT ?',
         values)
 end
 
+--- The tilläggsuppgifter under one anmälan.
+---
+--- A list too, so it reads without the bodies. A supplement's own body arrives
+--- through `anmalan.get` when somebody opens it -- which is also where its
+--- access check is written down, and 4.5 wants that check on the record being
+--- read rather than inherited from its parent.
 function Repo.supplements(anmalanId, agencyId)
     return FredPD.Core.db.query(
-        ANMALAN_SELECT .. ' WHERE parent_id = ? AND agency_id = ? ORDER BY created_at',
+        ANMALAN_LIST_SELECT .. ' WHERE parent_id = ? AND agency_id = ? ORDER BY created_at',
         { anmalanId, agencyId })
 end
 
@@ -164,12 +200,31 @@ function Repo.personer(anmalanId)
          ORDER BY ap.roll, ap.person_id]], { anmalanId })
 end
 
-function Repo.versions(anmalanId)
+--- The history of one anmälan: who signed what, and when.
+---
+--- **Without the snapshots.** Each one is the whole report as it read at that
+--- transition -- charges, people and the händelseförlopp, denormalised on
+--- purpose (see `Repo.transition`) -- so a report that has been returned and
+--- resubmitted a few times carries tens of kilobytes per row, and a history
+--- panel that lists "Inlämnad · 14:02 · Andersson" needs none of it.
+---
+--- `MAX_VERSIONS` bounds it because nothing else does: 7.7 keeps every version
+--- forever and a report that a supervisor keeps sending back grows a row each
+--- time. The newest are the ones somebody is looking for, and the rest are
+--- still in the table for the audit that wants them.
+---
+--- Reading one snapshot back is a route that does not exist yet. When it does
+--- it takes `(anmalanId, version)` and returns one row -- not this list with
+--- the column added, which is how the payload gets back in.
+local MAX_VERSIONS <const> = 50
+
+function Repo.versions(anmalanId, limit)
     return FredPD.Core.db.query([[
-        SELECT id, version, status, snapshot, signed_by AS signedBy, signed_at AS signedAt
+        SELECT id, version, status, signed_by AS signedBy, signed_at AS signedAt
           FROM fpd_anmalan_versions
          WHERE anmalan_id = ?
-         ORDER BY version DESC]], { anmalanId })
+         ORDER BY version DESC
+         LIMIT ?]], { anmalanId, math.min(limit or MAX_VERSIONS, MAX_VERSIONS) })
 end
 
 -- -----------------------------------------------------------------------------
