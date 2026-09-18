@@ -444,7 +444,7 @@ Where the two overlap, the rule is one owner per concern:
 
 ### 4.3 Permission model
 
-- **Permission keys:** `<area>.<object>.<action>`, optionally with a scope, for example `rms.report.approve` or `evidence.item.release`. Full catalog in Appendix B.
+- **Permission keys:** `<area>.<object>.<action>`, optionally with a scope, for example `rms.anmalan.approve` or `evidence.item.release`. Full catalog in Appendix B.
 - **Permission groups:** named bundles of keys. Groups can inherit from other groups.
 - **Role map:** Discord role ID → groups, scoped to an agency.
 - **Effective permissions:** the union of groups from all of a user's roles, per agency. Computed once per role change and cached in the session, so checks are constant-time.
@@ -699,41 +699,55 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 - [S] Premise hazards appear automatically on dispatch call cards.
 - **Permissions:** `rms.location.view`, `rms.location.hazard.edit`.
 
-### 7.7 Incident reports (M2)
+### 7.7 Anmälan (M2)
 
-- [M] Report types: incident/offence, arrest, supplemental, traffic collision, use of force, vehicle pursuit, death investigation, missing person, found/safekeeping property, field interview, traffic stop.
-- [M] Structured sections, following the NIBRS structure: offences (code picker), persons with roles, property (stolen, recovered, seized, evidence), vehicles, narrative (rich text).
-- [M] Templates per report type; required fields enforced per type.
-- [M] Pre-fill from a dispatch call (location, times, involved units and persons).
-- [M] Drafts with autosave; co-authors.
-- [M] Workflow: Draft → Submitted → Returned (with supervisor comments) → Approved. Approved reports are locked.
-- [M] After approval, changes only through a supplemental report or a supervisor-approved amendment. Every version is kept.
-- [M] Electronic signature (name, badge number, timestamp) at submission and approval.
-- [M] Evidence and attachments linked (access-controlled).
-- [S] Print and PDF with letterhead and classification watermark.
-- [S] Void with reason (supervisor), never delete.
-- [O] Live co-editing (as in ps-mdt v3).
-- **Based on:** Mark43/Axon RMS workflows; NIBRS; ps-mdt v3 and ox_mdt reports.
-- **Permissions:** `rms.report.create`, `rms.report.edit.own`, `rms.report.submit`, `rms.report.approve`, `rms.report.return`, `rms.report.void`, `rms.report.view.<type>`.
+Built. Migration 0009, `server/modules/anmalan/`, the Reports tab in `web/src/modules/records/`.
 
-### 7.8 Case management (M2 basic, M6 full)
+Rewritten for Swedish procedure (ADR-014). The approval workflow this section always described survives intact; what changed is that the investigation left it for 7.8, because a supervisor's approval and a prosecutor's decision are not the same act.
 
-- [M] Case number, type, lead investigator, assigned team, status (Open, Active, Suspended, Closed) and clearance (cleared by arrest, exceptionally cleared, unfounded, referred).
-- [M] Linked reports, persons (with roles), vehicles, firearms, evidence, warrants, lab requests.
-- [M] Chronological case timeline built from linked events.
-- [M] Case notes with classification and compartments.
-- [S] Tasks and leads with assignee and due date.
-- [S] Solvability factors and supervisor review dates.
-- [S] Prosecution package: bundle of selected, redacted items for the prosecutor (section 7.20).
-- **Permissions:** `inv.case.create`, `inv.case.view`, `inv.case.edit`, `inv.case.assign`, `inv.case.close`.
+- [M] An **anmälan** records an offence: structured sections (brott from the catalogue, personer with roles, gods, fordon) plus a **händelseförlopp** as editor JSON — never HTML (invariant 10), and refused as such by a JSON column rather than on trust.
+- [M] **Roller**: `misstankt`, `malsagande`, `vittne`, `anmalare`, `annan`. Not a translation of the US set — **målsägande** is the injured party and carries rights a "victim" does not have, to be heard and to bring a claim alongside the prosecution. One person may hold two roles on one anmälan, which is the commonest report there is, so the key carries the role.
+- [M] **Charges are per count**, not per offence, because BrB 26:2 computes over counts. Each cites one immutable catalogue *version* (7.10), so the legal basis of a charge is fixed when it is written and still reads after the catalogue moves on. `stage` covers BrB 23 — försök, förberedelse and stämpling are only offered where the statute makes them punishable.
+- [M] **Workflow**: Utkast → Inlämnad → Återsänd → Godkänd. Godkänd is terminal because the transition map has no row for it, rather than because four write paths remember to check.
+- [M] **An officer may not approve their own anmälan**, whatever they hold. No permission reaches the rule and there is deliberately no key that would: the value of the step is that a second person looked, and on a small server the supervisor writes half the reports. The screen says so before the button is pressed.
+- [M] After approval, changes only through a **tilläggsuppgift** — its own row, number, author and approval, never an edit of its parent. Every version is kept, snapshotted by the same transaction that moves the status.
+- [M] Electronic signature (name, badge number, timestamp) at submission and approval, taken from the roster at the moment of signing so a later rank change does not rewrite it.
+- [M] Pre-fill from a **händelse** (7.16) — linked rather than copied, so the call's timestamps stay the authority on when things happened.
+- [M] Drafts with autosave; optimistic locking, so two officers editing one draft produces a refusal rather than a silent overwrite.
+- [S] Print and PDF with letterhead and classification watermark. Needs the gateway (M7).
+- [S] Co-authors, and void with reason (supervisor), never delete.
+- **Permissions:** `rms.anmalan.view`, `rms.anmalan.create` (both patrol), `rms.anmalan.edit.any`, `rms.anmalan.approve` (both supervisor).
 
-### 7.9 Arrests and booking (M2 arrest, M6 booking)
+### 7.8 Förundersökning (M2)
 
-- [M] Arrest record: charges (from penal code), time, place, arresting officer(s), rights advisement with timestamp, force used (links to a use-of-force report).
-- [S] Booking at the booking terminal: mugshot with height chart (screenshot-basic with a fixed camera), ten-print capture (adds the person to the fingerprint index), DNA reference swab when policy allows.
-- [S] Property inventory of the arrestee (dedicated ox_inventory stash per booking, returned on release).
-- [S] Sentence and bail handoff to the jail bridge; release record.
-- **Permissions:** `rms.arrest.create`, `booking.create`, `booking.biometrics.capture`, `booking.release`.
+Built. Migration 0009, `server/modules/anmalan/` (same module, separate table).
+
+- [M] A **förundersökning** is opened by a decision (*inleda FU*), led by a **förundersökningsledare**, and ended by one: *lägga ned FU* with a stated ground, or **slutdelgivning** (RB 23:18a — the misstänkt and their försvarare are given the material) followed by **redovisning** to the åklagare.
+- [M] `ledare_kind` records the capacity — `polis` or `aklagare` — and it is not cosmetic: RB gives the åklagare powers a police FU-ledare does not have, and 7.12 reads this column. Reassignment writes the person and the capacity together or neither.
+- [M] Decisions belong to the FU-ledare. `inv.fu.assign` is the supervisor half, for an investigation whose ledare has left.
+- [M] Linked anmälningar, and through them the charges, the frihetsberövanden and the tvångsmedel.
+- [S] Tasks and leads with assignee and due date; solvability factors; prosecution package (M6).
+- **Not `fpd_intel_cases`.** The intelligence module has a case of its own (§10), and the two are deliberately separate: an intel case links `fpd_intel_persons` — the register's soft records, which exist precisely because intelligence is held about people with no master record — while an FU links the master index, because a misstänkt in a real investigation is an identified person. An FU has legal status and an intel case has none. `fpd_forundersokning.intel_case_id` links one to the other where intelligence work became an investigation.
+- **Permissions:** `inv.fu.view` (patrol), `inv.fu.open`, `inv.fu.lead` (supervisor), `inv.fu.assign` (command).
+
+### 7.9 Frihetsberövande (M2), inskrivning i arrest (M6)
+
+Built. Migration 0010, `server/modules/frihet/`.
+
+A chain of three decisions taken by three different people, not one arrest record (ADR-014).
+
+- [M] **Gripande** (RB 24:7). An officer seizes somebody caught in the act or already efterlyst. Provisional, and theirs to decide. The moment is stamped by the server and never accepted from input: every clock below runs from it.
+- [M] **Underrättelse om misstanke** (RB 24:9), recorded as a moment — the question asked afterwards is *when*, not whether — and written once, so a second call cannot move it later.
+- [M] **Anhållande** (RB 24:6). The **åklagare** decides whether the frihetsberövande continues. If they do not, the gripne is released.
+- [M] **Häktningsframställan**, then **häktning** (RB 24:13), decided by the **tingsrätt** at a hearing.
+- [M] **Frigivande is available from every open stage** and is the commonest outcome at the first. Its route is deliberately *not* marked `sensitive`, unlike every other decision here: the others keep somebody locked up and must not survive a stale permission snapshot, and this one lets somebody go — refusing it during a Discord outage would hold a person because a third party's API was down.
+- [M] **The two statutory clocks**, computed on the server and counted down on the screen:
+  - **RB 24:12** — the häktningsframställan is due *senast klockan tolv tredje dagen efter anhållningsbeslutet*. A wall-clock local noon, **not seventy-two hours**: 76 hours for an 08:00 anhållande, 62 for a 22:00 one.
+  - **RB 24:13** — the häktningsförhandling within four dygn of the gripande. That one is 96 hours.
+- [M] An append-only custody log: förhör, försvarare, måltider, the calls a detainee is entitled to.
+- [M] What somebody is held for is its own charge list, separate from the anmälan's: a prosecutor anhåller for two of the five offences reported, and the chain has to say which two.
+- [S] **Inskrivning i arrest** (M6): mugshot, ten-print capture, property inventory, sentence handoff.
+- **Permissions:** `frihet.view`, `frihet.gripande`, `frihet.frigiv` (patrol); `frihet.anhallande` (åklagare); `frihet.haktning` (domare).
 
 ### 7.10 Brottskatalogen och straffskalan (M2)
 
@@ -755,23 +769,36 @@ This section was originally written against a US penal code — a class (felony,
 - [S] Written warnings recorded without a fine.
 - **Permissions:** `rms.citation.issue`, `rms.citation.void`, `court.citation.adjudicate`.
 
-### 7.12 Warrants (M2)
+### 7.12 Tvångsmedel och efterlysning (M2)
 
-- [M] Types: arrest, search (person, vehicle, address), bench, surveillance (section 9).
-- [M] Application with probable-cause statement, linked case and evidence.
-- [M] Judge review (DOJ role): approve with conditions and expiry, or deny with reason. Electronic signature.
-- [M] Lifecycle: Requested → Approved or Denied → Active → Served (return of service) / Recalled / Expired.
-- [M] Active arrest warrants create hot-file hits; search warrants define scope and validity window.
-- [M] Export `HasSearchWarrant(targetType, targetId)` so raid and door scripts can require a valid warrant (section 14).
-- [S] Emergency (exigent) entries logged with required justification and after-the-fact review.
-- **Permissions:** `court.warrant.request`, `court.warrant.review`, `court.warrant.recall`, `rms.warrant.serve`.
+Built. Migration 0011, `server/modules/tvangsmedel/`.
 
-### 7.13 BOLOs and attempts to locate (M2)
+Rewritten for Swedish procedure (ADR-014). **There is no judge in this section**, and that is the substantive change: RB gives almost all of these decisions to the förundersökningsledare.
 
-- [M] Person and vehicle BOLOs with photos, reason, priority, area, expiry.
-- [M] Automatic hits on queries and ALPR reads; auto-resolve on arrest or impound.
-- [M] Shown on the roll-call board and context panel.
-- **Permissions:** `rms.bolo.create`, `rms.bolo.cancel`, `rms.bolo.view`.
+- [M] **Husrannsakan** in two kinds, which are separate decisions with separate grounds: *reell* (RB 28:1) searches a place for something, *personell* (RB 28:2) searches a place for a **person**, to arrest them.
+- [M] **Kroppsvisitation** (RB 28:11) — clothing and what somebody carries. **Kroppsbesiktning** (RB 28:12) — the body itself, and the measure that produces the reference sample the lab compares against. FredPD requires at least an **åklagare** for the second, which is stricter than RB and recorded as a policy choice: the alternative on a game server is that every officer who can open an investigation can order one.
+- [M] **Beslag** (RB 27:1) as a decision. The items have lived in the evidence module since M3.
+- [M] Decided by the **förundersökningsledare**, **åklagare** or **domare**. The capacity is derived from the session's permissions and is never a field a client sends.
+- [M] A **validity window**, because a decision with no end is a standing authority to enter somebody's home. Revocation (`upphävd`) overrides it. **Execution does not end it** — RB allows a husrannsakan to be resumed, and a door script refusing the second entry because the first was logged would enforce a rule nobody wrote.
+- [M] **`HasSearchWarrant(targetType, targetId)`** (§14), which `ox_doorlock` opens a door on. It asks the narrow question: only the two husrannsakan kinds authorise entry. A live kroppsvisitation against the same person does **not** open their front door, and a general "is there any measure" check would.
+- [M] **Efterlysning** replaces the US arrest warrant, which has no Swedish equivalent. The commonest ground is *anhållen i sin frånvaro* — a decision that lives in 7.9's chain, of which this is the consequence that makes somebody show up on a query.
+- [M] Only the two custody grounds mean **detain on sight**. Somebody wanted for **delgivning** is to be served a document and somebody **försvunnen** is wanted for their own sake; one red banner for all three teaches an officer that the banner does not mean what it says.
+- [M] `IsWanted(citizenid)` (§14) answers the narrow question too, and resolves the citizenid to a master record first.
+- [S] Emergency (**fara i dröjsmål**) entries logged with required justification and after-the-fact review.
+- **Permissions:** `tvang.view`, `tvang.verkstall` (patrol); `tvang.decide` (supervisor); `tvang.decide.aklagare`, `tvang.decide.domare` (DOJ); `efterlysning.issue` (command, åklagare).
+
+### 7.13 Spaningsuppdrag (M2)
+
+Built. Migration 0012, `server/modules/spaning/`.
+
+**Not the same thing as an efterlysning**, and keeping them apart is what lets the hit banner say something useful. An efterlysning is a legal status that means *detain this person*; a spaningsuppdrag is an operational lookout that means *look for this and tell us*.
+
+- [M] Person, vehicle, **or neither** — a description with no record behind it ("silver estate, no plate seen, three occupants") is the commonest lookout there is, and the case a foreign key cannot express.
+- [M] Raised by **any officer**, unlike an efterlysning. A department where a lookout needed command approval would not use it, and the sightings would stay in radio traffic where nothing can search them.
+- [M] Priority, area (a beat, so it joins the dispatch geography rather than inventing a second one), and a **required** expiry: a lookout that never expires is a banner that stays up until somebody remembers a van from three months ago.
+- [M] **Only priority 1 raises a banner.** Everything else is a notice on the record. The expensive mistake is the loud one: an officer shown a red banner for every "have a look for this van" learns within a shift that red banners are usually nothing, and then misses the one that was a person with a knife. No priority reaches the detain-on-sight treatment, which is 7.12's alone.
+- [M] Automatic hits on queries; **auto-resolve on gripande or omhändertagande**, as a server-local event (§14) rather than a call across modules.
+- **Permissions:** `spaning.view`, `spaning.create` (both patrol).
 
 ### 7.14 Field interviews and stop data (S, M6)
 
@@ -1558,18 +1585,27 @@ Total: roughly 320–450 hours.
 
 ## 19. Open decisions and inputs needed
 
+**Settled since v0.1:** the framework is **ESX** (ADR-005), and the procedure is
+**Swedish** rather than US workflows with Swedish labels (ADR-014). Both were on
+this list; both were load-bearing enough that deferring them would have meant
+rewriting M2 rather than extending it.
+
+The procedure decision opened one input of its own, listed below: the host's
+timezone is now load-bearing for RB 24:12's local noon, because Lua cannot
+resolve an IANA name to an offset without a tz database.
+
 | Decision or input | Why it matters | Needed by |
 |---|---|---|
 | ~~What PD-Span is technically and where its source lives~~ | **Resolved.** A live Next.js app on Supabase, not a FiveM resource. See `docs/pd-span-inventory.md` | M0 — done |
 | Agencies at launch (names, logos, colors) | Branding, numbering, sharing rules | M1 |
 | Discord guild ID and role IDs (ranks, units, compartments, DOJ) | Permission seed | M1 |
-| Procedure style: US-style workflows with Swedish text, or Swedish-style procedure (gripande, anhållande, häktning, prosecutor-led förundersökning) | Report, warrant and court workflows | M2 |
 | UI framework confirmation (Svelte 5 or React) | Locks in the web stack | End of M1 |
 | Phone, jail, billing, housing, appearance resources | Bridges | M2–M4 |
 | ~~Garage resource~~ | **Resolved.** FredPD owns the agency motor pool (7.31); impound stays with `p_policejob` | M1 — decided |
 | Dispatch alerts: built-in only or a ps-dispatch adapter | CAD scope | M4 |
 | Four call-log lines with no `entry_type`: `cad.log.acknowledged`, `cad.log.welfare_check`, `cad.log.report_created` (all three are features 7.16 names) and `cad.log.priority_changed` (which nothing names and no permission allows) | `ck_fpd_call_log_type` has eleven values and none of them fits these four, so either the CHECK grows, the lines ride on an existing value, or the strings go. Until it is settled they are keys no line can carry (7.16.1) | M4 |
 | Map tile source | Map module | M4 |
+| Host timezone for the deployment | RB 24:12's deadline is a *local* noon, and the server's own clock is the only zone Lua can resolve (ADR-014) | M2, now |
 | Retention periods per data type | Privacy and performance | M3 |
 | Lab turnaround times and success rates | Game balance | M3 |
 | Which evidence persists across restarts | Database load, realism | M3 |
@@ -1663,9 +1699,13 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Pages | `page.query`, `page.dispatch`, `page.records`, `page.evidence`, `page.lab`, `page.intel`, `page.court`, `page.personnel`, `page.stats`, `page.admin`, `page.comms` |
 | Queries | `query.run`, `query.hit.confirm`, `query.person.run`, `query.vehicle.run`, `query.firearm.run`, `query.phone.run`, `query.address.run`, `query.log.view` |
 | Records | `rms.person.view`, `rms.person.edit`, `rms.person.photo.upload`, `rms.person.caution.edit`, `rms.vehicle.view`, `rms.vehicle.edit`, `rms.vehicle.flag`, `rms.firearm.view`, `rms.firearm.edit`, `rms.firearm.trace`, `rms.brott.view`, `rms.location.view`, `rms.location.hazard.edit` |
-| Reports | `rms.report.create`, `rms.report.edit.own`, `rms.report.submit`, `rms.report.approve`, `rms.report.return`, `rms.report.void`, `rms.report.view.<type>` |
-| Enforcement | `rms.arrest.create`, `rms.citation.issue`, `rms.citation.void`, `rms.bolo.create`, `rms.bolo.cancel`, `rms.bolo.view`, `rms.fi.create`, `rms.stops.create`, `rms.impound.create`, `rms.impound.release`, `rms.impound.hold.release`, `rms.warrant.serve` |
-| Investigations | `inv.case.create`, `inv.case.view`, `inv.case.edit`, `inv.case.assign`, `inv.case.close` |
+| Anmälan | `rms.anmalan.view`, `rms.anmalan.create`, `rms.anmalan.edit.any`, `rms.anmalan.approve`, `rms.anmalan.view.<type>` |
+| Förundersökning | `inv.fu.view`, `inv.fu.open`, `inv.fu.lead`, `inv.fu.assign` |
+| Frihetsberövande | `frihet.view`, `frihet.gripande`, `frihet.anhallande`, `frihet.haktning`, `frihet.frigiv` |
+| Tvångsmedel | `tvang.view`, `tvang.decide`, `tvang.decide.aklagare`, `tvang.decide.domare`, `tvang.verkstall`, `efterlysning.issue` |
+| Spaning | `spaning.view`, `spaning.create` |
+| Enforcement | `rms.arrest.create`, `rms.citation.issue`, `rms.citation.void`, `rms.fi.create`, `rms.stops.create`, `rms.impound.create`, `rms.impound.release`, `rms.impound.hold.release`, `rms.warrant.serve` |
+| Investigations (intelligence cases, §10) | `inv.case.create`, `inv.case.view`, `inv.case.edit`, `inv.case.assign`, `inv.case.close` |
 | Booking | `booking.create`, `booking.biometrics.capture`, `booking.release` |
 | Court | `court.warrant.request`, `court.warrant.review`, `court.warrant.recall`, `court.referral.review`, `court.calendar.manage`, `court.disposition.enter`, `court.discovery.issue`, `court.discovery.view`, `court.seal.order`, `court.citation.adjudicate`, `court.sentence.calculate` |
 | Dispatch | `cad.call.create`, `cad.call.dispatch`, `cad.call.self_assign`, `cad.call.clear`, `cad.call.note`, `cad.call.link`, `cad.unit.manage`, `cad.unit.status`, `cad.emergency`, `cad.broadcast`, `alpr.read.view`, `alpr.hotlist.manage` |

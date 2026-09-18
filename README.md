@@ -21,10 +21,16 @@ Two guides in Swedish, for the people who run and use the server:
 
 ## Status
 
-**M0 complete, M1 in progress.** The monorepo, toolchain, CI and the mock NUI
-bridge are in place, and the platform core is building out: the route layer,
-sessions, the Discord-derived permission model, the audit log, and the first
-modules.
+**M0–M3 complete. M2 records and M4 dispatch are in.** The platform core, the
+registers, the evidence and forensics chain, dispatch, and the records half of
+M2 — anmälan, förundersökning, frihetsberövande, tvångsmedel and
+spaningsuppdrag — are built and tested. M5 surveillance and M6 court, personnel
+and booking are next; see the roadmap in spec section 17.
+
+Two decisions that shape everything below: the framework is **ESX** (ADR-005),
+and the procedure is **Swedish** rather than US workflows with Swedish labels
+(ADR-014). The second is structural, not cosmetic — see the ADR for the four
+places where it produces genuinely different software.
 
 Working today:
 
@@ -46,9 +52,31 @@ Working today:
 - **The intelligence register** — people, organizations, the intel log, vehicles,
   cases and the links between them — ported from PD-Span onto the server's own
   MariaDB, so it persists in the game database (spec 10).
+- **The registers**: the master name index with phonetic search, vehicles,
+  firearms, and hot-file hits with a confirmation step (spec 7.2–7.5).
+- **Crime scenes, evidence and the lab**: collection, chain of custody, the
+  property room, analysis and the forensic indexes (spec 8).
+- **Dispatch**: calls, the unit board, live positions, beats, broadcasts and the
+  ALPR hotlist (spec 7.16–7.18).
+- **Brottskatalogen** with straffskalor and BrB 26:2 sentencing for several
+  offences at once, versioned so a change never alters a past record (7.10).
+- **Anmälan och förundersökning**: the report workflow, locking, tilläggsuppgifter
+  and the investigation's own lifecycle (7.7, 7.8). An officer cannot approve
+  their own anmälan, and no permission reaches that rule.
+- **Frihetsberövande**: gripande → anhållande → häktning, with the RB 24:12 and
+  RB 24:13 deadlines counted down on the screen (7.9).
+- **Tvångsmedel och efterlysning**: husrannsakan, kroppsvisitation and wanted
+  notices, with `HasSearchWarrant` for door and raid scripts (7.12, §14).
+- **Spaningsuppdrag**: lookouts on people, vehicles or a description alone,
+  feeding the hot-file check (7.13).
 
-Records, dispatch, evidence, lab and court follow in M2–M6; see the roadmap in
-spec section 17.
+Not built yet, and worth knowing before you install: the **gateway** service, so
+no media uploads, no PDFs and no printing; **booking**, **citations**,
+**impound**, **court** and **personnel** (all M6); **surveillance** (M5); and
+screens for frihetsberövande, tvångsmedel and spaning — their servers are done
+and callable, the Svelte is not written. None of this has run on a live FiveM
+server: the logic is covered by tests, and the parts that call game natives are
+not.
 
 ## Layout
 

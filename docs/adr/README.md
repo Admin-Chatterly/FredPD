@@ -24,3 +24,4 @@ When a decision changes `docs/FredPD.md`, the ADR and the spec edit go in the
 | [011](011-evidence-records-live-in-the-core.md) | Evidence records live in the core; satellites hold only in-world mechanics | Accepted |
 | [012](012-record-numbers-from-a-locked-counter.md) | Record numbers come from a locked counter row, not from MAX() of the target table | Accepted |
 | [013](013-a-public-route-tier.md) | A public route tier, for the actions spec 8.10 gives to every player | Accepted |
+| [014](014-swedish-procedure.md) | Swedish procedure, not US workflows with Swedish labels | Accepted |

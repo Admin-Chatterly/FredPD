@@ -269,7 +269,7 @@ route.define({
 --- already contains, so a key an operator granted before it was catalogued
 --- still appears in the editor rather than silently vanishing from it.
 ---
---- The templated entries in Appendix B -- `rms.report.view.<type>`,
+--- The templated entries in Appendix B -- `rms.anmalan.view.<type>`,
 --- `clearance.<level>`, `compartment.<name>` -- are patterns, not keys, and are
 --- left out. The editor offers keys; a clearance is not one of them.
 ---
@@ -312,13 +312,22 @@ local PERMISSION_CATALOGUE <const> = {
     'spaning.view', 'spaning.create',
     'rms.location.view', 'rms.location.hazard.edit',
 
-    -- Reports
-    'rms.report.create', 'rms.report.edit.own', 'rms.report.submit',
-    'rms.report.approve', 'rms.report.return', 'rms.report.void',
+    -- Anmälan och förundersökning (spec 7.7, 7.8).
+    --
+    -- `rms.report.*` was the US-shaped set spec v0.1 catalogued; ADR-014
+    -- replaced it. The old keys are deliberately not kept alongside: no route
+    -- reads one, so offering them would fill the editor with grants that give
+    -- nobody anything and take an administrator an afternoon to discover.
+    --
+    -- The *record type* an anmälan is filed under in the access tables is still
+    -- `report`, and that is not an inconsistency: it is the key grants are
+    -- stored against, and renaming it would orphan every grant already written.
+    'rms.anmalan.view', 'rms.anmalan.create', 'rms.anmalan.edit.any',
+    'rms.anmalan.approve',
+    'inv.fu.view', 'inv.fu.open', 'inv.fu.lead', 'inv.fu.assign',
 
     -- Enforcement
     'rms.arrest.create', 'rms.citation.issue', 'rms.citation.void',
-    'rms.bolo.create', 'rms.bolo.cancel', 'rms.bolo.view',
     'rms.fi.create', 'rms.stops.create',
     'rms.impound.create', 'rms.impound.release', 'rms.impound.hold.release',
     'rms.warrant.serve',
