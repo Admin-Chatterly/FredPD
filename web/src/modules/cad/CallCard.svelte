@@ -183,7 +183,7 @@
   /** The position age of a recommended unit, from the board row beside it. */
   function positionAge(officerId: number): string {
     const unit = units.find((candidate) => candidate.officerId === officerId);
-    if (!unit || unit.positionAtUnix === null) return t('cad.map.noPosition');
+    if (!unit || unit.positionAtUnix == null) return t('cad.map.noPosition');
 
     return t('cad.map.positionAge', { duration: elapsed(unit.positionAtUnix, now) });
   }

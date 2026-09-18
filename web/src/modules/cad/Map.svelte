@@ -95,7 +95,7 @@
             seeded[unit.officerId] = {
               x: unit.x,
               y: unit.y,
-              ...(unit.positionAtUnix === null ? {} : { at: unit.positionAtUnix }),
+              ...(unit.positionAtUnix == null ? {} : { at: unit.positionAtUnix }),
             };
           }
         }

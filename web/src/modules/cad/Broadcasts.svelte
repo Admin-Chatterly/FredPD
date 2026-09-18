@@ -313,7 +313,7 @@
                  from the console's own call list, and a broadcast can outlive
                  the call it came out of. "From call ——" says less than
                  nothing. -->
-            {#if entry.callId !== null && callNumber(entry.callId) !== ''}
+            {#if entry.callId != null && callNumber(entry.callId) !== ''}
               <span class="text-xs text-[var(--color-ink-muted)]">
                 {t('cad.broadcast.fromCall', { number: callNumber(entry.callId) })}
               </span>

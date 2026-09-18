@@ -394,7 +394,7 @@
   }
 
   export function beatLabel(beats: Beat[], beatId: number | null | undefined): string {
-    if (beatId === null || beatId === undefined) return t('cad.beat.none');
+    if (beatId == null) return t('cad.beat.none');
 
     const beat = beats.find((candidate) => candidate.id === beatId);
     if (!beat) return t('cad.beat.none');
@@ -783,7 +783,7 @@
       </span>
 
       <span class="ml-auto flex gap-2">
-        {#if prompt.callId !== null}
+        {#if prompt.callId != null}
           <button
             type="button"
             class="border border-[var(--color-border)] px-3 py-1 hover:bg-[var(--color-surface)]"
