@@ -4,6 +4,8 @@ import type { IntelCase, IntelNote, IntelOrg, IntelPerson, IntelTag, PermissionG
 import type { FleetEntry, GroupRow, PermissionRow } from '../../modules/admin/types';
 import type { CustodyEntry, EvidenceItem, Scene } from '../../modules/evidence/types';
 import type { LabAnalysis } from '../../modules/lab/types';
+import { isStub } from '../../modules/records/types';
+import type { Maybe, PersonResult, VehicleResult } from '../../modules/records/types';
 
 /**
  * Fixtures for browser development (spec 17.2, M0).
@@ -755,6 +757,7 @@ let nextCallId = 4;
 let nextLogId = 20;
 let nextAssignmentId = 10;
 let nextBroadcastId = 3;
+let nextLinkId = 3;
 let callSequence = 44;
 
 const shotsFired = minutesAgo(4);
@@ -935,20 +938,28 @@ let cadLog: CadLogEntry[] = [
 /**
  * The persons and vehicles on the collision call.
  *
- * A constant, and that is a finding rather than a shortcut: `call.link` is a
- * route with a schema, a permission and a grant, and nothing in the interface
- * calls it — linking a record to a call needs the register's row id, and the
- * card has no picker to produce one. The milestone report says so; until there
- * is a caller, nothing can add a link and this list cannot move.
+ * This was a `const`, and said so at length: `call.link` was a route with a
+ * schema, a permission and a grant that nothing in the interface called,
+ * because linking needs the register's row id and the card had no picker to
+ * produce one. The card has one now, so the list moves — and the register rows
+ * it picks from are the `registerPersons` and `registerVehicles` fixtures
+ * below, deliberately the same ids these two rows already point at, so a
+ * dispatcher searching the picker meets the records the collision call is
+ * already linked to rather than a second, parallel department.
  */
-const cadLinks: CadLink[] = [
+let cadLinks: CadLink[] = [
   {
     id: 1,
     callId: 2,
     targetType: 'person',
     targetId: 1,
     role: 'involved',
-    label: 'DOE, John A.',
+    // As `Repo.linkTarget` builds it: `TRIM(CONCAT(first_name, ' ',
+    // last_name))`, and the plate on the row below. It read `DOE, John A.`
+    // here, which is how a records index prints a name and not how this column
+    // is filled — a fixture inventing a format the server does not write is
+    // how a screen gets built around one.
+    label: 'John Doe',
     detail: null,
     createdAt: minutesAgo(17).at,
   },
@@ -1207,6 +1218,275 @@ function recommendFor(call: CadCall): unknown[] {
     }))
     .sort((left, right) => left.distance - right.distance)
     .slice(0, 3);
+}
+
+// ---------------------------------------------------------------- registers
+
+/**
+ * The master name index and the vehicle register, as `person.search` and
+ * `vehicle.search` answer them (7.2–7.4).
+ *
+ * These were missing, and the gap is what let the call card ship with a link
+ * picker nobody could work. The mock answers an unmocked route with
+ * `not_found`, so in the browser every Search on the picker failed — the same
+ * dead end the seed produced in game by granting `cad.call.link` to a group
+ * without `rms.person.view`, and neither was noticed because the one place the
+ * interface is meant to be walkable end to end could not reach the screen
+ * either. web/CLAUDE.md states the rule these rows satisfy: a fixture for every
+ * route the NUI calls.
+ *
+ * `terms` is what the server matched on *before* access control ran, and it
+ * sits beside the row instead of being read off it. A stub carries no name, no
+ * number and no id — `Access.stub` builds it from nothing (4.5) — so a fixture
+ * that filtered on the row's own columns could never return one, and the
+ * withheld line on the picker would be unreachable in the browser and in the
+ * Playwright suite alike. That line is the honest answer to "the name I can see
+ * in front of me is not in this list", so it has to be walkable.
+ */
+interface RegisterRow<T extends { id: number }> {
+  /** Lower-case fragments the row matches, as the server's LIKE would. */
+  terms: string[];
+  row: Maybe<T>;
+  /**
+   * A row this reader *is* cleared for, held back until the query carries a
+   * reason or a case number (7.2). A different thing from the stub above and
+   * told apart the same way the server tells them apart: a stub is returned
+   * and says so, while this is simply absent and sets `restrictedWithheld`,
+   * which the register screen draws as an offer to search again with a reason.
+   */
+  breakGlass?: boolean;
+}
+
+/** The columns every register row carries, stamped once so the rows read short. */
+const RECORD_KEEPING = {
+  agencyId: 'lspd',
+  version: 1,
+  createdBy: 'OFF-1042',
+  createdAt: '2026-02-11T09:14:00.000Z',
+  updatedBy: 'OFF-1042',
+  updatedAt: '2026-08-03T16:40:00.000Z',
+};
+
+const registerPersons: RegisterRow<PersonResult>[] = [
+  {
+    // The person the collision call is already linked to, with the id that
+    // link carries. Linking from the picker therefore lands on the row the
+    // card already shows, which is what a second link to the same record does
+    // on the server: `Repo.setLink` upserts and changes the role.
+    terms: ['doe', 'john', 'p-000431', '555-0134'],
+    row: {
+      ...RECORD_KEEPING,
+      id: 1,
+      personNumber: 'P-000431',
+      firstName: 'John',
+      middleName: 'A.',
+      lastName: 'Doe',
+      dateOfBirth: '1989-04-12',
+      sex: 'm',
+      phone: '555-0134',
+      address: 'Alta Street 12, Apartment 3',
+      deceasedAt: null,
+      missingSince: null,
+      classification: 'internal',
+      recordType: 'person',
+      matchScore: 3,
+      matchedAlias: null,
+      cautions: [],
+    },
+  },
+  {
+    terms: ['doe', 'ellen', 'p-000512'],
+    row: {
+      ...RECORD_KEEPING,
+      id: 2,
+      personNumber: 'P-000512',
+      firstName: 'Ellen',
+      middleName: null,
+      lastName: 'Doe',
+      dateOfBirth: '1994-11-30',
+      sex: 'f',
+      phone: null,
+      address: null,
+      deceasedAt: null,
+      missingSince: null,
+      classification: 'internal',
+      recordType: 'person',
+      matchScore: 2,
+      // A caution reaches a search result as its kind and expiry and never as
+      // its detail: what a person is flagged for is on the record, not in a
+      // list somebody glanced at.
+      cautions: [{ kind: 'violent', expiresAt: null }],
+      matchedAlias: null,
+    },
+  },
+  {
+    // The third Doe, and the reason the picker has a withheld line at all: a
+    // dispatcher who knows this person exists gets told the search reached
+    // something and not what. No id, so nothing to link.
+    terms: ['doe', 'p-000633'],
+    row: { restricted: true, recordType: 'person', contact: 'homicide' },
+  },
+  {
+    terms: ['petrov', 'marko', 'p-000588'],
+    row: {
+      ...RECORD_KEEPING,
+      id: 3,
+      personNumber: 'P-000588',
+      firstName: 'Marko',
+      middleName: null,
+      lastName: 'Petrov',
+      dateOfBirth: '1982-06-02',
+      sex: 'm',
+      phone: '555-0177',
+      address: null,
+      deceasedAt: null,
+      missingSince: null,
+      classification: 'internal',
+      recordType: 'person',
+      matchScore: 3,
+      matchedAlias: null,
+      cautions: [],
+    },
+  },
+  {
+    // Cleared for, and still not handed over without a reason (7.2).
+    breakGlass: true,
+    terms: ['lind', 'sofia', 'p-000701'],
+    row: {
+      ...RECORD_KEEPING,
+      id: 4,
+      personNumber: 'P-000701',
+      firstName: 'Sofia',
+      middleName: null,
+      lastName: 'Lind',
+      dateOfBirth: '1976-01-19',
+      sex: 'f',
+      phone: null,
+      address: null,
+      deceasedAt: null,
+      missingSince: null,
+      classification: 'restricted',
+      recordType: 'person',
+      matchScore: 2,
+      matchedAlias: null,
+      cautions: [],
+    },
+  },
+];
+
+const registerVehicles: RegisterRow<VehicleResult>[] = [
+  {
+    terms: ['45abc123', 'sultan'],
+    row: {
+      ...RECORD_KEEPING,
+      id: 1,
+      plate: '45ABC123',
+      vin: 'WBA3A5C51DF123456',
+      model: 'Sultan',
+      colour: 'black',
+      colourSecondary: null,
+      ownerPersonId: 1,
+      ownerIdentifier: null,
+      registrationStatus: 'valid',
+      registrationExpires: '2027-03-31',
+      insuranceStatus: 'valid',
+      insuranceExpires: '2027-01-31',
+      classification: 'internal',
+      recordType: 'vehicle',
+      hits: [],
+      flags: [],
+    },
+  },
+  {
+    terms: ['45xyz777', 'sandking'],
+    row: {
+      ...RECORD_KEEPING,
+      id: 2,
+      plate: '45XYZ777',
+      vin: 'JH4KA8260MC001827',
+      model: 'Sandking',
+      colour: 'white',
+      colourSecondary: null,
+      ownerPersonId: null,
+      ownerIdentifier: null,
+      registrationStatus: 'expired',
+      registrationExpires: '2025-09-30',
+      insuranceStatus: 'none',
+      insuranceExpires: null,
+      classification: 'internal',
+      recordType: 'vehicle',
+      // The hot file, computed by the server off the live flags. The count in
+      // the answer is how many rows carry one, which is what puts the banner
+      // over the register's result list.
+      hits: ['stolen'],
+      flags: [
+        {
+          id: 1,
+          agencyId: 'lspd',
+          vehicleId: 2,
+          kind: 'stolen',
+          detail: 'Taken from the Alta Street multi-storey overnight.',
+          caseNumber: 'LSPD-C26-00045',
+          classification: 'internal',
+          expiresAt: null,
+          createdBy: 'OFF-1042',
+          createdAt: '2026-09-02T04:20:00.000Z',
+        },
+      ],
+    },
+  },
+  {
+    terms: ['45', '45qqr410'],
+    row: { restricted: true, recordType: 'vehicle', contact: 'narcotics' },
+  },
+];
+
+/**
+ * How the two search routes match.
+ *
+ * Both normalize before comparing — `Repo.parseTerm` lower-cases and collapses
+ * whitespace, `Registry.searchTerm` upper-cases and strips it — so the fixture
+ * does the same once here rather than twice, differently, below.
+ */
+function matches<T extends { id: number }>(rows: RegisterRow<T>[], term: string): RegisterRow<T>[] {
+  const needle = term.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (needle === '') return [];
+
+  return rows.filter((entry) => entry.terms.some((candidate) => candidate.includes(needle)));
+}
+
+/**
+ * The label `Repo.linkTarget` selects, or null for a target that cannot be
+ * linked: `TRIM(CONCAT(first_name, ' ', last_name))` for a person and the plate
+ * for a vehicle, so the row the card lists afterwards is the one the server
+ * would have written.
+ *
+ * A stub never answers here, and that is the server's behaviour rather than a
+ * shortcut: `call.link` runs the same access check the register runs, and a
+ * record the session may not read is refused with `not_found` — the same code
+ * as one that is not there, because telling the two apart is the disclosure
+ * (4.5).
+ */
+function linkLabel(kind: string, targetId: number): string | null {
+  if (kind === 'person') {
+    for (const entry of registerPersons) {
+      const row = entry.row;
+      if (!isStub(row) && row.id === targetId) {
+        return [row.firstName, row.lastName].filter(Boolean).join(' ');
+      }
+    }
+
+    return null;
+  }
+
+  if (kind === 'vehicle') {
+    for (const entry of registerVehicles) {
+      const row = entry.row;
+      if (!isStub(row) && row.id === targetId) return row.plate;
+    }
+  }
+
+  return null;
 }
 
 export const fixtures: FixtureSet = {
@@ -1646,6 +1926,133 @@ export const fixtures: FixtureSet = {
       });
 
       return { id: callId };
+    },
+
+    'call.link': (input) => {
+      const { callId, kind, targetId, role, remove } = input as {
+        callId: number;
+        kind: string;
+        targetId: number;
+        role?: string;
+        remove?: boolean;
+      };
+
+      const call = findCall(callId);
+      const closed = closedRefusal(call, 'callId');
+      if (closed || !call) return closed ?? refuse('not_found');
+
+      const label = linkLabel(kind, targetId);
+      if (label === null) return refuse('not_found', { targetId: 'unknown' });
+
+      const existing = cadLinks.find(
+        (link) =>
+          link.callId === callId && link.targetType === kind && link.targetId === targetId,
+      );
+
+      if (remove) {
+        // Checked before anything is written, because the log is append-only:
+        // an `unlinked` line about a link that was never there stays for good.
+        if (!existing) return refuse('not_found', { targetId: 'unknown' });
+
+        cadLinks = cadLinks.filter((link) => link !== existing);
+        addLog(callId, {
+          entryType: 'unlinked',
+          body: null,
+          messageKey: 'cad.log.unlinked',
+          messageArgs: { label: existing.label },
+          callsign: session.callsign,
+        });
+
+        return { id: callId };
+      }
+
+      const chosen = role ?? 'involved';
+
+      // The upsert on `uq_fpd_call_links_target`: linking the same record twice
+      // changes the role rather than stacking a second row nobody would think
+      // to remove, and the narrative gets a line saying who decided the witness
+      // was a suspect (7.16.1).
+      cadLinks = existing
+        ? cadLinks.map((link) => (link === existing ? { ...link, role: chosen } : link))
+        : [
+            ...cadLinks,
+            {
+              id: nextLinkId++,
+              callId,
+              targetType: kind,
+              targetId,
+              role: chosen,
+              label,
+              detail: null,
+              createdAt: minutesAgo(0).at,
+            },
+          ];
+
+      addLog(callId, {
+        entryType: 'linked',
+        body: null,
+        messageKey: 'cad.log.linked',
+        // `role` names a vocabulary and carries the enum member; `label` is
+        // data and is printed as the server recorded it (7.16.1).
+        messageArgs: { label, role: chosen },
+        callsign: session.callsign,
+      });
+
+      return { id: callId };
+    },
+
+    // -------------------------------------------------------- the registers
+
+    'person.search': (input) => {
+      const { term, reason, caseNumber } = (input ?? {}) as {
+        term?: string;
+        reason?: string;
+        caseNumber?: string;
+      };
+
+      // `Repo.parseTerm` refuses a term under two characters before it reaches
+      // the database, and the card reads the field code out rather than leaving
+      // a button that does nothing.
+      if ((term ?? '').trim().length < 2) return refuse('invalid', { term: 'too_short' });
+
+      const authorized = Boolean(reason?.trim() || caseNumber?.trim());
+      const found = matches(registerPersons, term ?? '');
+
+      return {
+        persons: found.filter((entry) => authorized || !entry.breakGlass).map((entry) => entry.row),
+        // Only ever about rows this reader is cleared for. A stub above is not
+        // counted here: for the reader it is an answer, not something withheld.
+        restrictedWithheld: !authorized && found.some((entry) => entry.breakGlass === true),
+      };
+    },
+
+    'vehicle.search': (input) => {
+      const { term, reason, caseNumber } = (input ?? {}) as {
+        term?: string;
+        reason?: string;
+        caseNumber?: string;
+      };
+
+      const authorized = Boolean(reason?.trim() || caseNumber?.trim());
+      // `Registry.searchTerm` answers nil for anything under two characters and
+      // the handler then searches without one, so a short term is a wide search
+      // here rather than a refusal — the opposite of `person.search` above, and
+      // the difference is the server's, not this file's.
+      const found =
+        (term ?? '').trim().length < 2
+          ? registerVehicles
+          : matches(registerVehicles, term ?? '');
+
+      const vehicles = found
+        .filter((entry) => authorized || !entry.breakGlass)
+        .map((entry) => entry.row);
+
+      return {
+        vehicles,
+        // How many rows carry a hot-file hit. The server counts; the screen
+        // draws what it is told.
+        hits: vehicles.filter((row) => !isStub(row) && row.hits.length > 0).length,
+      };
     },
 
     'unit.list': () => ({ units: cadUnits.filter((unit) => unit.status !== 'off_duty') }),
@@ -2404,8 +2811,20 @@ export const fixtures: FixtureSet = {
     },
   },
 
-  fail: {
-    // Proves the shell renders a forbidden state rather than an empty panel.
-    'records.person.search': { err: 'forbidden' },
-  },
+  /**
+   * Routes that always refuse.
+   *
+   * Empty, and deliberately so. It held `records.person.search` — "proves the
+   * shell renders a forbidden state rather than an empty panel" — and there has
+   * never been a route by that name: the search is `person.search`, and
+   * `records.person.search` is the *locale* prefix for the form's labels.
+   * Keyed to nothing, it proved nothing, and it sat next to a register with no
+   * fixtures at all, which is the shape a gap takes when it looks covered.
+   *
+   * The refusal path is walked by `?fail=forbidden`, which refuses every route
+   * at once and is what `tests/shell.spec.ts` asserts on. A route pinned to a
+   * refusal here would instead make that route unwalkable in the browser for
+   * everybody, which is the more expensive half of the trade.
+   */
+  fail: {},
 };
