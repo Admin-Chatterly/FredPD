@@ -382,6 +382,23 @@ local function stillOpen(observation)
     return session ~= nil and session.officerId == observation.officerId
 end
 
+--- Is any open session this officer's, right now?
+---
+--- A walk rather than an index, because there is nothing to index off: `bySrc`
+--- is this file's memory of the last pass and the drop handler clears it. It is
+--- only asked for an expired grace clock -- usually none per pass, occasionally
+--- one -- over a table the size of the server's slot count, so the walk costs
+--- less than the map that would replace it. Nothing in it suspends, which is the
+--- condition that makes walking the live session table legal at all (see
+--- `Events.pass`).
+local function connected(officerId)
+    for _, session in pairs(sessions.all()) do
+        if session.officerId == officerId then return true end
+    end
+
+    return false
+end
+
 --- Starts the grace clock for a unit whose officer has gone away.
 ---
 --- `officerId` is not decoration here: it is the column `signOff` keys its only
@@ -592,9 +609,30 @@ function Events.pass()
 
     for index = 1, count do
         local entry = expired[index]
+        local officerId = entry.officerId
 
-        dropped[entry.officerId] = nil
-        signOff(entry)
+        -- The same re-validation as the loop above, against the table this
+        -- snapshot was taken from. `signOff` suspends, so by the time this
+        -- iteration runs the clock it meant to act on may be gone, or may have
+        -- been replaced by a newer one -- a second drop writes a fresh table
+        -- with a fresh `at` under the same key. The identity test is what tells
+        -- "the clock I measured" apart from "a clock", and without it an officer
+        -- whose grace period had just restarted would be signed off on the
+        -- strength of the one before it.
+        if dropped[officerId] == entry then
+            dropped[officerId] = nil
+
+            -- And the clock expiring is not the same fact as the officer being
+            -- gone. They can have reconnected after the snapshot was taken and
+            -- after the loop above had already walked past their slot, in which
+            -- case nothing in this pass has cleared their clock and nothing
+            -- will. Clearing it and leaving them alone puts them back where
+            -- 0007 wants them: the next pass finds an officer on duty with no
+            -- memory behind them and signs them back on, still on their call,
+            -- rather than this one pulling a unit off a scene they are standing
+            -- on.
+            if not connected(officerId) then signOff(entry) end
+        end
     end
 end
 
