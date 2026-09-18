@@ -519,6 +519,22 @@ route.define({
         local term = service.searchTerm(input.term)
         local window, limit = service.fetchWindow(input.limit)
 
+        -- A search with nothing to search on is not a query, it is the register.
+        -- `searchFirearms` filters on agency alone when no filter is given, so
+        -- the answer is every firearm the agency holds, ordered by serial -- and
+        -- a serial is what `firearm.trace` and the ballistic index turn on. Every
+        -- real use names something: a serial fragment, an owner, a status, or
+        -- the officer a weapon is issued to. Listing what the quartermaster
+        -- holds is `status = 'agency_issued'`, which is a filter.
+        if not term
+            and not input.ownerPersonId
+            and not service.blankToNull(input.ownerIdentifier)
+            and not input.status
+            and not service.blankToNull(input.assignedOfficer)
+        then
+            return route.refuse(FredPD.ErrorCode.INVALID, { term = 'required' })
+        end
+
         local rows = repo.searchFirearms(session.agencyId, {
             term = term,
             ownerPersonId = input.ownerPersonId,
@@ -683,8 +699,18 @@ route.define({
         local err, fields = service.validateTransfer(input)
         if err then return route.refuse(err, fields) end
 
-        if not readFirearm(session, { id = input.id }) then
+        local firearm = readFirearm(session, { id = input.id })
+        if not firearm then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
+        end
+
+        -- A transfer writes `status = 'registered'`, which is right for a sale
+        -- and wrong for a weapon whose status is a statement about where it
+        -- actually is. Without this a stolen firearm stops being stolen by
+        -- being sold, and the hot file goes quiet on the serial (7.5).
+        local blocked = service.transferBlockedBy(firearm.status)
+        if blocked then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { status = blocked })
         end
 
         local transferred, reason = repo.transferFirearm(session.agencyId, input.id, input.version, {

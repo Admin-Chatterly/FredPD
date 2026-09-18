@@ -122,6 +122,18 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     -- somebody through every future stop.
     ('supervisor', 'rms.person.caution.edit'),
 
+    -- The two field-level grants of spec 4.5. Without a group holding them the
+    -- fields are not protected, they are invisible: the routes read the
+    -- permission on every path that returns the field, so a department that
+    -- granted nobody them would simply never see a victim's address or know a
+    -- mental-health caution exists.
+    --
+    -- An address is ordinary supervisory work. A mental-health caution is not:
+    -- an officer who cannot be told the detail cannot act on it either way, so
+    -- it is held where the decision to look is a deliberate one.
+    ('supervisor', 'fields.victim_address.view'),
+    ('command', 'fields.mental_health.view'),
+
     -- A firearm trace reaches into the ballistic index and says which weapon
     -- fired what. Command only, matching `evidence.item.release` above it.
     ('command', 'rms.firearm.trace'),

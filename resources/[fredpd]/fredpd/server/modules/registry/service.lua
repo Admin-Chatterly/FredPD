@@ -214,6 +214,28 @@ Registry.FIREARM_STATUS = {
 --- The statuses that are a hot-file hit on a serial query (7.5).
 Registry.FIREARM_HOTFILE = { lost = true, stolen = true }
 
+--- Statuses a transfer must not move a firearm out of (7.5).
+---
+--- `repo.transferFirearm` writes `status = 'registered'` with the new owner,
+--- because the ordinary case is a sale and the weapon is registered to whoever
+--- now holds it. For these four that is a record of the weapon's real state
+--- being overwritten by a form: a stolen firearm would stop being stolen by
+--- being sold, and the hot file that makes a serial query dangerous to ignore
+--- would go quiet. A seized weapon is in police custody and a destroyed one
+--- does not exist.
+---
+--- `agency_issued` is deliberately absent. An agency decommissioning a weapon
+--- to a person is a real transfer, and clearing the assignment is the point
+--- of it.
+Registry.TRANSFER_BLOCKED = {
+    lost = true, stolen = true, seized = true, destroyed = true,
+}
+
+--- @return string|nil the status that blocks this transfer, or nil to proceed
+function Registry.transferBlockedBy(status)
+    return Registry.TRANSFER_BLOCKED[status] and status or nil
+end
+
 Registry.FIREARM_TYPES = {
     pistol = true, revolver = true, rifle = true,
     shotgun = true, smg = true, other = true,

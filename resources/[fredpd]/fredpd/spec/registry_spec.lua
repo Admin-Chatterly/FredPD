@@ -298,4 +298,41 @@ describe('registry', function()
             assert.are.equal('plate', registry.queryType(nil))
         end)
     end)
+
+    -- -------------------------------------------------------------------------
+    describe('transferBlockedBy', function()
+        it('refuses a transfer that would clear a hot-file status', function()
+            -- A transfer writes status = 'registered' with the new owner. For
+            -- these the status is a statement about where the weapon actually
+            -- is, and a sale would quietly overwrite it: a stolen firearm would
+            -- stop being stolen and the serial would stop being a hot-file hit.
+            assert.are.equal('stolen', registry.transferBlockedBy('stolen'))
+            assert.are.equal('lost', registry.transferBlockedBy('lost'))
+            assert.are.equal('seized', registry.transferBlockedBy('seized'))
+            assert.are.equal('destroyed', registry.transferBlockedBy('destroyed'))
+        end)
+
+        it('lets an ordinary sale through', function()
+            assert.is_nil(registry.transferBlockedBy('registered'))
+        end)
+
+        it('lets an agency decommission a weapon it issued', function()
+            -- Deliberately not blocked: transferring an issued weapon out to a
+            -- person is a real transfer, and clearing the assignment is the
+            -- point of it.
+            assert.is_nil(registry.transferBlockedBy('agency_issued'))
+        end)
+
+        it('blocks exactly the hot-file and custody statuses, and no others', function()
+            -- Pinned as a set rather than one case at a time, so a status added
+            -- to FIREARM_STATUS later has to be classified deliberately.
+            local blocked = {}
+            for status in pairs(registry.FIREARM_STATUS) do
+                if registry.transferBlockedBy(status) then blocked[#blocked + 1] = status end
+            end
+            table.sort(blocked)
+
+            assert.are.same({ 'destroyed', 'lost', 'seized', 'stolen' }, blocked)
+        end)
+    end)
 end)
