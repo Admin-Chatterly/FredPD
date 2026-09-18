@@ -848,6 +848,14 @@ route.define({
 
         local events = repo.firearmEvents(session.agencyId, firearm.id)
 
+        -- 7.2 logs every query, and this is the deepest read in the module: the
+        -- ownership chain back to the first purchaser. `firearm.get` logs the
+        -- shallower lookup of the same record, so a trace going unlogged would
+        -- leave the misuse investigation able to see who checked a serial and
+        -- not who followed it. The serial is logged rather than the id, because
+        -- that is what an investigator searches the log for.
+        logQuery(session, 'firearm', firearm.serial or serial, { firearm }, 0, nil, nil)
+
         return {
             id = firearm.id,
             firearm = firearm,
