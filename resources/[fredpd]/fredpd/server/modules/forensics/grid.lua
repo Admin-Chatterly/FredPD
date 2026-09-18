@@ -276,28 +276,28 @@ end
 --- indoors, and `Grid.place` accordingly ignores any `outdoors` on the trace it
 --- is handed.
 ---
---- `GetInteriorAtCoords` answers the interior a position is inside and zero for
---- a position that is not inside one, which is the question near enough: a
---- multi-storey car park is an interior and a back garden is not.
+--- **There is no server-side source for it, so it answers nil on every real
+--- server, and this function is where that is written down rather than
+--- discovered.** `GetInteriorAtCoords` is the native that answers the question,
+--- and it is client-only: the INTERIOR namespace is not in the FXServer native
+--- set, and the server holds no map or IPL data to answer it from anyway. An
+--- earlier version of this called it behind a `type(...) == 'function'` guard
+--- and read as if the flag were usually set; it never was, and the busted case
+--- that proved otherwise was proving something about the test harness, which
+--- defines the global.
 ---
---- Guarded rather than called straight, and the guard is not defensive
---- programming for its own sake: this is a server-side call of a native whose
---- availability is a property of the FXServer build, and a nil global would
---- raise inside `Grid.place` -- which is to say inside every observation, every
---- shot and every damage event, on a resource that would otherwise have started
---- cleanly. A build without it answers nil, which is what every trace in the
---- grid carried before this existed: the weather term stays inert, and nothing
---- claims a print was indoors that nobody tested.
+--- Asking the reporting client is not the alternative. A client that could say
+--- "indoors" could tell the lab the print it left in a thunderstorm was under
+--- cover, which is invariant 1 and the hole this whole module exists to close.
+--- The honest sources are a server-side interior or zone table -- placements
+--- (spec 3.10) already carry world geometry the operator configures in game --
+--- or a weather service on the server. Neither exists yet.
 ---
---- Declared to luacheck on the line below rather than in `.luacheckrc`: this
---- file is the only one in the resources that names the native, and a name that
---- may only be read in one file is better said in that file than in the list
---- every other file is checked against.
--- luacheck: read_globals GetInteriorAtCoords
-local function outdoorsAt(x, y, z)
-    if type(GetInteriorAtCoords) ~= 'function' then return nil end
-
-    return GetInteriorAtCoords(x, y, z) == 0
+--- So the weather term of 8.1.4 is inert: a trace decays by age, and rain does
+--- nothing. `Evidence.qualityAfter` still takes the field, because the term is
+--- specified and the field is where it will arrive.
+local function outdoorsAt(_x, _y, _z)
+    return nil
 end
 
 --- Puts a trace into the world.
@@ -361,7 +361,7 @@ function Grid.place(trace)
         part = trace.part,
     }
 
-    local stored, merged, cellKey, evicted = service.placeIn(cells, item, config)
+    local stored, merged, cellKey = service.placeIn(cells, item, config)
 
     -- A cell full of other people's evidence (8.10, and the note on the caps in
     -- `placeIn`). Nothing was created, nothing was removed and nothing is told to
@@ -378,19 +378,11 @@ function Grid.place(trace)
         return nil, false
     end
 
-    -- A cap makes room out of the arriving trace's own owner's oldest row and
-    -- out of nobody else's (`placeIn`). That is a swap, not a second arrival:
-    -- counting the new one without counting the old one
-    -- out leaves `itemCount` above the truth until the global cap starts
-    -- refusing traces the grid has room for, and leaves the evicted key in
-    -- `located` pointing at a cell it is no longer in -- a lookup table that
-    -- only ever grows, and a `Grid.take` that walks a cell for nothing.
-    if evicted then
-        located[evicted.key] = nil
-        itemCount = itemCount - 1
-        stats.evicted = stats.evicted + 1
-    end
-
+    -- No eviction to reconcile: `placeIn` removes nothing, so an arrival is
+    -- always an arrival and never a swap, and `itemCount` and `located` cannot
+    -- drift apart here. `stats.evicted` is fed by the decay sweep alone, which
+    -- is what "evicted" now means in the health screen: aged out of the world,
+    -- not pushed out by somebody.
     if merged then
         stats.merged = stats.merged + 1
     else

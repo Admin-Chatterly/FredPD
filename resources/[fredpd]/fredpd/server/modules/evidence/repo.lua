@@ -286,12 +286,31 @@ function Repo.insertEvidence(agencyId, input, owner, discordId)
         },
     }))
 
-    if not committed then return nil end
+    if not committed then return nil, false end
 
-    return db().single(
+    -- Committed. Everything past this point is a read, and a read that fails
+    -- must NOT be reported as a write that failed: the caller undoes a failed
+    -- collection by putting the trace back in the world, and putting it back
+    -- after the row was written leaves the casing in two places -- on the
+    -- pavement for the next officer and in the property room with a custody
+    -- chain. So the second return value is the commit and not the read, and it
+    -- stays true here whatever the read does.
+    --
+    -- The read is wrapped rather than trusted for the same reason. `db().single`
+    -- is a second round trip, so a connection dropped between the COMMIT and the
+    -- SELECT raises out of a function whose work is already durable.
+    local ok, row = pcall(db().single,
         ([[SELECT %s FROM fpd_evidence e WHERE e.ref = ?]]):format(EVIDENCE_COLUMNS),
         { ref }
     )
+
+    if not ok then
+        print(('[fredpd] evidence %s was written but could not be read back: %s')
+            :format(ref, tostring(row)))
+        return nil, true
+    end
+
+    return row, true
 end
 
 function Repo.getEvidence(agencyId, id)

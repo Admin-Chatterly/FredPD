@@ -74,10 +74,9 @@ Forensics.defaults = {
 
     --- The cap per cell: how much evidence one grid cell may hold at once.
     ---
-    --- A memory bound and nothing else (12.2). It never takes one owner's trace
-    --- to make room for another's -- see `maxPerOwnerPerCell` below and the
-    --- eviction rule in `placeIn` -- so a cell that is full of other people's
-    --- evidence refuses the arriving trace instead of clearing a space in it.
+    --- A memory bound and nothing else (12.2). It removes nothing: a cell that
+    --- is full refuses the arriving trace rather than clearing a space in it,
+    --- so no arrival can ever cost anybody a row (`placeIn`).
     maxPerCell = 64,
 
     --- The cap per owner per cell: how much of one cell one source of traces --
@@ -90,6 +89,11 @@ Forensics.defaults = {
     --- cap threw away the oldest trace in the cell whoever had left it. That made
     --- an accomplice walking a slow circle a faster, cheaper and quieter way of
     --- destroying a scene than the wiping kit 8.10 charges time and items for.
+    ---
+    --- "Source" is the acting player (`sourceKeyOf`), not the owner. The owner is
+    --- deliberately not one value per player -- a casing carries a weapon serial
+    --- and no identifier (8.3.4) -- so a share counted by owner would have given
+    --- one client three shares of every cell and a fourth per further weapon.
     ---
     --- A quarter of the cell, so filling one needs four separate sources and no
     --- single player can deny the rest of the cell to anybody. Well above what a
@@ -497,24 +501,23 @@ Forensics.TOOLS = { 'powder', 'luminol', 'forensic_light' }
 --- empty table it answers for a shot that left no casing, and nothing about what
 --- happened reaches the client (8.11).
 ---
---- The eviction is the fourth return value and not a silent side effect. The
---- caller keeps a running item count and a key-to-cell lookup, and a swap that
---- looks like an arrival from the outside corrupts both: the count drifts up
---- until the world cap starts refusing traces there is room for, and the lookup
---- keeps an entry for a trace that is not in the grid any more. Neither shows up
---- as an error -- they show up weeks later as "evidence stopped spawning".
+--- **This function removes nothing, ever.** Both caps refuse, so there is no
+--- eviction to report and no swap for the caller's running count and key lookup
+--- to get wrong. The only thing that takes a trace out of a cell is the decay
+--- sweep, which is on a timer and belongs to nobody. Two earlier versions did
+--- evict here -- first the oldest row in the cell whoever had left it, then the
+--- oldest of the arriving source -- and each was a free way to destroy evidence
+--- that 8.10 charges time and items for.
 ---
 --- @param grid table cellKey -> list of items
 --- @param item table the new trace
 --- @param options table|nil { cellSize, mergeRadius, maxPerCell,
 ---   maxPerOwnerPerCell }
 --- @return table|nil stored the item now in the grid: the new one, or the one it
----   merged into; nil when the cell is full and none of it is the arriving
----   trace's owner's to give up
+---   merged into; nil when this source is at its share of the cell, or the cell
+---   is full
 --- @return boolean merged
 --- @return string cellKey where it landed, or would have
---- @return table|nil evicted the trace the cap took from this owner to make room
----   for their own, if any
 function Forensics.placeIn(grid, item, options)
     options = options or {}
 
@@ -533,12 +536,10 @@ function Forensics.placeIn(grid, item, options)
 
     local shouldMerge = FredPD.Modules.evidence.shouldMerge
 
-    local evicted
-
     -- What this owner already has here, counted on the merge pass rather than on
     -- a second walk of the cell: the pass is the hottest loop in the module
     -- (12.1) and the answer is only ever needed at the end of it.
-    local ownerCount, ownerOldest, ownerOldestAt = 0, nil, math.huge
+    local ownerCount = 0
     local mine = Forensics.sourceKeyOf(item)
 
     for index = 1, #cell do
@@ -546,12 +547,6 @@ function Forensics.placeIn(grid, item, options)
 
         if Forensics.sourceKeyOf(existing) == mine then
             ownerCount = ownerCount + 1
-
-            local at = existing.createdAt or 0
-
-            if at < ownerOldestAt then
-                ownerOldest, ownerOldestAt = index, at
-            end
         end
 
         if shouldMerge(existing, item, radius) then
@@ -574,22 +569,48 @@ function Forensics.placeIn(grid, item, options)
         end
     end
 
-    -- The caps. Either one is reached by giving up the oldest trace this owner
-    -- has here, and by nothing else: their own share is full, or the cell is and
-    -- the only rows they may have back are the ones they left.
-    if ownerCount >= maxPerOwner or #cell >= maxPerCell then
-        if not ownerOldest then
-            -- A full cell with nothing of theirs in it. There is no room to make
-            -- that is theirs to make, so the trace is not created at all.
-            return nil, false, key, nil
-        end
+    -- The share. A source at it gets nothing new here, and NOTHING OF THEIRS IS
+    -- TAKEN AWAY -- which is the whole point, and the half an earlier version of
+    -- this got backwards. Evicting a source's own oldest row to fit their newest
+    -- makes destroying your own evidence free and deterministic: the eviction
+    -- matches on the source and not on the type, so a murderer standing over
+    -- their own blood could push it out of the cell with a handful of prints, in
+    -- seconds, with no wiping kit and no progress bar. 8.10 prices destroying
+    -- evidence in time and items; a cap must not be a way around that price.
+    -- Refusing costs the newest trace instead, which is the one that has not
+    -- been recorded yet rather than the one that has.
+    --
+    -- Refusal is also why the share is counted by source rather than by owner.
+    -- A client can see which of its own traces reached the world, so a cap that
+    -- refused on somebody else's account would answer "is this cell full?" --
+    -- and a cell can be full of latent traces that client was never streamed,
+    -- which is an 8.11 oracle. Counted by source, the only thing a refusal can
+    -- tell them is how many traces they themselves have left here.
+    if ownerCount >= maxPerOwner then
+        return nil, false, key, nil
+    end
 
-        evicted = table.remove(cell, ownerOldest)
+    -- The cell cap underneath it, which is a memory bound and not a fairness one
+    -- (12.2). It refuses too, and for the same reason: NO CAP IN THIS FUNCTION
+    -- MAY REMOVE A TRACE. An earlier version made this one evict the oldest row
+    -- of whichever source held the most, on the reasoning that one source could
+    -- never reach the cell cap because their share stopped them short -- which
+    -- is true at the defaults and false the moment a server configures the share
+    -- at or near the cell cap, at which point the first arrival deletes somebody
+    -- else's scene again. A rule that holds only for the values that shipped is
+    -- not the rule; this one holds for every configuration.
+    --
+    -- Refusing also keeps the better half of the evidence. "Newest wins" sounds
+    -- neutral and is not: the oldest trace in a cell is the shot that started
+    -- it, and the newest is the sixty-fifth footprint of the crowd that gathered
+    -- afterwards.
+    if #cell >= maxPerCell then
+        return nil, false, key, nil
     end
 
     cell[#cell + 1] = item
 
-    return item, false, key, evicted
+    return item, false, key
 end
 
 -- -----------------------------------------------------------------------------

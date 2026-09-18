@@ -266,10 +266,15 @@ describe('forensics grid', function()
             assert.are.equal(1, #grid['1:0'])
         end)
 
-        it('caps a cell by dropping its oldest trace', function()
-            -- Spec 12.2's evidence cap. The newest evidence is the evidence that
-            -- survives, because it is the evidence somebody might still be
-            -- looking for.
+        it('caps a cell by refusing the newest trace, not by dropping the oldest', function()
+            -- Spec 12.2's evidence cap, and the shape of it that matters: the
+            -- cap bounds the cell by not growing it, never by emptying it. An
+            -- earlier version kept the newest on the reasoning that it is the
+            -- evidence somebody is still looking for. It is not: the oldest
+            -- trace in a cell is the shot that started the scene, and the newest
+            -- is the sixty-fifth footprint of the crowd that gathered after it.
+            -- Dropping the oldest also made the cap a free way to destroy
+            -- evidence, which 8.10 charges time and items for.
             local grid = {}
             local options = { cellSize = 32, maxPerCell = 3 }
 
@@ -285,17 +290,18 @@ describe('forensics grid', function()
             local cell = grid['0:0']
             assert.are.equal(3, #cell)
 
-            for index = 1, #cell do
-                assert.are_not.equal('k1', cell[index].key)
-            end
+            assert.are.equal('k1', cell[1].key, 'the first trace is still the first')
+            assert.are.equal('k2', cell[2].key)
+            assert.are.equal('k3', cell[3].key)
         end)
 
-        it('hands the evicted trace back to the caller', function()
-            -- The caller keeps a running item count and a key lookup, and a cap
-            -- that swapped silently left both wrong: the count grew for what was
-            -- not an arrival, and the lookup kept pointing at a trace that had
-            -- left the grid. Neither is visible from in here, which is exactly
-            -- why the eviction has to leave through the return values.
+        it('never hands an eviction back, because it never evicts', function()
+            -- The fourth return value is gone with the behaviour behind it. Two
+            -- versions of this function removed a trace to make room -- first
+            -- the oldest in the cell whoever left it, then the oldest of the
+            -- arriving source -- and each was a free way to destroy evidence.
+            -- The only thing that takes a trace out of a cell now is the decay
+            -- sweep, which is on a timer and belongs to nobody.
             local grid = {}
             local options = { cellSize = 32, maxPerCell = 2 }
 
@@ -303,12 +309,15 @@ describe('forensics grid', function()
                 forensics.placeIn(grid, trace({ key = 'k' .. index, x = 1.0 + index * 2, createdAt = 1000 + index }), options)
             end
 
-            local _, _, _, evicted = forensics.placeIn(
+            local stored, merged, cell, evicted = forensics.placeIn(
                 grid, trace({ key = 'k3', x = 9.0, createdAt = 1003 }), options
             )
 
-            assert.is_not_nil(evicted)
-            assert.are.equal('k1', evicted.key)
+            assert.is_nil(stored)
+            assert.is_false(merged)
+            assert.are.equal('0:0', cell)
+            assert.is_nil(evicted)
+            assert.are.equal(2, #grid['0:0'])
         end)
 
         it('evicts nothing while the cell has room', function()
@@ -348,25 +357,63 @@ describe('forensics grid', function()
             assert.are.equal('casing2', grid['0:0'][2].key)
         end)
 
-        it('still takes an owner\'s own oldest to make room for their own', function()
-            -- The other half: the cap has to keep bounding somebody. A source
-            -- that has filled the cell by itself gives its own oldest row up, so
-            -- the newest evidence from it is the evidence that survives (12.2).
+        it('will not let an owner push out their own evidence either', function()
+            -- The other half, and the one the first attempt at this cap got
+            -- backwards. Taking a source's own oldest row to fit their newest
+            -- makes destroying YOUR OWN evidence free and deterministic: the
+            -- rule matches on the source and not on the type, so a murderer
+            -- standing over their own blood pushes it out of the cell with a
+            -- handful of prints, in seconds, with no wiping kit and no progress
+            -- bar. 8.10 prices destroying evidence in time and items, and a cap
+            -- must not be a way around that price. So a full share refuses, and
+            -- what is lost is the newest trace -- the one not yet recorded --
+            -- rather than the oldest, which is usually the shot that started it.
             local grid = {}
-            local options = { cellSize = 32, maxPerCell = 2, maxPerOwnerPerCell = 8 }
+            local options = { cellSize = 32, maxPerCell = 8, maxPerOwnerPerCell = 2 }
 
-            forensics.placeIn(grid, trace({ key = 'k1', x = 2.0, createdAt = 1000 }), options)
-            forensics.placeIn(grid, trace({ key = 'k2', x = 4.0, createdAt = 1001 }), options)
+            forensics.placeIn(grid, trace({ key = 'blood1', x = 2.0, createdAt = 1000 }), options)
+            forensics.placeIn(grid, trace({ key = 'blood2', x = 4.0, createdAt = 1001 }), options)
 
-            local stored, _, _, evicted = forensics.placeIn(
-                grid, trace({ key = 'k3', x = 6.0, createdAt = 1002 }), options
+            local stored, merged, cell, evicted = forensics.placeIn(
+                grid, trace({ key = 'cover', x = 6.0, createdAt = 1002 }), options
             )
 
-            assert.is_not_nil(stored)
-            assert.are.equal('k3', stored.key)
-            assert.is_not_nil(evicted)
-            assert.are.equal('k1', evicted.key)
+            assert.is_nil(stored, 'the newest trace is refused')
+            assert.is_false(merged)
+            assert.are.equal('0:0', cell)
+            assert.is_nil(evicted, 'and nothing of theirs is taken away')
+
             assert.are.equal(2, #grid['0:0'])
+            assert.are.equal('blood1', grid['0:0'][1].key)
+            assert.are.equal('blood2', grid['0:0'][2].key)
+        end)
+
+        it('refuses rather than evicting when the cell itself is full', function()
+            -- The cell cap is a memory bound (12.2) and it removes nothing
+            -- either. An earlier version had it evict the oldest row of the
+            -- fullest source, on the reasoning that one source could never reach
+            -- the cell cap because their share stopped them short. That is true
+            -- at the shipped defaults and false the moment a server sets the
+            -- share at or near the cell cap -- as this case does -- at which
+            -- point the first arrival deletes somebody else's scene again.
+            local grid = {}
+            local options = { cellSize = 32, maxPerCell = 2, maxPerOwnerPerCell = 2 }
+
+            forensics.placeIn(grid, trace({
+                key = 'theirs1', ownerKey = 'victim|', sourceKey = 'victim', x = 2.0, createdAt = 1000,
+            }), options)
+            forensics.placeIn(grid, trace({
+                key = 'theirs2', ownerKey = 'victim|', sourceKey = 'victim', x = 4.0, createdAt = 1001,
+            }), options)
+
+            local stored = forensics.placeIn(grid, trace({
+                key = 'mine', ownerKey = 'other|', sourceKey = 'other', x = 6.0, createdAt = 1002,
+            }), options)
+
+            assert.is_nil(stored)
+            assert.are.equal(2, #grid['0:0'])
+            assert.are.equal('theirs1', grid['0:0'][1].key)
+            assert.are.equal('theirs2', grid['0:0'][2].key)
         end)
 
         it('bounds one owner well inside the cell, and leaves the rest for others', function()
@@ -1306,30 +1353,32 @@ describe('forensics grid, in memory', function()
     -- -------------------------------------------------------------------------
 
     describe('the per-cell cap', function()
-        it('keeps the item count honest when a full cell swaps its oldest out', function()
+        it('keeps the item count honest when a full cell refuses a trace', function()
             load({ maxPerCell = 3 })
 
             local keys = {}
 
-            -- One weapon, so every casing carries the same `ownerKey` and the
-            -- fourth is the same source filling its own cell -- which is the
-            -- only thing a cap is allowed to make room for (8.10).
+            -- One weapon, so every casing carries the same source. Even then the
+            -- fourth is refused rather than swapped in: a source filling its own
+            -- cell is still a source destroying its own evidence for free, which
+            -- 8.10 prices in time and items.
             for index = 1, 4 do
                 clock = clock + 1
-                keys[index] = casing(1.0 + index * 2, 'SN-1').key
+                keys[index] = casing(1.0 + index * 2, 'SN-1')
             end
 
-            -- Three in the cell, and three is what the grid believes it holds.
-            -- Counting the swap as an arrival walks the count away from the
-            -- truth until the world cap refuses traces there is room for.
+            -- Three in the cell, three the grid believes it holds, and the
+            -- fourth was never created -- so there is no key for it.
             assert.are.equal(3, grid.stats().items)
+            assert.is_nil(keys[4], 'a refused placement answers nil, not a trace')
 
-            -- The evicted key names nothing any more, in either direction.
-            assert.is_nil(grid.peek(keys[1]))
-            assert.is_nil(grid.take(keys[1]))
+            -- And the three that were left are all still there.
+            for index = 1, 3 do
+                assert.is_not_nil(grid.peek(keys[index].key))
+            end
 
-            for index = 2, 4 do
-                assert.is_not_nil(grid.take(keys[index]))
+            for index = 1, 3 do
+                assert.is_not_nil(grid.take(keys[index].key))
             end
 
             assert.are.equal(0, grid.stats().items)
@@ -1719,12 +1768,23 @@ describe('forensics grid, in memory', function()
     -- -------------------------------------------------------------------------
 
     describe('outdoors', function()
-        it('asks the world, and ignores what the caller said', function()
-            -- `evidence.qualityAfter` takes rain off an outdoor trace and leaves
-            -- an indoor one alone, so this flag decides how much of a print the
-            -- lab gets. A caller that could set it could tell the lab that the
-            -- print it left in a thunderstorm was on a steering wheel.
-            _G.GetInteriorAtCoords = function(x) return x >= 100.0 and 57 or 0 end
+        it('is unknown, and is never what the caller said', function()
+            -- Two things at once, and the second is why this test is worth
+            -- having. A caller that could set `outdoors` could tell the lab the
+            -- print it left in a thunderstorm was on a steering wheel, so what
+            -- the caller says is dropped -- that part is invariant 1 and holds.
+            --
+            -- And the answer is *unknown*, on every server. The native that
+            -- would answer it, `GetInteriorAtCoords`, is client-only: the
+            -- INTERIOR namespace is not in the FXServer native set and the
+            -- server holds no map data to answer from. An earlier version called
+            -- it behind a type check and read as though the flag were usually
+            -- set; the only reason its test passed was that the harness defined
+            -- the global, which is a test proving something about itself.
+            --
+            -- So the weather term of 8.1.4 is inert until there is a real
+            -- server-side source, and this asserts that rather than hiding it.
+            _G.GetInteriorAtCoords = function() return 0 end
 
             local outside = grid.place({
                 type = 'casing', x = 10.0, y = 10.0, z = 30.0,
@@ -1736,8 +1796,8 @@ describe('forensics grid, in memory', function()
                 owner = { weaponSerial = 'SN-2' }, outdoors = true,
             })
 
-            assert.is_true(outside.outdoors)
-            assert.is_false(inside.outdoors)
+            assert.is_nil(outside.outdoors, 'not false, because nobody tested it')
+            assert.is_nil(inside.outdoors, 'and not what the caller claimed')
         end)
 
         it('leaves it unknown rather than raising where the native is not there', function()

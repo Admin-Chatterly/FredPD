@@ -419,7 +419,7 @@ local function writeCollected(session, input, scene, trace)
         contaminated = contaminated,
     })
 
-    local item = repo.insertEvidence(session.agencyId, {
+    local item, committed = repo.insertEvidence(session.agencyId, {
         sceneId = input.sceneId,
         caseNumber = text(input.caseNumber) or (scene and scene.caseNumber),
         -- From the grid, never from the call.
@@ -431,9 +431,22 @@ local function writeCollected(session, input, scene, trace)
         fromParty = scene and scene.sceneNumber or nil,
     }, owner, session.discordId)
 
-    -- The transaction did not commit, so there is no item, no owner row and no
-    -- custody link -- and the caller puts the trace back for exactly this.
-    if not item then return route.refuse(FredPD.ErrorCode.INTERNAL) end
+    -- Two different failures wearing one face, and telling them apart is what
+    -- keeps the restore below from duplicating evidence.
+    --
+    -- `committed` false is the transaction not committing: no item, no owner
+    -- row, no custody link, and the trace belongs back in the world.
+    --
+    -- `committed` true with no item is the row being written and then not read
+    -- back -- a connection dropped between the COMMIT and the SELECT. The
+    -- collection HAPPENED. Putting the trace back then would leave the casing in
+    -- two places at once: on the pavement for the next officer to bag a second
+    -- time, and in the property room with a custody chain already on it. So this
+    -- refuses the same way to the officer, who tries again and finds nothing,
+    -- and the console line in the repo is what an operator follows.
+    if not item then
+        return route.refuse(FredPD.ErrorCode.INTERNAL), committed
+    end
 
     return item
 end
@@ -490,19 +503,29 @@ route.define({
         -- catches the second one. `route.define` has a pcall of its own, but it
         -- is outside this frame -- by the time it runs, every local here is
         -- gone and the trace is unreachable.
-        local ok, result = pcall(writeCollected, session, input, scene, trace)
+        local ok, result, committed = pcall(writeCollected, session, input, scene, trace)
 
-        -- No row, so put it back. A refusal carries `__err`; a raise never got
-        -- as far as answering anything; either way the world is short a casing
-        -- it should still have. `restore` files the same trace under the same
-        -- key, age, reveal and cleaned state, so the officer can simply collect
-        -- it again and a revealed latent print comes back revealed instead of
-        -- young and invisible.
+        -- No row, so put it back -- unless the row was written anyway. A refusal
+        -- carries `__err`; a raise never got as far as answering anything;
+        -- either way the world is usually short a casing it should still have.
+        -- `restore` files the same trace under the same key, age, reveal and
+        -- cleaned state, so the officer can simply collect it again and a
+        -- revealed latent print comes back revealed instead of young and
+        -- invisible.
+        --
+        -- `committed` is the exception and the reason it is threaded up here at
+        -- all. A transaction that commits and is then not read back answers a
+        -- refusal like any other failure, but the collection HAPPENED: restoring
+        -- then would put the casing on the pavement while it is also in the
+        -- property room with a custody chain on it, which is the duplication
+        -- 11.3 warns about arriving through the door built to prevent losing
+        -- evidence. "No row came back" and "nothing was written" are not the
+        -- same fact and must not be treated as one.
         --
         -- A swab has no restore, and that is not an oversight: residue cannot be
         -- put back without inventing a fresher timestamp than the suspect
         -- actually had. See `claimGsr`.
-        if restore and (not ok or result.__err) then restore() end
+        if restore and not committed and (not ok or result.__err) then restore() end
 
         -- Re-raised with the original message so `route.define` logs and audits
         -- what actually failed and answers the officer `internal`. Level 0
