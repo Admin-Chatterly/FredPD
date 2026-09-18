@@ -21,7 +21,32 @@ import { fileURLToPath } from 'node:url';
  *   3. a route the NUI may call that is missing from `NUI_ROUTES` in
  *      `client/main.lua`, so the callback is never registered;
  *   4. a route whose `perm` is granted to no group in the seed, which is a
- *      route nobody can ever reach.
+ *      route nobody can ever reach;
+ *   5. a call to `fredpd:<name>` from any resource — the core's client, a
+ *      satellite, anything — where no route declares `<name>`. That is how
+ *      `forensics.destroy` shipped in ef88b44: `fredpd_forensics` called it
+ *      over `lib.callback`, nothing registered it, and every check in CI passed
+ *      because nothing in CI loads a resource. 1–4 all start from a route that
+ *      exists; only this one starts from the call.
+ *   6. a `route.public` handler that reaches for a session, a permission set,
+ *      an access check or a repo. ADR-013, spec 3.5.1 and `route.lua` all state
+ *      as a flat fact that a public handler cannot touch a record, and all
+ *      three attribute it to the signature — the handler is handed a number and
+ *      not a session. The signature does not give it: a handler holding a
+ *      number can write `FredPD.Core.session.get(src)` and have the session
+ *      back. This check is what makes the three claims true, so weakening it
+ *      silently falsifies three pieces of prose at once.
+ *   7. a route named in `PUBLIC_ROUTES` that is declared with `route.define`.
+ *      The assertions in `Route.public` already stop a public route growing a
+ *      `perm`; what nothing caught was the other direction, someone converting
+ *      one back to `route.define` and adding a permission — which is spec
+ *      8.10's named bug, "police-only restrictions must never block criminal
+ *      gameplay", reintroduced with a green build.
+ *
+ * Both route tiers count as declaring a name: `route.define` and, since
+ * ADR-013, `route.public`. A public route has no permission by construction, so
+ * check 4 simply has nothing to look up for one; everything else applies to it
+ * unchanged, and checks 6 and 7 apply to it alone.
  *
  * What it deliberately does not do is guess intent. A route with no NUI
  * callback may be called from Lua; the allowlist below records the ones that
@@ -48,7 +73,61 @@ const SERVER_CALLED: Record<string, string> = {
   'forensics.process':
     'the powder, luminol and forensic-light tools in fredpd_forensics call it ' +
     'from the world, not from an MDT screen (spec 8.4, ADR-011)',
+  'forensics.destroy':
+    'ox_target prompts in fredpd_forensics call it — wiping, cleaning, washing ' +
+    'and picking up are actions in the world that every player may take, and ' +
+    'the MDT is police software (spec 8.10, ADR-013)',
 };
+
+/**
+ * Routes that MUST be declared with `route.public`, and why (ADR-013's table).
+ *
+ * These are the two calls spec 8 cannot express any other way: a criminal has
+ * no `fpd_officers` row, so no session, so a permissioned route answers
+ * `no_session` to exactly the players the feature is for. `Route.public`
+ * asserts the opposite direction already — a public route carrying a `perm`
+ * does not load — but nothing stopped the conversion back, which is the shape
+ * the regression actually takes: `route.public` becomes `route.define`, a
+ * plausible `perm` goes on beside it, CI stays green, and half of section 8 is
+ * dead on a real server again.
+ *
+ * Adding to this set is the same decision as adding a public route, and
+ * ADR-013 says what that costs: "a third public route is a decision, not a
+ * convenience", and it gets an ADR naming the clause that grants it.
+ */
+const PUBLIC_ROUTES: Record<string, string> = {
+  'forensics.observe':
+    '8.3.4: the owner of a print is whoever left it, and that is usually not an officer',
+  'forensics.destroy':
+    '8.10: wiping, cleaning, washing and picking up are available to every player, ' +
+    'and "police-only restrictions must never block criminal gameplay"',
+};
+
+/**
+ * What a `route.public` handler may not name.
+ *
+ * Every entry is the door into something a public caller does not have. A
+ * session carries the agency, the officer id and the permission set; `perms`
+ * and `access` answer questions about a reader this tier has not identified;
+ * a repo is the records themselves. `FredPD.Core.session.get(src)` is the one
+ * that actually compiles and runs today — src is a real server id, and for a
+ * player who happens to be an officer it hands back the whole session — which
+ * is precisely why the three prose claims need a check under them rather than
+ * a signature.
+ *
+ * The scan is textual and reads only the handler body, so a public handler
+ * could still reach a session through a helper defined elsewhere in the file.
+ * That is a deliberate floor and not the ceiling: this catches the reflex —
+ * someone writing the lookup where they needed it — and the reviewer is still
+ * the thing that catches indirection. It is not weakened to accommodate one.
+ */
+const PUBLIC_HANDLER_FORBIDDEN: readonly { readonly pattern: RegExp; readonly what: string }[] = [
+  { pattern: /\bFredPD\.Core\.session\b/, what: 'FredPD.Core.session' },
+  { pattern: /\bFredPD\.Core\.perms\b/, what: 'FredPD.Core.perms' },
+  { pattern: /\bFredPD\.Core\.access\b/, what: 'FredPD.Core.access' },
+  { pattern: /\bFredPD\.Modules\.access\b/, what: 'FredPD.Modules.access' },
+  { pattern: /\brepo\b/, what: 'a repo' },
+];
 
 /** Files a manifest is allowed not to list. */
 const NOT_LOADED = /\/(spec|tests?)\//;
@@ -221,27 +300,48 @@ for (const file of await walk(join(core, 'client'))) {
 
 if (nuiRoutes.size === 0) fail('client/: found no route registrations or calls at all');
 
+/** Names from `PUBLIC_ROUTES` that a `routes.lua` was found to declare at all. */
+const requiredPublicSeen = new Set<string>();
+
 for (const file of await walk(core)) {
   if (!file.endsWith('routes.lua')) continue;
 
   const source = await readFile(file, 'utf8');
   const shown = relative(REPO, file);
 
-  // One `route.define({ … })` call. The definition up to `handler =` is where
-  // `name`, `perm` and `schema` live; the slice after it is the handler, read
-  // only to see which input fields are actually used.
-  const defines = [...source.matchAll(/route\.define\(\{([\s\S]*?)handler\s*=/g)];
+  // One `route.define({ … })` or `route.public({ … })` call. The definition up
+  // to `handler =` is where `name`, `perm` and `schema` live; the slice after
+  // it is the handler, read only to see which input fields are actually used.
+  //
+  // Both tiers are read by one pass because both are routes: same gateway, same
+  // envelope, same schema table (ADR-013). The only difference that reaches
+  // here is that a public route declares no `perm`, which the grant check below
+  // already treats as "nothing to look up".
+  const defines = [...source.matchAll(/route\.(define|public)\(\{([\s\S]*?)handler\s*=/g)];
 
   for (let index = 0; index < defines.length; index += 1) {
     const define = defines[index];
     if (!define) continue;
 
-    const body = define[1] ?? '';
+    const body = define[2] ?? '';
+    const tier = define[1] ?? 'define';
 
     // Everything from this handler to the start of the next route definition.
     const from = (define.index ?? 0) + define[0].length;
     const to = defines[index + 1]?.index ?? source.length;
     const handler = source.slice(from, to);
+
+    // The handler on its own, stopping at the `})` that closes this route call
+    // in the first column — how every routes.lua in the tree is written. The
+    // slice above runs on to the next route definition and so carries whatever
+    // module code sits between the two; check 6 reads a handler and must not
+    // convict it of what its neighbour wrote. Comments come out for the same
+    // reason: half the point of these handlers is a comment explaining which
+    // session field they are not allowed to want.
+    const blockEnd = source.indexOf('\n})', from);
+    const handlerBody = withoutComments(
+      blockEnd === -1 || blockEnd > to ? handler : source.slice(from, blockEnd),
+    );
 
     const name = /\bname\s*=\s*'([^']+)'/.exec(body)?.[1];
     if (name === undefined) continue;
@@ -295,7 +395,46 @@ for (const file of await walk(core)) {
           `the NUI callback is never registered. Add it, or record it in SERVER_CALLED with a reason`,
       );
     }
+
+    // 6. What route.lua, ADR-013 and spec 3.5.1 all promise about this tier.
+    if (tier === 'public') {
+      for (const { pattern, what } of PUBLIC_HANDLER_FORBIDDEN) {
+        if (pattern.test(handlerBody)) {
+          fail(
+            `${shown}: public route '${name}' names ${what} in its handler — ` +
+              `a public handler holds a server id and no identity, and route.lua, ADR-013 ` +
+              `and spec 3.5.1 each state flatly that it therefore cannot reach a record. ` +
+              `This is the check that makes those three true. Use an officer route, or change ` +
+              `all three claims first`,
+          );
+        }
+      }
+    }
+
+    // 7. The conversion back, which is spec 8.10's bug returning.
+    const mustBePublic = PUBLIC_ROUTES[name];
+
+    if (mustBePublic !== undefined) {
+      requiredPublicSeen.add(name);
+
+      if (tier !== 'public') {
+        fail(
+          `${shown}: route '${name}' is declared with route.${tier}, but it must be ` +
+            `route.public — ${mustBePublic}. A session-bound route answers no_session to ` +
+            `every player without an fpd_officers row, which is everyone this route is for ` +
+            `(ADR-013)`,
+        );
+      }
+    }
   }
+}
+
+for (const [name, why] of Object.entries(PUBLIC_ROUTES)) {
+  if (requiredPublicSeen.has(name)) continue;
+
+  fail(
+    `routes: '${name}' must exist as a route.public and no routes.lua declares it — ${why}`,
+  );
 }
 
 // A name in NUI_ROUTES that no route defines is the same mistake mirrored: the
@@ -304,7 +443,7 @@ const defined = new Set<string>();
 for (const file of await walk(core)) {
   if (!file.endsWith('.lua')) continue;
   const source = await readFile(file, 'utf8');
-  for (const match of source.matchAll(/route\.define\(\{[\s\S]*?\bname\s*=\s*'([^']+)'/g)) {
+  for (const match of source.matchAll(/route\.(?:define|public)\(\{[\s\S]*?\bname\s*=\s*'([^']+)'/g)) {
     defined.add(match[1] ?? '');
   }
 }
@@ -315,7 +454,68 @@ for (const name of nuiRoutes) {
   if (name.startsWith('fredpd:')) continue;
 
   if (!defined.has(name)) {
-    fail(`client/: '${name}' is registered or called, but no route.define declares it`);
+    fail(`client/: '${name}' is registered or called, but no route.define or route.public declares it`);
+  }
+}
+
+// -------------------------------------------- 5: every call reaches a route
+
+console.log('wiring: every fredpd: callback a resource calls is a route');
+
+/**
+ * The route name a call names, in the three shapes calls are written in.
+ *
+ * Checks 2–4 above all begin at a route and ask whether it is reachable. This
+ * one begins at the call and asks whether it reaches anything, which is the
+ * only direction that catches a call to a route that was never written —
+ * `forensics.destroy` in ef88b44, called from `fredpd_forensics/client/
+ * destroy.lua`, defined nowhere.
+ *
+ *   * `lib.callback.await('fredpd:forensics.destroy', …)` and the non-blocking
+ *     `lib.callback('fredpd:…', …)` — how a satellite reaches the core, since
+ *     ox_lib callbacks are global event names (ADR-011);
+ *   * the same name held in a local first, which `report.lua` does;
+ *   * `core.call('evidence.collect', …)`, the core client's own wrapper, and
+ *     the bare `call('…')` the satellites wrap it in.
+ *
+ * The first two are found by looking for the literal rather than the call, so
+ * the name is caught wherever it is written down. A route name always contains
+ * a dot; the dotless `fredpd:` strings — `fredpd:close`, `fredpd:placements`,
+ * `fredpd:setupResult` — are net events and push channels, not routes, and
+ * requiring the dot leaves them alone without an allowlist that would have to
+ * grow with every new push channel.
+ */
+const CALL_PATTERNS: readonly RegExp[] = [
+  /'fredpd:([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+)'/g,
+  /\bcall\(\s*'([^']+)'/g,
+];
+
+for (const file of await walk(RESOURCES)) {
+  if (!file.endsWith('.lua')) continue;
+
+  const source = withoutComments(await readFile(file, 'utf8'));
+  const shown = relative(REPO, file);
+
+  const called = new Set<string>();
+
+  for (const pattern of CALL_PATTERNS) {
+    for (const match of source.matchAll(pattern)) {
+      const name = match[1];
+      if (name !== undefined && name !== '') called.add(name);
+    }
+  }
+
+  for (const name of called) {
+    // The allowlist records routes reached from Lua rather than from the NUI.
+    // Such a route still has to exist, so being listed there is not an excuse
+    // here — it only stops check 3 asking for an NUI callback. `fredpd:close`
+    // is in it as a control message and has no dot, so it never arrives.
+    if (defined.has(name)) continue;
+
+    fail(
+      `${shown}: calls 'fredpd:${name}', which no route.define or route.public declares — ` +
+        `the call answers nothing on a real server`,
+    );
   }
 }
 

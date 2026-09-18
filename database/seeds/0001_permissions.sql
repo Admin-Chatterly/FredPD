@@ -96,12 +96,21 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('patrol_basic', 'comms.pdchat.send'),
     ('patrol_basic', 'comms.pdchat.view'),
 
-    -- Every officer's own actions leave traces (8.3): a shot leaves a casing, a
-    -- door leaves a print. This is the key their client's sensors report
-    -- through, so it sits at the base -- an officer who did not hold it would
-    -- move through the world leaving no evidence behind them, which is the one
-    -- thing this module exists to prevent.
-    ('patrol_basic', 'forensics.trace.report'),
+    -- `forensics.trace.report` was granted here and is gone on purpose. M3
+    -- shipped it as the key a client's sensors reported through, which made
+    -- leaving evidence behind a thing only an officer could do: 8.3.4 says the
+    -- owner of a print is whoever left it, and that is usually not an officer,
+    -- and 8.10 says destroying it is open to every player. A permissioned
+    -- report route answered `no_session` to every criminal on the server, so
+    -- the two world routes became public instead (ADR-013) and the key now
+    -- guards nothing. It was never in the spec either -- Appendix B lists four
+    -- forensics keys and this was not one of them.
+    --
+    -- Dropping a grant from a seed is safe where dropping a migration is not:
+    -- this file is re-runnable upserts (see the header), not schema history. A
+    -- database that already ran the old seed keeps its row, because the
+    -- statement this comment sits inside is an INSERT IGNORE and nothing here
+    -- deletes; that row is inert, since no route asks for the key any more.
 
     -- Patrol adds the motor pool and the vehicle they need to do the job.
     ('patrol', 'garage.vehicle.draw'),
@@ -191,6 +200,14 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     -- The crime scene technician (8.4). Collecting is a specialist job: a
     -- patrol officer who picks a casing up off the ground has not collected
     -- evidence, they have contaminated a scene.
+    --
+    -- `forensics.evidence.collect` is deliberately one key for two routes.
+    -- `evidence.collect` takes a trace out of the grid and `forensics.swab`
+    -- takes residue off a person's hands, and they are the same act -- a
+    -- technician securing a sample -- so they are the same grant. A separate
+    -- `forensics.swab` key would be a fifth forensics permission the spec does
+    -- not have (Appendix B lists four) and a group nobody remembered to give it
+    -- to, which is how a route ships dead.
     ('evidence_tech', 'page.evidence'),
     ('evidence_tech', 'forensics.scene.create'),
     ('evidence_tech', 'forensics.scene.release'),

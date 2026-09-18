@@ -188,7 +188,7 @@
       "casing": "Patronhylsa",
       "bullet": "Projektil",
       "magazine": "Magasin",
-      "gsr": "Krutstänk",
+      "gsr": "Skottrester",
       "footwear": "Skoavtryck",
       "glove_mark": "Handskavtryck eller fibrer",
       "drug_residue": "Narkotikarester",
@@ -961,7 +961,9 @@
         "progress": "Rengör vapnet"
       },
       "done": "Klart",
-      "cancelled": "Avbrutet"
+      "cancelled": "Avbrutet",
+      "noItem": "Du har inte det som krävs",
+      "failed": "Det gick inte"
     },
     "marker": {
       "option": "Placera markör",
@@ -969,6 +971,13 @@
       "number": "Markör {number}",
       "placed": "Markör {number} placerad",
       "cleared": "Markörerna borttagna"
+    },
+    "swab": {
+      "option": "Ta prov på skottrester",
+      "progress": "Tar prov",
+      "done": "Prov taget",
+      "cancelled": "Avbrutet innan provet togs",
+      "failed": "Provet kunde inte tas"
     },
     "tool": {
       "powder": "Fingeravtryckspulver",

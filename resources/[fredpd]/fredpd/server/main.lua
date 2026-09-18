@@ -144,6 +144,15 @@ AddEventHandler('onResourceStart', function(resource)
     FredPD.Bridge.policejob.verify()
     FredPD.Bridge.society.verify()
 
+    -- The two forensics bridges (spec 3.8, 8.3.2). Both degrade rather than
+    -- refusing to start, and both are worth a line in the console even so: a
+    -- server missing them comes up looking healthy and then generates no
+    -- casings, no magazines and no tool marks, and leaves a fingerprint where
+    -- it should have left a glove mark. That is a silent, whole-milestone
+    -- failure, and the warning these print is the only place it is visible.
+    FredPD.Bridge.inventory.verify()
+    FredPD.Bridge.appearance.verify()
+
     local faults = configurationFaults()
     if #faults > 0 then
         for _, fault in ipairs(faults) do

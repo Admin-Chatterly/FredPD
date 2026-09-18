@@ -146,19 +146,34 @@ local nearMarkers = {}
 --- @param z number
 --- @param keep function called with the handle; answers false when whatever
 ---   asked for the prop has gone away in the meantime, in which case it is
----   deleted again rather than left in the world
+---   deleted again rather than left in the world. Called with `nil`, and its
+---   answer ignored, when there is no prop to keep -- see below.
+--- @return boolean false when this client has no such model, so the caller can
+---   draw the thing itself instead. Answering nothing here is what made
+---   evidence invisible in ef88b44: the caller had already decided not to draw
+---   a marker by the time this gave up, so a server whose configured model is
+---   missing on a client put evidence at a scene that nobody could see (8.4).
 local function spawnProp(model, x, y, z, keep)
     local hash = joaat(model)
 
     if not IsModelInCdimage(hash) then
         print(('[fredpd_forensics] unknown prop model "%s", drawing a marker instead'):format(model))
-        return
+        return false
     end
 
     CreateThread(function()
-        lib.requestModel(hash, 10000)
+        -- A model that is in the archive but never streams in is the same
+        -- outcome for the officer standing at the scene as one that is not
+        -- there at all, so it takes the same path back to the caller: `nil`,
+        -- and the caller draws something. `lib.requestModel` raises on timeout
+        -- rather than answering, hence the pcall.
+        local loaded = pcall(lib.requestModel, hash, 10000)
+        local object = loaded and CreateObject(hash, x, y, z, false, false, false) or nil
 
-        local object = CreateObject(hash, x, y, z, false, false, false)
+        if not object or object == 0 or not DoesEntityExist(object) then
+            keep(nil)
+            return
+        end
 
         SetEntityCollision(object, false, false)
         FreezeEntityPosition(object, true)
@@ -168,6 +183,8 @@ local function spawnProp(model, x, y, z, keep)
             DeleteEntity(object)
         end
     end)
+
+    return true
 end
 
 local function deleteProp(object)
@@ -241,13 +258,26 @@ local function addTrace(cellKey, data)
     attachZone(trace)
 
     if not trace.drawMarker then
-        spawnProp(trace.model, trace.x, trace.y, trace.z, function(object)
+        -- The marker is the fallback the field above promises it is, so the
+        -- answer has to be read and the failure inside the spawn has to come
+        -- back. A trace with neither a prop nor a marker is evidence at a scene
+        -- that nobody standing on it can see (8.4). `scan()` rebuilds its list
+        -- twice a second, so flipping the flag late shows the marker within
+        -- half a second rather than requiring the stream to re-send the cell.
+        local spawning = spawnProp(trace.model, trace.x, trace.y, trace.z, function(object)
             -- Collected, decayed or streamed away while the model loaded.
             if traces[trace.key] ~= trace then return false end
+
+            if not object then
+                trace.drawMarker = true
+                return false
+            end
 
             trace.object = object
             return true
         end)
+
+        if not spawning then trace.drawMarker = true end
     end
 end
 
@@ -362,8 +392,12 @@ function Render.placeMarker(trace, number)
     markers[#markers + 1] = marker
     markerByTrace[trace.key] = marker
 
+    -- No branch on the answer here, unlike a trace: the draw loop already draws
+    -- a marker under any number whose `object` is nil, so a missing model is
+    -- already the fallback for this one.
     spawnProp(MARKER_MODEL, marker.x, marker.y, marker.z, function(object)
         if markerByTrace[trace.key] ~= marker then return false end
+        if not object then return false end
 
         marker.object = object
         return true

@@ -59,6 +59,15 @@ if not render then
     error('[fredpd_forensics] client/render.lua must load before client/destroy.lua')
 end
 
+--- `client/collect.lua` loads before this file too (see `fxmanifest.lua`). It
+--- owns the resource's one "a timed action is running" flag, and this file
+--- takes that same flag rather than keeping one of its own -- see `perform`.
+local collect = FredPDForensics.Client.collect
+
+if not collect then
+    error('[fredpd_forensics] client/collect.lua must load before client/destroy.lua')
+end
+
 -- -----------------------------------------------------------------------------
 -- Settings
 -- -----------------------------------------------------------------------------
@@ -228,54 +237,67 @@ end
 --- for want of an item. The server checks the item, removes it and *then*
 --- destroys anything -- this file only spends the player's time.
 ---
---- `lib.progressActive` is checked rather than a flag of this file's own,
---- because `collect.lua` runs progress actions too and an officer must not be
---- able to start a wipe underneath a collection.
+--- Both halves run inside `collect.runExclusive`, which is this resource's one
+--- timed-action flag and not a second copy of it. `lib.progressActive()` was
+--- what stood here, and it was open during precisely the half that matters:
+--- `collect.lua` holds its flag across the server round trip that follows its
+--- progress circle, and during that round trip no circle is drawn, so a wipe
+--- could be started on top of a collection that was still in flight. The flag
+--- covers the call as well as the circle, in both files, in both directions.
+---
+--- What the flag is not is a permission. Destruction is open to every player
+--- (8.10) and nothing here asks who anybody is; one action at a time is the
+--- same rule an officer collecting gets, for the same reason.
 ---
 --- @param action string a key of `DURATION`
 --- @param label string already translated
 --- @param payload table the route call: { action, traceKey?, netId? }
 --- @return boolean whether the server accepted it
 local function perform(action, label, payload)
-    if lib.progressActive() then
-        notify(FredPD.t('forensics.busy'), 'error')
-        return false
-    end
+    local accepted = false
 
-    local completed = lib.progressCircle({
-        duration = DURATION[action],
-        label = label,
-        position = 'bottom',
-        useWhileDead = false,
-        canCancel = true,
-        disable = { move = true, car = true, combat = true },
-        anim = ANIM[action],
-    })
+    local started = collect.runExclusive(function()
+        local completed = lib.progressCircle({
+            duration = DURATION[action],
+            label = label,
+            position = 'bottom',
+            useWhileDead = false,
+            canCancel = true,
+            disable = { move = true, car = true, combat = true },
+            anim = ANIM[action],
+        })
 
-    if completed ~= true then
-        notify(FredPD.t('forensics.destroy.cancelled'))
-        return false
-    end
+        if completed ~= true then
+            notify(FredPD.t('forensics.destroy.cancelled'))
+            return
+        end
 
-    local response = call(payload)
+        local response = call(payload)
 
-    if not response.ok then
-        noteRefusal(action, response)
-        notify(
-            FredPD.t(response.err == 'conflict'
-                and 'forensics.destroy.noItem'
-                or 'forensics.destroy.failed'),
-            'error'
-        )
-        return false
-    end
+        if not response.ok then
+            noteRefusal(action, response)
+            notify(
+                FredPD.t(response.err == 'conflict'
+                    and 'forensics.destroy.noItem'
+                    or 'forensics.destroy.failed'),
+                'error'
+            )
+            return
+        end
 
-    -- The same message whatever happened, because the answer carries nothing
-    -- (8.11). A player who wipes a door nobody touched is told exactly what a
-    -- player who wiped away a murderer's prints is told.
-    notify(FredPD.t('forensics.destroy.done'), 'success')
+        -- The same message whatever happened, because the answer carries
+        -- nothing (8.11). A player who wipes a door nobody touched is told
+        -- exactly what a player who wiped away a murderer's prints is told.
+        notify(FredPD.t('forensics.destroy.done'), 'success')
 
-    return true
+        accepted = true
+    end)
+
+    -- `runExclusive` has already said `forensics.busy` for us when it refused,
+    -- so there is nothing to add here.
+    if not started then return false end
+
+    return accepted
 end
 
 -- -----------------------------------------------------------------------------

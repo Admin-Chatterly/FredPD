@@ -294,16 +294,53 @@ end
 -- Merging (8.3.5)
 -- -----------------------------------------------------------------------------
 
+--- A flag, with nil read as false.
+---
+--- The grid writes all three of these on every trace it creates, but the lists
+--- `shouldMerge` is called with in tests and from the lab-facing code are plain
+--- tables that may carry none of them. Two traces that both say nothing about
+--- their state are in the same state.
+local function flag(value)
+    return value == true
+end
+
 --- Should two traces be treated as one?
 ---
---- Same type, same owner, close together. Without this, emptying a magazine
---- into a wall leaves thirty separate blood rows and the grid cell becomes a
---- performance problem rather than an investigation (spec 12).
+--- Same type, same owner, same state, close together. Without this, emptying a
+--- magazine into a wall leaves thirty separate blood rows and the grid cell
+--- becomes a performance problem rather than an investigation (spec 12).
+---
+--- **Why state is part of "the same trace".** A pool of blood somebody cleaned
+--- an hour ago is at the same place, of the same type and from the same person
+--- as the blood they are dripping now, and every other rule here says fold them
+--- together. Folding them is the bug: the surviving row is the cleaned one, so
+--- the fresh blood inherits `cleaned` -- a quarter of the DNA yield (8.1.4) --
+--- and `latent`, which is invisibility. A murderer who mopped the floor would
+--- get every wound they open afterwards hidden for free, in the one place in the
+--- game where blood is supposed to give them away.
+---
+--- The fix lives here rather than in `forensics.placeIn`'s merge branch, and the
+--- choice is not arbitrary. A merge branch that "reconciled" the three flags has
+--- to pick an answer for a question with no good answer -- un-cleaning the old
+--- pool hands the murderer's mopping back to them, keeping it cleaned is the
+--- laundering, and there is only one `quality` and one `count` for what are
+--- really two events. Two rows is the honest model: the cleaned pool stays
+--- cleaned and still worth a quarter to luminol, the fresh blood is fresh, and
+--- what a client is shown follows from each row's own state. `shouldMerge` is
+--- also the one definition of "these are the same trace", which makes it the
+--- place where the answer stays true for every caller instead of for one branch.
 ---
 --- Compares squared distance to avoid a square root in the generation hot path.
 function Evidence.shouldMerge(left, right, radius)
     if left.type ~= right.type then return false end
     if left.ownerKey ~= right.ownerKey then return false end
+
+    -- Cleaned (8.10) decides what the lab gets out of the sample; latent and
+    -- revealed (8.4) decide who may be told it is there. A trace in a different
+    -- one of those states is a different trace, however close it landed.
+    if flag(left.cleaned) ~= flag(right.cleaned) then return false end
+    if flag(left.latent) ~= flag(right.latent) then return false end
+    if flag(left.revealed) ~= flag(right.revealed) then return false end
 
     local dx, dy, dz = left.x - right.x, left.y - right.y, left.z - right.z
     local limit = radius or 0.5

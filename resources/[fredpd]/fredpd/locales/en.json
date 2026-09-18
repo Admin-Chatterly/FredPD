@@ -961,7 +961,9 @@
         "progress": "Cleaning the weapon"
       },
       "done": "Done",
-      "cancelled": "Interrupted"
+      "cancelled": "Interrupted",
+      "noItem": "You do not have what that takes",
+      "failed": "That did not work"
     },
     "marker": {
       "option": "Place marker",
@@ -969,6 +971,13 @@
       "number": "Marker {number}",
       "placed": "Marker {number} placed",
       "cleared": "Markers cleared"
+    },
+    "swab": {
+      "option": "Swab for gunshot residue",
+      "progress": "Taking the swab",
+      "done": "Swab taken",
+      "cancelled": "Interrupted before the swab was taken",
+      "failed": "The swab could not be taken"
     },
     "tool": {
       "powder": "Fingerprint powder",

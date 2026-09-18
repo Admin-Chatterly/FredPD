@@ -137,8 +137,63 @@ Forensics.defaults = {
     --- A door handle they are nowhere near is not an observation, it is a claim.
     entityRange = 6.0,
 
+    --- How far the wiping kit reaches from the surface it is used on, in metres
+    --- (8.2, 8.10).
+    ---
+    --- Its own setting, and much smaller than `entityRange`, because the two
+    --- numbers answer different questions. `entityRange` is how far away the
+    --- entity being wiped is allowed to be from the player; wiping at that same
+    --- radius around that entity destroys everything within twice it -- twelve
+    --- metres at the defaults, four times the three an officer has to be inside
+    --- to collect (`collectRange`). A door handle is an arm's length from the
+    --- hand on the cloth, so the kit reaches an arm's length.
+    wipeRadius = 1.5,
+
+    --- What each destruction action in 8.10 costs, as ox_inventory item names.
+    ---
+    --- `wipe` and `weapon` are the same kit: 8.2 names one wiping kit, for
+    --- surfaces and for weapons. Washing at a sink and picking casings up off the
+    --- ground have no entry and cost nothing -- a sink is a sink and a hand is a
+    --- hand, and charging for them would make walking back for your own brass
+    --- something only a prepared player could do.
+    ---
+    --- Which item names an ox_inventory actually has is a property of the server,
+    --- so these are documented defaults rather than truth: a server that spells
+    --- its kit differently sets `forensics.destroyItems` in `config/server.lua`,
+    --- and `settings` merges it a key at a time like every other table here, so
+    --- renaming one item does not mean restating the other two.
+    destroyItems = {
+        wipe = 'wiping_kit',
+        weapon = 'wiping_kit',
+        clean = 'cleaning_chemicals',
+    },
+
     --- Damage above which a hit leaves blood (8.2).
     bloodDamageThreshold = 12,
+
+    --- Gunshot residue: how much of it a shooter loses per minute (8.2).
+    ---
+    --- GSR is the one trace in 8.2 that is not left anywhere in the world -- it
+    --- is on the shooter's hands and clothes and it travels with them -- so it
+    --- is not in the grid and deliberately not in `lifetimeSeconds` either. It
+    --- decays on a level rather than by disappearing at a cliff edge, because
+    --- what the GSR kit reads is how much is there: a shooter swabbed an hour
+    --- after the fact is a weaker result than one swabbed at the scene, not an
+    --- identical one.
+    ---
+    --- Half a point a minute takes a fresh 100 to nothing in three hours and
+    --- twenty minutes, which sits inside the four-to-six hours the kit is
+    --- realistically any use over.
+    gsrDecayPerMinute = 0.5,
+
+    --- The point past which residue is simply gone, whatever the rate says.
+    ---
+    --- A ceiling rather than the mechanic: at the default rate the level reaches
+    --- zero well before this. It exists so that a server which configures a very
+    --- slow decay -- or zero -- cannot leave every player who has ever fired a
+    --- weapon permanently swabbable, which would make "washing at sinks and
+    --- showers" (8.10) the only way residue ever ended.
+    gsrLifetimeSeconds = 4 * 3600,
 }
 
 --- Merges a server's overrides onto the defaults.
@@ -324,7 +379,10 @@ Forensics.TOOLS = { 'powder', 'luminol', 'forensic_light' }
 --- this function is the only thing that adds to it. The merge rule itself is
 --- `evidence.shouldMerge` (8.3.5) and is deliberately not restated here: there
 --- is one definition of "these are the same trace" and both the grid and the
---- lab-facing code read it.
+--- lab-facing code read it. That definition includes the trace's state, so a
+--- fresh trace never folds into a cleaned, latent or revealed one -- which is
+--- why the merge below can copy `count` and `quality` without reconciling
+--- anything: the two traces it is merging were already in the same state.
 ---
 --- What a merge does:
 ---   * the *first* trace stays, with its key and its position. A client that
@@ -343,6 +401,13 @@ Forensics.TOOLS = { 'powder', 'luminol', 'forensic_light' }
 --- neighbours to catch it would multiply the cost of the hottest function in
 --- the module by nine (12.1).
 ---
+--- The eviction is the fourth return value and not a silent side effect. The
+--- caller keeps a running item count and a key-to-cell lookup, and a swap that
+--- looks like an arrival from the outside corrupts both: the count drifts up
+--- until the world cap starts refusing traces there is room for, and the lookup
+--- keeps an entry for a trace that is not in the grid any more. Neither shows up
+--- as an error -- they show up weeks later as "evidence stopped spawning".
+---
 --- @param grid table cellKey -> list of items
 --- @param item table the new trace
 --- @param options table|nil { cellSize, mergeRadius, maxPerCell }
@@ -350,6 +415,7 @@ Forensics.TOOLS = { 'powder', 'luminol', 'forensic_light' }
 ---   merged into
 --- @return boolean merged
 --- @return string cellKey where it landed
+--- @return table|nil evicted the trace the cap threw out to make room, if any
 function Forensics.placeIn(grid, item, options)
     options = options or {}
 
@@ -367,6 +433,8 @@ function Forensics.placeIn(grid, item, options)
 
     local shouldMerge = FredPD.Modules.evidence.shouldMerge
 
+    local evicted
+
     for index = 1, #cell do
         local existing = cell[index]
 
@@ -377,8 +445,13 @@ function Forensics.placeIn(grid, item, options)
                 existing.quality = item.quality
             end
 
-            -- What the world looks like follows the newest arrival, so a pile
-            -- that started as one casing draws as a pile.
+            -- When the pile last grew. Bookkeeping and nothing more: nothing
+            -- reads it today -- render data does not carry it (8.1.6), and decay
+            -- is measured from `createdAt`, which deliberately stays at the
+            -- oldest so a trace cannot be kept alive by adding to it. It is kept
+            -- because "when did the last casing land here" is the question a
+            -- scene report would ask, and throwing the answer away at the merge
+            -- is the one point at which it can never be recovered.
             existing.mergedAt = item.createdAt or existing.mergedAt
 
             return existing, true, key
@@ -397,12 +470,12 @@ function Forensics.placeIn(grid, item, options)
             end
         end
 
-        table.remove(cell, oldestIndex)
+        evicted = table.remove(cell, oldestIndex)
     end
 
     cell[#cell + 1] = item
 
-    return item, false, key
+    return item, false, key, evicted
 end
 
 -- -----------------------------------------------------------------------------
@@ -431,6 +504,42 @@ function Forensics.decayed(item, now, config)
     if not lifetime or lifetime <= 0 then return false end
 
     return (now - (item.createdAt or 0)) >= lifetime
+end
+
+--- How much gunshot residue is left on a shooter (8.2).
+---
+--- The arithmetic lives here rather than in `gsr.lua` for the same reason the
+--- rest of this file does: a decay curve is exactly the kind of thing that is
+--- either right or quietly wrong, and it has to be assertable without a running
+--- server. `gsr.lua` owns the table of who has been marked and the clock; this
+--- owns what the number means.
+---
+--- Linear, not exponential. A curve would be more realistic and completely
+--- unreadable to a server owner tuning it: a rate in points per minute is a
+--- number somebody can put in a config file and predict the effect of.
+---
+--- @param markedAt number|nil unix seconds of the last shot fired
+--- @param now number unix seconds
+--- @param config table|nil as `Forensics.settings` returns
+--- @return number level 0..100; zero means there is nothing left to find
+function Forensics.gsrLevel(markedAt, now, config)
+    config = config or Forensics.defaults
+
+    if type(markedAt) ~= 'number' or type(now) ~= 'number' then return 0 end
+
+    -- A clock that went backwards (a server time change) reads as "just fired"
+    -- rather than as a negative age, which would decay *upwards*.
+    local elapsed = math.max(now - markedAt, 0)
+
+    local lifetime = tonumber(config.gsrLifetimeSeconds) or 0
+    if lifetime > 0 and elapsed >= lifetime then return 0 end
+
+    local perMinute = tonumber(config.gsrDecayPerMinute) or 0
+    local level = math.floor(100 - (elapsed / 60) * perMinute)
+
+    if level <= 0 then return 0 end
+
+    return math.min(level, 100)
 end
 
 --- How much quality a trace of this type loses per hour, for `qualityAfter`.

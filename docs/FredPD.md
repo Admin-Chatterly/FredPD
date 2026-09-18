@@ -262,6 +262,55 @@ Wrapper order: session exists → session not stale → permission → context c
 
 Response envelope: `{ ok = true, data = ... }` or `{ ok = false, err = 'code', fields = { ... } }`. Error codes: `no_session`, `forbidden`, `context`, `rate_limited`, `invalid`, `not_found`, `conflict` (stale version), `restricted`, `stale_permissions`, `internal`.
 
+#### 3.5.1 The public tier
+
+A session is opened only for a player with an `fpd_officers` row, so the wrapper
+above is reachable by officers and by nobody else. Section 8 needs the opposite
+for two of its calls: 8.3 requires that *any* player leaves traces — the whole
+value of a fingerprint is that the person who left it is not an officer — and
+8.10 requires that destroying evidence is "available to every player … Police-only
+restrictions must never block criminal gameplay."
+
+Those two calls use `route.public`, which is the same gateway (invariant 3), the
+same envelope, and the same registration:
+
+```lua
+route.public {
+    name    = 'forensics.destroy',
+    schema  = 'ForensicsDestroy',
+    limit   = { per = 20, window = 60 },    -- required, not defaulted
+    handler = function(src, input)          -- a server id, never a session
+        return destroy(src, input)
+    end
+}
+```
+
+Wrapper order: rate limit → schema → handler in `pcall` → response. What it drops
+is session, staleness, permission, context and audit — each of which needs a
+session to mean anything, so a public route declaring one fails at load rather
+than appearing to be protected.
+
+The handler receives a numeric `src` and not a session. The signature is not by
+itself the control, and saying it is overstates the design: a handler holding a
+server id can write `FredPD.Core.session.get(src)` and have the session back, so
+"a public handler has no identity" is a convention that nothing in Lua enforces.
+
+What enforces it is CI. `tools/wiring-check.ts` reads the body of every
+`route.public` handler and fails the build when it names the session, the
+permission set, an access check or a repo. So the guarantee is this: **a public
+handler is handed a number, and a public handler that reaches for identity or
+for a record does not merge.** What it is left with is the in-memory forensics
+grid, which holds no records and answers nothing (8.11).
+
+The check reads handler bodies, and only handler bodies. A function defined
+outside the handler and called from it is not covered — `forensics.destroy`
+has one, `auditDestruction`, which reads a `discordId` off a session that is
+usually absent and writes one append-only audit row. That is a deliberate
+exception with its reasoning written at the call site, not a loophole to use
+again: a helper reached from a public route has to be read with the same
+question in mind, because CI will not ask it. A third public route is a decision
+to be argued for in an ADR, not a convenience. See ADR-013.
+
 ### 3.6 Realtime updates
 
 - Sessions subscribe to channels while a view is open: `unit:<id>`, `call:<id>`, `record:<type>:<id>`, `board:<agency>`, `map:<agency>`.
@@ -918,6 +967,18 @@ This replaces the noobsystems/evidences script with a server-authoritative desig
 | Digital | Seized phone item | Item | — | Phone evidence bag | Extraction through phone bridge (optional) | New |
 
 Decay times, success rates and caps are configured per type.
+
+Gunshot residue is the one row above with no position, so it is the one that is
+not in the evidence grid: it is a state on the shooter, set by every shot,
+decaying from the most recent one, cleared outright by washing (8.10) and taken
+off a person with a swab — `forensics.swab`, gated by
+`forensics.evidence.collect` because a swab is a collection, and writing the
+item, the owner row and the first link of the custody chain in the one
+transaction every other collection uses (8.5, 8.6); `evidence.collect` takes the
+same target as an alternative to a trace key. What is
+deliberately not modelled: residue does not transfer to a passenger, a seat or
+anything handled afterwards, and it carries no weapon — a swab says this person
+fired something, never what.
 
 ### 8.3 Generation pipeline
 

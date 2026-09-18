@@ -259,12 +259,26 @@ export const schemas = {
 
   // ---------------------------------------------------------------- evidence
 
-  // `traceKey` is the opaque key the client was handed with render data, and it
-  // is the only thing collection takes from the call. The type and the owner
-  // come from the server-side grid: a client that could name either could
-  // collect a casing as a blood swab, or frame anybody (8.1, 8.3).
+  // `traceKey` is the opaque key the client was handed with render data, and
+  // `targetId` is a server id. Between them they name *which* collection this
+  // is, and nothing more: the type, the quality and the owner come from the
+  // server-side grid or from the residue table, never from the call. A client
+  // that could name either could collect a casing as a blood swab, or frame
+  // anybody (8.1, 8.3).
+  //
+  // Exactly one of the two is meaningful, and the **server** decides which --
+  // not this schema. The validator can only say "a string of at most 64
+  // characters" and "an integer", so both are optional here and the handler
+  // refuses a call that sends neither or both. Making `traceKey` required
+  // again, which it was before residue had a reader, deletes the swab path:
+  // a swab names a person and there is no trace in the grid to key it by.
   EvidenceCollect: {
-    traceKey: { type: 'string', required: true, min: 1, max: 64 },
+    traceKey: { type: 'string', required: false, min: 1, max: 64 },
+    // The person being swabbed, as a server id (8.2's "shooter's hands and
+    // clothes"). Resolved and range-checked server-side exactly as in
+    // `ForensicsSwab`; whether there is residue on them, and how much, is never
+    // in the call and never answered back (8.11).
+    targetId: { type: 'integer', required: false, min: 1 },
     sceneId: { type: 'integer', required: false, min: 1 },
     caseNumber: { type: 'string', required: false, max: 32 },
     packaging: { type: 'enum', required: false, values: EVIDENCE_PACKAGING },
@@ -1046,8 +1060,9 @@ export const schemas = {
   },
 
 
-  // In-world forensics (spec 8.3, 8.4). Both are called from the satellite
-  // rather than the MDT (ADR-011).
+  // In-world forensics (spec 8.3, 8.4, 8.10). Every one of these is called from
+  // the satellite rather than the MDT (ADR-011): they are actions taken in the
+  // world, at the thing they act on, and the MDT is a screen in a car.
 
   /**
    * A sensor reporting that something happened. Nothing else may be added.
@@ -1075,6 +1090,63 @@ export const schemas = {
   /** Powder, luminol or a forensic light, worked over a surface (8.4). */
   ForensicsProcess: {
     tool: { type: 'enum', required: true, values: ['powder', 'luminol', 'forensic_light'] },
+  },
+
+  /**
+   * A GSR kit on somebody's hands (8.2, 8.7).
+   *
+   * Residue is the one type in 8.2 that is not in the world: it sits on the
+   * shooter, so there is no trace in the grid and no key to send. What the
+   * officer names is a person, and `targetId` is that person's **server id** --
+   * which the server resolves to a ped itself and range-checks against its own
+   * copy of where both of them are standing (8.3.2), exactly as
+   * `ForensicsObserve` treats a `netId`. A client naming somebody across the
+   * map is not swabbing them.
+   *
+   * Nothing about the residue is in here, and nothing may be added. Whether
+   * there is any, how much, how old it is and what it is worth to the lab are
+   * all read on the server from the residue table (8.11) -- a `level` or a
+   * `present` field would let a shooter's own client tell them whether it was
+   * worth washing, and let an officer file a swab that found what it did not.
+   */
+  ForensicsSwab: {
+    targetId: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
+   * Wiping, cleaning, washing and picking up (8.10).
+   *
+   * The narrowest of the three, because it is the one every player reaches --
+   * 8.10 forbids gating destruction behind a police permission, so this shape
+   * is the only thing standing between a criminal's cloth and the grid. What a
+   * client may name is an intent and a handle; what it may never name is a
+   * position, a radius, a type or an owner. A `radius` field would let anyone
+   * scrub a city block from a doorway, and a `type` field would let them ask
+   * for prints specifically and learn, from what the wipe cost them, that
+   * prints were there (8.11).
+   *
+   * `traceKey` is the opaque key the trace was STREAMED with (8.3.2) -- never a
+   * position and never a type. It names one trace this player was already shown
+   * inside their streaming range, so it cannot reach evidence they were never
+   * told about; the grid decides whether it still names anything at all.
+   *
+   * `netId` is resolved and range-checked by the server, exactly as in
+   * `ForensicsObserve`: it says "the thing I am standing at", and the server
+   * takes the position off the entity rather than off the client. An unnetworked
+   * map prop has no id, which is why it is optional -- the server then falls
+   * back to its own copy of where the player is.
+   *
+   * Which surfaces, which traces and how many is the server's answer, and it is
+   * never reported back (8.11).
+   */
+  ForensicsDestroy: {
+    action: {
+      type: 'enum',
+      required: true,
+      values: ['wipe', 'weapon', 'clean', 'wash', 'pickup'],
+    },
+    traceKey: { type: 'string', required: false, max: 64 },
+    netId: { type: 'integer', required: false, min: 1 },
   },
 
 } as const satisfies Record<string, Schema>;

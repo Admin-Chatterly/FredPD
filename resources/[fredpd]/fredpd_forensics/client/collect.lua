@@ -169,8 +169,23 @@ end
 -- Timed actions
 -- -----------------------------------------------------------------------------
 
---- One timed action at a time, so a second prompt cannot be started underneath
---- the first one and land two calls on the server from one officer.
+--- One timed action at a time *for the whole resource*, so a second prompt
+--- cannot be started underneath the first one and land two calls on the server
+--- from one player.
+---
+--- Held by `run()` for the progress circle *and* the call that follows it, not
+--- by the progress circle alone: `lib.callback.await` yields, so an officer
+--- released the moment the circle finished could start a second collection
+--- while the first was still in flight -- which is the one thing this flag
+--- exists to stop.
+---
+--- `client/destroy.lua` runs timed actions of its own and takes this same flag
+--- through `Collect.runExclusive` at the bottom of this file, rather than
+--- keeping a second one or reading `lib.progressActive()`. Two flags, or a
+--- progress check, would both be open during exactly the window above -- the
+--- server round trip after a circle has finished -- and a wipe could start on
+--- top of an in-flight collection. `collect.lua` loads first (see
+--- `fxmanifest.lua`), which is what lets the flag live here.
 local busy = false
 
 --- Whether another action can be started, said out loud once.
@@ -186,15 +201,48 @@ local function idle()
     return true
 end
 
---- Runs a progress action.
---- @return boolean completed
-local function perform(label, duration, anim)
-    -- The last line of defence rather than the first: `idle()` is what reports
-    -- it, and a second action reaching here at all would be a bug in a caller.
-    if busy then return false end
+--- Runs one whole action -- the timed part in the world and the question for
+--- the server -- with `busy` held for all of it.
+---
+--- `pcall` is not decoration. Anything raising inside `body` -- a route
+--- answering something unexpected, ox_lib raising while the player disconnects
+--- with a call in flight -- would otherwise leave the flag set for the rest of
+--- the session, and the officer would be told they are busy at every trace on
+--- every scene until they reconnect. The error is re-raised so it still reaches
+--- the console: swallowing it would trade one silent failure for another.
+---
+--- @param body function
+--- @return boolean started false when another action already holds the flag
+local function run(body)
+    if not idle() then return false end
 
     busy = true
+    local ok, err = pcall(body)
+    busy = false
 
+    if not ok then error(err, 0) end
+
+    return true
+end
+
+--- The resource's one timed-action gate, for `client/destroy.lua`.
+---
+--- Same flag, same `pcall`, and the same single `forensics.busy` notification
+--- when it is already held -- so a wipe refuses underneath a collection and a
+--- collection refuses underneath a wipe, in both cases for the whole action
+--- including the server round trip. Destruction is not a police feature (8.10)
+--- and this grants nothing: it is the same one-at-a-time rule, not a check on
+--- who the player is.
+---
+--- @param body function
+--- @return boolean started
+Collect.runExclusive = run
+
+--- Runs a progress action. Only ever called from inside `run`, which is the one
+--- place `busy` is set: a second check here would see the flag `run` had just
+--- taken and refuse the action it is part of.
+--- @return boolean completed
+local function perform(label, duration, anim)
     local completed = lib.progressCircle({
         duration = duration,
         label = label,
@@ -204,8 +252,6 @@ local function perform(label, duration, anim)
         disable = { move = true, car = true, combat = true },
         anim = anim,
     })
-
-    busy = false
 
     return completed == true
 end
@@ -282,35 +328,41 @@ local function collect(trace)
 
     local duration = COLLECT_MS[trace.type] or COLLECT_MS.default
 
-    if not perform(FredPD.t('forensics.collect.progress'), duration, COLLECT_ANIM) then
-        notify(FredPD.t('forensics.collect.cancelled'))
-        return
-    end
+    -- The dialog is outside `run` on purpose: choosing packaging is not a timed
+    -- action and holding the flag through it would refuse an officer their own
+    -- tool menu while they read a select box. `run` re-checks `idle()` anyway,
+    -- so two dialogs opened at once still produce one collection.
+    run(function()
+        if not perform(FredPD.t('forensics.collect.progress'), duration, COLLECT_ANIM) then
+            notify(FredPD.t('forensics.collect.cancelled'))
+            return
+        end
 
-    -- The key is the only thing about the trace that is sent. What it names --
-    -- and whether it names anything at all any more -- is the grid's answer,
-    -- not this client's claim (8.3.2).
-    local response = call('evidence.collect', {
-        traceKey = trace.key,
-        packaging = choice.packaging,
-        markerNumber = choice.markerNumber,
-        description = choice.description,
-    })
+        -- The key is the only thing about the trace that is sent. What it names
+        -- -- and whether it names anything at all any more -- is the grid's
+        -- answer, not this client's claim (8.3.2).
+        local response = call('evidence.collect', {
+            traceKey = trace.key,
+            packaging = choice.packaging,
+            markerNumber = choice.markerNumber,
+            description = choice.description,
+        })
 
-    if not response.ok then
-        noteRefusal(response)
-        showError(response)
-        return
-    end
+        if not response.ok then
+            noteRefusal(response)
+            showError(response)
+            return
+        end
 
-    -- The server has already taken it out of the grid, so the next stream tick
-    -- would remove it within the second. Dropping it now only makes the world
-    -- agree with the officer's hands immediately.
-    render.forget(trace.key)
+        -- The server has already taken it out of the grid, so the next stream
+        -- tick would remove it within the second. Dropping it now only makes
+        -- the world agree with the officer's hands immediately.
+        render.forget(trace.key)
 
-    notify(FredPD.t('forensics.collect.done', {
-        number = response.data and response.data.item and response.data.item.evidenceNumber or '?',
-    }), 'success')
+        notify(FredPD.t('forensics.collect.done', {
+            number = response.data and response.data.item and response.data.item.evidenceNumber or '?',
+        }), 'success')
+    end)
 end
 
 -- -----------------------------------------------------------------------------
@@ -379,27 +431,30 @@ end)
 --- the client as render data if they reach it at all (8.11).
 local function useTool(tool, label)
     if not TOOL_MS[tool] then return end
-    if not idle() then return end
 
-    if not perform(FredPD.t('forensics.tool.progress', { tool = label }), TOOL_MS[tool], TOOL_ANIM) then
-        notify(FredPD.t('forensics.tool.cancelled'))
-        return
-    end
+    -- `run` is the gate as well as the flag, so there is no `idle()` here: the
+    -- tool menu has nothing to ask the officer first.
+    run(function()
+        if not perform(FredPD.t('forensics.tool.progress', { tool = label }), TOOL_MS[tool], TOOL_ANIM) then
+            notify(FredPD.t('forensics.tool.cancelled'))
+            return
+        end
 
-    local response = call('forensics.process', { tool = tool })
+        local response = call('forensics.process', { tool = tool })
 
-    if not response.ok then
-        showError(response)
-        return
-    end
+        if not response.ok then
+            showError(response)
+            return
+        end
 
-    local found = (response.data and response.data.found) or 0
+        local found = (response.data and response.data.found) or 0
 
-    if found > 0 then
-        notify(FredPD.t('forensics.tool.found', { count = found }), 'success')
-    else
-        notify(FredPD.t('forensics.tool.nothing'))
-    end
+        if found > 0 then
+            notify(FredPD.t('forensics.tool.found', { count = found }), 'success')
+        else
+            notify(FredPD.t('forensics.tool.nothing'))
+        end
+    end)
 end
 
 --- The kit. Registered once, because every label in it is static.

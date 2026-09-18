@@ -275,7 +275,8 @@ FredPD.Schema = {
     },
 
     EvidenceCollect = {
-        traceKey = { type = 'string', required = true, min = 1, max = 64 },
+        traceKey = { type = 'string', required = false, min = 1, max = 64 },
+        targetId = { type = 'integer', required = false, min = 1 },
         sceneId = { type = 'integer', required = false, min = 1 },
         caseNumber = { type = 'string', required = false, max = 32 },
         packaging = { type = 'enum', required = false, values = { 'evidence_bag', 'envelope', 'swab_box', 'lift_card', 'firearm_box', 'drug_bag', 'phone_bag', 'item_tag' } },
@@ -722,5 +723,15 @@ FredPD.Schema = {
 
     ForensicsProcess = {
         tool = { type = 'enum', required = true, values = { 'powder', 'luminol', 'forensic_light' } },
+    },
+
+    ForensicsSwab = {
+        targetId = { type = 'integer', required = true, min = 1 },
+    },
+
+    ForensicsDestroy = {
+        action = { type = 'enum', required = true, values = { 'wipe', 'weapon', 'clean', 'wash', 'pickup' } },
+        traceKey = { type = 'string', required = false, max = 64 },
+        netId = { type = 'integer', required = false, min = 1 },
     },
 }

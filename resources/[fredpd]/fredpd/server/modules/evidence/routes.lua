@@ -44,6 +44,25 @@ FredPD.Evidence.claimTrace = FredPD.Evidence.claimTrace or function()
     return nil
 end
 
+--- The same, for the residue a shooter carries instead of leaves (8.2).
+---
+--- Gunshot residue is the one trace in 8.2 that is not in the world, so there is
+--- no key for it and no grid cell it sits in: it is on a person, and what names
+--- it is that person. The claim is otherwise identical -- it answers the shape
+--- above or nil, it hands over hidden truth the client has never seen, and it is
+--- destructive, so two officers cannot swab the same hands.
+---
+--- Registered by `fredpd`'s forensics routes, beside `claimTrace`. Until they
+--- load there is nothing on anybody to collect and every swab is refused, which
+--- is the same stance as above and for the same reason.
+---
+--- @param src number the officer taking the swab
+--- @param targetSrc number the player being swabbed
+--- @return table|nil the shape `claimTrace` answers, with `type = 'gsr'`
+FredPD.Evidence.claimGsr = FredPD.Evidence.claimGsr or function()
+    return nil
+end
+
 -- -----------------------------------------------------------------------------
 -- Shared rules
 -- -----------------------------------------------------------------------------
@@ -241,6 +260,44 @@ route.define({
 -- Collection (8.4, 8.5)
 -- =============================================================================
 
+--- Where a collection's hidden truth comes from, by what the call named.
+---
+--- Two sources, one act. A trace lies in the world and is named by the opaque
+--- key it was streamed with; gunshot residue is on a person and is named by that
+--- person's server id, because 8.2 puts it on "shooter's hands and clothes" and
+--- there is nothing in the grid to key it by. Both claims answer the same shape,
+--- both are destructive, and both range-check against the server's copy of where
+--- everybody is standing -- so from here down there is one collection, which is
+--- the property 8.6 actually needs: one insert, one owner row, one first link of
+--- the custody chain, in one transaction.
+---
+--- Exactly one of the two, and the server decides that rather than the schema:
+--- the validator can say "an optional string" and "an optional integer" and
+--- cannot say "one of these". Neither is a call that names nothing to collect;
+--- both is a call that has not decided what it is doing, and guessing which one
+--- it meant would be this file inventing an intent (invariant 1).
+---
+--- @return table|nil trace, or nil when there was nothing to claim
+--- @return table|nil refusal, when the call named neither source or both
+local function claimFor(session, input)
+    local byTrace = input.traceKey ~= nil
+    local byTarget = input.targetId ~= nil
+
+    if not byTrace and not byTarget then
+        return nil, route.refuse(FredPD.ErrorCode.INVALID, { traceKey = 'required' })
+    end
+
+    if byTrace and byTarget then
+        return nil, route.refuse(FredPD.ErrorCode.INVALID, { targetId = 'not_allowed' })
+    end
+
+    if byTrace then
+        return FredPD.Evidence.claimTrace(session.src, input.traceKey), nil
+    end
+
+    return FredPD.Evidence.claimGsr(session.src, input.targetId), nil
+end
+
 route.define({
     name = 'evidence.collect',
     perm = 'forensics.evidence.collect',
@@ -248,7 +305,8 @@ route.define({
     -- No access point: collection happens where the evidence is, which is the
     -- point of collecting it. What replaces the terminal as the control is the
     -- claim below -- the server will not collect a trace the player is not
-    -- standing next to, because the grid refuses to give it up.
+    -- standing next to, or residue off a suspect they are not standing next to,
+    -- because the grid and the residue table both refuse to give it up.
     context = { onDuty = true },
     limit = { per = 30, window = 60 },
     writes = true,
@@ -275,7 +333,15 @@ route.define({
             end
         end
 
-        local trace = FredPD.Evidence.claimTrace(session.src, input.traceKey)
+        -- A trace out of the grid, or the residue off a suspect's hands (8.2).
+        -- One refusal for every way either of them can come to nothing -- no
+        -- such key, no such player, somebody got there first, out of reach,
+        -- nothing on them, residue that has already decayed -- because a
+        -- collection that reported *why* it found nothing is a detector an
+        -- officer could walk around pointing at people (8.11).
+        local trace, refusal = claimFor(session, input)
+
+        if refusal then return refusal end
         if not trace then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
 
         -- Every trace is left by somebody or by something: 8.3.4 makes the
@@ -290,9 +356,11 @@ route.define({
         local owner = service.ownerOf(trace)
 
         if not owner then
-            -- The grid handed over something it should never produce. The
-            -- console is where an operator can see it; the type and the key
-            -- name the trace and disclose nobody.
+            -- A claim handed over something it should never produce. The console
+            -- is where an operator can see it; the type and the key name the
+            -- trace and disclose nobody. A swab cannot reach here -- `claimGsr`
+            -- refuses residue it cannot attribute -- so the key is the one that
+            -- is printed, and it is nil on the path that has none.
             print(('[fredpd] evidence.collect: unattributed trace %s (%s)')
                 :format(tostring(input.traceKey), tostring(trace.type)))
 

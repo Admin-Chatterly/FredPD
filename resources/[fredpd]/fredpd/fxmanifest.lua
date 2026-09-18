@@ -33,6 +33,12 @@ server_scripts {
     'server/bridges/framework.lua',
     'server/bridges/policejob.lua',
     'server/bridges/society.lua',
+    -- Section 8 reads both of these on every sensor call: the weapon behind a
+    -- casing and the glove state behind a print (8.3.2). Unlisted, they are not
+    -- merely absent -- the forensics routes degrade silently and the server
+    -- generates no evidence at all.
+    'server/bridges/inventory.lua',
+    'server/bridges/appearance.lua',
 
     -- Core, in dependency order. route.lua last: it references the rest.
     'server/core/db.lua',
@@ -83,6 +89,9 @@ server_scripts {
     -- routes last, because they need the grid and the route layer.
     'server/modules/forensics/service.lua',
     'server/modules/forensics/grid.lua',
+    -- GSR after service (it reads the decay settings) and before routes (the
+    -- shot sensor marks a shooter and the washing route clears them).
+    'server/modules/forensics/gsr.lua',
     'server/modules/forensics/routes.lua',
 
     'server/modules/evidence/service.lua',
