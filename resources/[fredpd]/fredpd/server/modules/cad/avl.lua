@@ -57,6 +57,26 @@
 --- every route that changes it -- 12.2's "in-memory caches ... unit board
 --- (invalidated on write)". The cache is only ever filled while somebody is
 --- asking for positions, so an idle server never reads the board at all.
+---
+--- ## What leaves this file, and why only one thing here ever named a call
+---
+--- The cached board rows carry the five `onCall*` columns `Repo.listUnits`
+--- joins off `fpd_calls`, so everything built from them is audited for that.
+--- Three things are built from them and exactly one of them was wrong:
+---
+---   * **`Avl.livePositions` / `Avl.positions`** build a *new* table per unit
+---     holding `x`, `y`, `z`, `heading` and `at`. No field is copied across from
+---     the row, so no call field can ride along, and callers that want the board
+---     itself (`routes.lua`'s `boardWithPositions`) read the rows through the
+---     repo and mask them through `board.lua` rather than taking them from here.
+---   * **The `fredpd:cad:avl` delta** carries `officerId`, a position and
+---     `gone`, and goes only to subscribers re-checked every sweep for
+---     `page.dispatch` and the agency. A position is the *unit's* own fact, not
+---     the call's -- the same reason `board.boardFor` keeps the row and takes
+---     only the call off it -- so there is nothing here to mask.
+---   * **The welfare prompt** named the call outright and sent it unchecked.
+---     That was the leak; it goes through `board.welfarePush` now, and the
+---     comment on `Avl.welfarePass` has the detail.
 
 FredPD = FredPD or {}
 FredPD.Cad = FredPD.Cad or {}
@@ -66,6 +86,17 @@ local repo = FredPD.Repo.cad
 local push = FredPD.Core.push
 local perms = FredPD.Core.perms
 local sessions = FredPD.Core.session
+
+--- The one owner of "what may a payload carrying a call say, and to whom"
+--- (`server/modules/cad/board.lua`, loaded immediately before this file).
+---
+--- The welfare prompt below used to answer that question itself, by not asking
+--- it: it shipped `callId` and `callNumber` for every unit that had been sitting
+--- too long to every holder of `cad.unit.manage` in the agency, so a dispatcher
+--- who had been correctly refused call 1042 on the queue was handed 1042's id
+--- and number a moment later by a message that does not look like a call. The
+--- masking rule now lives in exactly one file and this one calls it.
+local board = FredPD.Cad.board
 
 local Avl = {}
 
@@ -138,11 +169,18 @@ local sweepCount = 0
 
 --- The units of one agency, from cache when it is fresh.
 ---
---- Rows carry `officerId`, `discordId`, `callsign`, `status`, `statusSinceUnix`
---- and the stored position, as the repo aliases them. Nothing here decides who
---- may see them: every caller below is already scoped to one agency and one
---- permission.
-local function board(agencyId)
+--- Rows carry `officerId`, `discordId`, `callsign`, `status`, `statusSinceUnix`,
+--- the stored position and -- the part that matters -- the five `onCall*`
+--- columns `Repo.listUnits` joins off `fpd_calls`. So a row out of here is a
+--- call payload wearing a unit's clothes, and nothing this function returns may
+--- leave the server without going through `board.lua` first.
+---
+--- Nothing here decides who may see a row; it is a cache in front of one query.
+--- Named `cachedBoard` and not `board`, which it was, because `board` now names
+--- the module that owns the access rule: two different things called the same
+--- word in one file is how the welfare prompt came to ship call numbers while
+--- the file beside it was masking them.
+local function cachedBoard(agencyId)
     local cached = boards[agencyId]
 
     if cached and (os.time() - cached.at) < config.avlBoardTtlSeconds then
@@ -207,7 +245,7 @@ end
 --- @param agencyId string
 --- @return table officerId -> { x, y, z, heading, at }
 function Avl.livePositions(agencyId)
-    local rows = board(agencyId)
+    local rows = cachedBoard(agencyId)
     if #rows == 0 then
         positions[agencyId] = {}
         return positions[agencyId]
@@ -401,13 +439,19 @@ end
 -- prompt to dispatch")
 -- -----------------------------------------------------------------------------
 
---- Who may be asked to check on a unit.
+--- Who may be asked to check on a unit: `board.WELFARE`, which is
+--- `cad.unit.manage` (7.16 says "to dispatch", and that is the key dispatch,
+--- supervisor and command hold -- Appendix B).
 ---
---- 7.16 says "to dispatch", and `cad.unit.manage` is the key those people hold:
---- dispatch, supervisor and command (Appendix B). Deliberately not the page key,
---- which every officer holds -- a prompt that reaches the whole department is one
---- nobody treats as addressed to them.
-local WELFARE_PERMISSION <const> = 'cad.unit.manage'
+--- Borrowed from `board.lua` rather than written out again, and that is not
+--- tidiness. `board.welfarePush` decides who the prompt is *sent* to; the pass
+--- below decides which agencies are swept for one at all, by looking for a
+--- session holding the same key. Two copies of the string would keep agreeing
+--- right up until somebody renamed the permission in one place, and the failure
+--- then is silent in both directions: either every agency is swept and the
+--- prompt reaches nobody, or no agency is swept and an officer sits at a scene
+--- with the one alert that exists to notice it never firing.
+local WELFARE_PERMISSION <const> = board.WELFARE
 
 --- agencyId -> officerId -> when this unit was last prompted about.
 ---
@@ -429,6 +473,25 @@ local prompted = {}
 --- `ck_fpd_call_log_type` has no entry type that fits it -- the spec's own open
 --- question (7.16.1, and the gap table in section 13) -- and inventing one would
 --- be this file deciding a question the migration left open.
+---
+--- ## The row this builds still names a call, and that is deliberate
+---
+--- `due` carries `callId` and `callNumber` because the prompt's own screen wants
+--- them when the reader is allowed them. What it must not do is *send* them
+--- unchecked, which is what it did: one `push.toPermission` of the whole list to
+--- every `cad.unit.manage` holder in the agency, so a dispatcher refused call
+--- 1042 on the queue read 1042's number off the welfare prompt seconds later.
+--- `board.welfarePush` now takes the list and does the masking per recipient.
+---
+--- The masking takes the call fields off and keeps the row. That is the whole
+--- point of the check and it is worth saying out loud: a welfare prompt is about
+--- the **officer**, not the call -- somebody has been on the same status for
+--- twenty-five minutes and should be spoken to. Dropping the row because the
+--- call behind it is classified would turn a classification into a reason nobody
+--- checks on an officer, which is a far worse outcome than a supervisor learning
+--- that a unit they cannot follow is busy. So the officer, the callsign, the
+--- status and the minutes reach every holder of the key; only the call comes
+--- off, and only for the readers who were refused it anyway.
 function Avl.welfarePass()
     local watching = {}
 
@@ -446,16 +509,16 @@ function Avl.welfarePass()
     local now = os.time()
 
     for agencyId in pairs(watching) do
-        local rows = board(agencyId)
+        local rows = cachedBoard(agencyId)
         local seen = prompted[agencyId] or {}
         local kept, due = {}, {}
 
         for index = 1, #rows do
             local unit = rows[index]
 
-            -- A view rather than the row itself: `board` hands out the cached
-            -- table, and writing the prompt time onto it would make the cache
-            -- carry state that belongs to this pass.
+            -- A view rather than the row itself: `cachedBoard` hands out the
+            -- cached table, and writing the prompt time onto it would make the
+            -- cache carry state that belongs to this pass.
             local view = {
                 status = unit.status,
                 statusSinceUnix = unit.statusSinceUnix,
@@ -463,6 +526,12 @@ function Avl.welfarePass()
             }
 
             if service.needsWelfareCheck(view, now, config) then
+                -- A fresh table, not a slice of `unit`: the row above belongs to
+                -- the cache, and `board.welfarePush` may hand what we build here
+                -- to several recipients. The two call fields are named rather
+                -- than aliased with the board's `onCall` prefix, which is why
+                -- `board.lua` keeps a hand-written list for this one payload --
+                -- a third call field added here has to be added there too.
                 due[#due + 1] = {
                     officerId = unit.officerId,
                     callsign = unit.callsign,
@@ -484,13 +553,15 @@ function Avl.welfarePass()
         -- this never grows with everyone who has ever been on scene.
         prompted[agencyId] = next(kept) and kept or nil
 
-        if #due > 0 then
-            push.toPermission(WELFARE_PERMISSION, 'fredpd:cad:welfare', {
-                units = FredPD.markArrays(due),
-            }, function(session)
-                return session.agencyId == agencyId
-            end)
-        end
+        -- One call, and every decision about who sees what is behind it: the
+        -- permission, the agency, the per-recipient masking and `markArrays`.
+        -- Note there is no complementary two-push here the way there is for a
+        -- unit row -- this list names many different calls, so a supervisor
+        -- cleared for one and refused another belongs to neither half of any
+        -- split. `board.welfarePush` builds the payload per recipient for that
+        -- reason, and skips the copies entirely on the common pass where nobody
+        -- due a check is on a call at all.
+        if #due > 0 then board.welfarePush(agencyId, due) end
     end
 end
 
