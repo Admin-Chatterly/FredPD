@@ -80,11 +80,13 @@ end
 --- may not be written into a level its author could not then read: that is
 --- either an accident that loses the record or a way to file something where
 --- the person filing it cannot be asked about it.
+--- Delegates to the shared rule so the registers and this module cannot drift
+--- apart on what "may classify" means. The one difference is the nil case:
+--- `canClassify` treats an absent level as "leave it alone" and allows it,
+--- while every caller here has already decided a level and must not be handed
+--- a pass for nil.
 local function clearedFor(reader, level)
-    local required = access.clearanceRank(level)
-    local held = access.clearanceRank(reader.clearance)
-
-    return required ~= nil and held ~= nil and held >= required
+    return level ~= nil and access.canClassify(reader, level)
 end
 
 --- Removes the address from a person row unless the reader may see it.
@@ -403,7 +405,7 @@ route.define({
         }
 
         if next(fields) == nil then
-            return route.refuse(FredPD.ErrorCode.INVALID, { _input = 'no_fields' })
+            return route.refuse(FredPD.ErrorCode.INVALID, { _input = 'nothing_to_change' })
         end
 
         if fields.dateOfBirth ~= nil and fields.dateOfBirth ~= ''

@@ -92,8 +92,7 @@
     "unattributed": "ingen ägare registrerad för spåret",
     "format": "inte ett datum i formatet ÅÅÅÅ-MM-DD",
     "field_forbidden": "du saknar behörighet för den här uppgiften",
-    "clearance": "över din behörighetsnivå",
-    "no_fields": "inga uppgifter att ändra"
+    "clearance": "över din behörighetsnivå"
   },
   "placement": {
     "station_terminal": "Stationsterminal",

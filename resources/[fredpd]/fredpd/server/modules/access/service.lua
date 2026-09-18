@@ -253,6 +253,38 @@ function Access.clearanceOf(permissions)
     return best
 end
 
+--- May this reader put a record at this classification?
+---
+--- The write-side counterpart of the read rule, and it was missing: every
+--- module took `classification` straight from input and wrote it. An officer
+--- cleared to `internal` could therefore mark a record `secret` -- and then not
+--- be able to open what they had just written, which is the harmless half. The
+--- harmful half is that a record can be classified out of reach of the people
+--- who need it by somebody who was never trusted with that level, and 4.5's
+--- ladder stops meaning anything in the direction that matters.
+---
+--- Same comparison as the read, deliberately: clearance must reach the level.
+--- A reader who may open `secret` may write `secret`, and nobody writes above
+--- what they could read back.
+---
+--- An unrecognised level is refused, as everywhere else in this module: nil
+--- from `clearanceRank` means "refuse", never "allow".
+---
+--- @param reader table from `Access.reader`
+--- @param level string|nil the classification being assigned; nil means unchanged
+--- @return boolean
+function Access.canClassify(reader, level)
+    if level == nil then return true end
+
+    local wanted = Access.clearanceRank(level)
+    if not wanted then return false end
+
+    local held = Access.clearanceRank(reader and reader.clearance)
+    if not held then return false end
+
+    return held >= wanted
+end
+
 --- The compartments a permission set puts its holder in.
 function Access.compartmentsOf(permissions)
     local held = {}

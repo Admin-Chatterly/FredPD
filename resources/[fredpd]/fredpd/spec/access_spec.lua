@@ -708,4 +708,44 @@ describe('access', function()
             assert.are.equal(0, #access.filterSearchResults({}, rows()))
         end)
     end)
+
+    -- -------------------------------------------------------------------------
+    describe('canClassify', function()
+        local function reader(level)
+            return access.reader({ permissions = { ['clearance.' .. level] = true } })
+        end
+
+        it('lets a reader classify at their own level', function()
+            assert.is_true(access.canClassify(reader('restricted'), 'restricted'))
+        end)
+
+        it('lets a reader classify below their own level', function()
+            assert.is_true(access.canClassify(reader('secret'), 'internal'))
+        end)
+
+        it('refuses a classification above the writer', function()
+            -- The defect this closes: both registers took `classification`
+            -- straight from input, so an officer cleared to `internal` could
+            -- mark a record `secret` and put it out of reach of the people who
+            -- need it.
+            assert.is_false(access.canClassify(reader('internal'), 'secret'))
+        end)
+
+        it('refuses a level it does not recognise', function()
+            -- nil from clearanceRank means refuse, never allow.
+            assert.is_false(access.canClassify(reader('secret'), 'cosmic'))
+        end)
+
+        it('treats an absent level as leaving the classification alone', function()
+            assert.is_true(access.canClassify(reader('open'), nil))
+        end)
+
+        it('refuses everything above open for a reader with no clearance at all', function()
+            local none = access.reader({ permissions = {} })
+
+            assert.is_true(access.canClassify(none, 'open'))
+            assert.is_false(access.canClassify(none, 'internal'))
+            assert.is_false(access.canClassify(none, 'secret'))
+        end)
+    end)
 end)

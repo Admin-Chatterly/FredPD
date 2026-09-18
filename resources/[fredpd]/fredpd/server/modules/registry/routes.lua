@@ -208,6 +208,21 @@ local function readVehicle(session, selector)
     return access.read(session, VEHICLE, row)
 end
 
+--- Refuses a write that would put a record above the writer's own clearance.
+---
+--- The write-side half of 4.5's ladder. Both registers took `classification`
+--- from input and wrote it, so an officer cleared to `internal` could mark a
+--- vehicle or a firearm `secret`: a record classified out of reach of the
+--- people who need it, by somebody never trusted with that level. The persons
+--- module has always checked this; these two did not.
+---
+--- @return table|nil a refusal to return from the handler, or nil to proceed
+local function refuseClassification(session, level)
+    if access.canClassify(access.reader(session), level) then return nil end
+
+    return route.refuse(FredPD.ErrorCode.FORBIDDEN, { classification = 'clearance' })
+end
+
 route.define({
     name = 'vehicle.search',
     perm = 'rms.vehicle.view',
@@ -315,6 +330,9 @@ route.define({
 
         -- The VIN is not read from `input` and could not be: the schema does
         -- not declare it, so the route layer would drop it (7.4, invariant 1).
+        local classRefusal = refuseClassification(session, input.classification)
+        if classRefusal then return classRefusal end
+
         local vehicle, reason = repo.registerVehicle(session.agencyId, {
             plate = plate,
             model = service.blankToNull(input.model),
@@ -356,6 +374,9 @@ route.define({
         if not readVehicle(session, { id = input.id }) then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
         end
+
+        local classRefusal = refuseClassification(session, input.classification)
+        if classRefusal then return classRefusal end
 
         local affected = repo.updateVehicle(session.agencyId, input.id, input.version, {
             model = input.model,
@@ -433,6 +454,9 @@ route.define({
         if not readVehicle(session, { id = input.vehicleId }) then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
         end
+
+        local classRefusal = refuseClassification(session, input.classification)
+        if classRefusal then return classRefusal end
 
         local id = repo.addFlag(session.agencyId, input.vehicleId, {
             kind = input.kind,
@@ -622,6 +646,9 @@ route.define({
             return route.refuse(FredPD.ErrorCode.INVALID, { type = 'not_allowed' })
         end
 
+        local classRefusal = refuseClassification(session, input.classification)
+        if classRefusal then return classRefusal end
+
         local firearm, reason = repo.registerFirearm(session.agencyId, {
             serial = serial,
             make = service.blankToNull(input.make),
@@ -665,6 +692,9 @@ route.define({
         -- The serial, the owner and the status are absent on purpose: each is
         -- an event in the life of the weapon and has its own route, so the
         -- ownership history can never disagree with the record (7.5).
+        local classRefusal = refuseClassification(session, input.classification)
+        if classRefusal then return classRefusal end
+
         local affected = repo.updateFirearm(session.agencyId, input.id, input.version, {
             make = input.make,
             model = input.model,

@@ -71,6 +71,14 @@ const REASONS = new Set([
   // what an unrelated group grants.
   'stale',
   'model_changed',
+
+  // The registers and the name index (spec 7.2-7.5). `clearance` is the
+  // write-side half of 4.5's ladder: the record would sit above what the
+  // writer may read back. `field_forbidden` is a field the reader was never
+  // shown, arriving in a write anyway. `format` is a date that is not a date.
+  'clearance',
+  'field_forbidden',
+  'format',
 ]);
 
 export interface FieldMessage {

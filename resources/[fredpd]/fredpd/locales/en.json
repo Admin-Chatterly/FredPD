@@ -92,8 +92,7 @@
     "unattributed": "no owner on record for this trace",
     "format": "not a date in YYYY-MM-DD form",
     "field_forbidden": "you are not cleared for this field",
-    "clearance": "above your clearance",
-    "no_fields": "no fields to update"
+    "clearance": "above your clearance"
   },
   "placement": {
     "station_terminal": "Station terminal",
