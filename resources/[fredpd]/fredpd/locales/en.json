@@ -58,7 +58,9 @@
     "failed": "Setup could not be written to the database. The server console has the reason."
   },
   "form": {
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "any": "Any",
+    "search": "Search"
   },
   "fieldError": {
     "type": "the wrong kind of value",
@@ -707,7 +709,8 @@
       "internal_affairs": "Internal Affairs",
       "narcotics": "Narcotics",
       "records": "Records"
-    }
+    },
+    "restrictedRecord": "Restricted record"
   },
   "records": {
     "aliasKind": {
@@ -938,7 +941,8 @@
     "tab": {
       "firearms": "Firearms",
       "persons": "Persons",
-      "vehicles": "Vehicles"
+      "vehicles": "Vehicles",
+      "anmalan": "Reports"
     },
     "vehicle": {
       "column": {
@@ -1572,7 +1576,13 @@
     "locked": "Approved and locked. Add a supplemental to amend it.",
     "ownReport": "You cannot approve a report you wrote.",
     "returnedNote": "Returned by the supervisor: {note}",
-    "aklagareIndicated": "The offences charged normally place this investigation under a prosecutor."
+    "aklagareIndicated": "The offences charged normally place this investigation under a prosecutor.",
+    "filter": {
+      "mine": "Mine only"
+    },
+    "detail": {
+      "none": "Select a report to open it."
+    }
   },
   "fu": {
     "status": {

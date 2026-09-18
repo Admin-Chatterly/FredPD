@@ -1626,9 +1626,172 @@ function linkLabel(kind: string, targetId: number): string | null {
   return null;
 }
 
+/** Whose session the fixtures answer as, for the own-report rule. */
+const FIXTURE_VIEWER = '100000000000000001';
+
+interface FixtureAnmalan {
+  id: number;
+  number: string;
+  title: string;
+  status: string;
+  createdBy: string;
+  version: number;
+  brott: {
+    id: number;
+    code: string;
+    labelKey: string;
+    citation: string;
+    grad: string;
+    stage: string;
+  }[];
+  personer: { personId: number; roll: string; personNumber: string }[];
+}
+
+const anmalningar: FixtureAnmalan[] = [
+  {
+    id: 1,
+    number: 'LSPD-26-000101',
+    title: 'Stöld ur bil, Grove Street',
+    status: 'utkast',
+    createdBy: FIXTURE_VIEWER,
+    version: 1,
+    brott: [
+      {
+        id: 11,
+        code: 'BRB-8-1',
+        labelKey: 'brott.rubrik.stold',
+        citation: 'BrB 8:1',
+        grad: 'normal',
+        stage: 'fullbordat',
+      },
+    ],
+    personer: [{ personId: 1, roll: 'malsagande', personNumber: 'P-000431' }],
+  },
+  {
+    id: 2,
+    number: 'LSPD-26-000102',
+    title: 'Misshandel utanför Vanilla Unicorn',
+    status: 'inlamnad',
+    // Somebody else's, so it can be approved.
+    createdBy: '100000000000000002',
+    version: 3,
+    brott: [
+      {
+        id: 12,
+        code: 'BRB-3-5',
+        labelKey: 'brott.rubrik.misshandel',
+        citation: 'BrB 3:5',
+        grad: 'normal',
+        stage: 'fullbordat',
+      },
+    ],
+    personer: [{ personId: 2, roll: 'misstankt', personNumber: 'P-000512' }],
+  },
+  {
+    id: 3,
+    number: 'LSPD-26-000103',
+    title: 'Skadegörelse, busshållplats',
+    status: 'inlamnad',
+    // The viewer's own, submitted. The case that must not be approvable.
+    createdBy: FIXTURE_VIEWER,
+    version: 2,
+    brott: [
+      {
+        id: 13,
+        code: 'BRB-12-1',
+        labelKey: 'brott.rubrik.skadegorelse',
+        citation: 'BrB 12:1',
+        grad: 'normal',
+        stage: 'fullbordat',
+      },
+    ],
+    personer: [],
+  },
+];
+
+/**
+ * A workflow transition against the fixture rows.
+ *
+ * Enforces the two rules the screen is tested against: an approved anmälan is
+ * locked, and nobody approves their own.
+ */
+function moveAnmalan(input: unknown, to: string): unknown {
+  const { id } = (input ?? {}) as { id?: number };
+  const row = anmalningar.find((entry) => entry.id === id);
+
+  if (!row) return refuse('not_found');
+  if (row.status === 'godkand') return refuse('conflict', { status: 'locked' });
+
+  if (to === 'godkand' && row.createdBy === FIXTURE_VIEWER) {
+    return refuse('forbidden', { status: 'own_report' });
+  }
+
+  row.status = to;
+  row.version += 1;
+
+  return { id: row.id, status: to };
+}
+
 export const fixtures: FixtureSet = {
   ok: {
     'session.get': () => session,
+
+    // ------------------------------------------------------------- anmälan
+
+    /**
+     * The report workflow (spec 7.7).
+     *
+     * Three rows covering the three states the screen draws differently: a
+     * draft the viewer wrote, one submitted by somebody else (so it can be
+     * approved), and one the viewer submitted themselves -- the case that must
+     * NOT be approvable, and the one the screen explains before the button is
+     * pressed rather than after.
+     */
+    'anmalan.list': (input) => {
+      const filter = (input ?? {}) as { status?: string; mine?: boolean };
+
+      const found = anmalningar.filter(
+        (row) =>
+          (!filter.status || row.status === filter.status) &&
+          (!filter.mine || row.createdBy === FIXTURE_VIEWER),
+      );
+
+      return {
+        anmalningar: found.map(({ brott: _brott, personer: _personer, ...row }) => row),
+      };
+    },
+
+    'anmalan.get': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const row = anmalningar.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+
+      const { brott, personer, ...anmalan } = row;
+
+      // `may` is the server's answer rather than the screen's inference -- see
+      // the route. `ownReport` is what makes the own-approval note render.
+      const ownReport = row.createdBy === FIXTURE_VIEWER;
+
+      return {
+        anmalan,
+        brott,
+        personer,
+        supplements: [],
+        straffskala: brott.length > 0 ? { boter: false, min: 0, max: 36 } : null,
+        aklagareIndicated: brott.length > 0,
+        may: {
+          approve: row.status === 'inlamnad' && !ownReport,
+          submit: row.status === 'utkast' || row.status === 'atersand',
+          edit: row.status === 'utkast' || row.status === 'atersand',
+          ownReport,
+        },
+      };
+    },
+
+    'anmalan.submit': (input) => moveAnmalan(input, 'inlamnad'),
+    'anmalan.approve': (input) => moveAnmalan(input, 'godkand'),
+    'anmalan.atersand': (input) => moveAnmalan(input, 'atersand'),
 
     // ------------------------------------------------------------- dispatch
 

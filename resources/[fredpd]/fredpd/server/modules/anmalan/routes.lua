@@ -121,6 +121,23 @@ route.define({
             charges[index].citation = brott.citation(charges[index])
         end
 
+        -- What this session may do with this record, answered here rather
+        -- than left for the screen to infer.
+        --
+        -- The alternative was shipping the viewer's Discord id to the NUI so it
+        -- could compare authors itself. `Session` deliberately carries no
+        -- discordId -- it is an identifier the interface has no use for -- and
+        -- "what a session may do is the server's answer" (spec 6.4) is the
+        -- rule this whole codebase is built on. So the server answers.
+        --
+        -- `ownReport` is separate from `canApprove` because the screen says
+        -- different things about them. Not holding the grant is a role
+        -- question; having written the thing yourself is a rule no grant
+        -- reaches, and an officer refused with a bare `forbidden` goes and asks
+        -- for a permission that would not have helped.
+        local hasApprove = FredPD.Core.perms.satisfies(session.permissions, 'rms.anmalan.approve')
+        local editAny = FredPD.Core.perms.satisfies(session.permissions, 'rms.anmalan.edit.any')
+
         return {
             anmalan = row,
             brott = charges,
@@ -128,6 +145,12 @@ route.define({
             supplements = repo.supplements(row.id, session.agencyId),
             straffskala = #skalor > 0 and brott.gemensamStraffskala(skalor) or nil,
             aklagareIndicated = service.aklagareIndicated(skalor),
+            may = {
+                approve = service.canApprove(row, session.discordId, hasApprove),
+                submit = service.canSubmit(row, session.discordId, editAny),
+                edit = service.canEdit(row, session.discordId, editAny),
+                ownReport = row.createdBy == session.discordId,
+            },
         }
     end,
 })

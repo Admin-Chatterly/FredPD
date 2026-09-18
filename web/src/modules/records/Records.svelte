@@ -1,5 +1,6 @@
 <script lang="ts">
   import { nui } from '../../lib/nui';
+  import Anmalan from './Anmalan.svelte';
   import { t } from '../../lib/i18n';
   import {
     CLASSIFICATIONS,
@@ -63,7 +64,7 @@
    * drawn as a refusal (invariant 4, spec 6.4).
    */
 
-  type Tab = 'persons' | 'vehicles' | 'firearms';
+  type Tab = 'persons' | 'vehicles' | 'firearms' | 'anmalan';
 
   /** Which form's label a rejected field belongs to (spec 3.5). */
   const FIELD_LABELS: Record<string, string> = {
@@ -1032,7 +1033,7 @@
     selectedFirearmId = id;
   }
 
-  const tabs: Tab[] = ['persons', 'vehicles', 'firearms'];
+  const tabs: Tab[] = ['persons', 'vehicles', 'firearms', 'anmalan'];
   const messages = $derived(fieldList(failure, FIELD_LABELS));
 
   const openVehicleRecord = $derived(vehicleDetail?.vehicle ?? null);
@@ -2253,7 +2254,7 @@
         {t('records.vehicle.register.submit')}
       </button>
     </form>
-  {:else}
+  {:else if tab === 'firearms'}
     <!-- ------------------------------------------------------ firearms -->
     <form class="flex flex-wrap items-end gap-3" onsubmit={runFirearmSearch}>
       <label class="flex flex-col gap-1 text-xs">
@@ -2868,5 +2869,16 @@
         {t('records.firearm.register.submit')}
       </button>
     </form>
+  {:else if tab === 'anmalan'}
+    <!--
+      Its own component. `Records.svelte` is the tab host for the three
+      registers and would be five thousand lines with the report workflow
+      inlined; `cad/` is split the same way and for the same reason.
+
+      It takes no props: what the session may do with a record comes back on
+      `anmalan.get` as the server's own answer, rather than being inferred here
+      from an identifier the interface would have to be sent first.
+    -->
+    <Anmalan />
   {/if}
 </section>

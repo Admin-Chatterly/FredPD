@@ -58,7 +58,9 @@
     "failed": "Uppstarten kunde inte sparas i databasen. Anledningen finns i serverkonsolen."
   },
   "form": {
-    "cancel": "Avbryt"
+    "cancel": "Avbryt",
+    "any": "Alla",
+    "search": "Sök"
   },
   "fieldError": {
     "type": "fel typ av värde",
@@ -707,7 +709,8 @@
       "internal_affairs": "Internutredningen",
       "narcotics": "Narkotikaroteln",
       "records": "Registerenheten"
-    }
+    },
+    "restrictedRecord": "Skyddad handling"
   },
   "records": {
     "aliasKind": {
@@ -938,7 +941,8 @@
     "tab": {
       "firearms": "Vapen",
       "persons": "Personer",
-      "vehicles": "Fordon"
+      "vehicles": "Fordon",
+      "anmalan": "Anmälningar"
     },
     "vehicle": {
       "column": {
@@ -1572,7 +1576,13 @@
     "locked": "Godkänd och låst. Lägg till en tilläggsuppgift för att komplettera.",
     "ownReport": "Du kan inte godkänna en anmälan du själv har upprättat.",
     "returnedNote": "Återsänd av befäl: {note}",
-    "aklagareIndicated": "Brotten som anges gör normalt åklagare till förundersökningsledare."
+    "aklagareIndicated": "Brotten som anges gör normalt åklagare till förundersökningsledare.",
+    "filter": {
+      "mine": "Endast mina"
+    },
+    "detail": {
+      "none": "Välj en anmälan för att öppna den."
+    }
   },
   "fu": {
     "status": {
