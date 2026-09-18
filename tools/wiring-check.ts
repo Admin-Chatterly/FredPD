@@ -42,6 +42,12 @@ const SCHEMAS = join(REPO, 'packages', 'schema', 'src', 'schemas.ts');
  */
 const SERVER_CALLED: Record<string, string> = {
   'fredpd:close': 'the NUI asks the client to close it; not a route',
+  'forensics.observe':
+    'a sensor in fredpd_forensics reports it, not the NUI: the satellite calls ' +
+    'lib.callback.await on the global event name the core registered (ADR-011)',
+  'forensics.process':
+    'the powder, luminol and forensic-light tools in fredpd_forensics call it ' +
+    'from the world, not from an MDT screen (spec 8.4, ADR-011)',
 };
 
 /** Files a manifest is allowed not to list. */

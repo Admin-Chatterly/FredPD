@@ -78,6 +78,13 @@ server_scripts {
     'server/modules/garage/service.lua',
     'server/modules/garage/repo.lua',
     'server/modules/garage/routes.lua',
+    -- The uncollected-trace grid (8.3.5). service before grid, because the
+    -- grid reads `evidence.shouldMerge` and the forensics settings at load;
+    -- routes last, because they need the grid and the route layer.
+    'server/modules/forensics/service.lua',
+    'server/modules/forensics/grid.lua',
+    'server/modules/forensics/routes.lua',
+
     'server/modules/evidence/service.lua',
     'server/modules/evidence/repo.lua',
     'server/modules/evidence/routes.lua',

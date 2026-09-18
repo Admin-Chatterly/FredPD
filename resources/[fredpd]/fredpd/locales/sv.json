@@ -929,5 +929,64 @@
       "title": "Poster undanhållna"
     },
     "yes": "Ja"
+  },
+  "forensics": {
+    "busy": "Du håller redan på med något",
+    "collect": {
+      "option": "Säkra spår",
+      "description": "Förpacka och för in i beslagskedjan",
+      "progress": "Säkrar",
+      "done": "Säkrat",
+      "cancelled": "Avbrutet innan spåret säkrades"
+    },
+    "destroy": {
+      "wipe": {
+        "option": "Torka av",
+        "progress": "Torkar av"
+      },
+      "clean": {
+        "option": "Rengör",
+        "progress": "Rengör"
+      },
+      "wash": {
+        "option": "Tvätta händerna",
+        "progress": "Tvättar"
+      },
+      "pickup": {
+        "option": "Plocka upp",
+        "progress": "Plockar upp"
+      },
+      "weapon": {
+        "option": "Rengör vapnet",
+        "progress": "Rengör vapnet"
+      },
+      "done": "Klart",
+      "cancelled": "Avbrutet"
+    },
+    "marker": {
+      "option": "Placera markör",
+      "title": "Bevismarkör",
+      "number": "Markör {number}",
+      "placed": "Markör {number} placerad",
+      "cleared": "Markörerna borttagna"
+    },
+    "tool": {
+      "powder": "Fingeravtryckspulver",
+      "powderHint": "Framkallar latenta fingeravtryck på en yta",
+      "luminol": "Luminol",
+      "luminolHint": "Framkallar blod, även blod som rengjorts",
+      "forensic_light": "Kriminalteknisk lampa",
+      "forensicLightHint": "Framkallar spår i mörker",
+      "progress": "Bearbetar ytan",
+      "found": "{count} framkallade",
+      "nothing": "Inget framkallades här",
+      "cancelled": "Avbrutet"
+    },
+    "tools": {
+      "title": "Brottsplatsverktyg",
+      "keybind": "Brottsplatsverktyg",
+      "clearMarkers": "Ta bort markörer",
+      "clearMarkersHint": "Tar bort alla markörer du placerat på brottsplatsen"
+    }
   }
 }

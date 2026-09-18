@@ -1045,6 +1045,38 @@ export const schemas = {
     limit: { type: 'integer', required: false, min: 1, max: 200 },
   },
 
+
+  // In-world forensics (spec 8.3, 8.4). Both are called from the satellite
+  // rather than the MDT (ADR-011).
+
+  /**
+   * A sensor reporting that something happened. Nothing else may be added.
+   *
+   * Position, weapon, glove state, the trace's type and its owner are all
+   * resolved server-side (8.3.2). A coordinate or a type field here would be
+   * the hole the whole module exists to close: the client would be telling the
+   * server what evidence to create and whose it is.
+   *
+   * `netId` is resolved and range-checked by the server, never trusted as a
+   * position, and `doorIndex` is recorded rather than used as one.
+   */
+  ForensicsObserve: {
+    kind: {
+      type: 'enum',
+      required: true,
+      values: ['shot', 'reload', 'surface', 'vehicle_door', 'item_use', 'tool'],
+    },
+    netId: { type: 'integer', required: false, min: 1 },
+    // A vehicle has eight door indices; which one a print is on is part of the
+    // record, because it is what a defence asks about.
+    doorIndex: { type: 'integer', required: false, min: 0, max: 7 },
+  },
+
+  /** Powder, luminol or a forensic light, worked over a surface (8.4). */
+  ForensicsProcess: {
+    tool: { type: 'enum', required: true, values: ['powder', 'luminol', 'forensic_light'] },
+  },
+
 } as const satisfies Record<string, Schema>;
 
 export type SchemaName = keyof typeof schemas;

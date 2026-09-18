@@ -713,4 +713,14 @@ FredPD.Schema = {
         queryType = { type = 'string', required = false, max = 16 },
         limit = { type = 'integer', required = false, min = 1, max = 200 },
     },
+
+    ForensicsObserve = {
+        kind = { type = 'enum', required = true, values = { 'shot', 'reload', 'surface', 'vehicle_door', 'item_use', 'tool' } },
+        netId = { type = 'integer', required = false, min = 1 },
+        doorIndex = { type = 'integer', required = false, min = 0, max = 7 },
+    },
+
+    ForensicsProcess = {
+        tool = { type = 'enum', required = true, values = { 'powder', 'luminol', 'forensic_light' } },
+    },
 }

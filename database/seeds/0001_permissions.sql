@@ -96,6 +96,13 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('patrol_basic', 'comms.pdchat.send'),
     ('patrol_basic', 'comms.pdchat.view'),
 
+    -- Every officer's own actions leave traces (8.3): a shot leaves a casing, a
+    -- door leaves a print. This is the key their client's sensors report
+    -- through, so it sits at the base -- an officer who did not hold it would
+    -- move through the world leaving no evidence behind them, which is the one
+    -- thing this module exists to prevent.
+    ('patrol_basic', 'forensics.trace.report'),
+
     -- Patrol adds the motor pool and the vehicle they need to do the job.
     ('patrol', 'garage.vehicle.draw'),
     ('patrol', 'garage.vehicle.return'),

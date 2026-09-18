@@ -929,5 +929,64 @@
       "title": "Records withheld"
     },
     "yes": "Yes"
+  },
+  "forensics": {
+    "busy": "Already doing something",
+    "collect": {
+      "option": "Secure trace",
+      "description": "Package it and enter it in the chain of custody",
+      "progress": "Securing",
+      "done": "Secured",
+      "cancelled": "Interrupted before it was secured"
+    },
+    "destroy": {
+      "wipe": {
+        "option": "Wipe down",
+        "progress": "Wiping"
+      },
+      "clean": {
+        "option": "Clean",
+        "progress": "Cleaning"
+      },
+      "wash": {
+        "option": "Wash hands",
+        "progress": "Washing"
+      },
+      "pickup": {
+        "option": "Pick up",
+        "progress": "Picking up"
+      },
+      "weapon": {
+        "option": "Clean the weapon",
+        "progress": "Cleaning the weapon"
+      },
+      "done": "Done",
+      "cancelled": "Interrupted"
+    },
+    "marker": {
+      "option": "Place marker",
+      "title": "Evidence marker",
+      "number": "Marker {number}",
+      "placed": "Marker {number} placed",
+      "cleared": "Markers cleared"
+    },
+    "tool": {
+      "powder": "Fingerprint powder",
+      "powderHint": "Reveals latent prints on a surface",
+      "luminol": "Luminol",
+      "luminolHint": "Reveals blood, including blood that has been cleaned",
+      "forensic_light": "Forensic light",
+      "forensicLightHint": "Reveals trace evidence in the dark",
+      "progress": "Working the surface",
+      "found": "{count} revealed",
+      "nothing": "Nothing revealed here",
+      "cancelled": "Interrupted"
+    },
+    "tools": {
+      "title": "Scene tools",
+      "keybind": "Scene tools",
+      "clearMarkers": "Clear markers",
+      "clearMarkersHint": "Removes every marker you have placed at this scene"
+    }
   }
 }

@@ -1,0 +1,496 @@
+--- The uncollected-trace grid, as pure logic (spec 8.3.5, 8.1.6, 12.1).
+---
+--- Everything in this file is arithmetic over plain tables: no natives, no
+--- database, no clock of its own. That is what lets busted prove the three
+--- rules the grid actually has to get right, none of which can be checked by
+--- looking at a running server:
+---
+---   * a world position belongs to exactly one cell, including on a boundary;
+---   * a second identical trace folds into the first instead of appending
+---     (8.3.5) -- without which emptying a magazine leaves thirty rows and the
+---     cell becomes a performance problem rather than an investigation;
+---   * a shot leaves a casing at a fixed, documented rate (8.2, spec 12.2),
+---     decided by a counter rather than by chance.
+---
+--- Sampling is deterministic on purpose. `math.random` would make the rate
+--- untestable, and the test harness bans it; more importantly a rate that is
+--- argued about in a bug report should be a rate somebody can read off a table.
+---
+--- Nothing here knows who left a trace. `ownerKey` hashes nothing and reveals
+--- nothing -- it is a comparison key for merging, and it never leaves the
+--- server, because nothing in this file ever reaches a client. What a client
+--- receives is built by `FredPD.Modules.evidence.renderData` and by nothing
+--- else (8.11).
+
+FredPD = FredPD or {}
+FredPD.Modules = FredPD.Modules or {}
+
+local Forensics = {}
+
+-- -----------------------------------------------------------------------------
+-- Configuration
+-- -----------------------------------------------------------------------------
+
+--- Working defaults for the whole grid.
+---
+--- A server overrides any of it in `config/server.lua` under `forensics`; the
+--- defaults are here rather than there because they are the values the tests
+--- assert against, and a spec that read the server config would be testing the
+--- installation instead of the code.
+---
+--- The numbers that matter to spec 12.1 are `cellSize`, `streamRange` and
+--- `pushIntervalSeconds`: together they decide how much a client is told and
+--- how often. `maxPerCell` is the cap 12.2 asks for -- the grid refuses to grow
+--- without bound even if the generation pipeline is wrong.
+Forensics.defaults = {
+    --- Metres per grid cell, on both axes. A cell is the unit of subscription
+    --- and of the per-second push budget, so bigger cells mean fewer, larger
+    --- updates and smaller cells mean more, smaller ones.
+    cellSize = 32.0,
+
+    --- How far a client is told about evidence, in metres. Below GTA's entity
+    --- streaming distance deliberately: a player is told about traces they
+    --- could walk up to, not about everything their machine has loaded (8.11).
+    streamRange = 96.0,
+
+    --- The push budget from spec 12.1: at most one update per second per cell
+    --- per client. The grid coalesces everything that happened in the interval
+    --- into a single message rather than pushing per item.
+    pushIntervalSeconds = 1,
+
+    --- How often decayed traces are swept out of the grid, in seconds. On a
+    --- timer rather than on read (12.2): a read happens once per client per
+    --- second and would pay for the sweep every time.
+    evictIntervalSeconds = 30,
+
+    --- Two traces closer together than this, of the same type and the same
+    --- owner, are one trace (8.3.5).
+    mergeRadius = 0.5,
+
+    --- The cap per cell. Reached only by a generation pipeline that has gone
+    --- wrong or by somebody trying to fill the grid; the oldest trace in the
+    --- cell gives way, so the newest evidence is the evidence that survives.
+    maxPerCell = 64,
+
+    --- The cap across the whole world. Per-cell caps bound one street corner;
+    --- this bounds a player driving across the map generating as they go. Past
+    --- it the grid sweeps early and then refuses to grow (12.2).
+    maxItems = 5000,
+
+    --- One casing per this many shots (8.2, 12.2). Emptying a thirty-round
+    --- magazine leaves six casings at the default, not thirty.
+    casingEvery = 5,
+
+    --- How long a trace lies in the world before it is gone entirely, per type,
+    --- in seconds. This is not quality decay -- `evidence.qualityAfter` does
+    --- that at collection time (8.1.4) -- it is the point past which there is
+    --- nothing left to collect at all.
+    defaultLifetimeSeconds = 2 * 3600,
+
+    lifetimeSeconds = {
+        -- Physical objects lie where they fell until somebody picks them up.
+        casing = 6 * 3600,
+        magazine = 6 * 3600,
+        bullet = 12 * 3600,
+        -- Latent traces are fragile: they are the ones a scene has to be worked
+        -- quickly to recover.
+        print = 3 * 3600,
+        glove_mark = 3 * 3600,
+        dna_touch = 90 * 60,
+        blood = 8 * 3600,
+        drug_residue = 2 * 3600,
+        footwear = 45 * 60,
+        tool_mark = 12 * 3600,
+    },
+
+    --- Quality lost per hour, per type, handed to `evidence.qualityAfter` when
+    --- the trace is finally collected (8.1.4).
+    decayPerHour = {
+        print = 4,
+        glove_mark = 4,
+        dna_touch = 8,
+        blood = 2,
+        casing = 0.5,
+        bullet = 0.5,
+        magazine = 1,
+        drug_residue = 6,
+        footwear = 10,
+        tool_mark = 0.5,
+    },
+
+    --- How close an officer has to be to collect a trace, in metres. Checked
+    --- against the server's copy of their position, never against the call.
+    collectRange = 3.0,
+
+    --- How far powder, luminol and the forensic light reach from where the
+    --- officer is standing, in metres (8.4).
+    processRadius = 4.0,
+
+    --- The prop a type is drawn as, by type. Empty by default and deliberately
+    --- so: a model name is a rendering decision, and a server that has not
+    --- chosen one gets a marker drawn by `fredpd_forensics` instead of a prop
+    --- this file guessed at. The value only ever travels as part of render data
+    --- (8.1.6).
+    models = {},
+
+    --- How close a reported entity has to be to the player reporting it (8.3.2).
+    --- A door handle they are nowhere near is not an observation, it is a claim.
+    entityRange = 6.0,
+
+    --- Damage above which a hit leaves blood (8.2).
+    bloodDamageThreshold = 12,
+}
+
+--- Merges a server's overrides onto the defaults.
+---
+--- Two levels, because `lifetimeSeconds` and `decayPerHour` are tables of their
+--- own and a server that wants to change how long a casing lies around should
+--- not have to restate every other type to do it.
+---
+--- @param overrides table|nil
+--- @return table a new table; the defaults are never mutated
+function Forensics.settings(overrides)
+    local merged = {}
+
+    for key, value in pairs(Forensics.defaults) do
+        if type(value) == 'table' then
+            local copy = {}
+            for innerKey, innerValue in pairs(value) do copy[innerKey] = innerValue end
+            merged[key] = copy
+        else
+            merged[key] = value
+        end
+    end
+
+    for key, value in pairs(overrides or {}) do
+        if type(value) == 'table' and type(merged[key]) == 'table' then
+            for innerKey, innerValue in pairs(value) do merged[key][innerKey] = innerValue end
+        else
+            merged[key] = value
+        end
+    end
+
+    return merged
+end
+
+-- -----------------------------------------------------------------------------
+-- Cells (12.2: a spatial grid for evidence)
+-- -----------------------------------------------------------------------------
+
+--- The cell a world position falls in.
+---
+--- `math.floor` on the division is the whole rule, and it is the reason a
+--- position on a boundary belongs to exactly one cell: at x = 32 with a 32 m
+--- cell the division is exactly 1, so the boundary is the *first* metre of the
+--- higher cell and never the last of the lower one. Any rule works as long as
+--- it is total and consistent; this one is both, and it holds for negative
+--- coordinates too, where -32 is the first metre of cell -1.
+---
+--- Z is deliberately absent. A grid cell is a subscription unit for streaming,
+--- and a player on the tenth floor is streaming the street below them.
+---
+--- @param x number
+--- @param y number
+--- @param size number|nil metres per cell; defaults to `defaults.cellSize`
+--- @return string
+function Forensics.cellKey(x, y, size)
+    size = size or Forensics.defaults.cellSize
+
+    return ('%d:%d'):format(math.floor(x / size), math.floor(y / size))
+end
+
+--- Every cell a client at this position is subscribed to.
+---
+--- The square that covers `range` in every direction, which is between nine and
+--- sixteen cells at the default settings. A square rather than a circle because
+--- the cell is the unit of the push budget (12.1): trimming the corners would
+--- save a cell whose contents are usually empty and cost a distance check per
+--- cell per client per second, which is the wrong trade at 200 players.
+---
+--- The order is stable -- x ascending, then y -- so a test can assert on the
+--- whole list and a diff between two positions is readable.
+---
+--- @param x number
+--- @param y number
+--- @param range number metres
+--- @param size number|nil
+--- @return table list of cell keys
+function Forensics.cellsAround(x, y, range, size)
+    size = size or Forensics.defaults.cellSize
+    range = range or Forensics.defaults.streamRange
+
+    local minX = math.floor((x - range) / size)
+    local maxX = math.floor((x + range) / size)
+    local minY = math.floor((y - range) / size)
+    local maxY = math.floor((y + range) / size)
+
+    local keys = {}
+
+    for cx = minX, maxX do
+        for cy = minY, maxY do
+            keys[#keys + 1] = ('%d:%d'):format(cx, cy)
+        end
+    end
+
+    return keys
+end
+
+-- -----------------------------------------------------------------------------
+-- Owners (8.3.4) -- hidden, and only ever compared
+-- -----------------------------------------------------------------------------
+
+--- The key two traces are compared on to decide whether they are one trace.
+---
+--- It contains the source's hidden identifier, so it is hidden truth in the
+--- sense of 8.1: it stays in the grid, it is never part of render data, and
+--- nothing derived from it is returned by a route. It exists because
+--- `evidence.shouldMerge` needs a single value to compare and the owner is two
+--- nullable fields.
+---
+--- A trace with no owner at all gets a key of its own rather than nil, so two
+--- unattributed traces never merge into each other -- they are a bug in the
+--- generation pipeline (8.3.4) and merging them would hide it.
+---
+--- @param owner table|nil { identifier, weaponSerial }
+--- @return string
+function Forensics.ownerKey(owner)
+    if type(owner) ~= 'table' then return '?' end
+
+    local identifier = type(owner.identifier) == 'string' and owner.identifier or ''
+    local serial = type(owner.weaponSerial) == 'string' and owner.weaponSerial or ''
+
+    if identifier == '' and serial == '' then return '?' end
+
+    return identifier .. '|' .. serial
+end
+
+-- -----------------------------------------------------------------------------
+-- Visibility (8.4)
+-- -----------------------------------------------------------------------------
+
+--- Types that are invisible until a tool is used on them (8.4).
+---
+--- The rest -- casings, magazines, bullets, a pool of blood -- can be seen
+--- without anything, which is what makes 8.10 work: a criminal can walk back
+--- and pick up their own casings.
+local LATENT <const> = {
+    print = true,
+    glove_mark = true,
+    dna_touch = true,
+    drug_residue = true,
+    footwear = true,
+    tool_mark = true,
+}
+
+--- Is this type invisible until processed?
+function Forensics.isLatent(type_)
+    return LATENT[type_] == true
+end
+
+--- Which tool reveals which type (8.4).
+---
+--- Powder for the ridge detail somebody left on a surface, luminol for blood
+--- including blood that has been cleaned (8.10), the forensic light for the
+--- trace material neither of the other two shows.
+local REVEALS <const> = {
+    powder = { print = true, glove_mark = true, tool_mark = true },
+    luminol = { blood = true },
+    forensic_light = { dna_touch = true, drug_residue = true, footwear = true },
+}
+
+--- Does using `tool` find a trace of this type?
+---
+--- Only whether the tool works on the type, not whether this particular trace is
+--- hidden -- the caller knows that, and it is not a property of the type. Blood
+--- is the case that proves it: a fresh pool is visible to anybody and luminol
+--- adds nothing, but blood somebody has cleaned is invisible again and luminol
+--- is the only thing that finds it (8.10).
+function Forensics.revealedBy(tool, type_)
+    local reveals = REVEALS[tool]
+
+    return reveals ~= nil and reveals[type_] == true
+end
+
+--- Every tool the grid knows, for the route's allowlist.
+Forensics.TOOLS = { 'powder', 'luminol', 'forensic_light' }
+
+-- -----------------------------------------------------------------------------
+-- Placement and merging (8.3.5)
+-- -----------------------------------------------------------------------------
+
+--- Puts a trace into the grid, folding it into an identical neighbour.
+---
+--- `grid` is a plain map of cell key to a list of items; the caller owns it and
+--- this function is the only thing that adds to it. The merge rule itself is
+--- `evidence.shouldMerge` (8.3.5) and is deliberately not restated here: there
+--- is one definition of "these are the same trace" and both the grid and the
+--- lab-facing code read it.
+---
+--- What a merge does:
+---   * the *first* trace stays, with its key and its position. A client that
+---     was told about it keeps a key that still works, and the pile does not
+---     jump half a metre every time another casing lands on it;
+---   * `count` grows, which is what makes "six casings here" one row;
+---   * `quality` takes the better of the two -- the freshest casing in the pile
+---     is the one the lab would actually work from;
+---   * `createdAt` stays at the oldest. A trace cannot be kept alive forever by
+---     adding to it, which is what refreshing the age would allow.
+---
+--- Merging is searched within the trace's own cell only. The merge radius is
+--- half a metre against a 32 m cell, so the cases this misses are traces within
+--- half a metre of a cell boundary -- two rows instead of one, occasionally,
+--- which costs a row and never costs correctness. Searching the eight
+--- neighbours to catch it would multiply the cost of the hottest function in
+--- the module by nine (12.1).
+---
+--- @param grid table cellKey -> list of items
+--- @param item table the new trace
+--- @param options table|nil { cellSize, mergeRadius, maxPerCell }
+--- @return table stored the item now in the grid: the new one, or the one it
+---   merged into
+--- @return boolean merged
+--- @return string cellKey where it landed
+function Forensics.placeIn(grid, item, options)
+    options = options or {}
+
+    local size = options.cellSize or Forensics.defaults.cellSize
+    local radius = options.mergeRadius or Forensics.defaults.mergeRadius
+    local maxPerCell = options.maxPerCell or Forensics.defaults.maxPerCell
+
+    local key = Forensics.cellKey(item.x, item.y, size)
+    local cell = grid[key]
+
+    if not cell then
+        cell = {}
+        grid[key] = cell
+    end
+
+    local shouldMerge = FredPD.Modules.evidence.shouldMerge
+
+    for index = 1, #cell do
+        local existing = cell[index]
+
+        if shouldMerge(existing, item, radius) then
+            existing.count = (existing.count or 1) + (item.count or 1)
+
+            if (item.quality or 0) > (existing.quality or 0) then
+                existing.quality = item.quality
+            end
+
+            -- What the world looks like follows the newest arrival, so a pile
+            -- that started as one casing draws as a pile.
+            existing.mergedAt = item.createdAt or existing.mergedAt
+
+            return existing, true, key
+        end
+    end
+
+    -- The cap (12.2). Full means somebody is generating faster than anyone can
+    -- collect, and the oldest trace in the cell is the one worth least.
+    if #cell >= maxPerCell then
+        local oldestIndex, oldestAt = 1, math.huge
+
+        for index = 1, #cell do
+            local at = cell[index].createdAt or 0
+            if at < oldestAt then
+                oldestIndex, oldestAt = index, at
+            end
+        end
+
+        table.remove(cell, oldestIndex)
+    end
+
+    cell[#cell + 1] = item
+
+    return item, false, key
+end
+
+-- -----------------------------------------------------------------------------
+-- Decay (8.1.4, 12.2)
+-- -----------------------------------------------------------------------------
+
+--- Has this trace aged out of the world entirely?
+---
+--- Different from quality decay, which lowers what the lab can get out of a
+--- sample that is still there (8.1.4). This is the point at which there is
+--- nothing to collect: the casing has been swept up, the print has degraded past
+--- recovery, and the grid stops carrying the row.
+---
+--- A lifetime of zero or less means "never", which is how a server switches the
+--- sweep off for a type it wants to keep until somebody collects it.
+---
+--- @param item table
+--- @param now number unix seconds
+--- @param config table as `Forensics.settings` returns
+--- @return boolean
+function Forensics.decayed(item, now, config)
+    config = config or Forensics.defaults
+
+    local lifetime = (config.lifetimeSeconds or {})[item.type]
+    if lifetime == nil then lifetime = config.defaultLifetimeSeconds end
+    if not lifetime or lifetime <= 0 then return false end
+
+    return (now - (item.createdAt or 0)) >= lifetime
+end
+
+--- How much quality a trace of this type loses per hour, for `qualityAfter`.
+function Forensics.decayPerHour(type_, config)
+    config = config or Forensics.defaults
+
+    return (config.decayPerHour or {})[type_] or 2
+end
+
+-- -----------------------------------------------------------------------------
+-- Sampling (8.2, 12.2)
+-- -----------------------------------------------------------------------------
+
+--- Does *this* shot leave a casing?
+---
+--- The rate is exactly one casing per `casingEvery` shots, and the shot that
+--- leaves it is the first of each run: shots 1, 6, 11 at the default of five.
+--- The first shot counting is the half that matters -- a single shot fired at a
+--- victim is the most investigable event in the game, and a rule that started
+--- counting at the fifth would leave nothing behind it.
+---
+--- Deterministic in the shot counter, which the server keeps per player. Chance
+--- would make the rate an anecdote instead of a number, and `math.random` is
+--- not available to the tests that have to prove it.
+---
+--- @param shotCount number the player's running shot count, 1 for their first
+--- @param config table|nil
+--- @return boolean
+function Forensics.sampleShot(shotCount, config)
+    config = config or Forensics.defaults
+
+    local every = tonumber(config.casingEvery) or Forensics.defaults.casingEvery
+    every = math.floor(every)
+
+    if type(shotCount) ~= 'number' or shotCount < 1 then return false end
+    if every <= 1 then return true end
+
+    return (math.floor(shotCount) - 1) % every == 0
+end
+
+-- -----------------------------------------------------------------------------
+-- The push budget (12.1)
+-- -----------------------------------------------------------------------------
+
+--- May a cell be pushed to a client again yet?
+---
+--- Spec 12.1 makes "at most one update per second per grid cell per client" an
+--- acceptance criterion, so the rule is a function rather than an implicit
+--- property of how often a loop happens to run. A client that has never been
+--- sent this cell is always due.
+---
+--- @param lastPushedAt number|nil
+--- @param now number
+--- @param interval number|nil seconds
+function Forensics.dueForPush(lastPushedAt, now, interval)
+    if lastPushedAt == nil then return true end
+
+    interval = interval or Forensics.defaults.pushIntervalSeconds
+
+    return (now - lastPushedAt) >= interval
+end
+
+FredPD.Modules.forensics = Forensics
