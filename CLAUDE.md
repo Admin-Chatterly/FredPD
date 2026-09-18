@@ -51,15 +51,22 @@ only a pointer; the spec has the detail.
 
 ```
 pnpm install
+pnpm verify           # EVERYTHING CI RUNS. Run this before you commit.
 pnpm dev:web          # NUI in a browser against fixtures, no game server
 pnpm build            # schema → NUI → gateway
-pnpm check            # lint, types, svelte-check, i18n
+pnpm check            # lint, types, svelte-check, i18n, wiring, enums
 pnpm test             # unit tests (Vitest)
 pnpm test:lua         # Lua unit tests (busted)
 pnpm lint:lua         # luacheck over the resources
 pnpm test:e2e         # Playwright against the mock bridge
 pnpm schema:gen       # regenerate the Lua schema; commit the result
 ```
+
+`pnpm verify` exists because the gate used to live in somebody's head, and a
+gate that is remembered drifts from the one CI runs. `test:e2e` is not part of
+`check` — it needs a browser — and it is the only suite that renders the module
+rail, so a stale assertion about the rail reached `main` while `check`, `test`
+and `build` were all green. Run the one command.
 
 ## Conventions
 

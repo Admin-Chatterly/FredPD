@@ -23,6 +23,7 @@
     "enum:check": "tsx tools/enum-check.ts",
     "schema:gen": "pnpm --filter @fredpd/schema build",
     "check": "pnpm lint && pnpm typecheck && pnpm svelte-check && pnpm i18n:check && pnpm wiring:check && pnpm enum:check",
+    "verify": "pnpm check && pnpm lint:lua && pnpm test:lua && pnpm test && pnpm build && pnpm test:e2e",
     "test:lua": "busted",
     "lint:lua": "luacheck resources/"
   },
