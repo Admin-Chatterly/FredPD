@@ -9,11 +9,18 @@
 --- none of them names those tables. There is no `SELECT *` in this file for
 --- that reason.
 ---
---- **Record numbers are allocated by the database, in the statement that uses
---- them.** The sequence is a `MAX` over the numbers that already exist for this
---- agency and year, read inside the same INSERT, so two officers collecting at
---- the same moment cannot be handed the same number. The unique index is the
---- backstop; this is what stops it being hit (invariant 1).
+--- **Record numbers are allocated from `fpd_counters`, under a row lock, inside
+--- the transaction that writes the record** (spec 13.1, `core/counters.lua`).
+---
+--- This used to be a `MAX(sequence) + 1` read inside the same `INSERT ... SELECT`
+--- that used it, over the table being inserted into. That is atomic only under
+--- REPEATABLE READ, where the scan takes next-key locks; under READ COMMITTED --
+--- the default on several managed MariaDB products and a common setting on ESX
+--- servers -- the scanning half is an ordinary consistent read, two officers
+--- collecting in the same tick read the same MAX, and `uq_fpd_evidence_number`
+--- refuses one of them in front of the officer. The counter is a primary-key
+--- lookup under an exclusive lock and behaves the same under every isolation
+--- level. The unique index stays as the backstop it always was.
 
 FredPD = FredPD or {}
 FredPD.Repo = FredPD.Repo or {}
@@ -79,34 +86,54 @@ local SCENE_COLUMNS <const> = [[
 
 --- Opens a scene and gives it its number.
 ---
---- `INSERT ... SELECT` over a derived table rather than a read followed by a
---- write: the `MAX` and the insert are one statement, so the sequence cannot be
---- taken twice. An aggregate with no `GROUP BY` returns exactly one row even
---- when the table is empty, which is what makes the first scene of the year
---- number 1 rather than inserting nothing.
+--- The number comes from `fpd_counters` under a row lock, in the same
+--- transaction as the INSERT that uses it (spec 13.1). `counters.transaction`
+--- wraps the statement below in the seed, the `FOR UPDATE` and the bump; see
+--- `core/counters.lua` for why the sequence cannot be read any other way.
 ---
---- Both conditions on the sequence scan are deliberate. The prefix carries the
---- agency and the year, so it is the real filter; `agency_id` keeps the scan on
---- this agency's rows even if a short name ever contained a LIKE wildcard, which
---- could then only widen the MAX and skip a number, never repeat one.
+--- The id is read back afterwards rather than returned by the write, because a
+--- transaction reports only whether it committed. It is scoped to the officer
+--- who just wrote it: one Discord account holds one session, so nobody else can
+--- have interleaved a scene under this signature. `createLabRequest` reads its
+--- id back the same way and for the same reason.
 ---
 --- @return number|nil scene id
 function Repo.createScene(agencyId, input, discordId)
+    local counters = FredPD.Core.counters
     local prefix, width = numberPrefix('scene', agencyId)
+    local year = counters.year()
 
-    return db().insert(
-        [[INSERT INTO fpd_scenes
-              (scene_number, agency_id, case_number, x, y, z, radius, created_by)
-          SELECT CONCAT(?, LPAD(COALESCE(MAX(existing.sequence), 0) + 1, ?, '0')),
-                 ?, ?, ?, ?, ?, ?, ?
-            FROM (SELECT CAST(SUBSTRING_INDEX(scene_number, '-', -1) AS UNSIGNED) AS sequence
-                    FROM fpd_scenes
-                   WHERE agency_id = ? AND scene_number LIKE ?) AS existing]],
+    -- The five values the number subquery consumes come first, because the
+    -- number is the first column. The rest are written by index rather than
+    -- appended: `input.caseNumber` is often nil, and appending after a nil
+    -- silently fills its slot and shifts every parameter after it.
+    local values = counters.numberValues(prefix, width, 'scene', agencyId, year)
+    local base = #values
+
+    values[base + 1] = agencyId
+    values[base + 2] = input.caseNumber
+    values[base + 3] = input.x
+    values[base + 4] = input.y
+    values[base + 5] = input.z
+    values[base + 6] = input.radius
+    values[base + 7] = discordId
+
+    local committed = db().transaction(counters.transaction('scene', agencyId, year, {
         {
-            prefix, width,
-            agencyId, input.caseNumber, input.x, input.y, input.z, input.radius, discordId,
-            agencyId, prefix .. '%',
-        }
+            query = ([[INSERT INTO fpd_scenes
+                           (scene_number, agency_id, case_number, x, y, z, radius, created_by)
+                       VALUES (%s, ?, ?, ?, ?, ?, ?, ?)]]):format(counters.numberSql()),
+            values = values,
+        },
+    }))
+
+    if not committed then return nil end
+
+    return db().scalar(
+        [[SELECT id FROM fpd_scenes
+           WHERE agency_id = ? AND created_by = ?
+           ORDER BY id DESC LIMIT 1]],
+        { agencyId, discordId }
     )
 end
 
@@ -208,28 +235,41 @@ local EVIDENCE_COLUMNS <const> = [[
 --- @param discordId string the collecting officer, from the session
 --- @return table|nil the inserted row, public columns only
 function Repo.insertEvidence(agencyId, input, owner, discordId)
+    local counters = FredPD.Core.counters
     local prefix, width = numberPrefix('evidence', agencyId)
+    local year = counters.year()
     local ref = newRef()
 
-    local committed = db().transaction({
+    -- `ref` is the first column, then the five values of the number subquery,
+    -- then the rest by index -- several of them are legitimately nil, and a nil
+    -- appended to a values list shifts every parameter after it.
+    local numberValues = counters.numberValues(prefix, width, 'evidence', agencyId, year)
+    local values = { ref }
+
+    for index = 1, #numberValues do
+        values[index + 1] = numberValues[index]
+    end
+
+    local base = #numberValues + 1
+
+    values[base + 1] = agencyId
+    values[base + 2] = input.sceneId
+    values[base + 3] = input.caseNumber
+    values[base + 4] = input.type
+    values[base + 5] = input.packaging
+    values[base + 6] = input.markerNumber
+    values[base + 7] = input.description
+    values[base + 8] = input.quality
+    values[base + 9] = discordId
+
+    local committed = db().transaction(counters.transaction('evidence', agencyId, year, {
         {
-            query = [[INSERT INTO fpd_evidence
-                          (ref, evidence_number, agency_id, scene_id, case_number, type,
-                           packaging, marker_number, description, quality, collected_by, status)
-                      SELECT ?,
-                             CONCAT(?, LPAD(COALESCE(MAX(existing.sequence), 0) + 1, ?, '0')),
-                             ?, ?, ?, ?, ?, ?, ?, ?, ?, 'collected'
-                        FROM (SELECT CAST(SUBSTRING_INDEX(evidence_number, '-', -1) AS UNSIGNED)
-                                       AS sequence
-                                FROM fpd_evidence
-                               WHERE agency_id = ? AND evidence_number LIKE ?) AS existing]],
-            values = {
-                ref,
-                prefix, width,
-                agencyId, input.sceneId, input.caseNumber, input.type,
-                input.packaging, input.markerNumber, input.description, input.quality, discordId,
-                agencyId, prefix .. '%',
-            },
+            query = ([[INSERT INTO fpd_evidence
+                           (ref, evidence_number, agency_id, scene_id, case_number, type,
+                            packaging, marker_number, description, quality, collected_by, status)
+                       VALUES (?, %s, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'collected')]])
+                :format(counters.numberSql()),
+            values = values,
         },
 
         {
@@ -244,7 +284,7 @@ function Repo.insertEvidence(agencyId, input, owner, discordId)
                       SELECT id, 'collect', ?, ?, ?, ? FROM fpd_evidence WHERE ref = ?]],
             values = { input.fromParty, discordId, input.reason, discordId, ref },
         },
-    })
+    }))
 
     if not committed then return nil end
 

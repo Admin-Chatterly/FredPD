@@ -39,6 +39,36 @@ local REQUIRED_TABLES <const> = {
     'fpd_lab_requests',
     'fpd_lab_analyses',
     'fpd_forensic_index',
+
+    -- Migration 0005. `fpd_counters` is the one the whole server needs rather
+    -- than one module: every record number in the suite is allocated from it,
+    -- so a server missing it cannot open a scene, collect an item or create a
+    -- person, and would report each of those as its own unrelated SQL error.
+    'fpd_counters',
+
+    -- Record-level access (spec 4.5). The access module is loaded before every
+    -- module that reads a record, so these are missing for exactly as long as
+    -- access control is not being enforced.
+    'fpd_compartments',
+    'fpd_classifications',
+    'fpd_record_compartments',
+    'fpd_record_grants',
+    'fpd_record_seals',
+    'fpd_breakglass',
+
+    -- M2 records (spec 7.2-7.5).
+    'fpd_persons',
+    'fpd_person_aliases',
+    'fpd_person_descriptors',
+    'fpd_person_photos',
+    'fpd_person_cautions',
+    'fpd_person_biometrics_index',
+    'fpd_vehicles',
+    'fpd_vehicle_plates',
+    'fpd_vehicle_flags',
+    'fpd_firearms',
+    'fpd_firearm_events',
+    'fpd_query_log',
 }
 
 --- Columns a migration added to a table that already existed, which the table

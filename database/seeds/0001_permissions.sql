@@ -102,6 +102,30 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('patrol', 'query.person.run'),
     ('patrol', 'query.vehicle.run'),
 
+    -- The registers (spec 7.2-7.5). Reading them is ordinary patrol work: an
+    -- officer who may run a plate has to be able to open what the plate
+    -- returns, or the query answers a question nobody can follow up.
+    ('patrol', 'rms.person.view'),
+    ('patrol', 'rms.vehicle.view'),
+    ('patrol', 'rms.firearm.view'),
+
+    -- Writing to them is not. Correcting a record of a real person, registering
+    -- a vehicle or changing a plate are all things a department wants to be able
+    -- to point at afterwards, so they sit a rank up.
+    ('supervisor', 'rms.person.edit'),
+    ('supervisor', 'rms.vehicle.edit'),
+    ('supervisor', 'rms.vehicle.flag'),
+    ('supervisor', 'rms.firearm.edit'),
+
+    -- A caution is a safety flag on a person -- armed, violent, officer safety.
+    -- Held apart from `rms.person.edit` because setting one wrongly follows
+    -- somebody through every future stop.
+    ('supervisor', 'rms.person.caution.edit'),
+
+    -- A firearm trace reaches into the ballistic index and says which weapon
+    -- fired what. Command only, matching `evidence.item.release` above it.
+    ('command', 'rms.firearm.trace'),
+
     -- A supervisor sees the whole department's traffic, not just their agency's.
     ('supervisor', 'comms.pdchat.all'),
 

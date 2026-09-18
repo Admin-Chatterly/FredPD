@@ -46,6 +46,7 @@ server_scripts {
     'server/core/session.lua',
     'server/core/push.lua',
     'server/core/placements.lua',
+    'server/core/counters.lua',
     'server/core/route.lua',
 
     -- Modules: service (logic) and repo (SQL) before the routes that use them.
@@ -54,6 +55,14 @@ server_scripts {
     -- record, because all of them ask it the same question.
     'server/modules/access/service.lua',
     'server/modules/access/repo.lua',
+
+    -- The registers (spec 7.2-7.5). Persons first: the vehicle and firearm
+    -- registers both resolve an owner through it.
+    'server/modules/persons/repo.lua',
+    'server/modules/persons/routes.lua',
+    'server/modules/registry/service.lua',
+    'server/modules/registry/repo.lua',
+    'server/modules/registry/routes.lua',
 
     'server/modules/placements/service.lua',
     'server/modules/placements/repo.lua',

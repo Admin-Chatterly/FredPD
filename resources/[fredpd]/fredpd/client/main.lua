@@ -96,6 +96,29 @@ local NUI_ROUTES <const> = {
     'intel.evidence.add',
     'intel.evidence.delete',
 
+    -- The master name index (spec 7.2, 7.3).
+    'person.search',
+    'person.get',
+    'person.update',
+    'person.caution.set',
+
+    -- Vehicle and firearm registers (spec 7.4, 7.5).
+    'vehicle.search',
+    'vehicle.get',
+    'vehicle.register',
+    'vehicle.update',
+    'vehicle.plate.change',
+    'vehicle.flag',
+    'vehicle.flag.clear',
+    'firearm.search',
+    'firearm.get',
+    'firearm.register',
+    'firearm.update',
+    'firearm.transfer',
+    'firearm.status',
+    'firearm.assign',
+    'firearm.trace',
+
     -- Crime scenes, evidence and the chain of custody (spec 8).
     'scene.create',
     'scene.release',
