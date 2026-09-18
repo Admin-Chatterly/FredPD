@@ -876,14 +876,24 @@ end
 --- `is_lead = 0` goes with it: a lead unit that has left the call is a call
 --- where nobody is in charge and the card still says somebody is.
 ---
---- **And the unit's status comes back with it.** A unit a dispatcher takes off
---- a call is in exactly the position of a unit whose call was cleared, and
---- `Cad.statusAfterCall` is the one rule both of them go through: the statuses
---- the call itself put them in go back to `available`, and a unit that has
---- moved on under its own steam -- `transporting` a prisoner from this call,
---- say -- keeps what they chose. Without it a released unit reads `on_scene`
---- for the rest of the shift, at a scene it is not at, with the welfare timer
---- counting up from the moment it arrived there.
+--- **And the unit's status comes back with it.** The statuses the call itself
+--- put them in go back to `available`, and a unit that has moved on under its
+--- own steam -- `transporting` a prisoner from this call, say -- keeps what
+--- they chose. Without it a released unit reads `on_scene` for the rest of the
+--- shift, at a scene it is not at, with the welfare timer counting up from the
+--- moment it arrived there.
+---
+--- **`Cad.CALL_RELEASED`, and not `Cad.CALL_ENDED`.** That is the whole of the
+--- difference between this and `clearCall`, and it was wrong here until a
+--- review read the two statements side by side: both asked for the closure's
+--- rule, which names `emergency`. Nothing that reaches this function says the
+--- call is over. Both callers leave it open -- a dispatcher taking a unit off
+--- it (`call.dispatch`) is rearranging who is going where, and `events.signOff`
+--- is a unit going home from a call that still needs somebody -- so neither has
+--- established that an officer who pressed panic has stopped needing help. What
+--- clearing it cost was specific and silent: the officer's own P1 was still
+--- open and still unacknowledged in the queue, and the one row on the board
+--- that said somebody needed help now read `available`.
 ---
 --- Both the status and the line are guarded on the release having actually
 --- closed a row (`@fpd_changed`, see `LOG_INSERT_CHANGED`). Releasing a unit
@@ -896,7 +906,7 @@ end
 function Repo.releaseUnits(agencyId, callId, units, actor)
     local statements = {}
     local cad = service()
-    local statuses, freed = cad.statusesClearedByCall(cad.CALL_ENDED)
+    local statuses, freed = cad.statusesClearedByCall(cad.CALL_RELEASED)
     local holders = {}
 
     for index = 1, #statuses do holders[index] = '?' end
@@ -1169,13 +1179,17 @@ end
 --- report by the calls nobody went to.
 ---
 --- Which statuses come back to `available` comes from `Cad.statusAfterCall`,
---- which is the same rule `releaseUnits` and the divert in `assignUnits` go
---- through. Reading that list here rather than writing it into the SQL is what
---- put `emergency` on it: the officer who pressed panic can leave that status by
---- no other route -- it is on neither `SELF_SET_UNIT_STATUSES` nor
---- `SUPERVISOR_UNIT_STATUSES` -- so a clear that skipped it left them reading as
---- in distress on the board indefinitely, and `Cad.isFree` excludes `emergency`,
---- so nothing would ever recommend them again.
+--- the same function `releaseUnits` and the divert in `assignUnits` go through
+--- -- under a different reason, which is the point of there being reasons.
+--- `Cad.CALL_ENDED` is this statement and no other, and it is the only one of
+--- the three that names `emergency`: the officer who pressed panic can leave
+--- that status by no other route -- it is on neither `SELF_SET_UNIT_STATUSES`
+--- nor `SUPERVISOR_UNIT_STATUSES` -- and closing the call is the one event that
+--- establishes the emergency is over, because `ck_fpd_calls_panic_ack` refuses
+--- to let a panic call close until a supervisor has acknowledged it. A clear
+--- that skipped it left them reading as in distress on the board indefinitely,
+--- and `Cad.isFree` excludes `emergency`, so nothing would ever recommend them
+--- again.
 ---
 --- @param params table { status, disposition, note }
 --- @param units table list of { officerId } still on the call

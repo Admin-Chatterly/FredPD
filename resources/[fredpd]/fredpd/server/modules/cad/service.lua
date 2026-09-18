@@ -11,9 +11,9 @@
 ---     even though they are nearer (7.16);
 ---   * when a unit has been on scene long enough to be worth asking about
 ---     (7.16, the welfare check);
----   * what a unit's status becomes when a call stops being theirs -- one rule
----     for the call closing, the dispatcher taking them off it, and the call
----     they are sent to instead (`statusAfterCall`);
+---   * what a unit's status becomes when a call stops being theirs, and how the
+---     call closing, the dispatcher taking them off an open one, and the call
+---     they are sent to instead differ (`statusAfterCall`);
 ---   * whether a point on the edge of a beat is in that beat (7.17) -- a
 ---     boundary that belongs to neither beat is a call that lands nowhere;
 ---   * the bounding box a beat is rejected by before the ray cast runs, which
@@ -549,44 +549,104 @@ end
 
 --- Why a call stopped being this unit's call.
 ---
---- `ENDED` is the call closing under a disposition, and a dispatcher taking the
---- unit off a call that stays open: from the unit's side those are the same
---- move, and a unit left reading `on_scene` at a scene it is not at any more is
---- the same lie either way.
+--- Three reasons, and the third is here because two was wrong. `ENDED` used to
+--- cover both the call closing and a dispatcher taking a unit off a call that
+--- stays open, on the reasoning that from the unit's side those are the same
+--- move: a unit left reading `on_scene` at a scene it is not at any more is the
+--- same lie either way. That is true of `on_scene` and `en_route`. It is not
+--- true of `emergency` (see `CLEARED_BY_CALL`), and because one reason served
+--- both situations, the removal path was carrying the closure's rule and
+--- standing officers in distress down.
+---
+--- `ENDED` is the call itself closing under a disposition: `Repo.clearCall`,
+--- and nothing else reaches it.
+---
+--- `RELEASED` is this unit coming off a call that is still open and still
+--- somebody's problem. Two callers, both through `Repo.releaseUnits`: a
+--- dispatcher pulling a unit off a call (`call.dispatch`'s `removeOfficerIds`)
+--- and a unit that signs off the board while it is on one (`events.signOff`).
 ---
 --- `DIVERTED` is the unit being put on *another* call, which is that move seen
 --- from the new call -- `Repo.assignUnits` closes whatever else they were live
 --- on, because a unit is on one call at a time.
 Cad.CALL_ENDED = 'ended'
+Cad.CALL_RELEASED = 'released'
 Cad.CALL_DIVERTED = 'diverted'
 
 --- The statuses a call put the unit into, which the call is therefore entitled
---- to take back -- and the one difference between the two reasons.
+--- to take back -- and the one status the three reasons disagree about.
 ---
---- `en_route` and `on_scene` are both lists: they are what working *this* call
---- looks like, and they mean nothing once the call is not theirs. Everything
---- else is deliberately absent, and the absences are the content of this table:
---- a unit that went `transporting` or `busy` on the way out of a call has moved
---- on under its own steam, and a call closing behind them must not overwrite
---- what they chose -- 0007 keeps no per-unit arrival columns precisely because
---- the unit's own word is the record.
+--- `en_route` and `on_scene` are on all three lists: they are what working
+--- *this* call looks like, and they mean nothing once the call is not theirs.
+--- Everything else is deliberately absent, and the absences are the content of
+--- this table: a unit that went `transporting` or `busy` on the way out of a
+--- call has moved on under its own steam, and a call closing behind them must
+--- not overwrite what they chose -- 0007 keeps no per-unit arrival columns
+--- precisely because the unit's own word is the record.
 ---
---- **`emergency` is on the `ended` list and not on the `diverted` one.** A unit
---- in distress has no other way out: `SUPERVISOR_UNIT_STATUSES` leaves
---- `emergency` off (a supervisor cannot declare somebody else's panic, and
---- cannot undeclare it either) and `SELF_SET_UNIT_STATUSES` leaves it off too,
---- so `enums.ts` says in as many words that "clearing one is done by clearing
---- the call". If the end of a call did not take it back, the officer who
---- pressed panic would read as in distress on the board for the rest of the
---- shift -- and `Cad.isFree` excludes `emergency`, so they would never be
---- recommended for anything again. Diverting is the other case: a dispatcher
---- sending a unit to a second call has not established that the first one is
---- over, and a distress flag that another call's dispatch could clear is a
---- distress flag that goes out while the officer is still in the ditch.
+--- **`emergency` is on the `ended` list and on neither of the others**, and
+--- that is worth taking one reason at a time, because it was one rule serving
+--- all three and the situations are not the same event.
+---
+---   * *The call closed.* A unit in distress has no other way out of the
+---     status: `SUPERVISOR_UNIT_STATUSES` leaves `emergency` off (a supervisor
+---     cannot declare somebody else's panic, and cannot undeclare it either)
+---     and `SELF_SET_UNIT_STATUSES` leaves it off too, so `enums.ts` says in as
+---     many words that "clearing one is done by clearing the call". The panic
+---     button raises a call of its own and puts the officer on it
+---     (`unit.emergency`), and `ck_fpd_calls_panic_ack` will not let that call
+---     close until a supervisor has acknowledged it -- so a closure is the one
+---     event in the module that has actually established the emergency is over.
+---     If it did not take the status back, the officer who pressed panic would
+---     read as in distress on the board for the rest of the shift -- and
+---     `Cad.isFree` excludes `emergency`, so they would never be recommended
+---     for anything again.
+---   * *A dispatcher took them off a call that stays open.* Nothing has been
+---     established. The panic call is still open, still unacknowledged and
+---     still in the queue; the officer is still wherever they went down. Taking
+---     a unit off a call is a dispatcher rearranging who is going where, and an
+---     officer with a live panic does not stop having one because their name
+---     moved on a board. Clearing it here drops the single status that means
+---     somebody needs help right now, and drops it where nobody can see it went:
+---     the row reads `available`, the welfare timer restarts from zero, and the
+---     dispatcher who would have radioed them has nothing left to look at.
+---   * *They were diverted to another call.* The same argument with the same
+---     answer. A dispatcher sending a unit to a second call has not established
+---     that the first one is over, and a distress flag that another call's
+---     dispatch could clear is a distress flag that goes out while the officer
+---     is still in the ditch.
+---
+--- `released` and `diverted` therefore hold the same two statuses today. They
+--- are still two entries and not an alias: they are two different things that
+--- happen to a unit -- one leaves them on nothing, the other puts them on
+--- something -- and the next status that needs a rule will need it for one and
+--- not the other. Collapsing them now would make that change look like a typo.
 local CLEARED_BY_CALL <const> = {
     ended = { UnitStatus.EN_ROUTE, UnitStatus.ON_SCENE, UnitStatus.EMERGENCY },
+    released = { UnitStatus.EN_ROUTE, UnitStatus.ON_SCENE },
     diverted = { UnitStatus.EN_ROUTE, UnitStatus.ON_SCENE },
 }
+
+--- The list a reason names, and what an unnamed one falls back to.
+---
+--- `RELEASED`, the narrow list -- and the fallback changed direction when
+--- `emergency` stopped being on every list. The old note argued for the wider
+--- one: "a typo that freed a unit is visible on the board within one poll while
+--- a typo that stranded one is not". That was true while the widest list held
+--- nothing but statuses a unit can set on itself in one press. It is backwards
+--- now, because the wider list is the one that clears `emergency` and the two
+--- ways of being wrong about a distress flag are not equally visible. A flag
+--- wrongly kept is the loudest row on the dispatch board and somebody is on the
+--- radio to that unit within a minute; a flag wrongly taken down looks exactly
+--- like a unit that is fine. So an unrecognised reason gets the rule that
+--- cannot lose one, and the one rule that stands a panic down has to be asked
+--- for by name.
+---
+--- @param reason string|nil
+--- @return table the shared list; callers hand out copies
+local function clearedBy(reason)
+    return CLEARED_BY_CALL[reason] or CLEARED_BY_CALL[Cad.CALL_RELEASED]
+end
 
 --- What a unit's status becomes when a call stops being theirs.
 ---
@@ -596,11 +656,16 @@ local CLEARED_BY_CALL <const> = {
 --- `available`, one touched the status not at all, and the third had no opinion
 --- because it did not know it was taking a unit off anything.
 ---
+--- Each of those three names its own reason, and naming the wrong one is the
+--- defect this function exists to make findable: `releaseUnits` asked for
+--- `CALL_ENDED` while the call it was releasing from stayed open.
+---
 --- @param status string the unit's status now
---- @param reason string|nil `Cad.CALL_ENDED` (the default) or `Cad.CALL_DIVERTED`
+--- @param reason string|nil `Cad.CALL_ENDED`, `Cad.CALL_RELEASED` (the default)
+---   or `Cad.CALL_DIVERTED`
 --- @return string|nil `available`, or nil to leave the status where it is
 function Cad.statusAfterCall(status, reason)
-    local statuses = CLEARED_BY_CALL[reason] or CLEARED_BY_CALL[Cad.CALL_ENDED]
+    local statuses = clearedBy(reason)
 
     for index = 1, #statuses do
         if statuses[index] == status then return UnitStatus.AVAILABLE end
@@ -616,10 +681,8 @@ end
 --- The spec asserts the two agree, which is what stops the list and the
 --- predicate drifting apart the next time a status is added.
 ---
---- An unrecognised reason is `ENDED`, which is the wider list: the repo passes
---- one of the two constants above, so the only way to get here with anything
---- else is a typo, and a typo that freed a unit is visible on the board within
---- one poll while a typo that stranded one is not.
+--- An unrecognised reason is `RELEASED`; `clearedBy` argues which way that
+--- fallback should point and why it used to point the other way.
 ---
 --- Returns a new list; the table above is never handed out.
 ---
@@ -627,7 +690,7 @@ end
 --- @return table list of statuses
 --- @return string what each one becomes
 function Cad.statusesClearedByCall(reason)
-    local statuses = CLEARED_BY_CALL[reason] or CLEARED_BY_CALL[Cad.CALL_ENDED]
+    local statuses = clearedBy(reason)
     local list = {}
 
     for index = 1, #statuses do list[index] = statuses[index] end

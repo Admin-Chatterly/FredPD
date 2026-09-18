@@ -415,11 +415,22 @@ describe('cad', function()
     -- -------------------------------------------------------------------------
 
     describe('the status a call gives back', function()
+        --- The three reasons, which are three different events and not three
+        --- spellings of one. They were two until a review found the removal
+        --- path carrying the closure's rule. Read through a function rather
+        --- than a local list because `cad` is reloaded in `before_each`.
+        local function reasons()
+            return { cad.CALL_ENDED, cad.CALL_RELEASED, cad.CALL_DIVERTED }
+        end
+
         it('takes back the statuses the call itself put the unit in', function()
             for _, status in ipairs({ 'en_route', 'on_scene' }) do
                 assert.are.equal('available', cad.statusAfterCall(status), status)
-                assert.are.equal(
-                    'available', cad.statusAfterCall(status, cad.CALL_DIVERTED), status)
+
+                for _, reason in ipairs(reasons()) do
+                    assert.are.equal(
+                        'available', cad.statusAfterCall(status, reason), status .. ' ' .. reason)
+                end
             end
         end)
 
@@ -429,7 +440,10 @@ describe('cad', function()
             -- `busy` is the same fact with paperwork instead of a prisoner.
             for _, status in ipairs({ 'busy', 'transporting', 'at_station', 'out_of_service' }) do
                 assert.is_nil(cad.statusAfterCall(status), status)
-                assert.is_nil(cad.statusAfterCall(status, cad.CALL_DIVERTED), status)
+
+                for _, reason in ipairs(reasons()) do
+                    assert.is_nil(cad.statusAfterCall(status, reason), status .. ' ' .. reason)
+                end
             end
         end)
 
@@ -441,15 +455,23 @@ describe('cad', function()
             -- did not take the status back, the officer who pressed panic would
             -- read as in distress for the rest of the shift -- and `isFree`
             -- excludes `emergency`, so nothing would recommend them again.
-            assert.are.equal('available', cad.statusAfterCall('emergency'))
+            --
+            -- The closure is also the only one of the three events that has
+            -- established anything: `ck_fpd_calls_panic_ack` will not let a
+            -- panic call close until a supervisor has acknowledged it.
             assert.are.equal('available', cad.statusAfterCall('emergency', cad.CALL_ENDED))
         end)
 
-        it('will not let another call clear a distress flag', function()
-            -- Diverting is a dispatcher sending a unit to a second call. It
-            -- establishes nothing about whether the first one is over, and a
-            -- distress flag another call's dispatch could clear is one that goes
-            -- out while the officer is still in the ditch.
+        it('will not let a call the unit is merely off clear a distress flag', function()
+            -- The defect this pair of assertions is here for. Releasing is a
+            -- dispatcher taking a unit off a call that stays open, and
+            -- diverting is them sending it to a second one; neither establishes
+            -- that the officer has stopped needing help, and neither closes the
+            -- panic call, which is still sitting in the queue unacknowledged.
+            -- Clearing the flag on either path takes the one row that says
+            -- somebody needs help now off the board, silently, and restarts the
+            -- welfare timer that would have asked about them.
+            assert.is_nil(cad.statusAfterCall('emergency', cad.CALL_RELEASED))
             assert.is_nil(cad.statusAfterCall('emergency', cad.CALL_DIVERTED))
         end)
 
@@ -464,7 +486,7 @@ describe('cad', function()
             -- binds this list instead. Two spellings of one rule is how the
             -- list and the predicate drift apart the next time a status is
             -- added, and this is what notices.
-            for _, reason in ipairs({ cad.CALL_ENDED, cad.CALL_DIVERTED }) do
+            for _, reason in ipairs(reasons()) do
                 local statuses, freed = cad.statusesClearedByCall(reason)
 
                 assert.are.equal('available', freed)
@@ -493,8 +515,36 @@ describe('cad', function()
             assert.are_not.equal('off_duty', cad.statusesClearedByCall(cad.CALL_ENDED)[1])
         end)
 
-        it('reads an unknown reason as the end of a call', function()
-            assert.are.equal('available', cad.statusAfterCall('emergency', 'typo'))
+        it('hands the closure a longer list than the other two', function()
+            -- The claim the SQL depends on, stated once: `clearCall` binds one
+            -- more status than `releaseUnits` and the divert do, and that one
+            -- is the distress flag. Before the reasons were split, all three
+            -- statements bound the same list and a dispatcher taking a unit off
+            -- an open call stood down a panic that was still in the queue.
+            local function names(reason)
+                local listed = {}
+
+                for _, status in ipairs(cad.statusesClearedByCall(reason)) do
+                    listed[status] = true
+                end
+
+                return listed
+            end
+
+            assert.is_true(names(cad.CALL_ENDED).emergency)
+            assert.is_nil(names(cad.CALL_RELEASED).emergency)
+            assert.is_nil(names(cad.CALL_DIVERTED).emergency)
+        end)
+
+        it('reads an unknown reason as the rule that cannot lose a panic', function()
+            -- The fallback points at `RELEASED` rather than `ENDED`, which is
+            -- the opposite of what it did while every list held the same
+            -- statuses. A flag wrongly kept is the loudest row on the board and
+            -- somebody radios that unit within a minute; a flag wrongly taken
+            -- down looks exactly like a unit that is fine. A typo gets the
+            -- visible failure.
+            assert.is_nil(cad.statusAfterCall('emergency', 'typo'))
+            assert.are.equal('available', cad.statusAfterCall('on_scene', 'typo'))
         end)
     end)
 
@@ -1168,7 +1218,24 @@ describe('cad', function()
                 assert.is_true(binds(status, '100000000000000041'))
             end)
 
-            it('gives it back for the same statuses clearing the call does', function()
+            it('gives back what the call put them in, and nothing else', function()
+                repo.releaseUnits('lspd', 90, { unit() }, actor())
+
+                local status = statementWith('UPDATE fpd_units')
+
+                assert.is_true(binds(status, 'en_route'))
+                assert.is_true(binds(status, 'on_scene'))
+            end)
+
+            it('leaves a live panic raised when the call stays open', function()
+                -- The defect: this statement asked `statusesClearedByCall` for
+                -- `CALL_ENDED`, so it bound `emergency` and cleared it. Neither
+                -- caller ends the call -- a dispatcher pulling a unit off one
+                -- (`call.dispatch`) leaves it open, and `events.signOff` is a
+                -- unit going home from a call that still needs somebody -- so
+                -- an officer with a live panic had their distress flag taken
+                -- down because their name moved on a board, while their own P1
+                -- sat in the queue unacknowledged.
                 repo.releaseUnits('lspd', 90, { unit() }, actor())
                 local released = statementWith('UPDATE fpd_units')
 
@@ -1177,9 +1244,31 @@ describe('cad', function()
                     { unit() }, actor())
                 local cleared = statementsWith('UPDATE fpd_units')[1]
 
-                for _, status in ipairs({ 'en_route', 'on_scene', 'emergency' }) do
+                -- The two statements are the same rule under two reasons, and
+                -- the distress flag is the whole of the difference: clearing
+                -- the call is the one event that establishes the emergency is
+                -- over, because a panic call cannot close unacknowledged.
+                assert.is_false(binds(released, 'emergency'))
+                assert.is_true(binds(cleared, 'emergency'))
+
+                for _, status in ipairs({ 'en_route', 'on_scene' }) do
                     assert.are.equal(binds(cleared, status), binds(released, status), status)
                 end
+            end)
+
+            it('binds exactly the statuses its WHERE names', function()
+                -- The list is built into the SQL as placeholders and bound
+                -- beside it, so a list that shortened without the `IN (…)`
+                -- shortening with it would bind a status into the agency slot.
+                repo.releaseUnits('lspd', 90, { unit() }, actor())
+
+                local status = statementWith('UPDATE fpd_units')
+                local listed = select(2, status.sql:gsub('%?', ''))
+
+                -- One for the freed status, one each for the agency and the
+                -- unit, and the rest are the statuses the WHERE lists.
+                assert.are.equal(#status.values, listed)
+                assert.are.equal('available', status.values[1])
             end)
 
             it('writes neither the line nor the status when nobody was released', function()
