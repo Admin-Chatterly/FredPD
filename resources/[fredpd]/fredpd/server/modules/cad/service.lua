@@ -629,21 +629,20 @@ local CLEARED_BY_CALL <const> = {
 
 --- The list a reason names, and what an unnamed one falls back to.
 ---
---- `RELEASED`, the narrow list -- and the fallback changed direction when
---- `emergency` stopped being on every list. The old note argued for the wider
---- one: "a typo that freed a unit is visible on the board within one poll while
---- a typo that stranded one is not". That was true while the widest list held
---- nothing but statuses a unit can set on itself in one press. It is backwards
---- now, because the wider list is the one that clears `emergency` and the two
---- ways of being wrong about a distress flag are not equally visible. A flag
---- wrongly kept is the loudest row on the dispatch board and somebody is on the
---- radio to that unit within a minute; a flag wrongly taken down looks exactly
---- like a unit that is fine. So an unrecognised reason gets the rule that
---- cannot lose one, and the one rule that stands a panic down has to be asked
---- for by name.
+--- `RELEASED`, the narrow list, and the fallback changed direction to get here.
+--- It used to be `ENDED` on the argument that "a typo that freed a unit is
+--- visible on the board within one poll while a typo that stranded one is not"
+--- -- which weighs `en_route` and `on_scene`, the two statuses a unit can put
+--- itself back into in one press, and never weighs the third. For `emergency`
+--- it comes out the other way round. A distress flag wrongly kept is the
+--- loudest row on the dispatch board and somebody is on the radio to that unit
+--- within a minute; a distress flag wrongly taken down looks exactly like a
+--- unit that is fine, and the officer it belonged to is not in a position to
+--- put it back. So an unrecognised reason gets the rule that cannot lose one,
+--- and the one rule that stands a panic down has to be asked for by name.
 ---
 --- @param reason string|nil
---- @return table the shared list; callers hand out copies
+--- @return table the shared list; a caller that hands it out copies it first
 local function clearedBy(reason)
     return CLEARED_BY_CALL[reason] or CLEARED_BY_CALL[Cad.CALL_RELEASED]
 end
