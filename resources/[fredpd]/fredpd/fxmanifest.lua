@@ -100,6 +100,15 @@ server_scripts {
     'server/modules/intel/service.lua',
     'server/modules/intel/repo.lua',
     'server/modules/intel/routes.lua',
+    -- Dispatch (spec 7.16-7.18). The order is load-bearing and the wiring check
+    -- enforces it: each of these binds the namespace the one above publishes at
+    -- load, not at call time -- `repo` reads `FredPD.Modules.cad`, `avl` reads
+    -- both the repo and the service, and `routes` reads `FredPD.Cad.avl`.
+    'server/modules/cad/service.lua',
+    'server/modules/cad/repo.lua',
+    'server/modules/cad/avl.lua',
+    'server/modules/cad/routes.lua',
+
     'server/modules/admin/service.lua',
     'server/modules/admin/routes.lua',
     'server/modules/admin/bootstrap.lua',

@@ -152,6 +152,34 @@ local NUI_ROUTES <const> = {
     'garage.fleet.add',
     'garage.fleet.update',
     'garage.fleet.remove',
+
+    -- Dispatch: calls, the unit board, the map and ALPR (spec 7.16-7.18).
+    --
+    -- `unit.emergency` and `unit.status` are here as well as on the keybind in
+    -- `client/cad.lua`: the panic button has to work with the MDT shut, and a
+    -- dispatcher sitting at the console has to be able to press the same thing.
+    'call.create',
+    'call.list',
+    'call.get',
+    'call.dispatch',
+    'call.self_assign',
+    'call.status',
+    'call.clear',
+    'call.acknowledge',
+    'call.note',
+    'call.link',
+    'unit.list',
+    'unit.status',
+    'unit.manage',
+    'unit.emergency',
+    'broadcast.create',
+    'broadcast.cancel',
+    'broadcast.list',
+    'beat.list',
+    'map.view',
+    'alpr.read.list',
+    'alpr.hotlist.edit',
+    'alpr.hotlist.list',
 }
 
 for _, name in ipairs(NUI_ROUTES) do
