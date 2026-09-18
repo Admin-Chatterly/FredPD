@@ -44,8 +44,9 @@
 --- thread in this file.** Every line below runs inside an event handler -- a net
 --- event the server sent, or a command the player pressed. A player standing
 --- still, driving, or with the MDT open and idle runs nothing here at all. The
---- one piece of state is a call id and a timestamp, compared when the button is
---- pressed and never on a timer.
+--- state is a call id, a timestamp and a list that is empty except during the
+--- half-second an emergency of this client's own is in flight -- all of it
+--- compared when something arrives, never on a timer.
 
 FredPD = FredPD or {}
 FredPD.Client = FredPD.Client or {}
@@ -130,6 +131,35 @@ local raised = { callId = nil, at = 0 }
 --- round trip does not become a second call.
 local pressing = false
 
+--- Emergency alerts that arrived while this client's own press was in flight.
+---
+--- Empty at every other moment. `emergencyAlert` explains what puts anything in
+--- here and `release` below is what takes it out again.
+local held = {}
+
+--- Draws one emergency alert. Declared here and written with the other pushes
+--- below, where it belongs, because `release` is called from `Cad.panic` -- a
+--- local is in scope from its declaration and not from its assignment.
+local showEmergency
+
+--- Shows every held alert that is not this client's own emergency.
+---
+--- Called on both ends of the round trip in `Cad.panic`, the refusal path
+--- included: an officer going down while a press of ours is in flight must not
+--- be swallowed by the server turning that press down.
+local function release()
+    local queued = held
+    held = {}
+
+    for index = 1, #queued do
+        local payload = queued[index]
+
+        if not (raised.callId and payload.call.id == raised.callId) then
+            showEmergency(payload)
+        end
+    end
+end
+
 --- Shows a route refusal in the words that say what to do about it.
 ---
 --- `Client.showError` renders `error.<code>`, and for this route the code is
@@ -190,12 +220,22 @@ function Cad.panic()
     pressing = false
 
     if not response.ok then
+        -- The press was refused, so no new call of ours exists. `release` still
+        -- compares against `raised`, which either names nothing or names an
+        -- earlier emergency of ours that is still ours to leave alone.
+        release()
         showRefusal(response)
         return
     end
 
     raised.callId = response.data and response.data.id or nil
     raised.at = GetGameTimer()
+
+    -- Our own alert reached this client before this call returned (see
+    -- `emergencyAlert`), so it is in `held` rather than on screen. Now that the
+    -- call id is known, it is the one thing in there that is dropped and
+    -- anything else is shown -- a round trip late rather than not at all.
+    release()
 
     core.notify('cad.emergency.sent')
 end
@@ -218,22 +258,12 @@ RegisterKeyMapping(COMMAND, FredPD.t('cad.emergency.button'), 'keyboard', '')
 --- callsign and turn the car around.
 local EMERGENCY_NOTIFY_MS <const> = 10000
 
---- An officer is in distress somewhere this session can hear it.
----
---- Who gets this is decided entirely on the server -- dispatchers and
---- supervisors wherever they are, and everyone else only if their own ped is
---- within range of the position it read (`routes.lua`). Nothing here filters
---- anything: a client deciding whether it is close enough to hear an officer
---- calling for help would be a client deciding whether it hears one.
+--- Draws the alert. Assigned to the local declared beside `Cad.panic`.
 ---
 --- The notification is for the officer with the MDT shut, which is most of them.
 --- The console draws the same event properly.
-local function emergencyAlert(payload)
-    local call = payload and payload.call
-
-    -- Our own. The presser is inside their own alert radius, so this arrives
-    -- back at them; they have already been told by `Cad.panic`.
-    if not call or (raised.callId and call.id == raised.callId) then return end
+function showEmergency(payload)
+    local call = payload.call
 
     -- `fpd_units.callsign` is NOT NULL and the server read it off the row it
     -- put on the call, so this is always a callsign and never a placeholder.
@@ -247,6 +277,44 @@ local function emergencyAlert(payload)
         type = 'error',
         duration = EMERGENCY_NOTIFY_MS,
     })
+end
+
+--- An officer is in distress somewhere this session can hear it.
+---
+--- Who gets this is decided entirely on the server -- dispatchers and
+--- supervisors wherever they are, and everyone else only if their own ped is
+--- within range of the position it read (`routes.lua`). Nothing here filters
+--- anything: a client deciding whether it is close enough to hear an officer
+--- calling for help would be a client deciding whether it hears one.
+---
+--- ## Telling our own emergency from somebody else's
+---
+--- The presser is inside their own alert radius, so this arrives back at them
+--- too, and `Cad.panic` has already told them. Comparing the call id is the
+--- whole test **once the id is known** -- and on the press that raised it, it is
+--- not: `unit.emergency` pushes `fredpd:cad:emergency` from inside its handler,
+--- before the route answers, so this runs while `core.call` is still parked and
+--- `raised.callId` still holds whatever it did before the press. A guard that
+--- only compared the id would therefore never fire on the one alert it was
+--- written for.
+---
+--- Held rather than dropped, because the press in flight is not necessarily the
+--- emergency that just arrived: a second officer can go down during the round
+--- trip and their alert is the one that must not be swallowed. `release` sorts
+--- the two out the moment `Cad.panic` knows its own call id, which is a few
+--- hundred milliseconds later at worst.
+local function emergencyAlert(payload)
+    local call = payload and payload.call
+    if not call then return end
+
+    if raised.callId and call.id == raised.callId then return end
+
+    if pressing then
+        held[#held + 1] = payload
+        return
+    end
+
+    showEmergency(payload)
 end
 
 --- The statuses that end a call (Appendix E). A call in either has left the
