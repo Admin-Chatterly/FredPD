@@ -281,6 +281,46 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('dispatch', 'alpr.read.view'),
     ('dispatch', 'alpr.hotlist.manage'),
 
+    -- -------------------------------------------------------------------------
+    -- Record clearance (spec 4.5, Appendix B and C)
+    -- -------------------------------------------------------------------------
+
+    -- WITHOUT THESE ROWS THE PRODUCT DOES NOT WORK AT ALL, and it fails in the
+    -- least obvious way there is. `Access.clearanceOf` answers `open` for a
+    -- session holding no `clearance.*` key; every record table defaults its
+    -- `classification` column to `internal`; and the read rule is clearance >=
+    -- classification. So on a freshly seeded server every person, vehicle,
+    -- firearm and call was refused to everybody, including the officer who had
+    -- just created it -- a blank screen with no error, because a refused read is
+    -- deliberately indistinguishable from nothing to show (4.5).
+    --
+    -- `internal` is the ordinary working level: it is what an unclassified
+    -- record is, so being cleared to it means "may do the job", not "is
+    -- trusted with something". The levels above it are the ladder, and they
+    -- follow supervision rather than seniority -- a source handler outranks a
+    -- patrol supervisor here because of what they read, not where they sit.
+    --
+    -- Granted per group rather than to one base group everyone inherits,
+    -- because half of these do not inherit from `patrol_basic` at all
+    -- (`dispatch` does; `evidence_tech`, `lab_analyst`, `property_officer` and
+    -- the intelligence groups are roots).
+    ('patrol_basic', 'clearance.internal'),
+    ('supervisor', 'clearance.restricted'),
+    ('command', 'clearance.confidential'),
+    ('dispatch', 'clearance.internal'),
+
+    ('evidence_tech', 'clearance.internal'),
+    ('property_officer', 'clearance.internal'),
+    ('lab_analyst', 'clearance.internal'),
+    ('lab_supervisor', 'clearance.restricted'),
+
+    -- Intelligence reads what the rest of the department may not (spec 10), so
+    -- it starts a rung higher and its command tier is the only group seeded at
+    -- `secret`.
+    ('intel_analyst', 'clearance.restricted'),
+    ('intel_handler', 'clearance.confidential'),
+    ('intel_command', 'clearance.secret'),
+
     -- Administration configures the system: permissions, placements, fleet.
     -- Note what is absent: no record clearance, no compartments. An admin who
     -- needs to read records is granted a records group as well, deliberately

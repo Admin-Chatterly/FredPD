@@ -16,6 +16,7 @@ read_globals = {
     'GetConvar',
     'GetConvarInt',
     'GetGameTimer',
+    'GetInvokingResource',
     'GetPlayerIdentifierByType',
     'GetPlayerName',
     'GetPlayers',

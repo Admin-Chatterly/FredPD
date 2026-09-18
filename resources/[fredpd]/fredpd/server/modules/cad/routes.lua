@@ -1817,14 +1817,9 @@ local function createCall(data)
     -- Which resource is asking. It feeds the limiter and
     -- `fpd_calls.source_resource`, which is the audit trail 0007 asks for.
     --
-    -- Read through `_G` rather than called by name: `.luacheckrc` lists the
-    -- natives this codebase uses, nothing has needed this one before, and that
-    -- file is not this change's to edit. The milestone report asks for
-    -- `GetInvokingResource` to be added so the call can be written plainly.
     -- `unknown` is a real answer -- a call raised from a server console, say --
     -- and is limited as one bucket like any other name.
-    local invoking = _G['GetInvokingResource']
-    local resource = (invoking and invoking()) or 'unknown'
+    local resource = GetInvokingResource() or 'unknown'
 
     -- The limiter keyed on the resource name instead of a server id.
     -- `RateLimit.take` never interprets its first argument, so a string is a
