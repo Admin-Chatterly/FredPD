@@ -1,5 +1,6 @@
 import {
   BROADCAST_KINDS,
+  BROTT_GRADER,
   CALL_DISPOSITIONS,
   CALL_LINK_KINDS,
   CALL_LINK_ROLES,
@@ -1789,6 +1790,74 @@ export const schemas = {
      */
     includeExpired: { type: 'boolean', required: false },
     limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  // ------------------------------------------------------------------- brott
+
+  /**
+   * Brottskatalogen (spec 7.10). The catalogue is read by everyone who writes
+   * a record and edited by almost nobody, which is why `BrottList` takes no
+   * input at all: the agency comes from the session, and there is nothing to
+   * filter by that the client should be choosing.
+   */
+  BrottList: {},
+
+  BrottVersions: {
+    code: { type: 'string', required: true, min: 1, max: 32 },
+  },
+
+  /**
+   * The charge set a gemensam straffskala is computed over (BrB 26:2).
+   *
+   * A string list because the validator has no integer-list type; the server
+   * parses and bounds them (`Brott.parseIds`) and refuses the whole request if
+   * one entry is not an id.
+   *
+   * **Duplicates are meaningful here** and the server keeps them, unlike
+   * `LabRequestCreate.evidenceIds` where a repeat is a double charge to the
+   * lab. Three counts of one offence is three entries of the same catalogue
+   * id, and collapsing them would understate the very calculation BrB 26:2
+   * exists to perform. `maxItems` is what stops one record arriving with a
+   * thousand counts and turning the span arithmetic into a loop worth
+   * profiling.
+   */
+  BrottStraffskala: {
+    brottIds: { type: 'string[]', required: true, maxItems: 25, maxLength: 20 },
+  },
+
+  /**
+   * Adding an offence, or adding a version of one. The same shape for both:
+   * a new version is the whole row as it should now read, not a patch, because
+   * 7.10's rule is that a version is immutable once records cite it and a
+   * partial update has no immutable row to be partial against.
+   *
+   * The straffskala arrives as three fields rather than one object because
+   * the validator is flat, and the cross-field rules between them — a floor
+   * above a ceiling, böter alongside a fängelse floor, a fixed term above
+   * eighteen years — are checked by `Brott.validate`, which is the same set of
+   * rules migration 0008 carries as CHECK constraints.
+   *
+   * `fangelseMaxMonths` absent means **livstid**, not zero. That is why it is
+   * not required and why it has no default: a missing ceiling is a legal fact
+   * about the offence, and a schema that filled in a number would quietly turn
+   * mord into a fixed-term offence.
+   */
+  BrottCreate: {
+    code: { type: 'string', required: true, min: 1, max: 32 },
+    balk: { type: 'string', required: false, max: 16 },
+    kapitel: { type: 'integer', required: false, min: 1, max: 255 },
+    paragraf: { type: 'integer', required: false, min: 1, max: 255 },
+    stycke: { type: 'integer', required: false, min: 1, max: 255 },
+    labelKey: { type: 'string', required: true, min: 1, max: 128 },
+    descriptionKey: { type: 'string', required: false, max: 128 },
+    grad: { type: 'enum', required: true, values: BROTT_GRADER },
+    boter: { type: 'boolean', required: false },
+    // 216 months is eighteen years, the ceiling on a fixed term (BrB 26:1).
+    fangelseMinMonths: { type: 'integer', required: false, min: 0, max: 216 },
+    fangelseMaxMonths: { type: 'integer', required: false, min: 0, max: 216 },
+    forsok: { type: 'boolean', required: false },
+    forberedelse: { type: 'boolean', required: false },
+    preskriptionYears: { type: 'integer', required: false, min: 1, max: 100 },
   },
 
 } as const satisfies Record<string, Schema>;

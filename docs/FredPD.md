@@ -735,12 +735,18 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 - [S] Sentence and bail handoff to the jail bridge; release record.
 - **Permissions:** `rms.arrest.create`, `booking.create`, `booking.biometrics.capture`, `booking.release`.
 
-### 7.10 Penal code and sentencing (M2)
+### 7.10 Brottskatalogen och straffskalan (M2)
 
-- [M] Code table: code, title, class (felony, misdemeanor, infraction), fine, jail time, licence points, enhancements, lesser-included offences. Localized titles.
-- [M] Versioned: a change never alters past records; records store the version used.
-- [M] Sentencing calculator with totals, enhancements and reductions (plea, cooperation).
-- **Permissions:** `admin.penalcode.edit`, `court.sentence.calculate`.
+Built. Migration 0008, `server/modules/brott/`, seed `database/seeds/0002_brott.sql`.
+
+This section was originally written against a US penal code — a class (felony, misdemeanor, infraction), a fine, a jail time, licence points. The procedure decision (section 19) settled on Swedish procedure, and none of those five is a per-offence constant in Swedish law, so the shape below is what shipped instead.
+
+- [M] **Brottskatalog**: `code`, statutory citation (`balk`, `kapitel`, `paragraf`, `stycke`), rubrik and description as locale keys (5.3 — never literal text), `grad`, straffskala, whether försök and förberedelse are punishable (BrB 23), and the preskription period. One row per **grad**: ringa stöld (8:2) and grov stöld (8:4) are separate paragrafer with their own spans, not modifiers on stöld (8:1), which is also how a prosecutor cites them.
+- [M] **The straffskala is a span, not a number**: whether böter is available, a floor in months, and a ceiling in months that may be absent entirely (livstid). Stored in months throughout, so the arithmetic never mixes units. Böter and a fängelse floor above zero are mutually exclusive — no statute reads "böter eller fängelse i lägst sex månader" — and both the CHECK constraints and `Brott.straffskala` refuse the combination.
+- [M] **Versioned: a change never alters past records.** A row is immutable once records cite it; an edit supersedes the current version and inserts a new one, in that order, inside one transaction. Identity is `(agency_id, code, version)`; a record stores the version it was written under. There is no UPDATE and no DELETE route, because the rule is not enforceable by convention. A repealed offence is superseded, never removed, so the anmälningar citing it still render.
+- [M] **Gemensam straffskala** for several offences tried together (BrB 26:2), replacing the "sentencing calculator with enhancements and reductions" this section used to ask for. Four rules: the floor is the heaviest of the floors, never their sum; the ceiling is the heaviest ceiling plus a band uplift (one year under four, two years to eight, four years above); capped at the sum of the individual ceilings; and capped again at eighteen years (BrB 26:1). Livstid short-circuits all of it. Computed on the server and covered by `spec/brott_spec.lua`, because it is the one calculation here a prosecutor could be asked to justify in public.
+- **Deliberately absent:** any recommended or typical sentence. The span is the law; where inside it a sentence falls is the court's, and a number FredPD invented would be quoted as though it were not invented.
+- **Permissions:** `rms.brott.view` (patrol — an officer who cannot list the offences cannot write a charge), `admin.brott.edit` (admin only, and `sensitive`: a straffskala is the legal basis every charge is measured against).
 
 ### 7.11 Citations (M6)
 
@@ -1656,7 +1662,7 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 |---|---|
 | Pages | `page.query`, `page.dispatch`, `page.records`, `page.evidence`, `page.lab`, `page.intel`, `page.court`, `page.personnel`, `page.stats`, `page.admin`, `page.comms` |
 | Queries | `query.run`, `query.hit.confirm`, `query.person.run`, `query.vehicle.run`, `query.firearm.run`, `query.phone.run`, `query.address.run`, `query.log.view` |
-| Records | `rms.person.view`, `rms.person.edit`, `rms.person.photo.upload`, `rms.person.caution.edit`, `rms.vehicle.view`, `rms.vehicle.edit`, `rms.vehicle.flag`, `rms.firearm.view`, `rms.firearm.edit`, `rms.firearm.trace`, `rms.location.view`, `rms.location.hazard.edit` |
+| Records | `rms.person.view`, `rms.person.edit`, `rms.person.photo.upload`, `rms.person.caution.edit`, `rms.vehicle.view`, `rms.vehicle.edit`, `rms.vehicle.flag`, `rms.firearm.view`, `rms.firearm.edit`, `rms.firearm.trace`, `rms.brott.view`, `rms.location.view`, `rms.location.hazard.edit` |
 | Reports | `rms.report.create`, `rms.report.edit.own`, `rms.report.submit`, `rms.report.approve`, `rms.report.return`, `rms.report.void`, `rms.report.view.<type>` |
 | Enforcement | `rms.arrest.create`, `rms.citation.issue`, `rms.citation.void`, `rms.bolo.create`, `rms.bolo.cancel`, `rms.bolo.view`, `rms.fi.create`, `rms.stops.create`, `rms.impound.create`, `rms.impound.release`, `rms.impound.hold.release`, `rms.warrant.serve` |
 | Investigations | `inv.case.create`, `inv.case.view`, `inv.case.edit`, `inv.case.assign`, `inv.case.close` |
@@ -1672,7 +1678,7 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Communications | `comms.message.send`, `comms.bulletin.post`, `comms.pdchat.send`, `comms.pdchat.view`, `comms.pdchat.all` |
 | Motor pool | `garage.vehicle.draw`, `garage.vehicle.return`, `garage.fleet.edit` |
 | Statistics | `stats.view`, `stats.export` |
-| Administration | `admin.permissions.edit`, `admin.groups.edit`, `admin.penalcode.edit`, `admin.codetables.edit`, `admin.branding.edit`, `admin.audit.view`, `admin.retention.edit`, `admin.health.view`, `admin.placement.edit` |
+| Administration | `admin.permissions.edit`, `admin.groups.edit`, `admin.brott.edit`, `admin.codetables.edit`, `admin.branding.edit`, `admin.audit.view`, `admin.retention.edit`, `admin.health.view`, `admin.placement.edit` |
 | Access | `records.breakglass`, `clearance.<level>`, `compartment.<name>`, `fields.mental_health.view`, `fields.victim_address.view` |
 
 **Reads have no key of their own where a page key already says the same thing.**

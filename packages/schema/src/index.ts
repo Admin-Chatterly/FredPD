@@ -15,6 +15,7 @@ export type { ErrorCode } from './errors';
 export {
   ACCESS_POINTS,
   BROADCAST_KINDS,
+  BROTT_GRADER,
   CALL_DISPOSITIONS,
   CALL_LINK_KINDS,
   CALL_LINK_ROLES,
@@ -61,6 +62,7 @@ export {
 export type {
   AccessPoint,
   BroadcastKind,
+  BrottGrad,
   CallDisposition,
   CallLinkKind,
   CallLinkRole,

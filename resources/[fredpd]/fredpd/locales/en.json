@@ -105,7 +105,10 @@
     "unavailable": "not available for dispatch",
     "no_unit": "not signed on to a unit",
     "needs_acknowledgement": "needs a supervisor's acknowledgement",
-    "disabled": "switched off"
+    "disabled": "switched off",
+    "straffskala": "Not a valid sentencing range.",
+    "incomplete_citation": "A citation needs the statute, chapter and section, or none of them.",
+    "over_max": "A fixed term cannot exceed eighteen years."
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -1438,6 +1441,60 @@
       "bolo": "BOLO",
       "investigation": "Investigation",
       "other": "Other"
+    }
+  },
+  "brott": {
+    "grad": {
+      "ringa": "Petty",
+      "normal": "Standard",
+      "grov": "Aggravated",
+      "synnerligen_grov": "Exceptionally aggravated"
+    },
+    "column": {
+      "code": "Code",
+      "citation": "Citation",
+      "rubrik": "Offence",
+      "grad": "Degree",
+      "straffskala": "Sentencing range",
+      "version": "Version"
+    },
+    "straffskala": {
+      "boter": "Fines",
+      "livstid": "Life imprisonment",
+      "months": "{count} months",
+      "years": "{count} years",
+      "upTo": "up to {max}",
+      "atLeast": "at least {min}, up to {max}",
+      "gemensam": "Combined range ({counts} counts)"
+    },
+    "empty": "No offences in the catalogue.",
+    "superseded": "Superseded {date}",
+    "rubrik": {
+      "mord": "Murder",
+      "drap": "Manslaughter",
+      "misshandel": "Assault",
+      "ringa_misshandel": "Petty assault",
+      "grov_misshandel": "Aggravated assault",
+      "olaga_tvang": "Unlawful coercion",
+      "olaga_hot": "Unlawful threat",
+      "stold": "Theft",
+      "ringa_stold": "Petty theft",
+      "grov_stold": "Aggravated theft",
+      "ran": "Robbery",
+      "grovt_ran": "Aggravated robbery",
+      "bedrageri": "Fraud",
+      "skadegorelse": "Criminal damage",
+      "vald_mot_tjansteman": "Violence or threat against a public servant",
+      "ringa_vald_mot_tjansteman": "Petty violence or threat against a public servant",
+      "valdsamt_motstand": "Violent resistance",
+      "narkotikabrott": "Narcotics offence",
+      "ringa_narkotikabrott": "Petty narcotics offence",
+      "grovt_narkotikabrott": "Aggravated narcotics offence",
+      "olovlig_korning": "Driving without a licence",
+      "rattfylleri": "Drink driving",
+      "grovt_rattfylleri": "Aggravated drink driving",
+      "vapenbrott": "Firearms offence",
+      "grovt_vapenbrott": "Aggravated firearms offence"
     }
   }
 }

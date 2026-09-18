@@ -105,7 +105,10 @@
     "unavailable": "inte disponibel för utlarmning",
     "no_unit": "inte inloggad på någon enhet",
     "needs_acknowledgement": "kräver kvittens från befäl",
-    "disabled": "avstängd"
+    "disabled": "avstängd",
+    "straffskala": "Ingen giltig straffskala.",
+    "incomplete_citation": "Ett lagrum kräver balk, kapitel och paragraf — eller inget alls.",
+    "over_max": "Tidsbestämt fängelse kan inte överstiga arton år."
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -1438,6 +1441,60 @@
       "bolo": "Spaningsuppdrag",
       "investigation": "Utredning",
       "other": "Övrigt"
+    }
+  },
+  "brott": {
+    "grad": {
+      "ringa": "Ringa",
+      "normal": "Normalgraden",
+      "grov": "Grovt",
+      "synnerligen_grov": "Synnerligen grovt"
+    },
+    "column": {
+      "code": "Kod",
+      "citation": "Lagrum",
+      "rubrik": "Brottsrubricering",
+      "grad": "Grad",
+      "straffskala": "Straffskala",
+      "version": "Version"
+    },
+    "straffskala": {
+      "boter": "Böter",
+      "livstid": "Fängelse på livstid",
+      "months": "{count} månader",
+      "years": "{count} år",
+      "upTo": "högst {max}",
+      "atLeast": "lägst {min} och högst {max}",
+      "gemensam": "Gemensam straffskala ({counts} brott)"
+    },
+    "empty": "Inga brott i katalogen.",
+    "superseded": "Ersatt {date}",
+    "rubrik": {
+      "mord": "Mord",
+      "drap": "Dråp",
+      "misshandel": "Misshandel",
+      "ringa_misshandel": "Ringa misshandel",
+      "grov_misshandel": "Grov misshandel",
+      "olaga_tvang": "Olaga tvång",
+      "olaga_hot": "Olaga hot",
+      "stold": "Stöld",
+      "ringa_stold": "Ringa stöld",
+      "grov_stold": "Grov stöld",
+      "ran": "Rån",
+      "grovt_ran": "Grovt rån",
+      "bedrageri": "Bedrägeri",
+      "skadegorelse": "Skadegörelse",
+      "vald_mot_tjansteman": "Våld eller hot mot tjänsteman",
+      "ringa_vald_mot_tjansteman": "Ringa våld eller hot mot tjänsteman",
+      "valdsamt_motstand": "Våldsamt motstånd",
+      "narkotikabrott": "Narkotikabrott",
+      "ringa_narkotikabrott": "Ringa narkotikabrott",
+      "grovt_narkotikabrott": "Grovt narkotikabrott",
+      "olovlig_korning": "Olovlig körning",
+      "rattfylleri": "Rattfylleri",
+      "grovt_rattfylleri": "Grovt rattfylleri",
+      "vapenbrott": "Vapenbrott",
+      "grovt_vapenbrott": "Grovt vapenbrott"
     }
   }
 }

@@ -177,6 +177,14 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     -- somebody through every future stop.
     ('supervisor', 'rms.person.caution.edit'),
 
+    -- Brottskatalogen (spec 7.10). Reading it is patrol work by necessity
+    -- rather than by rank: an officer who cannot list the offences cannot
+    -- write a charge, so the charging screen would be empty for everyone who
+    -- actually attends incidents. The catalogue carries no personal data --
+    -- it is the statute -- so there is nothing here that a lower rank should
+    -- not see.
+    ('patrol', 'rms.brott.view'),
+
     -- The two field-level grants of spec 4.5. Without a group holding them the
     -- fields are not protected, they are invisible: the routes read the
     -- permission on every path that returns the field, so a department that
@@ -427,6 +435,19 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('admin', 'admin.branding.edit'),
     ('admin', 'admin.audit.view'),
     ('admin', 'garage.fleet.edit'),
+
+    -- Editing brottskatalogen (spec 7.10). `admin` and nobody else, including
+    -- not `command`: a straffskala is the legal basis every charge on every
+    -- record is measured against, and an edit to one is quoted in court long
+    -- after whoever made it has forgotten. The routes behind it are `sensitive`
+    -- too, so a stale Discord snapshot cannot be used to reach them (4.2).
+    --
+    -- Editing is additive by construction -- a change writes a new version and
+    -- supersedes the old one, it never rewrites a row a record cites (7.10) --
+    -- so the power this grants is to change what can be charged *next*, not to
+    -- alter what was charged before. That is why it is a grant at all rather
+    -- than something reserved to a migration.
+    ('admin', 'admin.brott.edit'),
 
     -- The health screen (7.30). It goes to `admin` and to nobody else, because
     -- it is the one group whose job is the running system rather than the

@@ -300,6 +300,7 @@ local PERMISSION_CATALOGUE <const> = {
     'rms.person.view', 'rms.person.edit', 'rms.person.photo.upload', 'rms.person.caution.edit',
     'rms.vehicle.view', 'rms.vehicle.edit', 'rms.vehicle.flag',
     'rms.firearm.view', 'rms.firearm.edit', 'rms.firearm.trace',
+    'rms.brott.view',
     'rms.location.view', 'rms.location.hazard.edit',
 
     -- Reports
@@ -383,7 +384,7 @@ local PERMISSION_CATALOGUE <const> = {
     'stats.view', 'stats.export',
 
     -- Administration
-    'admin.permissions.edit', 'admin.groups.edit', 'admin.penalcode.edit',
+    'admin.permissions.edit', 'admin.groups.edit', 'admin.brott.edit',
     'admin.codetables.edit', 'admin.branding.edit', 'admin.audit.view',
     'admin.retention.edit', 'admin.health.view', 'admin.placement.edit',
 

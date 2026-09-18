@@ -140,6 +140,14 @@ local NUI_ROUTES <const> = {
     'query.hit.confirm',
     'query.log',
 
+    -- Brottskatalogen (spec 7.10).
+    'brott.list',
+    'brott.versions',
+    'brott.straffskala',
+    'brott.create',
+    'brott.version',
+    'brott.retire',
+
     -- Crime scenes, evidence and the chain of custody (spec 8).
     'scene.create',
     'scene.release',

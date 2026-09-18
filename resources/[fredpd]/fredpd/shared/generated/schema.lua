@@ -1007,4 +1007,33 @@ FredPD.Schema = {
         includeExpired = { type = 'boolean', required = false },
         limit = { type = 'integer', required = false, min = 1, max = 200 },
     },
+
+    BrottList = {
+
+    },
+
+    BrottVersions = {
+        code = { type = 'string', required = true, min = 1, max = 32 },
+    },
+
+    BrottStraffskala = {
+        brottIds = { type = 'string[]', required = true, maxItems = 25, maxLength = 20 },
+    },
+
+    BrottCreate = {
+        code = { type = 'string', required = true, min = 1, max = 32 },
+        balk = { type = 'string', required = false, max = 16 },
+        kapitel = { type = 'integer', required = false, min = 1, max = 255 },
+        paragraf = { type = 'integer', required = false, min = 1, max = 255 },
+        stycke = { type = 'integer', required = false, min = 1, max = 255 },
+        labelKey = { type = 'string', required = true, min = 1, max = 128 },
+        descriptionKey = { type = 'string', required = false, max = 128 },
+        grad = { type = 'enum', required = true, values = { 'ringa', 'normal', 'grov', 'synnerligen_grov' } },
+        boter = { type = 'boolean', required = false },
+        fangelseMinMonths = { type = 'integer', required = false, min = 0, max = 216 },
+        fangelseMaxMonths = { type = 'integer', required = false, min = 0, max = 216 },
+        forsok = { type = 'boolean', required = false },
+        forberedelse = { type = 'boolean', required = false },
+        preskriptionYears = { type = 'integer', required = false, min = 1, max = 100 },
+    },
 }

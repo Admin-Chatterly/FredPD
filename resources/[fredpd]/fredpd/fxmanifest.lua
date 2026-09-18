@@ -75,6 +75,14 @@ server_scripts {
     'server/modules/query/repo.lua',
     'server/modules/query/routes.lua',
 
+    -- Brottskatalogen (spec 7.10). Loads before every module that writes a
+    -- record, because a charge is a reference into this catalogue and the
+    -- modules that hold charges read `brott.straffskala` and
+    -- `brott.expandCharges` through its service.
+    'server/modules/brott/service.lua',
+    'server/modules/brott/repo.lua',
+    'server/modules/brott/routes.lua',
+
     'server/modules/placements/service.lua',
     'server/modules/placements/repo.lua',
     'server/modules/placements/routes.lua',

@@ -852,3 +852,30 @@ export const HOTLIST_REASONS = [
 ] as const;
 
 export type HotlistReason = (typeof HOTLIST_REASONS)[number];
+
+/**
+ * `ck_fpd_brott_grad` — the grad of an offence (spec 7.10, brottsbalken).
+ *
+ * The Swedish equivalent of a US penal code's class, and deliberately not
+ * modelled as one. A class in that system is a property of the offence; a
+ * grad here is a property of *this instance* of it, and brottsbalken writes
+ * each grad as its own numbered stycke with its own straffskala — "ringa
+ * stöld" (8:2) and "grov stöld" (8:4) are separate paragrafer from stöld
+ * (8:1), not modifiers on it.
+ *
+ * So the catalogue carries one row per grad and this enum names which row is
+ * which. It is ordered from lightest to heaviest, which is the order a
+ * charging list shows them in and the order `Brott.gradRank` compares them by.
+ *
+ * Labels are `brott.grad.<value>` in both locale files (invariant 6). A fifth
+ * grad would be a change to the statute, not to a configuration file, which is
+ * why the set is closed.
+ */
+export const BROTT_GRADER = [
+  'ringa',
+  'normal',
+  'grov',
+  'synnerligen_grov',
+] as const;
+
+export type BrottGrad = (typeof BROTT_GRADER)[number];

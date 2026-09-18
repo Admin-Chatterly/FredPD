@@ -89,6 +89,13 @@ local REQUIRED_TABLES <const> = {
     'fpd_broadcasts',
     'fpd_hotlist',
     'fpd_alpr_reads',
+
+    -- Migration 0008. Brottskatalogen (spec 7.10). Listed because every module
+    -- that writes a charge resolves it against this table: a server missing it
+    -- opens perfectly well and then fails on the first offence anybody tries to
+    -- add to an anmälan, which is the point at which an incident is already
+    -- half-written.
+    'fpd_brott',
 }
 
 --- Columns a migration added to a table that already existed, which the table

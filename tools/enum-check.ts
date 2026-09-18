@@ -100,6 +100,7 @@ const PAIRED: Record<string, keyof typeof enums> = {
   ck_fpd_call_links_role: 'CALL_LINK_ROLES',
   ck_fpd_hotlist_reason: 'HOTLIST_REASONS',
   ck_fpd_broadcasts_kind: 'BROADCAST_KINDS',
+  ck_fpd_brott_grad: 'BROTT_GRADER',
 };
 
 /**
