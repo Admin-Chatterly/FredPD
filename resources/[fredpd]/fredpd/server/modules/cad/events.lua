@@ -104,11 +104,13 @@ FredPD.Cad = FredPD.Cad or {}
 
 local service = FredPD.Modules.cad
 local repo = FredPD.Repo.cad
+-- Only the boot sweep still needs this: every other invalidation in this file
+-- happens inside `board.unitChanged`, which owns "a unit row changed" and "the
+-- cached board is now wrong" as one event.
 local avl = FredPD.Cad.avl
-local accessRules = FredPD.Modules.access
+local board = FredPD.Cad.board
 local sessions = FredPD.Core.session
 local perms = FredPD.Core.perms
-local push = FredPD.Core.push
 local policejob = FredPD.Bridge.policejob
 
 local Events = {}
@@ -144,11 +146,6 @@ local UNIT_PERMISSION <const> = 'cad.unit.status'
 --- who is missing from the board asks dispatch to add them, and a console
 --- operator sitting on the board gets sent to a shooting.
 local CONSOLE_PERMISSION <const> = 'cad.console.open'
-
---- Who is told that the board changed (Appendix B: the dispatch reads have no
---- key of their own). The same permission `routes.lua` pushes `fredpd:cad:unit`
---- on, because this is the same message.
-local BOARD_PERMISSION <const> = 'page.dispatch'
 
 -- -----------------------------------------------------------------------------
 -- Settings
@@ -230,42 +227,27 @@ local booted = false
 -- Telling the screens
 -- -----------------------------------------------------------------------------
 
---- Tells the boards of one agency that a unit row changed.
----
---- Deliberately the same two tests `unitChanged` in `routes.lua` applies -- the
---- page permission and the agency read off the *recipient's* session -- and not
---- a call to it, because that helper is a local in a file that is not ours to
---- change. A unit row carries no classification, so there is no third test to
---- apply; the payload is a callsign, a status and a position, and everybody who
---- may open the board may see all three.
----
---- Never `-1` (invariant 5).
-local function unitChanged(agencyId, unit)
-    avl.invalidate(agencyId)
-
-    if not unit then return end
-
-    push.toPermission(BOARD_PERMISSION, 'fredpd:cad:unit', FredPD.markArrays({ unit = unit }),
-        function(session)
-            return session.agencyId == agencyId
-        end)
-end
-
---- Tells the sessions that may read a call that it changed.
----
---- The same filter `callChanged` in `routes.lua` applies, for the same reason as
---- above, and with the access check it carries: a call is a record with a
---- classification, and a push is a read nobody asked for (invariants 4 and 5).
-local function callChanged(agencyId, call)
-    if not call then return end
-
-    push.toPermission(BOARD_PERMISSION, 'fredpd:cad:call', FredPD.markArrays({ call = call }),
-        function(session)
-            if session.agencyId ~= agencyId then return false end
-
-            return accessRules.canRead(accessRules.reader(session), call)
-        end)
-end
+-- There is no push helper in this file any more, and its absence is the fix.
+--
+-- This file used to carry its own `unitChanged` and `callChanged`, which
+-- repeated the two tests `routes.lua` applied -- the page permission and the
+-- agency read off the *recipient's* session -- on the argument that the
+-- originals were locals in a file that was not ours to change. That argument
+-- was answered by `board.lua`, and it had already cost something: the copy of
+-- `unitChanged` asserted that "a unit row carries no classification", and a
+-- unit row does. `Repo.getUnit` LEFT JOINs `fpd_calls` and aliases five columns
+-- off it -- `onCallId`, `onCallLead`, `onCallNumber`, `onCallPriority`,
+-- `onCallStatus` -- so pushing the raw row on the page key alone handed every
+-- holder of `page.dispatch` the number, the urgency and the stage of a call the
+-- queue had correctly refused them (invariants 4 and 5). Worse, because the NUI
+-- *replaces* a unit row rather than merging it, sign-on and sign-off healed the
+-- hole the access check had just made in a dispatcher's board -- seconds later,
+-- on the next duty pass, with nothing on screen to say it had happened.
+--
+-- So the two calls below are `board.unitChanged` and `board.callChanged`, which
+-- are the same functions `routes.lua` and `avl.lua` push through. A fourth
+-- sender of a board row starts by reaching past them to `FredPD.Core.push`,
+-- which is why this file no longer captures it.
 
 -- -----------------------------------------------------------------------------
 -- Signing on and off
@@ -346,7 +328,7 @@ local function signOn(entry)
         callsign = entry.callsign,
     })
 
-    unitChanged(entry.agencyId, repo.getUnit(entry.agencyId, entry.officerId))
+    board.unitChanged(entry.agencyId, repo.getUnit(entry.agencyId, entry.officerId))
 
     return true
 end
@@ -371,14 +353,57 @@ local function signOff(entry)
         -- leaving: the line reads as the unit coming off the call, which is
         -- what happened, and not as a supervisor having pulled them.
         repo.releaseUnits(entry.agencyId, assignment.callId, { actor }, actor)
-        callChanged(entry.agencyId, repo.getCall(entry.agencyId, assignment.callId))
+        board.callChanged(entry.agencyId, repo.getCall(entry.agencyId, assignment.callId))
     end
 
     repo.setUnitStatus(entry.agencyId, entry.officerId, FredPD.UnitStatus.OFF_DUTY)
 
     -- The row is kept rather than deleted (0007): it is what an officer comes
     -- back to. `listUnits` leaves `off_duty` off the board without being asked.
-    unitChanged(entry.agencyId, repo.getUnit(entry.agencyId, entry.officerId))
+    board.unitChanged(entry.agencyId, repo.getUnit(entry.agencyId, entry.officerId))
+end
+
+-- -----------------------------------------------------------------------------
+-- Re-validating an observation, and starting a grace clock
+-- -----------------------------------------------------------------------------
+
+--- Is the officer this observation was taken from still connected on that slot,
+--- *right now*?
+---
+--- The one question a snapshot cannot answer about itself, and the guard every
+--- write in `Events.pass` sits behind. It compares the officer id as well as the
+--- slot because a server id is reusable: an officer who dropped and whose number
+--- was handed to somebody else is not "still connected", and writing this pass's
+--- conclusions against the newcomer's session would put one officer's callsign
+--- on another officer's row.
+local function stillOpen(observation)
+    local session = sessions.all()[observation.src]
+
+    return session ~= nil and session.officerId == observation.officerId
+end
+
+--- Starts the grace clock for a unit whose officer has gone away.
+---
+--- `officerId` is not decoration here: it is the column `signOff` keys its only
+--- UPDATE on. Every other entry that reaches `signOff` comes from `known`, which
+--- carries it; the entries built here are built by hand, and without it the
+--- UPDATE matched zero rows and a dropped officer stayed on the board forever,
+--- available, at the position they left at.
+---
+--- Two callers. `playerDropped` is the obvious one. `Events.pass` is the other,
+--- and it exists for one narrow case: an officer who drops *during* their own
+--- sign-on. At the moment their drop handler ran, `known` did not yet say they
+--- were on duty -- the INSERT this pass was parked on had not come back -- so
+--- the handler correctly declined to start a clock for a unit it had no record
+--- of, and the pass has to start it once it learns there is now a row.
+local function startGrace(officerId, entry)
+    dropped[officerId] = {
+        officerId = officerId,
+        at = os.time(),
+        agencyId = entry.agencyId,
+        discordId = entry.discordId,
+        callsign = entry.callsign,
+    }
 end
 
 -- -----------------------------------------------------------------------------
@@ -420,6 +445,42 @@ end
 --- ago: an officer who drops mid-pass may still be signed on, and the next pass
 --- and the drop handler put that right. That is the right direction to be wrong
 --- in, and it is the only one of the three orderings that is defined at all.
+---
+--- ## A snapshot is a safe READ order. It is not a safe WRITE order.
+---
+--- Read the paragraph above and then read this one, because the snapshot closed
+--- the traversal bug and, in the same edit, silently opened a second bug at the
+--- other end of the same loop. The shape recurs and the symptom is a long way
+--- from the cause, so it is worth setting out exactly.
+---
+--- `dropped[officerId] = nil` means "this officer is back inside their grace
+--- period, so as far as the board is concerned the drop never happened". It used
+--- to sit in the same iteration as the read of `sessions.all()` that justified
+--- it, with nothing suspended in between, so it could only ever run on an
+--- officer who was connected at that instant. Moved into the second loop it runs
+--- on an observation that is by then up to one database round trip *per unit*
+--- old -- and the officers whose `playerDropped` fires inside that window are
+--- precisely the ones the grace clock exists for. Their clock was erased by an
+--- observation saying they had been connected a moment ago, `known[officerId]`
+--- had already been cleared by the drop handler, and no later pass had any
+--- record of them: no session to observe, no memory to compare against, no clock
+--- to expire. The unit stayed on the board -- available, holding its call slot,
+--- at the position it left at -- until the server was restarted. That is the
+--- ghost the drop handler was written to prevent, reintroduced deterministically
+--- by the fix for an unrelated bug.
+---
+--- So the snapshot decides the ORDER of the work and nothing else. Every write
+--- below is re-validated against the live tables at the moment it is made:
+--- `stillOpen` re-reads `sessions.all()` after the bridge call and again after
+--- the repo round trips, and `known` is read *after* the bridge call rather than
+--- before it, because the drop handler clears it and a stale `before` would sign
+--- a crashed officer off instantly instead of giving them their grace period.
+--- An observation whose session has since gone is not acted on at all: the drop
+--- handler has already recorded it correctly and undoing that is the whole bug.
+--- The two exceptions are the officer who drops during their own sign-on, whose
+--- clock nobody else could have started (`startGrace`), and the one who drops
+--- during their own sign-off, whose clock has just been made pointless by the
+--- sign-off that already happened.
 function Events.pass()
     if not booted then return end
 
@@ -445,39 +506,76 @@ function Events.pass()
         local observation = observed[index]
         local officerId = observation.officerId
 
-        -- Back inside the grace period: the drop never happened as far as the
-        -- board is concerned, and the row still carries their status, their
-        -- time in status and their call.
-        dropped[officerId] = nil
+        -- The first of the two re-validations. Cheap, and it skips the bridge
+        -- call and the whole body for an officer who has already gone -- which
+        -- on a server with `dutyRequired = false` would otherwise sign a
+        -- disconnected player on, since `eligible` was true when it was asked
+        -- and nothing else would contradict it.
+        if stillOpen(observation) then
+            -- The bridge call goes first because it can suspend, and `known` is
+            -- read after it for that reason: the drop handler clears `known`,
+            -- and a `before` read before the suspension would still say "on
+            -- duty" for an officer whose grace clock had already started.
+            local working = onDuty(observation.src, observation.eligible)
+            local before = known[officerId]
 
-        local before = known[officerId]
-        local working = onDuty(observation.src, observation.eligible)
+            local entry = before or {}
+            entry.officerId = officerId
+            entry.src = observation.src
+            entry.agencyId = observation.agencyId
+            entry.discordId = observation.discordId
+            entry.callsign = observation.callsign
 
-        local entry = before or {}
-        entry.officerId = officerId
-        entry.src = observation.src
-        entry.agencyId = observation.agencyId
-        entry.discordId = observation.discordId
-        entry.callsign = observation.callsign
+            -- What this iteration actually did, because after the round trips
+            -- below the only honest way to decide what to write is to know what
+            -- has already been written to the database.
+            local signedOn, signedOff = false, false
 
-        if working and not (before and before.onDuty) then
-            -- A transition, and an officer we have never seen is one too: that
-            -- is the reconnect case, and it is why this compares against
-            -- memory rather than watching for an edge.
-            entry.onDuty = signOn(entry)
-        elseif not working and before and before.onDuty then
-            signOff(before)
-            entry.onDuty = false
-        elseif before == nil then
-            entry.onDuty = false
+            if working and not (before and before.onDuty) then
+                -- A transition, and an officer we have never seen is one too:
+                -- that is the reconnect case, and it is why this compares
+                -- against memory rather than watching for an edge.
+                entry.onDuty = signOn(entry)
+                signedOn = entry.onDuty
+            elseif not working and before and before.onDuty then
+                signOff(before)
+                signedOff = true
+                entry.onDuty = false
+            elseif before == nil then
+                entry.onDuty = false
+            end
+
+            -- The second re-validation, and the one the ghost came through.
+            -- Everything under here is a write whose justification is "this
+            -- officer is connected", so it is asked again here rather than
+            -- trusted from the snapshot.
+            if stillOpen(observation) then
+                -- Back inside the grace period: the drop never happened as far
+                -- as the board is concerned, and the row still carries their
+                -- status, their time in status and their call.
+                dropped[officerId] = nil
+
+                -- A unit a supervisor signed off with `unit.manage` while its
+                -- officer is still on duty in the job stays off: this pass sees
+                -- no transition, so it writes nothing. Re-signing them on would
+                -- undo a supervisory decision every fifteen seconds.
+                known[officerId] = entry
+                bySrc[observation.src] = officerId
+            elseif signedOn then
+                -- They dropped while this thread was parked on their own
+                -- sign-on. Their drop handler found no on-duty entry and started
+                -- no clock, so there is a row on the board that only this
+                -- iteration knows about. Start it here or it is a ghost.
+                startGrace(officerId, entry)
+            elseif signedOff then
+                -- The mirror image: they dropped while this thread was parked
+                -- on their own sign-off, so their drop handler started a clock
+                -- for a unit that is already off the board. Letting it expire
+                -- would sign them off a second time and push the board again
+                -- for nothing.
+                dropped[officerId] = nil
+            end
         end
-
-        -- A unit a supervisor signed off with `unit.manage` while its officer
-        -- is still on duty in the job stays off: this pass sees no transition,
-        -- so it writes nothing. Re-signing them on would undo a supervisory
-        -- decision every fifteen seconds.
-        known[officerId] = entry
-        bySrc[observation.src] = officerId
     end
 
     -- The grace clocks, snapshotted for the same reason: `signOff` yields, and
@@ -519,20 +617,14 @@ AddEventHandler('playerDropped', function()
     local entry = known[officerId]
     known[officerId] = nil
 
+    -- An officer this file has no on-duty record of has no row on the board to
+    -- take off it, so there is nothing to time. `Events.pass` covers the one
+    -- case where that reasoning is wrong -- a drop landing inside a sign-on
+    -- this handler could not see -- and it covers it from the other side,
+    -- because only that iteration knows the INSERT went through.
     if not entry or not entry.onDuty then return end
 
-    dropped[officerId] = {
-        -- `officerId` is not decoration here: it is the column `signOff` keys
-        -- its only UPDATE on. Every other entry that reaches `signOff` comes
-        -- from `known`, which carries it; this one is built by hand, and
-        -- without it the UPDATE matched zero rows and a dropped officer stayed
-        -- on the board forever, available, at the position they left at.
-        officerId = officerId,
-        at = os.time(),
-        agencyId = entry.agencyId,
-        discordId = entry.discordId,
-        callsign = entry.callsign,
-    }
+    startGrace(officerId, entry)
 end)
 
 -- -----------------------------------------------------------------------------
