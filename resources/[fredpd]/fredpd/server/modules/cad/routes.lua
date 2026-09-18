@@ -36,13 +36,32 @@
 --- `fpd_calls` carries a `classification`, and the repo aliases `agency_id`
 --- beside it so that `Access.control` can read the row. Every call this file
 --- *reads back or pushes* has been through `accessRules.canRead`: one card,
---- every row of a list, the map payload, and the recipient list of every push
---- (invariant 4, and invariant 5's "same checks as a read"). A call the reader
---- may not see is absent rather than stubbed -- on a queue a placeholder would
---- carry the count, the priority and the position, which is most of what a call
---- discloses. The two routes that *create* a call answer with the row they have
---- just written, to the session that wrote it, which is the one reader whose
---- clearance the write itself already settled.
+--- every row of a list, the map payload, the recipient list of every push
+--- (invariant 4, and invariant 5's "same checks as a read"), and -- the one that
+--- had to be found rather than designed -- every call carried on a payload that
+--- is nominally about something else. A call the reader may not see is absent
+--- rather than stubbed: on a queue a placeholder would carry the count, the
+--- priority and the position, which is most of what a call discloses. The two
+--- routes that *create* a call answer with the row they have just written, to
+--- the session that wrote it, which is the one reader whose clearance the write
+--- itself already settled.
+---
+--- **The unit board is a call payload, and it does not look like one.**
+--- `Repo.listUnits` and `Repo.getUnit` LEFT JOIN `fpd_calls` and alias five
+--- columns off it -- `onCallId`, `onCallLead`, `onCallNumber`, `onCallPriority`,
+--- `onCallStatus` -- so a board row carries the number, the urgency and the
+--- stage of whatever its unit is working. Filtered on `page.dispatch` and the
+--- agency and nothing else, that hands a reader who was correctly refused a call
+--- on the queue that same call's number, priority and status one array further
+--- down the same response. So `boardFor` below runs each row's call through
+--- `mayRead` and takes the five columns off the rows that fail, and
+--- `unitChanged` sends the full row and the masked row to two complementary
+--- halves of one recipient list rather than one payload to both.
+---
+--- `Cad.recommendUnits` reasons over the *unmasked* board on purpose: a unit
+--- shown as free because its reader may not see what it is on is a unit a
+--- dispatcher sends to a second call. Only its answer is masked, and the only
+--- field in that answer naming a call is `divertFromCallId`.
 ---
 --- It is `Access.canRead` (the pure service) and not `Repo.read` (the register's
 --- path) for one checkable reason: `call` is not in the `RECORD_TYPES` allowlist
@@ -51,15 +70,23 @@
 --- explicit grants, and the `access.read` audit row for a restricted read. That
 --- is tolerable only because nothing in M4 writes a call above the column
 --- default of `internal`: there is no route or export field that sets one. The
---- day a call can be classified higher, `call` has to go into that allowlist and
---- this has to become `accessRepo.read`. The milestone report says so rather
+--- day a call can be classified higher, `call` goes into that allowlist and
+--- `call.get` becomes `accessRepo.read` -- **and that fixes the card and nothing
+--- else.** The queue, the board, the map and every push select their own rows
+--- and hand them to `mayRead` directly; none of them goes through `Repo.read`,
+--- so the allowlist entry never reaches them and each one would still need its
+--- compartments and grants loaded by hand. The milestone report says so rather
 --- than leaving it for somebody to infer from this comment.
 ---
---- `call.get` audits every card it opens (`cad.call.read`), which covers the
---- restricted case for the read that matters. `call.list` and `map.view`
---- deliberately do not: they are polled every few seconds by every open console
---- (12.1), and an audit row per poll would bury the log this invariant exists to
---- keep readable.
+--- `call.get` audits the restricted case and only that (`cad.call.read`), which
+--- is what invariant 11 asks for. It audited every card it opened until the
+--- console started refetching on every `fredpd:cad:call` push: one P1 with four
+--- units then wrote dozens of `cad.call.read` rows per open console, none of
+--- them a read anybody performed, and enough of them to spend the route's own
+--- rate limit in the middle of the incident. `call.list` and `map.view` do not
+--- audit either, for the older half of the same reason: they are polled every
+--- few seconds by every open console (12.1), and an audit row per poll would
+--- bury the log this invariant exists to keep readable.
 
 local route = FredPD.Core.route
 local service = FredPD.Modules.cad
@@ -233,12 +260,117 @@ local function readable(session, calls)
     return out
 end
 
+--- The prefix every column `Repo.listUnits` joins off `fpd_calls` is aliased
+--- with.
+---
+--- A prefix rather than a list of five names, because the list is the thing that
+--- goes stale: the next column somebody joins onto the board will be called
+--- `onCallSomething` by the convention the other five already follow, and it
+--- will be masked the day it is added rather than the day somebody notices.
+local ON_CALL <const> = 'onCall'
+
+--- A board row with the call it is on taken off it.
+---
+--- A copy and never the row itself, because `unitChanged` sends both shapes of
+--- the same row in one pass: clearing the fields in place would mask it for the
+--- cleared readers too, and the second push would carry the row the first one
+--- had already emptied.
+local function withoutCall(unit)
+    local out = {}
+
+    for key, value in pairs(unit) do
+        if key:sub(1, #ON_CALL) ~= ON_CALL then out[key] = value end
+    end
+
+    return out
+end
+
+--- The calls a board is standing on, by id, each read once.
+---
+--- One primary-key lookup per *distinct* call, not per unit, and none at all for
+--- a board where nobody is on anything -- which on a quiet shift is all of it.
+--- A call that cannot be read back is remembered as `false` and masks its units,
+--- because an unknown row is not a readable one.
+---
+--- `Repo.listUnits` could answer this in the JOIN it already makes by aliasing
+--- `c.classification`, which would remove these lookups outright; the milestone
+--- report asks for that, and nothing here may wait for it.
+local function callsBehind(agencyId, units)
+    local calls = {}
+
+    for index = 1, #units do
+        local id = units[index].onCallId
+
+        if id ~= nil and calls[id] == nil then
+            calls[id] = repo.getCall(agencyId, id) or false
+        end
+    end
+
+    return calls
+end
+
+--- The unit board as one session may see it (invariant 4).
+---
+--- The row stays -- a callsign, a status, a position and a time in status are
+--- the board, and none of them belongs to the call. What comes off is the call:
+--- a reader refused call 1042 on the queue must not read its number, its
+--- priority and its stage off the row of the unit sitting on it. A masked row is
+--- indistinguishable from a unit working nothing, which is the same answer the
+--- queue gave them.
+local function boardFor(session, units)
+    local calls = callsBehind(session.agencyId, units)
+    local out = {}
+
+    for index = 1, #units do
+        local unit = units[index]
+        local call = unit.onCallId ~= nil and calls[unit.onCallId] or nil
+
+        if unit.onCallId == nil or mayRead(session, call) then
+            out[index] = unit
+        else
+            out[index] = withoutCall(unit)
+        end
+    end
+
+    return out
+end
+
+--- Takes the diverted-from call off the recommendations naming one this reader
+--- may not open.
+---
+--- The recommendation itself stays: that a unit is on scene somewhere and can be
+--- pulled off it is the unit's own status, which the board already carries. What
+--- comes off is the id of the call they would be pulled from, which is a call
+--- this reader was refused. At most `recommendLimit` entries, so at most that
+--- many lookups, and none for a board where nobody is divertible.
+local function withoutDiverts(session, list)
+    if list == nil then return nil end
+
+    local calls = {}
+
+    for index = 1, #list do
+        local id = list[index].divertFromCallId
+
+        if id ~= nil then
+            if calls[id] == nil then calls[id] = repo.getCall(session.agencyId, id) or false end
+
+            if not mayRead(session, calls[id] or nil) then
+                list[index].divertFromCallId = nil
+            end
+        end
+    end
+
+    return list
+end
+
 --- Sends a dispatch payload to the sessions of one agency that may read it.
 ---
 --- Never `-1` (invariant 5). `push.toPermission` walks the open sessions and
 --- applies the two tests a read applies: the page permission, and the agency --
 --- which is read off the recipient's session, not off the payload. A payload
---- carrying a call takes a third test; `callChanged` adds it.
+--- carrying a call takes a third test, and two things below add it:
+--- `callChanged` for the call itself, `unitChanged` for the call a board row
+--- carries without looking like it does.
 ---
 --- @return number recipients
 local function toDispatch(agencyId, event, payload, extra)
@@ -286,12 +418,34 @@ end
 
 --- Tells the boards that a unit moved, and drops the cached board behind the AVL
 --- sweep so the next pass reads the change rather than the last minute.
+---
+--- Two pushes rather than one when the unit is on a call, because the row
+--- carries that call (see the header) and a push is a read nobody asked for
+--- (invariants 4 and 5). The filters are complementary, so every recipient gets
+--- exactly one of the two payloads and nobody who would have received the old
+--- one is dropped -- the board still says the unit exists, moved and is where it
+--- is; it stops saying what they are on. A call that cannot be read back masks
+--- for everybody, because an unknown row is not a readable one.
 local function unitChanged(agencyId, unit)
     avl.invalidate(agencyId)
 
     if not unit then return end
 
-    toDispatch(agencyId, 'fredpd:cad:unit', { unit = unit })
+    if unit.onCallId == nil then
+        toDispatch(agencyId, 'fredpd:cad:unit', { unit = unit })
+        return
+    end
+
+    local call = repo.getCall(agencyId, unit.onCallId)
+    local masked = withoutCall(unit)
+
+    toDispatch(agencyId, 'fredpd:cad:unit', { unit = unit }, function(session)
+        return mayRead(session, call)
+    end)
+
+    toDispatch(agencyId, 'fredpd:cad:unit', { unit = masked }, function(session)
+        return not mayRead(session, call)
+    end)
 end
 
 --- The session's own unit row, or a refusal saying why there is not one.
@@ -525,6 +679,21 @@ route.define({
         }
     end,
     handler = function(session, input)
+        -- Trimmed before it is judged, not after.
+        --
+        -- `CallCreate` bounds `locationText` at one character and the validator
+        -- counts the spaces, so three of them pass the schema, come back out of
+        -- `text` as nil, and reach `ck_fpd_calls_where` -- which refuses the
+        -- INSERT, which answers `internal`, which the dispatcher reads as
+        -- "something went wrong" while losing the form they had typed. Every
+        -- required free-text field in this file is trimmed first and refused
+        -- with `required`, which the box can render under itself.
+        local locationText = text(input.locationText)
+
+        if locationText == nil then
+            return route.refuse(FredPD.ErrorCode.INVALID, { locationText = 'required' })
+        end
+
         local refusal = checkBeat(session, input.beatId)
         if refusal then return refusal end
 
@@ -535,7 +704,7 @@ route.define({
         local created = repo.createCall(session.agencyId, {
             type = input.type,
             priority = input.priority,
-            locationText = text(input.locationText),
+            locationText = locationText,
             beatId = input.beatId,
             callerName = text(input.callerName),
             callerPhone = text(input.callerPhone),
@@ -597,11 +766,35 @@ route.define({
     perm = READ,
     schema = 'CallGet',
     limit = { per = 60, window = 60 },
-    audit = 'cad.call.read',
+    -- No declarative `audit`: this route audits the restricted case and only
+    -- that, from the handler, because `route.define`'s entry has no condition to
+    -- hang on. `subjectType` stays -- `audit.denied` still uses it for the
+    -- refusal below, which is the read attempt worth keeping either way.
     subjectType = 'call',
     handler = function(session, input)
         local call = repo.getCall(session.agencyId, input.id)
         if not mayRead(session, call) then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+
+        -- Invariant 11: *reads of restricted records* are audited. Not every
+        -- read -- the console refetches this card on every `fredpd:cad:call`
+        -- push, so auditing them all wrote dozens of rows for one P1 with four
+        -- units on it, none of which was a read a person performed, and buried
+        -- the entries this log exists to hold. `isRestricted` is the same
+        -- generous test `accessRepo.read` applies: above `internal`, in a
+        -- compartment, sealed, or classified as something nobody recognises.
+        if accessRules.isRestricted(call) then
+            audit.write({
+                action = 'cad.call.read',
+                discordId = session.discordId,
+                agencyId = session.agencyId,
+                subjectType = 'call',
+                subjectId = tostring(input.id),
+                -- What was opened and how far up the scale it sat. Never what
+                -- was in it: an audit row that copies the record defeats the
+                -- access control on the record.
+                detail = { classification = call.classification },
+            })
+        end
 
         local log = repo.callLog(session.agencyId, input.id)
 
@@ -623,11 +816,17 @@ route.define({
         local recommended = nil
 
         if call.x and perms.satisfies(session.permissions, ASSIGNS) then
-            recommended = service.recommendUnits(
+            -- The *unmasked* board goes in. `Cad.isFree` reads `onCallId`, so a
+            -- board masked first would offer a unit standing at somebody else's
+            -- shooting as available, and the dispatcher would send them. The
+            -- ranking is the server reasoning about its own rows; only the
+            -- answer leaves the server, and `divertFromCallId` is the one field
+            -- in it that names a call (invariant 4; see the header).
+            recommended = withoutDiverts(session, service.recommendUnits(
                 boardWithPositions(session.agencyId, { limit = 200 }),
                 { x = call.x, y = call.y },
                 { callPriority = call.priority, config = settings }
-            )
+            ))
         end
 
         return {
@@ -1014,9 +1213,20 @@ route.define({
         -- writes every other kind from what it has just done -- a line a client
         -- could label is a line a client can dress up as a status change that
         -- never happened (invariant 11).
+        -- Trimmed before it is judged, like `call.create`'s location. `CallNote`
+        -- bounds the body at one character and the validator counts the spaces,
+        -- and `ck_fpd_call_log_content` only asks a note for a body that is not
+        -- NULL -- so three spaces stored cleanly as a blank line in a log that
+        -- is append-only and cannot have it taken back out.
+        local body = text(input.body)
+
+        if body == nil then
+            return route.refuse(FredPD.ErrorCode.INVALID, { body = 'required' })
+        end
+
         local unit = repo.getUnit(session.agencyId, session.officerId)
         local actor = actorOf(session, unit)
-        local entry = logLine(FredPD.CallLogKind.NOTE, nil, input.body, actor)
+        local entry = logLine(FredPD.CallLogKind.NOTE, nil, body, actor)
 
         if repo.addLog(session.agencyId, input.callId, entry) == 0 then
             return route.refuse(FredPD.ErrorCode.INTERNAL)
@@ -1126,13 +1336,19 @@ route.define({
         -- Positions are laid over the rows for the same reason the card's
         -- recommendation gets them: the board shows where a unit is, and the
         -- stored column is only as fresh as the last sweep.
-        return {
-            units = boardWithPositions(session.agencyId, {
-                status = input.status,
-                beatId = input.beatId,
-                limit = input.limit or 100,
-            }),
-        }
+        --
+        -- `boardFor` is the access check on the call each row carries, and it is
+        -- not optional decoration on a read gated by the page key: without it
+        -- this route answers with the number, the priority and the stage of
+        -- every call on the board, including the ones `call.list` refused this
+        -- same session a second earlier (invariant 4; see the header).
+        local units = boardWithPositions(session.agencyId, {
+            status = input.status,
+            beatId = input.beatId,
+            limit = input.limit or 100,
+        })
+
+        return { units = boardFor(session, units) }
     end,
 })
 
@@ -1425,11 +1641,26 @@ route.define({
         return { kind = input.kind, plate = input.plate, priority = input.priority }
     end,
     handler = function(session, input)
+        -- Trimmed before it is judged, like `call.create`'s location. Both
+        -- columns are NOT NULL and `ck_fpd_broadcasts_body` wants a body with
+        -- something in it, so a title or a message of spaces passes the schema's
+        -- `min = 1`, comes out of `text` as nil, and is refused by the database
+        -- as `internal` -- with the BOLO the supervisor had just typed gone.
+        local title, body = text(input.title), text(input.body)
+
+        if title == nil then
+            return route.refuse(FredPD.ErrorCode.INVALID, { title = 'required' })
+        end
+
+        if body == nil then
+            return route.refuse(FredPD.ErrorCode.INVALID, { body = 'required' })
+        end
+
         local broadcast = {
             kind = input.kind,
             priority = input.priority or 3,
-            title = text(input.title),
-            body = text(input.body),
+            title = title,
+            body = body,
             -- Upper-cased and trimmed, like every other plate column in the
             -- suite. It puts the plate on the message and does nothing else:
             -- making an ALPR banner fire on it is a hotlist entry under its own
@@ -1541,9 +1772,13 @@ route.define({
         -- second for the whole server.
         avl.subscribe(session)
 
+        -- Both arrays are filtered against the same reader, and they have to
+        -- be: a call dropped from `calls` and left standing on a unit row in
+        -- `units` is the same disclosure made twice as quietly (invariant 4;
+        -- see the header).
         return {
             subscribed = true,
-            units = boardWithPositions(session.agencyId, { limit = 200 }),
+            units = boardFor(session, boardWithPositions(session.agencyId, { limit = 200 })),
             calls = readable(session, repo.listCalls(session.agencyId, { limit = 200 })),
         }
     end,
@@ -1580,49 +1815,78 @@ route.define({
         return { plate = input.plate, officerId = input.officerId, count = #result.reads }
     end,
     handler = function(session, input)
+        -- `hitsOnly` decides what a masked row can be, so it is read once here
+        -- and used twice below.
+        local hitsOnly = input.hitsOnly == true
+
         local rows = repo.listReads(session.agencyId, {
             plate = plate(input.plate),
             officerId = input.officerId,
             sinceHours = input.sinceHours or 24,
-            hitsOnly = input.hitsOnly == true,
+            hitsOnly = hitsOnly,
             limit = input.limit or 100,
         })
 
-        -- Which of the entries behind these hits are covert. `listReads` does not
-        -- join `fpd_hotlist`, so this is one extra read -- and only when the page
-        -- actually contains a hit, which most pages do not: a patrol car reads
-        -- hundreds of plates and matches almost none. A join on `hotlist_id`
-        -- would remove it, and the milestone report asks for one.
-        local hits = false
+        local out = {}
+
         for index = 1, #rows do
-            if rows[index].hit == 1 and rows[index].hotlistId then hits = true break end
-        end
+            local row = rows[index]
 
-        if hits then
-            local entries = repo.listHotlist(session.agencyId,
-                { includeExpired = true, limit = 1000 })
-            local hidden = {}
+            -- `listReads` LEFT JOINs the entry, so `silent` and its author
+            -- arrive on the read itself and the decision is made per row. The
+            -- read it replaced asked `listHotlist` for a thousand entries and
+            -- built a set of ids from them, which masked nothing at all for a
+            -- silent entry that happened to sort past row one thousand -- a
+            -- covert watch whose disclosure depended on how busy the hotlist
+            -- was. There is no page to outrun here and no second query.
+            local covert = row.silent == 1
+                and not seesSilent(session, { createdBy = row.hotlistCreatedBy })
 
-            for index = 1, #entries do
-                if entries[index].silent == 1 and not seesSilent(session, entries[index]) then
-                    hidden[entries[index].id] = true
-                end
-            end
-
-            for index = 1, #rows do
+            -- **The response is built, never redacted.** Clearing two fields off
+            -- the repo row left `silent`, `hotlistReason` and `hotlistCreatedBy`
+            -- standing on it: a patrol officer who may not know the plate is
+            -- watched was told that it is, why, and the Discord id of who is
+            -- watching it -- which on a `sources` or an internal-affairs watch
+            -- is the officer being investigated reading their own surveillance.
+            -- Naming the fields that go out is what stops the next column joined
+            -- onto that SELECT arriving here on its own.
+            local read = {
+                id = row.id,
+                plate = row.plate,
+                readAt = row.readAt,
+                readAtUnix = row.readAtUnix,
+                x = row.x,
+                y = row.y,
+                z = row.z,
+                officerId = row.officerId,
+                discordId = row.discordId,
+                callsign = row.callsign,
+                camera = row.camera,
                 -- The read itself is not the secret -- a camera saw a car -- but
                 -- that the car is flagged is exactly what a covert watch exists
                 -- not to disclose. So the hit comes off and the read stays:
                 -- dropping the row would leave a hole in the movement history
                 -- that a second reader could difference against.
-                if rows[index].hotlistId and hidden[rows[index].hotlistId] then
-                    rows[index].hit = 0
-                    rows[index].hotlistId = nil
-                end
-            end
+                hit = covert and 0 or row.hit,
+                hotlistId = (not covert) and row.hotlistId or nil,
+                -- Why the banner fired, which is the reason's key and never a
+                -- sentence (7.18: the NUI renders `alpr.reason.<value>`). Off a
+                -- covert row with the hit it belongs to. Who wrote the entry is
+                -- never on this route at all: `alpr.read.view` asks which cars
+                -- drove past a camera, and who is watching a plate is the
+                -- hotlist's own question under its own key.
+                hotlistReason = (not covert) and row.hotlistReason or nil,
+            }
+
+            -- A masked row cannot stay in a list that asked for hits only. Every
+            -- row in that answer is a hit by construction, so one reading `hit =
+            -- 0` announces itself as the one the reader was not allowed to see.
+            -- Absent is the same answer the unfiltered list gives, where the
+            -- row is indistinguishable from a plate that matched nothing.
+            if not (covert and hitsOnly) then out[#out + 1] = read end
         end
 
-        return { reads = rows }
+        return { reads = out }
     end,
 })
 

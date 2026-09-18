@@ -2,8 +2,8 @@
 ---
 --- Everything in this file is arithmetic over plain tables: no natives, no SQL,
 --- no clock of its own. That is the rule 3.4 sets for every `service.lua`, and
---- here it buys something specific -- six decisions that are argued about in bug
---- reports and cannot be eyeballed on a running server:
+--- here it buys something specific -- seven decisions that are argued about in
+--- bug reports and cannot be eyeballed on a running server:
 ---
 ---   * what "stacked by priority and age" means when a P3 has waited an hour
 ---     and a P1 arrives (7.16);
@@ -11,6 +11,9 @@
 ---     even though they are nearer (7.16);
 ---   * when a unit has been on scene long enough to be worth asking about
 ---     (7.16, the welfare check);
+---   * what a unit's status becomes when a call stops being theirs -- one rule
+---     for the call closing, the dispatcher taking them off it, and the call
+---     they are sent to instead (`statusAfterCall`);
 ---   * whether a point on the edge of a beat is in that beat (7.17) -- a
 ---     boundary that belongs to neither beat is a call that lands nowhere;
 ---   * the bounding box a beat is rejected by before the ray cast runs, which
@@ -445,6 +448,13 @@ end
 ---      where a nil would land it. It is still on the board and still
 ---      dispatchable by hand: "we do not know where they are" is a thing for a
 ---      person to decide about, not a thing to present as "closest".
+---   5. *A unit appears once.* A board row is a unit joined to the call it is
+---      live on, so a unit live on two calls is two rows -- and two of the
+---      three slots in this list filled by one callsign is a dispatcher
+---      sending a car that is already coming. `Repo.assignUnits` is what keeps
+---      a unit live on one call at a time; this is the second lock on the same
+---      door, because a database written before that rule was enforced still
+---      hands this the rows it made.
 ---
 --- Deterministic all the way down -- distance, then officer id -- so two
 --- dispatchers looking at the same board see the same three names in the same
@@ -510,13 +520,119 @@ function Cad.recommendUnits(units, position, options)
     end)
 
     local recommended = {}
+    local seen = {}
 
-    for index = 1, math.min(#candidates, limit) do
-        candidates[index].tier = nil
-        recommended[index] = candidates[index]
+    for index = 1, #candidates do
+        if #recommended >= limit then break end
+
+        local candidate = candidates[index]
+        local officerId = candidate.officerId
+
+        -- The best-ranked row for an officer wins, because the list is already
+        -- sorted: a free row beats a divertible one, and a fresh position beats
+        -- a stale one. A row with no officer id at all is not a unit anybody
+        -- can be deduplicated against, so it is kept as it is.
+        if officerId == nil or not seen[officerId] then
+            if officerId ~= nil then seen[officerId] = true end
+
+            candidate.tier = nil
+            recommended[#recommended + 1] = candidate
+        end
     end
 
     return recommended
+end
+
+-- -----------------------------------------------------------------------------
+-- What a unit is doing when a call stops being theirs (7.16)
+-- -----------------------------------------------------------------------------
+
+--- Why a call stopped being this unit's call.
+---
+--- `ENDED` is the call closing under a disposition, and a dispatcher taking the
+--- unit off a call that stays open: from the unit's side those are the same
+--- move, and a unit left reading `on_scene` at a scene it is not at any more is
+--- the same lie either way.
+---
+--- `DIVERTED` is the unit being put on *another* call, which is that move seen
+--- from the new call -- `Repo.assignUnits` closes whatever else they were live
+--- on, because a unit is on one call at a time.
+Cad.CALL_ENDED = 'ended'
+Cad.CALL_DIVERTED = 'diverted'
+
+--- The statuses a call put the unit into, which the call is therefore entitled
+--- to take back -- and the one difference between the two reasons.
+---
+--- `en_route` and `on_scene` are both lists: they are what working *this* call
+--- looks like, and they mean nothing once the call is not theirs. Everything
+--- else is deliberately absent, and the absences are the content of this table:
+--- a unit that went `transporting` or `busy` on the way out of a call has moved
+--- on under its own steam, and a call closing behind them must not overwrite
+--- what they chose -- 0007 keeps no per-unit arrival columns precisely because
+--- the unit's own word is the record.
+---
+--- **`emergency` is on the `ended` list and not on the `diverted` one.** A unit
+--- in distress has no other way out: `SUPERVISOR_UNIT_STATUSES` leaves
+--- `emergency` off (a supervisor cannot declare somebody else's panic, and
+--- cannot undeclare it either) and `SELF_SET_UNIT_STATUSES` leaves it off too,
+--- so `enums.ts` says in as many words that "clearing one is done by clearing
+--- the call". If the end of a call did not take it back, the officer who
+--- pressed panic would read as in distress on the board for the rest of the
+--- shift -- and `Cad.isFree` excludes `emergency`, so they would never be
+--- recommended for anything again. Diverting is the other case: a dispatcher
+--- sending a unit to a second call has not established that the first one is
+--- over, and a distress flag that another call's dispatch could clear is a
+--- distress flag that goes out while the officer is still in the ditch.
+local CLEARED_BY_CALL <const> = {
+    ended = { UnitStatus.EN_ROUTE, UnitStatus.ON_SCENE, UnitStatus.EMERGENCY },
+    diverted = { UnitStatus.EN_ROUTE, UnitStatus.ON_SCENE },
+}
+
+--- What a unit's status becomes when a call stops being theirs.
+---
+--- The single owner of that decision. Three statements in `repo.lua` write it
+--- -- `clearCall`, `releaseUnits` and the divert inside `assignUnits` -- and
+--- before this existed each of them had its own idea: one returned units to
+--- `available`, one touched the status not at all, and the third had no opinion
+--- because it did not know it was taking a unit off anything.
+---
+--- @param status string the unit's status now
+--- @param reason string|nil `Cad.CALL_ENDED` (the default) or `Cad.CALL_DIVERTED`
+--- @return string|nil `available`, or nil to leave the status where it is
+function Cad.statusAfterCall(status, reason)
+    local statuses = CLEARED_BY_CALL[reason] or CLEARED_BY_CALL[Cad.CALL_ENDED]
+
+    for index = 1, #statuses do
+        if statuses[index] == status then return UnitStatus.AVAILABLE end
+    end
+
+    return nil
+end
+
+--- The same rule as a list, for the one statement that has to name it.
+---
+--- A SQL `UPDATE … WHERE status IN (…)` cannot call `statusAfterCall` per row,
+--- so the repo builds its placeholders from this list and binds these values.
+--- The spec asserts the two agree, which is what stops the list and the
+--- predicate drifting apart the next time a status is added.
+---
+--- An unrecognised reason is `ENDED`, which is the wider list: the repo passes
+--- one of the two constants above, so the only way to get here with anything
+--- else is a typo, and a typo that freed a unit is visible on the board within
+--- one poll while a typo that stranded one is not.
+---
+--- Returns a new list; the table above is never handed out.
+---
+--- @param reason string|nil
+--- @return table list of statuses
+--- @return string what each one becomes
+function Cad.statusesClearedByCall(reason)
+    local statuses = CLEARED_BY_CALL[reason] or CLEARED_BY_CALL[Cad.CALL_ENDED]
+    local list = {}
+
+    for index = 1, #statuses do list[index] = statuses[index] end
+
+    return list, UnitStatus.AVAILABLE
 end
 
 -- -----------------------------------------------------------------------------

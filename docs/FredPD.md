@@ -850,6 +850,58 @@ The line's own label — the icon and the word beside the timestamp — is
 - **Hotlist reasons** are `stolen_vehicle`, `wanted_person`, `warrant`, `bolo`, `investigation` and `other` — `ck_fpd_hotlist_reason` and `HOTLIST_REASONS`. The banner an officer reads before stopping a car is the reason's label, so each one has a key under **`alpr.reason.<value>`** (not `cad.*`: the hotlist, the reads and the hit banner are one screen and one namespace), and the free-text `note` beside it carries the detail.
 - **Permissions:** `alpr.read.view`, `alpr.hotlist.manage`.
 
+#### 7.18.1 What M4 shipped, and what it did not
+
+7.18 is [S] and M4 built the half of it that is storage and access control. The
+other half — the thing that reads a plate — is not built, and nothing on any
+screen says so, so this is where it is written down. **No plate has ever been
+read on a FredPD server**: `fpd_alpr_reads` is empty on every deployment and
+will stay empty until the bridge below exists.
+
+**Shipped and working.**
+
+- The tables, in migration `0007_dispatch.sql`: `fpd_hotlist` (with
+  `ck_fpd_hotlist_reason`, the per-entry `silent` flag and the live/expiry
+  handling) and `fpd_alpr_reads` (plate, time, position, unit, camera, and the
+  `hit`/`hotlist_id` pair that records what the read matched *at the time*).
+- Three routes, each with a schema, a permission, a grant in the seed and an
+  entry in `NUI_ROUTES`: `alpr.read.list` (`alpr.read.view`, rate limited,
+  audited), `alpr.hotlist.edit` (`alpr.hotlist.manage`, `sensitive`, audited)
+  and `alpr.hotlist.list` (`alpr.hotlist.manage`, rate limited). All three are
+  callable today by any client that names them.
+- The covert-watch rule, which is the part that was worth building first: a
+  `silent` entry is masked out of both reads for everyone but its author and
+  those cleared for it, the reads list is *built* field by field rather than
+  redacted, and a masked row is dropped from a hits-only list rather than sent
+  with `hit = 0`.
+- The locale namespace `alpr.*`, complete in `en` and `sv`, including the
+  `alpr.hit.*` banner strings and `alpr.reason.<value>`.
+- `alprRetentionDays` in `config/server.lua`, default 30.
+
+**Written but reachable from nothing.** Three repo functions have no caller:
+`Repo.hotlistHits`, `Repo.recordRead` and `Repo.purgeReads`. Their comments say
+so; this section says what it would take to change that.
+
+- **The reader.** There is no radar bridge. A plate is read on a client, so the
+  bridge belongs in `server/bridges/` and is the only file allowed to name
+  Wolfknight (3.8). Per read it calls `Repo.hotlistHits(agencyId, plate)` and
+  then `Repo.recordRead`, with the position taken off the *reading unit's* ped
+  on the server exactly as the AVL sweep does — a client that could send the
+  position of a read could place a car anywhere it liked (invariant 1).
+- **The hit banner.** Nothing pushes a hit and no client handler draws one, so
+  `alpr.hit.title`, `alpr.hit.banner` and `alpr.hit.advice` are strings nobody
+  has seen. The push must be to the reading unit alone and must respect
+  `silent` per entry (invariant 5, section 9): a silent entry is logged and the
+  unit is told nothing.
+- **The screen.** `cad.tab.alpr` exists as a tab label; `Dispatch.svelte` has
+  four tabs and this is not one of them. Nothing in the NUI calls the three
+  routes, so the reads file, the hotlist and its editor have no way in.
+- **Retention.** 13.3 gives the 30-day sweep to the gateway scheduler and the
+  gateway is off by default (ADR-010), so nothing calls `Repo.purgeReads` and
+  `alprRetentionDays` currently changes nothing. The number is a privacy
+  commitment under 11.4 that is **not being kept**; whichever scheduler ends up
+  owning it calls that function in batches, per agency.
+
 ### 7.19 Cameras (O, later)
 
 - [O] CCTV, body-worn and dash cameras with live view, as in ps-mdt v3.

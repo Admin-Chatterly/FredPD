@@ -276,6 +276,14 @@
     details: 'cad.create.details',
     status: 'cad.column.status',
     disposition: 'cad.clear.disposition',
+    // The link picker on the call card (7.16). `targetId` is the register row
+    // `call.link` refuses as `unknown` — which is both "no such record" and
+    // "not yours to read", deliberately one answer — and `term` is the box the
+    // two search routes refuse as `too_short`. Without these two the officer
+    // would be told "targetId — unknown" over a form that has no such box.
+    targetId: 'cad.card.links',
+    role: 'cad.card.links',
+    term: 'records.search.term',
     note: 'cad.clear.note',
     body: 'cad.broadcast.body',
     callsign: 'cad.manage.callsign',

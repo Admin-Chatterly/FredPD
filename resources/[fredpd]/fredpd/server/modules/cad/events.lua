@@ -284,8 +284,13 @@ local function eligible(session)
 end
 
 --- Is this officer working right now?
-local function onDuty(src, session)
-    if not eligible(session) then return false end
+---
+--- Takes the answer `eligible` already gave rather than the session, because
+--- the two halves are asked at different moments: `eligible` is pure and runs
+--- while `Events.pass` is walking the session table, and the bridge call runs
+--- afterwards, once that walk has finished. See the note on the walk itself.
+local function onDuty(src, isEligible)
+    if not isEligible then return false end
     if not config.dutyRequired then return true end
 
     return policejob.isOnDuty(src) == true
@@ -384,56 +389,114 @@ end
 ---
 --- Writes only where something changed. A server where nobody's duty moved
 --- costs one bridge call per connected officer and no SQL.
+---
+--- ## Why this is a snapshot and then two loops, and not one loop
+---
+--- Not defensiveness. `signOn` and `signOff` both reach the database through
+--- the repo, and every `MySQL.*.await` in there **suspends this thread** until
+--- the round trip comes back. The two tables being walked are live for exactly
+--- that window:
+---
+---   * `sessions.all()` is `core/session.lua`'s own table. It gains a key when
+---     a player's session opens and loses one when they drop, and both happen
+---     from other threads while this one is parked on a query.
+---   * `dropped` is written by the `playerDropped` handler below, which is a
+---     different thread again.
+---
+--- Lua 5.4 makes no promise about a `pairs` traversal of a table that gains a
+--- key while it is running -- the manual's words are "undefined behaviour" --
+--- and the usual consequence is not a crash but a key silently skipped or
+--- visited twice: an officer who never reaches the board, or one signed off
+--- twice. The window is not a few instructions here, it is a database round
+--- trip per unit.
+---
+--- So the walk only reads. It copies out of each session the five fields the
+--- writers need and asks the one question that cannot yield -- `eligible` is a
+--- pure test over `session.permissions` -- and nothing suspends until the walk
+--- has finished. `sessionsByDiscord` and `welfarePass` in `avl.lua` are built
+--- the same way, for the same reason.
+---
+--- What the snapshot costs is that the pass acts on who was connected a moment
+--- ago: an officer who drops mid-pass may still be signed on, and the next pass
+--- and the drop handler put that right. That is the right direction to be wrong
+--- in, and it is the only one of the three orderings that is defined at all.
 function Events.pass()
     if not booted then return end
 
     local now = os.time()
 
+    local observed, seen = {}, 0
+
     for src, session in pairs(sessions.all()) do
-        local officerId = session.officerId
-
-        if officerId then
-            -- Back inside the grace period: the drop never happened as far as
-            -- the board is concerned, and the row still carries their status,
-            -- their time in status and their call.
-            dropped[officerId] = nil
-
-            local before = known[officerId]
-            local working = onDuty(src, session)
-
-            local entry = before or {}
-            entry.officerId = officerId
-            entry.src = src
-            entry.agencyId = session.agencyId
-            entry.discordId = session.discordId
-            entry.callsign = session.callsign
-
-            if working and not (before and before.onDuty) then
-                -- A transition, and an officer we have never seen is one too:
-                -- that is the reconnect case, and it is why this compares
-                -- against memory rather than watching for an edge.
-                entry.onDuty = signOn(entry)
-            elseif not working and before and before.onDuty then
-                signOff(before)
-                entry.onDuty = false
-            elseif before == nil then
-                entry.onDuty = false
-            end
-
-            -- A unit a supervisor signed off with `unit.manage` while its
-            -- officer is still on duty in the job stays off: this pass sees no
-            -- transition, so it writes nothing. Re-signing them on would undo a
-            -- supervisory decision every fifteen seconds.
-            known[officerId] = entry
-            bySrc[src] = officerId
+        if session.officerId then
+            seen = seen + 1
+            observed[seen] = {
+                src = src,
+                officerId = session.officerId,
+                agencyId = session.agencyId,
+                discordId = session.discordId,
+                callsign = session.callsign,
+                eligible = eligible(session),
+            }
         end
     end
 
-    for officerId, entry in pairs(dropped) do
-        if (now - entry.at) >= config.signOffGraceSeconds then
-            dropped[officerId] = nil
-            signOff(entry)
+    for index = 1, seen do
+        local observation = observed[index]
+        local officerId = observation.officerId
+
+        -- Back inside the grace period: the drop never happened as far as the
+        -- board is concerned, and the row still carries their status, their
+        -- time in status and their call.
+        dropped[officerId] = nil
+
+        local before = known[officerId]
+        local working = onDuty(observation.src, observation.eligible)
+
+        local entry = before or {}
+        entry.officerId = officerId
+        entry.src = observation.src
+        entry.agencyId = observation.agencyId
+        entry.discordId = observation.discordId
+        entry.callsign = observation.callsign
+
+        if working and not (before and before.onDuty) then
+            -- A transition, and an officer we have never seen is one too: that
+            -- is the reconnect case, and it is why this compares against
+            -- memory rather than watching for an edge.
+            entry.onDuty = signOn(entry)
+        elseif not working and before and before.onDuty then
+            signOff(before)
+            entry.onDuty = false
+        elseif before == nil then
+            entry.onDuty = false
         end
+
+        -- A unit a supervisor signed off with `unit.manage` while its officer
+        -- is still on duty in the job stays off: this pass sees no transition,
+        -- so it writes nothing. Re-signing them on would undo a supervisory
+        -- decision every fifteen seconds.
+        known[officerId] = entry
+        bySrc[observation.src] = officerId
+    end
+
+    -- The grace clocks, snapshotted for the same reason: `signOff` yields, and
+    -- a player dropping during that query writes a new key into `dropped` --
+    -- which is the table this would otherwise still be walking.
+    local expired, count = {}, 0
+
+    for _, entry in pairs(dropped) do
+        if (now - entry.at) >= config.signOffGraceSeconds then
+            count = count + 1
+            expired[count] = entry
+        end
+    end
+
+    for index = 1, count do
+        local entry = expired[index]
+
+        dropped[entry.officerId] = nil
+        signOff(entry)
     end
 end
 

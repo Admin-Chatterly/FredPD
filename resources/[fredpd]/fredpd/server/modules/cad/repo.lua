@@ -1,7 +1,7 @@
 --- Dispatch (CAD) SQL (spec 7.16, 7.17, 7.18; migration 0007). Parameterized
 --- only (invariant 8).
 ---
---- Five rules shape every statement in this file.
+--- Six rules shape every statement in this file.
 ---
 --- **The queue and the board are read every few seconds by every open console**
 --- (3.6), so every read here names the index that serves it and what it costs.
@@ -20,13 +20,25 @@
 --- always to write the row correctly here -- never to relax the constraint.
 ---
 --- **The database enforces what two dispatchers can race on.**
---- `uq_fpd_call_units_live` already means "a unit is on a call once at a time"
---- and `uq_fpd_call_units_lead` means "at most one live lead unit", both in the
---- database. So the writes below attempt the insert and let it fail: a
---- check-then-insert in Lua is two statements two dispatchers can interleave,
---- and what it would let through is a call with two units who each think the
---- other is in charge. A refused insert rolls its whole transaction back and the
---- route answers `already_assigned`.
+--- `uq_fpd_call_units_live` is `(call_id, discord_id, active)`, so what it
+--- enforces is "a unit is on a *given* call once" -- read it carefully, because
+--- it is not "a unit is on one call". `uq_fpd_call_units_lead` means "at most
+--- one live lead unit". Both are in the database, so the writes below attempt
+--- the insert and let it fail: a check-then-insert in Lua is two statements two
+--- dispatchers can interleave, and what it would let through is a call with two
+--- units who each think the other is in charge. A refused insert rolls its whole
+--- transaction back and the route answers `already_assigned`.
+---
+--- **A unit is live on one call, and `assignUnits` is the one place that is
+--- made true.** No key in 0007 can say it -- a unique key cannot span two calls
+--- -- so it is one rule in one function: putting a unit on a call closes
+--- whatever else they were live on first, in the same transaction, with the
+--- `unit_left` line on the abandoned call that says so and the status reset that
+--- goes with it (`Cad.statusAfterCall`). Everything downstream assumes it: the
+--- board's `LEFT JOIN` returns one row per unit, `activeAssignment` answers with
+--- one call, and the count of units on a call is the count of units who are
+--- actually coming. The case that produces a second live assignment without it
+--- is not exotic -- it is an officer already on a call pressing panic.
 ---
 --- **A write that must not happen twice is one guarded UPDATE, and its caller
 --- reads the affected-row count** -- clearing a call, acknowledging an
@@ -158,6 +170,59 @@ local LOG_INSERT_NEW <const> = [[INSERT INTO fpd_call_log
          officer_id, discord_id, callsign, entry_type)
      VALUES (?, @fpd_call, ?, ?, ?, ?, ?, ?, ?)]]
 
+--- The same insert, written only if the statement it belongs to changed a row.
+---
+--- `fpd_call_log` is append-only, so a line written by a transaction that then
+--- turned out to have changed nothing is a line nobody can take back: a second
+--- "cleared" on a call somebody else cleared, or a "unit left" naming a unit
+--- that was not on the call. An `INSERT … SELECT` is how a log line gets a
+--- WHERE clause of its own.
+---
+--- `@fpd_changed` is captured from `ROW_COUNT()` in the statement immediately
+--- after the guarded UPDATE, the same per-connection trick `createCall` uses for
+--- `@fpd_call` and for the same reason -- a transaction is one connection, and
+--- `ROW_COUNT()` reports the statement before it, so the capture has to be the
+--- very next statement and the guard reads it afterwards.
+---
+--- The call supplies `agency_id` and `call_id` rather than a parameter: the row
+--- has to exist for the line to be filed against it anyway, and a line can then
+--- never be filed against an agency the call is not in.
+local LOG_INSERT_CHANGED <const> = [[INSERT INTO fpd_call_log
+        (agency_id, call_id, body, message_key, message_args,
+         officer_id, discord_id, callsign, entry_type)
+     SELECT c.agency_id, c.id, ?, ?, ?, ?, ?, ?, ?
+       FROM fpd_calls c
+      WHERE c.agency_id = ? AND c.id = ? AND @fpd_changed > 0]]
+
+--- Captures the affected-row count of the statement before it.
+---
+--- A fresh table each time rather than one shared constant, because the caller
+--- puts it in a list the db layer walks and a shared table in several lists is
+--- one edit away from being a shared bug.
+local function captureChanged()
+    return { query = 'SET @fpd_changed = ROW_COUNT()', values = {} }
+end
+
+--- One guarded log statement, in the order `LOG_INSERT_CHANGED` reads.
+---
+--- The trailing three parameters are `entry_type`, `agency_id` and `id`, all
+--- NOT NULL, so this values list cannot end in a nil (see the header).
+local function changedLogStatement(agencyId, callId, entry)
+    local values = {}
+
+    values[1] = entry.body
+    values[2] = entry.messageKey
+    values[3] = entry.args and json.encode(entry.args) or nil
+    values[4] = entry.officerId
+    values[5] = entry.discordId
+    values[6] = entry.callsign
+    values[7] = entry.entryType
+    values[8] = agencyId
+    values[9] = callId
+
+    return { query = LOG_INSERT_CHANGED, values = values }
+end
+
 local LOG_COLUMNS <const> = [[
     l.id, l.call_id AS callId, l.entry_type AS entryType, l.body,
     l.message_key AS messageKey, l.message_args AS messageArgs,
@@ -247,10 +312,21 @@ local CALL_INSERT <const> = [[INSERT INTO fpd_calls
 --- Discord account holds one session, so a call raised by an officer cannot have
 --- been interleaved with another of their own. A call raised by the `CreateCall`
 --- export (11.2) has no author at all, so that path is scoped by the resource,
---- the type and the location instead, and `<=>` rather than `=`, because
---- `created_by` is NULL there and `NULL = NULL` is unknown -- a plain equality
---- would match no row at all. What is left is two identical calls from one
---- resource in the same tick, which is a duplicate call rather than a mix-up.
+--- the type and the location instead. What is left is two identical calls from
+--- one resource in the same tick, which is a duplicate call rather than a
+--- mix-up.
+---
+--- **A column that is NULL is matched by `IS NULL` and binds no parameter.**
+--- Three of the columns this reads back are nullable, and `created_by` is NULL
+--- on the export path by definition. Writing them as `<=> ?` and binding nil
+--- would be a values list with a hole in it and a nil at the end -- the one
+--- shape the header forbids, because `#` on a table with a hole is undefined in
+--- Lua and a trailing nil shortens it, and what oxmysql then receives is a list
+--- with the wrong number of parameters in it for the placeholders in the query.
+--- So each predicate is chosen from the value: present means `= ?` and one more
+--- parameter, absent means `IS NULL` and none. The two forms select exactly the
+--- same rows `<=>` would, and the list is dense and starts with the two columns
+--- that are NOT NULL.
 ---
 --- @param input table { type, priority, locationText, x, y, z, beatId,
 ---   callerName, callerPhone, source, sourceResource, classification, details }
@@ -302,18 +378,26 @@ function Repo.createCall(agencyId, input, actor)
 
     if not committed then return nil end
 
-    local where = { 'agency_id = ?', 'type = ?', 'created_by <=> ?' }
-    local scope = {}
+    local where = { 'agency_id = ?', 'type = ?' }
+    local scope = { agencyId, input.type }
 
-    scope[1] = agencyId
-    scope[2] = input.type
-    scope[3] = author.discordId
+    -- The column names are constants in this file and never come from input
+    -- (invariant 8): what the value decides is which of two fixed predicates is
+    -- used, not any part of the SQL text.
+    local function match(column, value)
+        if value == nil then
+            where[#where + 1] = column .. ' IS NULL'
+        else
+            where[#where + 1] = column .. ' = ?'
+            scope[#scope + 1] = value
+        end
+    end
+
+    match('created_by', author.discordId)
 
     if not author.discordId then
-        where[#where + 1] = 'source_resource <=> ?'
-        where[#where + 1] = 'location_text <=> ?'
-        scope[4] = input.sourceResource
-        scope[5] = input.locationText
+        match('source_resource', input.sourceResource)
+        match('location_text', input.locationText)
     end
 
     return db().single(
@@ -616,6 +700,90 @@ local DISPATCH_STAMP <const> = [[UPDATE fpd_calls
            updated_by = ?, version = version + 1
      WHERE agency_id = ? AND id = ? AND status NOT IN ('cleared', 'cancelled')]]
 
+--- Closing whatever else a unit was live on, so that they are on one call.
+---
+--- Three statements, and the order is the whole of the correctness: the log line
+--- and the status reset both read the live row, and the third closes it.
+---
+---   * the `unit_left` line on the *abandoned* call, written by an
+---     `INSERT … SELECT` over `idx_fpd_call_units_unit` so that a unit who was
+---     on nothing produces no line at all;
+---   * the status, back to what `Cad.statusAfterCall` says a diverted unit
+---     holds -- they are not on scene at the call they have just been taken off,
+---     and leaving `on_scene` there would keep the welfare timer counting from
+---     a scene they are driving away from;
+---   * the assignment itself, `left_at` stamped and the lead flag dropped,
+---     exactly as `releaseUnits` closes one.
+---
+--- `call_id <> ?` is what makes all three a no-op for the ordinary case of a
+--- unit joining their first call, and what stops a re-dispatch to the call they
+--- are already on from closing the assignment it is about to refuse.
+local function divertStatements(agencyId, callId, unit, actor)
+    local cad = service()
+    local statuses, freed = cad.statusesClearedByCall(cad.CALL_DIVERTED)
+    local left = {}
+    local status = {}
+    local holders = {}
+
+    left[1] = cad.logMessageKey('unit_left')
+    left[2] = json.encode({ callsign = unit.callsign })
+    left[3] = actor.officerId
+    left[4] = actor.discordId
+    left[5] = actor.callsign
+    left[6] = 'unit_left'
+    left[7] = agencyId
+    left[8] = unit.discordId
+    left[9] = callId
+
+    status[1] = freed
+    status[2] = agencyId
+    status[3] = unit.discordId
+
+    for index = 1, #statuses do
+        holders[index] = '?'
+        status[3 + index] = statuses[index]
+    end
+
+    status[4 + #statuses] = agencyId
+    status[5 + #statuses] = unit.discordId
+    status[6 + #statuses] = callId
+
+    return {
+        {
+            -- `body` is the literal NULL of a generated line rather than a bound
+            -- nil, so nothing in this values list is absent (see the header).
+            query = [[INSERT INTO fpd_call_log
+                          (agency_id, call_id, body, message_key, message_args,
+                           officer_id, discord_id, callsign, entry_type)
+                       SELECT cu.agency_id, cu.call_id, NULL, ?, ?, ?, ?, ?, ?
+                         FROM fpd_call_units cu
+                        WHERE cu.agency_id = ? AND cu.discord_id = ?
+                          AND cu.active = 1 AND cu.call_id <> ?]],
+            values = left,
+        },
+        {
+            -- Only a unit that was genuinely on another call: the EXISTS is why
+            -- a unit sitting at `on_scene` with no assignment at all keeps the
+            -- status they chose rather than having it overwritten by a dispatch.
+            query = ([[UPDATE fpd_units
+                          SET status = ?, status_since = CURRENT_TIMESTAMP(3)
+                        WHERE agency_id = ? AND discord_id = ? AND status IN (%s)
+                          AND EXISTS (SELECT 1 FROM fpd_call_units cu
+                                       WHERE cu.agency_id = ? AND cu.discord_id = ?
+                                         AND cu.active = 1 AND cu.call_id <> ?)]])
+                :format(table.concat(holders, ', ')),
+            values = status,
+        },
+        {
+            query = [[UPDATE fpd_call_units
+                         SET left_at = CURRENT_TIMESTAMP(3), is_lead = 0
+                       WHERE agency_id = ? AND discord_id = ?
+                         AND active = 1 AND call_id <> ?]],
+            values = { agencyId, unit.discordId, callId },
+        },
+    }
+end
+
 --- Puts units on a call (7.16: assign, self-assign, add units).
 ---
 --- One transaction for the whole dispatch: every unit row, the call's stamp and
@@ -628,6 +796,16 @@ local DISPATCH_STAMP <const> = [[UPDATE fpd_calls
 --- lives in the database because two dispatchers pressing Dispatch in the same
 --- moment is exactly what a `SELECT` followed by an `INSERT` gets wrong. The
 --- transaction rolls back whole and the caller answers `already_assigned`.
+---
+--- **A unit already on a *different* call is taken off it here** (see
+--- `divertStatements` and the header). That key cannot span two calls, so this
+--- is the one place the rule lives -- and it is not a rare path: an officer who
+--- is already working a call and presses panic is assigned to their own P1 by
+--- `unit.emergency`, and without this they would sit on both. What that costs is
+--- specific: two board rows for one officer, two "closest available" slots
+--- filled by one callsign, a status line landing on whichever of the two calls a
+--- `LIMIT 1` happened to return, and a call still counting a unit who is never
+--- coming, which is a call no dispatcher re-dispatches.
 ---
 --- `discord_id` and `callsign` are recorded as they are now, so the row stays
 --- readable after the officer leaves the roster and `officer_id` is nulled.
@@ -658,6 +836,13 @@ function Repo.assignUnits(agencyId, callId, units, options)
         values[4] = unit.callsign
         values[5] = options.assignedBy
         values[6] = unit.discordId
+
+        -- Off everything else first, in this same transaction: the insert below
+        -- would otherwise be the second live assignment for this unit, which
+        -- `uq_fpd_call_units_live` permits and nothing downstream expects.
+        local divert = divertStatements(agencyId, callId, unit, actor)
+
+        for step = 1, #divert do statements[#statements + 1] = divert[step] end
 
         statements[#statements + 1] = {
             -- `discord_id` last: it is NOT NULL where `callsign` and
@@ -691,13 +876,45 @@ end
 --- `is_lead = 0` goes with it: a lead unit that has left the call is a call
 --- where nobody is in charge and the card still says somebody is.
 ---
+--- **And the unit's status comes back with it.** A unit a dispatcher takes off
+--- a call is in exactly the position of a unit whose call was cleared, and
+--- `Cad.statusAfterCall` is the one rule both of them go through: the statuses
+--- the call itself put them in go back to `available`, and a unit that has
+--- moved on under its own steam -- `transporting` a prisoner from this call,
+--- say -- keeps what they chose. Without it a released unit reads `on_scene`
+--- for the rest of the shift, at a scene it is not at, with the welfare timer
+--- counting up from the moment it arrived there.
+---
+--- Both the status and the line are guarded on the release having actually
+--- closed a row (`@fpd_changed`, see `LOG_INSERT_CHANGED`). Releasing a unit
+--- that was not on the call must not write "unit left" about a unit that was
+--- never there, into a log nothing can edit afterwards, nor free a unit that is
+--- on scene at somebody else's call.
+---
 --- @param units table list of { discordId, callsign }
 --- @return boolean committed
 function Repo.releaseUnits(agencyId, callId, units, actor)
     local statements = {}
+    local cad = service()
+    local statuses, freed = cad.statusesClearedByCall(cad.CALL_ENDED)
+    local holders = {}
+
+    for index = 1, #statuses do holders[index] = '?' end
+
+    local freeReleased <const> = ([[UPDATE fpd_units
+                 SET status = ?, status_since = CURRENT_TIMESTAMP(3)
+               WHERE agency_id = ? AND discord_id = ? AND status IN (%s)
+                 AND @fpd_changed > 0]]):format(table.concat(holders, ', '))
 
     for index = 1, #units do
         local unit = units[index]
+        local status = {}
+
+        status[1] = freed
+        status[2] = agencyId
+        status[3] = unit.discordId
+
+        for step = 1, #statuses do status[3 + step] = statuses[step] end
 
         statements[#statements + 1] = {
             query = [[UPDATE fpd_call_units
@@ -706,9 +923,12 @@ function Repo.releaseUnits(agencyId, callId, units, actor)
             values = { agencyId, callId, unit.discordId },
         }
 
-        statements[#statements + 1] = logStatement(agencyId, callId, {
+        statements[#statements + 1] = captureChanged()
+        statements[#statements + 1] = { query = freeReleased, values = status }
+
+        statements[#statements + 1] = changedLogStatement(agencyId, callId, {
             entryType = 'unit_left',
-            messageKey = service().logMessageKey('unit_left'),
+            messageKey = cad.logMessageKey('unit_left'),
             args = { callsign = unit.callsign },
             officerId = actor.officerId,
             discordId = actor.discordId,
@@ -784,6 +1004,15 @@ end
 --- row with a window in which the two disagree -- so this seek is the answer
 --- instead. `idx_fpd_call_units_unit (agency_id, discord_id, active)` makes it a
 --- key lookup.
+---
+--- **There is one live row, and the ORDER BY is what happens if there is not.**
+--- `assignUnits` closes a unit's other assignments, so the `LIMIT 1` normally
+--- has nothing to choose between. A row written before that rule was enforced,
+--- or one left by a transaction that failed halfway, would otherwise make this
+--- answer whichever row the storage engine reached first -- and the caller is
+--- `logUnitStatus`, so what "whichever" means in practice is an officer's
+--- status line filed against an arbitrary one of two calls. Newest first, which
+--- is the call they are actually on.
 function Repo.activeAssignment(agencyId, discordId)
     return db().single(
         [[SELECT cu.call_id AS callId, cu.is_lead AS isLead, cu.joined_at AS joinedAt,
@@ -791,6 +1020,7 @@ function Repo.activeAssignment(agencyId, discordId)
             FROM fpd_call_units cu
             JOIN fpd_calls c ON c.id = cu.call_id AND c.agency_id = cu.agency_id
            WHERE cu.agency_id = ? AND cu.discord_id = ? AND cu.active = 1
+           ORDER BY cu.joined_at DESC, cu.id DESC
            LIMIT 1]],
         { agencyId, discordId }
     )
@@ -836,28 +1066,64 @@ local ADVANCE <const> = {
 --- rendered label: the NUI resolves it through `cad.unitStatus.<status>` in the
 --- *reader's* language (7.16.1).
 ---
+--- **`status <> ?` carries the same weight here as it does in `setUnitStatus`,
+--- and this is the second path to the same two statuses.** Pressing "On scene"
+--- a second time must not restamp `status_since`: 7.16's welfare check is the
+--- one alert written for a unit that has gone quiet, and a timer any key press
+--- resets is a timer that never fires for the unit it exists for -- a bored
+--- officer pressing the same button every nineteen minutes would defeat it
+--- entirely, and so would a console that re-sent the status on a reconnect. The
+--- log line carries the guard too, because it is the same press: a line per
+--- press is a narrative that reads as a unit arriving four times.
+---
+--- The line therefore goes **before** the UPDATE. `u.status <> ?` is only true
+--- while the status has not moved yet, so a guard read after the write would be
+--- false on every press including the real one.
+---
+--- The call's own rung still advances unconditionally: a unit who set
+--- `on_scene` off the call and then reports arriving on it has not changed
+--- status, and the call still has to be stamped. `ADVANCE` is `COALESCE`d and
+--- moves the status only from below, so running it twice costs nothing.
+---
 --- @param status string `en_route` or `on_scene`
 --- @param unit table { officerId, discordId, callsign }
---- @return boolean committed
+--- @return boolean committed; a press that changed nothing still commits
 function Repo.reportProgress(agencyId, callId, status, unit)
     local advance = ADVANCE[status]
     if not advance then return false end
 
+    local line = {}
+
+    line[1] = callId
+    line[2] = service().logMessageKey('unit_status')
+    line[3] = json.encode({ callsign = unit.callsign, status = status })
+    line[4] = unit.officerId
+    line[5] = unit.discordId
+    line[6] = unit.callsign
+    line[7] = 'unit_status'
+    line[8] = agencyId
+    line[9] = unit.officerId
+    line[10] = status
+
     return db().transaction({
         {
+            -- `body` is a literal NULL rather than a bound nil, and the three
+            -- trailing parameters are NOT NULL, so this values list neither has
+            -- a hole at its end nor ends in one (see the header).
+            query = [[INSERT INTO fpd_call_log
+                          (agency_id, call_id, body, message_key, message_args,
+                           officer_id, discord_id, callsign, entry_type)
+                       SELECT u.agency_id, ?, NULL, ?, ?, ?, ?, ?, ?
+                         FROM fpd_units u
+                        WHERE u.agency_id = ? AND u.officer_id = ? AND u.status <> ?]],
+            values = line,
+        },
+        {
             query = [[UPDATE fpd_units SET status = ?, status_since = CURRENT_TIMESTAMP(3)
-                       WHERE agency_id = ? AND officer_id = ?]],
-            values = { status, agencyId, unit.officerId },
+                       WHERE agency_id = ? AND officer_id = ? AND status <> ?]],
+            values = { status, agencyId, unit.officerId, status },
         },
         { query = advance, values = { unit.discordId, agencyId, callId } },
-        logStatement(agencyId, callId, {
-            entryType = 'unit_status',
-            messageKey = service().logMessageKey('unit_status'),
-            args = { callsign = unit.callsign, status = status },
-            officerId = unit.officerId,
-            discordId = unit.discordId,
-            callsign = unit.callsign,
-        }),
     })
 end
 
@@ -882,10 +1148,18 @@ end
 --- that it committed and not what each statement matched. So the caller reads
 --- the call back and looks at its status: that is the one place "did I close
 --- it?" can be answered honestly, and 11.3 is explicit that "query succeeded" is
---- not "row changed". Every other statement here is written so that losing the
---- race costs nothing -- closing an assignment that is already closed matches no
---- rows, and the log line is the only trace, which is why the caller must report
---- the conflict rather than shrug.
+--- not "row changed".
+---
+--- **Every other statement here is written so that losing the race costs
+--- nothing, and `@fpd_changed` is what makes that true rather than nearly
+--- true.** The close runs first and its affected-row count is captured in the
+--- very next statement; everything after it carries `@fpd_changed > 0`. Two of
+--- them are inserts into a log nothing can edit afterwards, so without the guard
+--- the second dispatcher to press Clear writes a second "cleared" line, signed
+--- by them, onto a call somebody else closed -- and their note underneath it.
+--- The two updates are guarded for the same reason a beat less obviously: a unit
+--- the winner already freed, who has since gone `en_route` to something else, is
+--- not a unit the loser may set `available`.
 ---
 --- `ck_fpd_calls_disposition` requires a disposition on a `cleared` call and
 --- `ck_fpd_calls_closed` requires `cleared_at` on both terminal statuses; both
@@ -894,10 +1168,25 @@ end
 --- caller, did not happen, and counting it as cleared inflates every workload
 --- report by the calls nobody went to.
 ---
+--- Which statuses come back to `available` comes from `Cad.statusAfterCall`,
+--- which is the same rule `releaseUnits` and the divert in `assignUnits` go
+--- through. Reading that list here rather than writing it into the SQL is what
+--- put `emergency` on it: the officer who pressed panic can leave that status by
+--- no other route -- it is on neither `SELF_SET_UNIT_STATUSES` nor
+--- `SUPERVISOR_UNIT_STATUSES` -- so a clear that skipped it left them reading as
+--- in distress on the board indefinitely, and `Cad.isFree` excludes `emergency`,
+--- so nothing would ever recommend them again.
+---
 --- @param params table { status, disposition, note }
 --- @param units table list of { officerId } still on the call
 --- @return boolean committed
 function Repo.clearCall(agencyId, callId, params, units, actor)
+    local cad = service()
+    local statuses, freed = cad.statusesClearedByCall(cad.CALL_ENDED)
+    local holders = {}
+
+    for index = 1, #statuses do holders[index] = '?' end
+
     local statements = {
         {
             query = [[UPDATE fpd_calls
@@ -911,15 +1200,20 @@ function Repo.clearCall(agencyId, callId, params, units, actor)
                 agencyId, callId,
             },
         },
+        -- Immediately after the close and before anything else: `ROW_COUNT()`
+        -- reports the statement before it, so one statement in between would
+        -- capture that one instead.
+        captureChanged(),
         {
             query = [[UPDATE fpd_call_units SET left_at = CURRENT_TIMESTAMP(3)
-                       WHERE agency_id = ? AND call_id = ? AND left_at IS NULL]],
+                       WHERE agency_id = ? AND call_id = ? AND left_at IS NULL
+                         AND @fpd_changed > 0]],
             values = { agencyId, callId },
         },
     }
 
     if params.note then
-        statements[#statements + 1] = logStatement(agencyId, callId, {
+        statements[#statements + 1] = changedLogStatement(agencyId, callId, {
             entryType = 'note',
             body = params.note,
             officerId = actor.officerId,
@@ -928,9 +1222,9 @@ function Repo.clearCall(agencyId, callId, params, units, actor)
         })
     end
 
-    statements[#statements + 1] = logStatement(agencyId, callId, {
+    statements[#statements + 1] = changedLogStatement(agencyId, callId, {
         entryType = 'cleared',
-        messageKey = service().logMessageKey('cleared', { disposition = params.disposition }),
+        messageKey = cad.logMessageKey('cleared', { disposition = params.disposition }),
         -- The disposition travels as the enum member; the NUI renders it through
         -- `cad.disposition.<value>` (7.16.1).
         args = { disposition = params.disposition },
@@ -939,18 +1233,26 @@ function Repo.clearCall(agencyId, callId, params, units, actor)
         callsign = actor.callsign,
     })
 
+    local freeWorked <const> = ([[UPDATE fpd_units
+                 SET status = ?, status_since = CURRENT_TIMESTAMP(3)
+               WHERE agency_id = ? AND officer_id = ? AND status IN (%s)
+                 AND @fpd_changed > 0]]):format(table.concat(holders, ', '))
+
     for index = 1, #units do
-        statements[#statements + 1] = {
-            -- Only a unit the call itself had working goes back to available. A
-            -- unit that has already moved on -- transporting a prisoner from
-            -- this call, say -- keeps the status it chose, which is why the
-            -- WHERE names the two statuses the call put them in rather than
-            -- clearing whatever they are doing now.
-            query = [[UPDATE fpd_units SET status = 'available', status_since = CURRENT_TIMESTAMP(3)
-                       WHERE agency_id = ? AND officer_id = ?
-                         AND status IN ('en_route', 'on_scene')]],
-            values = { agencyId, units[index].officerId },
-        }
+        local values = {}
+
+        values[1] = freed
+        values[2] = agencyId
+        values[3] = units[index].officerId
+
+        for step = 1, #statuses do values[3 + step] = statuses[step] end
+
+        -- Only a unit the call itself had working goes back to available. A
+        -- unit that has already moved on -- transporting a prisoner from this
+        -- call, say -- keeps the status it chose, which is why the WHERE names
+        -- the statuses the call put them in rather than clearing whatever they
+        -- are doing now.
+        statements[#statements + 1] = { query = freeWorked, values = values }
     end
 
     return db().transaction(statements)

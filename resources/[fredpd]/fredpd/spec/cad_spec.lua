@@ -360,6 +360,142 @@ describe('cad', function()
             assert.are.equal(4, recommended[1].officerId)
             assert.are.equal(9, recommended[2].officerId)
         end)
+
+        it('offers one unit once, however many board rows it has', function()
+            -- The board is units joined to what they are live on, so a unit live
+            -- on two calls is two rows. `Repo.assignUnits` is what stops that
+            -- happening, and this is the second lock on the same door: two of
+            -- the three "closest available" slots filled by one callsign is a
+            -- dispatcher sending a car that is already on its way.
+            local recommended = cad.recommendUnits({
+                unit(1, 50, 0),
+                unit(1, 50, 0),
+                unit(2, 900, 0),
+            }, { x = 0, y = 0 }, { now = now })
+
+            assert.are.equal(2, #recommended)
+            assert.are.equal(1, recommended[1].officerId)
+            assert.are.equal(2, recommended[2].officerId)
+        end)
+
+        it('keeps the best-ranked row of a unit that has two', function()
+            -- The list is already sorted when the duplicates are dropped, so the
+            -- row that survives is the one that ranked highest -- a free row
+            -- rather than a divertible one, and a known position rather than a
+            -- guess. The other way round it would report a unit as busier or
+            -- further away than it is.
+            local recommended = cad.recommendUnits({
+                unit(1, 400, 0, { positionAtUnix = now - 900 }),
+                unit(1, 400, 0),
+            }, { x = 0, y = 0 }, { now = now })
+
+            assert.are.equal(1, #recommended)
+            assert.is_false(recommended[1].stale)
+        end)
+
+        it('still fills the list when a duplicate would have taken a slot', function()
+            -- The limit counts units, not rows: dropping a duplicate must not
+            -- cost the dispatcher the third suggestion.
+            local recommended = cad.recommendUnits({
+                unit(1, 10, 0),
+                unit(1, 10, 0),
+                unit(2, 20, 0),
+                unit(3, 30, 0),
+            }, { x = 0, y = 0 }, { now = now })
+
+            assert.are.equal(3, #recommended)
+            assert.are.same({ 1, 2, 3 }, {
+                recommended[1].officerId, recommended[2].officerId, recommended[3].officerId,
+            })
+        end)
+    end)
+
+    -- -------------------------------------------------------------------------
+    -- What a unit is doing when a call stops being theirs (7.16)
+    -- -------------------------------------------------------------------------
+
+    describe('the status a call gives back', function()
+        it('takes back the statuses the call itself put the unit in', function()
+            for _, status in ipairs({ 'en_route', 'on_scene' }) do
+                assert.are.equal('available', cad.statusAfterCall(status), status)
+                assert.are.equal(
+                    'available', cad.statusAfterCall(status, cad.CALL_DIVERTED), status)
+            end
+        end)
+
+        it('leaves a unit that moved on under its own steam alone', function()
+            -- `transporting` is a prisoner in the back of the car. A call
+            -- closing behind that unit must not report them as available, and
+            -- `busy` is the same fact with paperwork instead of a prisoner.
+            for _, status in ipairs({ 'busy', 'transporting', 'at_station', 'out_of_service' }) do
+                assert.is_nil(cad.statusAfterCall(status), status)
+                assert.is_nil(cad.statusAfterCall(status, cad.CALL_DIVERTED), status)
+            end
+        end)
+
+        it('frees an officer whose own emergency call has been cleared', function()
+            -- `emergency` is on neither `SELF_SET_UNIT_STATUSES` nor
+            -- `SUPERVISOR_UNIT_STATUSES`: the officer cannot stand themselves
+            -- down and a supervisor cannot do it for them, so `enums.ts` says
+            -- clearing one is done by clearing the call. If the end of a call
+            -- did not take the status back, the officer who pressed panic would
+            -- read as in distress for the rest of the shift -- and `isFree`
+            -- excludes `emergency`, so nothing would recommend them again.
+            assert.are.equal('available', cad.statusAfterCall('emergency'))
+            assert.are.equal('available', cad.statusAfterCall('emergency', cad.CALL_ENDED))
+        end)
+
+        it('will not let another call clear a distress flag', function()
+            -- Diverting is a dispatcher sending a unit to a second call. It
+            -- establishes nothing about whether the first one is over, and a
+            -- distress flag another call's dispatch could clear is one that goes
+            -- out while the officer is still in the ditch.
+            assert.is_nil(cad.statusAfterCall('emergency', cad.CALL_DIVERTED))
+        end)
+
+        it('never reports a unit that is not working as freed', function()
+            assert.is_nil(cad.statusAfterCall('off_duty'))
+            assert.is_nil(cad.statusAfterCall('available'))
+            assert.is_nil(cad.statusAfterCall(nil))
+        end)
+
+        it('hands the repo a list that agrees with the predicate', function()
+            -- The SQL cannot call `statusAfterCall` per row, so one statement
+            -- binds this list instead. Two spellings of one rule is how the
+            -- list and the predicate drift apart the next time a status is
+            -- added, and this is what notices.
+            for _, reason in ipairs({ cad.CALL_ENDED, cad.CALL_DIVERTED }) do
+                local statuses, freed = cad.statusesClearedByCall(reason)
+
+                assert.are.equal('available', freed)
+                assert.is_true(#statuses > 0)
+
+                for _, status in ipairs(statuses) do
+                    assert.are.equal(freed, cad.statusAfterCall(status, reason), status)
+                end
+
+                for _, status in pairs(FredPD.UnitStatus) do
+                    local listed = false
+                    for _, member in ipairs(statuses) do
+                        if member == status then listed = true end
+                    end
+
+                    assert.are.equal(
+                        listed, cad.statusAfterCall(status, reason) ~= nil, status)
+                end
+            end
+        end)
+
+        it('hands out a copy, so a caller cannot edit the rule', function()
+            local statuses = cad.statusesClearedByCall(cad.CALL_ENDED)
+            statuses[1] = 'off_duty'
+
+            assert.are_not.equal('off_duty', cad.statusesClearedByCall(cad.CALL_ENDED)[1])
+        end)
+
+        it('reads an unknown reason as the end of a call', function()
+            assert.are.equal('available', cad.statusAfterCall('emergency', 'typo'))
+        end)
     end)
 
     -- -------------------------------------------------------------------------
@@ -713,6 +849,551 @@ describe('cad', function()
             for _, entryType in pairs(FredPD.CallLogKind) do
                 assert.are.equal(expected[entryType], cad.logMessageKey(entryType), entryType)
             end
+        end)
+    end)
+
+    -- -------------------------------------------------------------------------
+    -- What the assignment writes (7.16)
+    -- -------------------------------------------------------------------------
+
+    --- The four statements nothing else can check.
+    ---
+    --- "A unit is on one call at a time" is not a property of any one function
+    --- and not something a key in 0007 can express -- `uq_fpd_call_units_live`
+    --- is `(call_id, discord_id, active)`, which says a unit is on a *given*
+    --- call once. It is a property of the statement list `assignUnits` sends,
+    --- so that list is what is asserted here: the repo is loaded over a database
+    --- stub that records what it was asked to run, the way `persons_spec` does
+    --- it, and the assertions are about the SQL and the values together.
+    ---
+    --- The three rules that follow it are the same kind of claim. A status the
+    --- call gave back, a log line that is not written when the write it
+    --- describes changed nothing, and a `status_since` a repeated key press does
+    --- not restamp: each of them is one predicate in one statement, invisible
+    --- from anywhere else, and each of them was wrong in a different direction
+    --- before this spec existed.
+    describe('what the assignment writes', function()
+        local repo, db
+
+        --- The database stub: it answers nothing and remembers everything.
+        local function makeDb()
+            local fake = { statements = {}, transactions = {} }
+
+            local function record(sql, values)
+                fake.statements[#fake.statements + 1] = { sql = sql, values = values or {} }
+            end
+
+            function fake.query(sql, values)
+                record(sql, values)
+
+                return {}
+            end
+
+            function fake.single(sql, values)
+                record(sql, values)
+
+                return fake.row
+            end
+
+            function fake.scalar(sql, values)
+                record(sql, values)
+
+                return nil
+            end
+
+            function fake.execute(sql, values)
+                record(sql, values)
+
+                return 1
+            end
+
+            function fake.insert(sql, values)
+                record(sql, values)
+
+                return 1
+            end
+
+            function fake.transaction(statements)
+                fake.transactions[#fake.transactions + 1] = statements
+
+                for index = 1, #statements do
+                    record(statements[index].query, statements[index].values)
+                end
+
+                return true
+            end
+
+            return fake
+        end
+
+        before_each(function()
+            -- `json` is a FiveM runtime global rather than a Lua one, and the
+            -- repo encodes `message_args` with it. Sorted keys, so an assertion
+            -- can name the string it expects.
+            _G.json = {
+                encode = function(value)
+                    if type(value) ~= 'table' then return tostring(value) end
+
+                    local keys = {}
+                    for key in pairs(value) do keys[#keys + 1] = key end
+                    table.sort(keys)
+
+                    local parts = {}
+                    for index = 1, #keys do
+                        parts[index] = ('"%s":"%s"')
+                            :format(keys[index], tostring(value[keys[index]]))
+                    end
+
+                    return '{' .. table.concat(parts, ',') .. '}'
+                end,
+                decode = function(text) return text end,
+            }
+
+            helper.load({
+                'shared/generated/schema',
+                'server/modules/cad/service',
+                'server/modules/cad/repo',
+            })
+
+            db = makeDb()
+            repo = FredPD.Repo.cad
+
+            FredPD.Core = {
+                db = db,
+                counters = {
+                    numberSql = function() return 'CONCAT(?, LPAD(?, ?, ?))' end,
+                    numberValues = function(prefix, width) return { prefix, 1, width, '0' } end,
+                    transaction = function(_, _, _, statements) return statements end,
+                },
+            }
+        end)
+
+        --- Every statement whose SQL contains `fragment`, in the order sent.
+        local function statementsWith(fragment)
+            local found = {}
+
+            for index = 1, #db.statements do
+                if db.statements[index].sql:find(fragment, 1, true) then
+                    found[#found + 1] = db.statements[index]
+                end
+            end
+
+            return found
+        end
+
+        local function statementWith(fragment)
+            return statementsWith(fragment)[1]
+        end
+
+        --- Where in the order a statement matching `fragment` was sent.
+        local function positionOf(fragment)
+            for index = 1, #db.statements do
+                if db.statements[index].sql:find(fragment, 1, true) then return index end
+            end
+
+            return nil
+        end
+
+        --- How many `?` a statement carries.
+        local function placeholders(sql)
+            local count = 0
+
+            for _ in sql:gmatch('%?') do count = count + 1 end
+
+            return count
+        end
+
+        --- Is `value` among a statement's bound values?
+        local function binds(statement, value)
+            for index = 1, placeholders(statement.sql) do
+                if statement.values[index] == value then return true end
+            end
+
+            return false
+        end
+
+        local function unit(overrides)
+            local row = {
+                officerId = 41,
+                discordId = '100000000000000041',
+                callsign = '3A-12',
+            }
+
+            for key, value in pairs(overrides or {}) do
+                row[key] = value ~= helper.NONE and value or nil
+            end
+
+            return row
+        end
+
+        local function actor()
+            return { officerId = 7, discordId = '100000000000000007', callsign = 'DISP-1' }
+        end
+
+        -- ---------------------------------------------------------------------
+        -- A unit is on one call
+        -- ---------------------------------------------------------------------
+
+        describe('a unit on one call', function()
+            it('closes whatever else the unit was live on', function()
+                -- The case that makes this not theoretical: an officer already
+                -- working a call presses panic, and `unit.emergency` assigns
+                -- them to their own P1. Without this they are live on both, the
+                -- board draws them twice, and the call they walked away from
+                -- still counts a unit, so no dispatcher re-dispatches it.
+                repo.assignUnits('lspd', 90, { unit() }, { actor = actor() })
+
+                local release = statementWith('AND active = 1 AND call_id <> ?')
+
+                assert.is_not_nil(release)
+                assert.is_not_nil(release.sql:find('UPDATE fpd_call_units', 1, true))
+                assert.is_not_nil(release.sql:find('left_at = CURRENT_TIMESTAMP(3)', 1, true))
+                -- The lead flag goes with it, or the abandoned call still says
+                -- somebody is in charge of it.
+                assert.is_not_nil(release.sql:find('is_lead = 0', 1, true))
+                assert.are.same({ 'lspd', '100000000000000041', 90 }, release.values)
+            end)
+
+            it('leaves the call it is joining alone', function()
+                -- `call_id <> ?` and never `call_id = ?`: closing the row for
+                -- the call being joined would turn the `already_assigned`
+                -- refusal `uq_fpd_call_units_live` produces into a silent
+                -- re-join, which is a second `unit_joined` line on a call the
+                -- unit never left.
+                repo.assignUnits('lspd', 90, { unit() }, { actor = actor() })
+
+                local release = statementWith('AND active = 1 AND call_id <> ?')
+
+                assert.is_nil(release.sql:find('call_id = ?', 1, true))
+            end)
+
+            it('says so on the call the unit is walking away from', function()
+                repo.assignUnits('lspd', 90, { unit() }, { actor = actor() })
+
+                local line = statementWith('FROM fpd_call_units cu')
+
+                assert.is_not_nil(line)
+                assert.is_not_nil(line.sql:find('INSERT INTO fpd_call_log', 1, true))
+                -- The call the line is filed against comes from the row, so it
+                -- is the abandoned call and never the one being joined.
+                assert.is_not_nil(line.sql:find('SELECT cu.agency_id, cu.call_id', 1, true))
+                assert.is_true(binds(line, 'cad.log.unit_left'))
+                assert.is_true(binds(line, 'unit_left'))
+                assert.is_true(binds(line, '{"callsign":"3A-12"}'))
+            end)
+
+            it('writes the line and the status before closing the row', function()
+                -- Both read the live assignment. After the close there is
+                -- nothing left to read, so the order is the whole of it.
+                repo.assignUnits('lspd', 90, { unit() }, { actor = actor() })
+
+                local line = positionOf('FROM fpd_call_units cu')
+                local status = positionOf('UPDATE fpd_units')
+                local release = positionOf('AND active = 1 AND call_id <> ?')
+
+                assert.is_true(line < release)
+                assert.is_true(status < release)
+            end)
+
+            it('takes back the status the abandoned call put them in', function()
+                repo.assignUnits('lspd', 90, { unit() }, { actor = actor() })
+
+                local status = statementWith('UPDATE fpd_units')
+
+                assert.is_true(binds(status, 'available'))
+                assert.is_true(binds(status, 'en_route'))
+                assert.is_true(binds(status, 'on_scene'))
+                -- Diverting is not the end of a call, so it may not stand an
+                -- officer in distress down (`Cad.statusAfterCall`).
+                assert.is_false(binds(status, 'emergency'))
+            end)
+
+            it('leaves the status of a unit that was on nothing alone', function()
+                -- Without the EXISTS this would free a unit sitting at
+                -- `on_scene` with no assignment at all -- overwriting a status
+                -- they chose because somebody dispatched them somewhere.
+                repo.assignUnits('lspd', 90, { unit() }, { actor = actor() })
+
+                local status = statementWith('UPDATE fpd_units')
+
+                assert.is_not_nil(status.sql:find('EXISTS', 1, true))
+                assert.is_not_nil(status.sql:find('cu.call_id <> ?', 1, true))
+            end)
+
+            it('does it for every unit of a dispatch, in one transaction', function()
+                repo.assignUnits('lspd', 90, {
+                    unit(),
+                    unit({ officerId = 42, discordId = '100000000000000042', callsign = '3A-13' }),
+                }, { actor = actor() })
+
+                assert.are.equal(1, #db.transactions)
+                assert.are.equal(2, #statementsWith('AND active = 1 AND call_id <> ?'))
+            end)
+
+            it('ends no values list in a nil', function()
+                -- The header's rule, and the one the read-back in `createCall`
+                -- broke: a trailing nil shortens the list oxmysql receives, so
+                -- the placeholders and the values stop lining up.
+                repo.assignUnits('lspd', 90, { unit({ officerId = helper.NONE }) }, {
+                    actor = { discordId = '100000000000000007' },
+                })
+
+                for index = 1, #db.statements do
+                    local statement = db.statements[index]
+                    local last = placeholders(statement.sql)
+
+                    if last > 0 then
+                        assert.is_not_nil(statement.values[last], statement.sql)
+                    end
+                end
+            end)
+        end)
+
+        -- ---------------------------------------------------------------------
+        -- Taking a unit off a call
+        -- ---------------------------------------------------------------------
+
+        describe('releasing a unit', function()
+            it('gives the unit its status back', function()
+                -- Before this, `releaseUnits` stamped `left_at` and touched
+                -- `fpd_units` not at all, so a unit a dispatcher took off a call
+                -- read `on_scene` for the rest of the shift, at a scene it was
+                -- not at, with the welfare timer counting from when it arrived.
+                repo.releaseUnits('lspd', 90, { unit() }, actor())
+
+                local status = statementWith('UPDATE fpd_units')
+
+                assert.is_not_nil(status)
+                assert.is_true(binds(status, 'available'))
+                assert.is_true(binds(status, '100000000000000041'))
+            end)
+
+            it('gives it back for the same statuses clearing the call does', function()
+                repo.releaseUnits('lspd', 90, { unit() }, actor())
+                local released = statementWith('UPDATE fpd_units')
+
+                db.statements = {}
+                repo.clearCall('lspd', 90, { status = 'cleared', disposition = 'report_taken' },
+                    { unit() }, actor())
+                local cleared = statementsWith('UPDATE fpd_units')[1]
+
+                for _, status in ipairs({ 'en_route', 'on_scene', 'emergency' }) do
+                    assert.are.equal(binds(cleared, status), binds(released, status), status)
+                end
+            end)
+
+            it('writes neither the line nor the status when nobody was released', function()
+                -- A release that closed no row describes nothing that happened.
+                -- `fpd_call_log` is append-only, so a "unit left" line about a
+                -- unit that was never on the call is one nothing can take back.
+                repo.releaseUnits('lspd', 90, { unit() }, actor())
+
+                local guarded = statementsWith('@fpd_changed > 0')
+
+                assert.are.equal(2, #guarded)
+                assert.is_not_nil(statementWith('SET @fpd_changed = ROW_COUNT()'))
+                assert.is_true(
+                    positionOf('UPDATE fpd_call_units') < positionOf('SET @fpd_changed'))
+            end)
+        end)
+
+        -- ---------------------------------------------------------------------
+        -- Clearing a call
+        -- ---------------------------------------------------------------------
+
+        describe('clearing a call', function()
+            local function clear(units)
+                repo.clearCall('lspd', 90, {
+                    status = 'cleared',
+                    disposition = 'report_taken',
+                    note = 'Code 4.',
+                }, units or { unit() }, actor())
+            end
+
+            it('stands an officer in distress down with their own call', function()
+                -- 7.16's emergency button sets `emergency`, and nothing else can
+                -- take it off: it is on neither self-set list nor the supervisor
+                -- one. A clear that named only `en_route` and `on_scene` left
+                -- the officer who pressed panic in distress on the board
+                -- indefinitely -- and `Cad.isFree` excludes `emergency`, so they
+                -- were never recommended for anything again.
+                clear()
+
+                local status = statementsWith('UPDATE fpd_units')[1]
+
+                assert.is_true(binds(status, 'emergency'))
+                assert.is_true(binds(status, 'available'))
+            end)
+
+            it('captures the close before anything reads it', function()
+                clear()
+
+                assert.are.equal(1, positionOf('UPDATE fpd_calls'))
+                assert.are.equal(2, positionOf('SET @fpd_changed = ROW_COUNT()'))
+            end)
+
+            it('writes no log line on a call somebody else cleared', function()
+                -- The doc said every other statement here was written so that
+                -- losing the race costs nothing, and two of them were
+                -- unconditional inserts into an append-only log: the second
+                -- dispatcher to press Clear wrote a second "cleared" line, and
+                -- their note under it, onto a call that was already closed.
+                clear()
+
+                local lines = statementsWith('INSERT INTO fpd_call_log')
+
+                assert.are.equal(2, #lines)
+
+                for index = 1, #lines do
+                    assert.is_not_nil(lines[index].sql:find('@fpd_changed > 0', 1, true))
+                end
+            end)
+
+            it('frees no unit and closes no assignment when it lost the race', function()
+                clear()
+
+                for _, fragment in ipairs({ 'UPDATE fpd_call_units', 'UPDATE fpd_units' }) do
+                    local statement = statementWith(fragment)
+
+                    assert.is_not_nil(statement.sql:find('@fpd_changed > 0', 1, true), fragment)
+                end
+            end)
+        end)
+
+        -- ---------------------------------------------------------------------
+        -- Reporting progress
+        -- ---------------------------------------------------------------------
+
+        describe('reporting progress', function()
+            it('does not restamp the timer for a status the unit already holds', function()
+                -- 7.16's welfare check is the one alert written for a unit that
+                -- has gone quiet. `setUnitStatus` has carried this guard from
+                -- the start; `call.status` is the second path to the same two
+                -- statuses, and without it an officer pressing "On scene" every
+                -- nineteen minutes defeats the check entirely.
+                repo.reportProgress('lspd', 90, 'on_scene', unit())
+
+                local status = statementWith('UPDATE fpd_units')
+
+                assert.is_not_nil(status.sql:find('AND status <> ?', 1, true))
+                assert.are.same(
+                    { 'on_scene', 'lspd', 41, 'on_scene' }, status.values)
+            end)
+
+            it('writes one line per press that changed something', function()
+                repo.reportProgress('lspd', 90, 'on_scene', unit())
+
+                local line = statementWith('INSERT INTO fpd_call_log')
+
+                assert.is_not_nil(line.sql:find('u.status <> ?', 1, true))
+                -- Before the UPDATE, or the guard is false on every press
+                -- including the one that changed something.
+                assert.is_true(positionOf('INSERT INTO fpd_call_log')
+                    < positionOf('UPDATE fpd_units'))
+            end)
+
+            it('still advances the call, which is idempotent on its own', function()
+                -- A unit that set `on_scene` off the call and then reports
+                -- arriving on it has not changed status, and the call still has
+                -- to be stamped.
+                repo.reportProgress('lspd', 90, 'on_scene', unit())
+
+                local advance = statementWith('UPDATE fpd_calls')
+
+                assert.is_not_nil(advance.sql:find('COALESCE(on_scene_at', 1, true))
+                assert.is_nil(advance.sql:find('@fpd_changed', 1, true))
+            end)
+
+            it('refuses a status that is not a rung of the ladder', function()
+                assert.is_false(repo.reportProgress('lspd', 90, 'busy', unit()))
+                assert.are.equal(0, #db.statements)
+            end)
+        end)
+
+        -- ---------------------------------------------------------------------
+        -- Reading a call back after raising it
+        -- ---------------------------------------------------------------------
+
+        describe('reading a raised call back', function()
+            it('binds a dense values list, with nothing missing from the middle', function()
+                -- The header's rule, broken: the old read-back wrote
+                -- `created_by <=> ?` and bound nil for it, which on the export
+                -- path left a hole at index 3 and a nullable value at the end.
+                -- `#` on a table with a hole is undefined in Lua, and what
+                -- oxmysql then receives is a list with the wrong number of
+                -- parameters for the placeholders in the query.
+                db.row = { id = 91, callNumber = '260918-0001' }
+
+                repo.createCall('lspd', {
+                    type = 'alarm',
+                    priority = 3,
+                    source = 'export',
+                    sourceResource = 'alarm_script',
+                }, nil)
+
+                local read = statementWith('FROM fpd_calls WHERE')
+
+                for index = 1, placeholders(read.sql) do
+                    assert.is_not_nil(read.values[index], index)
+                end
+
+                assert.are.equal(placeholders(read.sql), #read.values)
+            end)
+
+            it('matches a NULL column with IS NULL rather than a bound nil', function()
+                db.row = { id = 91, callNumber = '260918-0001' }
+
+                repo.createCall('lspd', {
+                    type = 'alarm',
+                    priority = 3,
+                    source = 'export',
+                    sourceResource = 'alarm_script',
+                }, nil)
+
+                local read = statementWith('FROM fpd_calls WHERE')
+
+                assert.is_nil(read.sql:find('<=>', 1, true))
+                assert.is_not_nil(read.sql:find('created_by IS NULL', 1, true))
+                -- No location was given, so that column is NULL too.
+                assert.is_not_nil(read.sql:find('location_text IS NULL', 1, true))
+                assert.are.same({ 'lspd', 'alarm', 'alarm_script' }, read.values)
+            end)
+
+            it('scopes a call with an author to that author', function()
+                db.row = { id = 91, callNumber = '260918-0001' }
+
+                repo.createCall('lspd', { type = 'disturbance', priority = 3 }, {
+                    discordId = '100000000000000007',
+                })
+
+                local read = statementWith('FROM fpd_calls WHERE')
+
+                assert.is_not_nil(read.sql:find('created_by = ?', 1, true))
+                -- The resource and the location are the export path's scope and
+                -- have no business narrowing a call an officer raised.
+                assert.is_nil(read.sql:find('source_resource', 1, true))
+                assert.are.same({ 'lspd', 'disturbance', '100000000000000007' }, read.values)
+            end)
+        end)
+
+        -- ---------------------------------------------------------------------
+        -- The call a unit is on
+        -- ---------------------------------------------------------------------
+
+        describe('the call a unit is on', function()
+            it('answers the same one twice', function()
+                -- `assignUnits` keeps this to one row, so the ORDER BY is what
+                -- happens when it is not: without one, `LIMIT 1` hands
+                -- `logUnitStatus` whichever row the storage engine reached
+                -- first, and an officer's status line lands on an arbitrary one
+                -- of two calls.
+                repo.activeAssignment('lspd', '100000000000000041')
+
+                local read = statementWith('FROM fpd_call_units cu')
+
+                assert.is_not_nil(read.sql:find('ORDER BY cu.joined_at DESC, cu.id DESC', 1, true))
+                assert.is_not_nil(read.sql:find('LIMIT 1', 1, true))
+            end)
         end)
     end)
 end)

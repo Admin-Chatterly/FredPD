@@ -1,9 +1,15 @@
 <script lang="ts">
   import { nui } from '../../lib/nui';
   import { getLocale, t } from '../../lib/i18n';
-  import type { ErrorCode } from '@fredpd/schema';
-  import { CALL_DISPOSITIONS, CALL_PROGRESS_STATUSES } from '@fredpd/schema';
+  import type { CallLinkKind, ErrorCode } from '@fredpd/schema';
+  import {
+    CALL_DISPOSITIONS,
+    CALL_LINK_KINDS,
+    CALL_LINK_ROLES,
+    CALL_PROGRESS_STATUSES,
+  } from '@fredpd/schema';
   import { fieldList, type Failure } from '../shared/failure';
+  import { isStub, type Maybe, type PersonResult, type VehicleResult } from '../records/types';
   import {
     beatLabel,
     clockOf,
@@ -16,6 +22,7 @@
     stamp,
     type Beat,
     type CallCardData,
+    type CallLink,
     type LogEntry,
     type Unit,
   } from './Dispatch.svelte';
@@ -76,6 +83,57 @@
   let busy = $state(false);
 
   /**
+   * The links panel (7.16: "linked persons and vehicles").
+   *
+   * `call.link` takes a register row id and nothing else — a plate or a name is
+   * deliberately not accepted, because creating records from a call card would
+   * be a second way into the master name index with none of 7.3's checks. So
+   * the only way to produce one is to search the register, which is what this
+   * does: `person.search` or `vehicle.search`, the same routes Records calls,
+   * with the same access control and the same query log behind them (7.2).
+   *
+   * Two consequences that are the server's answer and are drawn, not
+   * anticipated (invariant 4):
+   *
+   *   * the search is gated on `rms.person.view` / `rms.vehicle.view`, which
+   *     `cad.call.link` does not imply — a session holding one and not the
+   *     other is refused by the search and told so;
+   *   * a record the reader may be told about but not read comes back as a
+   *     stub with no id (`isStub`), and there is nothing to link a call to. It
+   *     is listed as restricted rather than dropped, because "it exists and is
+   *     not yours to attach" is the honest answer.
+   */
+  interface Candidate {
+    id: number;
+    /**
+     * The register this row came out of.
+     *
+     * Carried on the row rather than read off the select when the button is
+     * pressed: the select is live, and a dispatcher who searched for a person
+     * and then flipped the select to vehicles would otherwise send a person id
+     * as a vehicle — `not_found` if the department is lucky and the wrong
+     * record if it is not.
+     */
+    kind: CallLinkKind;
+    label: string;
+  }
+
+  /** The first kind on the list, which is `person`. */
+  const FIRST_KIND = CALL_LINK_KINDS[0];
+
+  /** The column default, and the honest role for a part not yet known. */
+  const DEFAULT_ROLE = 'involved';
+
+  let linkKind = $state<CallLinkKind>(FIRST_KIND);
+  let linkTerm = $state('');
+  let candidates = $state<Candidate[]>([]);
+  let restrictedCandidates = $state(0);
+  /** False until a search has run, so "nothing matched" is not shown before one. */
+  let searched = $state(false);
+  /** Candidate id -> the role it would be linked under. */
+  let candidateRoles = $state<Record<number, string>>({});
+
+  /**
    * Which call the forms below belong to.
    *
    * A dispatcher who half-fills a dispatch on one call and then opens another
@@ -98,6 +156,7 @@
     disposition = FIRST_DISPOSITION;
     selfAssignArmed = false;
     failure = null;
+    clearSearch();
   });
 
   /**
@@ -273,6 +332,137 @@
 
     await send('call.acknowledge', { callId: card.id });
   }
+
+  // ------------------------------------------------- persons and vehicles
+
+  function clearSearch(): void {
+    linkKind = FIRST_KIND;
+    linkTerm = '';
+    candidates = [];
+    restrictedCandidates = 0;
+    candidateRoles = {};
+    searched = false;
+  }
+
+  /**
+   * How a candidate is written in the picker.
+   *
+   * The same two columns the server records on the link itself
+   * (`Repo.linkTarget`): a person is their name and a vehicle is its plate, so
+   * what the dispatcher clicked is what appears in the list above afterwards.
+   * The record number and the model ride along because a department has more
+   * than one John Doe and more than one black sedan.
+   */
+  function personLabel(person: PersonResult): string {
+    const name = [person.firstName, person.lastName].filter(Boolean).join(' ').trim();
+
+    return name ? `${name} · ${person.personNumber}` : person.personNumber;
+  }
+
+  function vehicleLabel(vehicle: VehicleResult): string {
+    return vehicle.model ? `${vehicle.plate} · ${vehicle.model}` : vehicle.plate;
+  }
+
+  /**
+   * Searches the register named by `linkKind`.
+   *
+   * The term goes over untouched: `person.search` does its own parsing and
+   * refuses a term that is too short with a field code this card reads out,
+   * which is a better answer than a button that does nothing.
+   */
+  async function searchTargets(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+
+    busy = true;
+    candidates = [];
+    candidateRoles = {};
+    restrictedCandidates = 0;
+
+    const found: Candidate[] = [];
+    let restricted = 0;
+
+    if (linkKind === 'person') {
+      const response = await nui.call<{ persons: Maybe<PersonResult>[] }>('person.search', {
+        term: linkTerm,
+      });
+
+      if (response.ok) {
+        for (const row of response.data.persons) {
+          if (isStub(row)) restricted += 1;
+          else found.push({ id: row.id, kind: 'person', label: personLabel(row) });
+        }
+
+        failure = null;
+      } else {
+        failure = response;
+      }
+    } else {
+      const response = await nui.call<{ vehicles: Maybe<VehicleResult>[] }>('vehicle.search', {
+        term: linkTerm,
+      });
+
+      if (response.ok) {
+        for (const row of response.data.vehicles) {
+          if (isStub(row)) restricted += 1;
+          else found.push({ id: row.id, kind: 'vehicle', label: vehicleLabel(row) });
+        }
+
+        failure = null;
+      } else {
+        failure = response;
+      }
+    }
+
+    candidates = found;
+    restrictedCandidates = restricted;
+    searched = true;
+    busy = false;
+  }
+
+  /** Links one candidate to the open call, under the role chosen beside it. */
+  async function linkTarget(candidate: Candidate): Promise<void> {
+    if (!card) return;
+
+    await send('call.link', {
+      callId: card.id,
+      kind: candidate.kind,
+      targetId: candidate.id,
+      role: candidateRoles[candidate.id] ?? DEFAULT_ROLE,
+    });
+
+    if (!failure) {
+      candidates = candidates.filter((row) => row.id !== candidate.id);
+    }
+  }
+
+  /**
+   * Changes the role of a link that is already there.
+   *
+   * The same route: `Repo.setLink` upserts on `uq_fpd_call_links_target`, so
+   * this changes the role rather than stacking a second row, and the narrative
+   * gets a `linked` line saying who decided the witness was a suspect (7.16.1).
+   */
+  async function setLinkRole(link: CallLink, role: string): Promise<void> {
+    if (!card || role === link.role) return;
+
+    await send('call.link', {
+      callId: card.id,
+      kind: link.targetType,
+      targetId: link.targetId,
+      role,
+    });
+  }
+
+  async function unlink(link: CallLink): Promise<void> {
+    if (!card) return;
+
+    await send('call.link', {
+      callId: card.id,
+      kind: link.targetType,
+      targetId: link.targetId,
+      remove: true,
+    });
+  }
 </script>
 
 <div class="flex min-h-0 flex-col border border-[var(--color-border)]">
@@ -422,7 +612,14 @@
         {/if}
       </section>
 
-      <!-- Persons and vehicles (7.16). -->
+      <!--
+        Persons and vehicles (7.16).
+
+        Every select below takes its accessible name from the record it acts on,
+        which is why each one is wrapped in a label carrying that record's own
+        text: a role is only ever read as "this person's part in this call", and
+        a bare "Role" over a column of them would be less use, not more.
+      -->
       <section class="border-t border-[var(--color-border)] px-3 py-2">
         <h3 class="text-xs font-semibold">{t('cad.card.links')}</h3>
 
@@ -431,15 +628,118 @@
         {:else}
           <ul class="mt-1 text-xs">
             {#each card.links as link (link.id)}
-              <li class="flex gap-2 border-t border-[var(--color-border)] py-0.5">
+              <li class="flex flex-wrap items-baseline gap-2 border-t border-[var(--color-border)] py-0.5">
                 <span class="w-16 shrink-0 text-[var(--color-ink-muted)]">
                   {t(`cad.linkKind.${link.targetType}`)}
                 </span>
-                <span class="flex-1">{link.label}</span>
-                <span class="text-[var(--color-ink-muted)]">{t(`cad.linkRole.${link.role}`)}</span>
+                <label class="flex min-w-0 flex-1 items-baseline gap-2">
+                  <span class="min-w-0 flex-1">{link.label}</span>
+                  <select
+                    class="border border-[var(--color-border)] bg-[var(--color-panel)] px-1 py-0.5"
+                    value={link.role}
+                    disabled={busy}
+                    onchange={(event) => void setLinkRole(link, event.currentTarget.value)}
+                  >
+                    {#each CALL_LINK_ROLES as role (role)}
+                      <option value={role}>{t(`cad.linkRole.${role}`)}</option>
+                    {/each}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  class="border border-[var(--color-border)] px-2 py-0.5 hover:bg-[var(--color-surface)]"
+                  disabled={busy}
+                  onclick={() => void unlink(link)}
+                >
+                  {t('admin.roleMap.remove')}
+                </button>
               </li>
             {/each}
           </ul>
+        {/if}
+
+        <!-- The picker. A link is to a record, so the id comes from the
+             register and never from a name typed on this form. -->
+        <form class="mt-2 flex flex-wrap items-end gap-2 text-xs" onsubmit={searchTargets}>
+          <label class="flex flex-col gap-1">
+            <span class="text-[var(--color-ink-muted)]">{t('cad.column.type')}</span>
+            <select
+              class="border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1"
+              bind:value={linkKind}
+            >
+              {#each CALL_LINK_KINDS as kind (kind)}
+                <option value={kind}>{t(`cad.linkKind.${kind}`)}</option>
+              {/each}
+            </select>
+          </label>
+
+          <label class="flex min-w-40 flex-1 flex-col gap-1">
+            <span class="text-[var(--color-ink-muted)]">{t('records.search.term')}</span>
+            <input
+              type="text"
+              class="border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1"
+              placeholder={linkKind === 'person'
+                ? t('records.person.search.termPlaceholder')
+                : t('records.vehicle.search.termPlaceholder')}
+              bind:value={linkTerm}
+            />
+          </label>
+
+          <button
+            type="submit"
+            class="border border-[var(--color-border)] px-3 py-1 hover:bg-[var(--color-surface)]"
+            disabled={busy}
+          >
+            {t('records.search.run')}
+          </button>
+        </form>
+
+        {#if searched}
+          {#if candidates.length === 0}
+            <p class="mt-1 text-xs text-[var(--color-ink-muted)]">
+              {t(`records.${linkKind}.empty`)}
+            </p>
+          {:else}
+            <ul class="mt-1 max-h-40 overflow-y-auto text-xs">
+              {#each candidates as candidate (candidate.id)}
+                <li class="flex flex-wrap items-baseline gap-2 border-t border-[var(--color-border)] py-0.5">
+                  <label class="flex min-w-0 flex-1 items-baseline gap-2">
+                    <span class="min-w-0 flex-1">{candidate.label}</span>
+                    <select
+                      class="border border-[var(--color-border)] bg-[var(--color-panel)] px-1 py-0.5"
+                      value={candidateRoles[candidate.id] ?? DEFAULT_ROLE}
+                      onchange={(event) =>
+                        (candidateRoles = {
+                          ...candidateRoles,
+                          [candidate.id]: event.currentTarget.value,
+                        })}
+                    >
+                      {#each CALL_LINK_ROLES as role (role)}
+                        <option value={role}>{t(`cad.linkRole.${role}`)}</option>
+                      {/each}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    class="border border-[var(--color-border)] px-2 py-0.5 hover:bg-[var(--color-surface)]"
+                    disabled={busy}
+                    onclick={() => void linkTarget(candidate)}
+                  >
+                    {t('cad.selfAssign.action')}
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+
+          {#if restrictedCandidates > 0}
+            <!-- A record this reader may be told about and not read (4.5). It
+                 has no id, so there is nothing to link; saying so beats a
+                 shorter list the dispatcher cannot account for. -->
+            <p class="mt-1 text-xs text-[var(--color-ink-muted)]">
+              {t('records.restricted.title')}
+            </p>
+          {/if}
         {/if}
       </section>
 
