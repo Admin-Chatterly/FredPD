@@ -1492,7 +1492,9 @@
       "boter": "Fines",
       "livstid": "Life imprisonment",
       "months": "{count} months",
+      "month": "{count} month",
       "years": "{count} years",
+      "year": "{count} year",
       "upTo": "up to {max}",
       "atLeast": "at least {min}, up to {max}",
       "gemensam": "Combined range ({counts} counts)"
@@ -1634,14 +1636,14 @@
   },
   "frihet": {
     "status": {
-      "gripen": "Seized",
+      "gripen": "Arrested",
       "anhallen": "Detained by the prosecutor",
       "framstalld": "Remand application filed",
       "haktad": "Remanded in custody",
       "frigiven": "Released"
     },
     "action": {
-      "gripande": "Record a seizure",
+      "gripande": "Record an arrest",
       "anhallande": "Detain (prosecutor)",
       "framstallan": "File remand application",
       "haktning": "Remand in custody",
@@ -1653,7 +1655,7 @@
       "number": "Reference",
       "person": "Person",
       "status": "Status",
-      "gripen": "Seized",
+      "gripen": "Arrested",
       "heldFor": "Held for",
       "deadline": "Next deadline",
       "grund": "Ground"
@@ -1671,6 +1673,9 @@
       "kollusionsfara": "Risk of interference with the investigation",
       "recidivfara": "Risk of reoffending",
       "identitet_oklar": "Identity not established",
+      "annan": "Other, stated in the log"
+    },
+    "frigivningsgrund": {
       "ej_anhallen": "Not detained by the prosecutor",
       "beslut_upphavt": "Decision revoked",
       "tiden_ute": "Statutory time expired",
@@ -1721,7 +1726,7 @@
     },
     "grund": {
       "skalig_misstanke": "Reasonable suspicion",
-      "sannolika_skal": "Probable cause",
+      "sannolika_skal": "Probable grounds",
       "eftersokande_person": "To locate a person to be arrested",
       "sakra_bevis": "To secure evidence",
       "fara_i_drojsmal": "Danger in delay",
@@ -1743,10 +1748,13 @@
       "delgivning": "To be served a document",
       "forsvunnen": "Missing person",
       "oidentifierad": "Unidentified",
-      "annan": "Other",
+      "annan": "Other"
+    },
+    "avlysningsgrund": {
       "gripen": "Taken into custody",
       "aterkallad": "Withdrawn",
-      "preskriberad": "Time-barred"
+      "preskriberad": "Time-barred",
+      "annan": "Other"
     },
     "column": {
       "number": "Reference",
@@ -1795,6 +1803,9 @@
       "stulet_fordon": "Stolen vehicle",
       "misstankt_fordon": "Vehicle linked to an offence",
       "eftersokt_person": "Person sought for questioning",
+      "annan": "Other"
+    },
+    "avslutsgrund": {
       "gripen": "Taken into custody",
       "omhandertaget": "Vehicle recovered",
       "aterkallad": "Withdrawn",

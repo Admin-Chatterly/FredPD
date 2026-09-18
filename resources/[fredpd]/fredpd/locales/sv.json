@@ -119,7 +119,7 @@
     "locked": "Godkänd och låst.",
     "not_ledare": "Du är inte förundersökningsledare i ärendet.",
     "fu_closed": "Förundersökningen är avslutad.",
-    "self_parent": "En tilläggsuppgift kan inte vara sin egen moderanmälan.",
+    "self_parent": "En tilläggsuppgift kan inte vara sin egen huvudanmälan.",
     "too_deep": "Kedjan av tilläggsuppgifter är för lång.",
     "length_mismatch": "Listorna stämmer inte överens.",
     "stage_unavailable": "Lagen gör inte det stadiet straffbart för det här brottet.",
@@ -1492,7 +1492,9 @@
       "boter": "Böter",
       "livstid": "Fängelse på livstid",
       "months": "{count} månader",
+      "month": "{count} månad",
       "years": "{count} år",
+      "year": "{count} år",
       "upTo": "högst {max}",
       "atLeast": "lägst {min} och högst {max}",
       "gemensam": "Gemensam straffskala ({counts} brott)"
@@ -1671,8 +1673,11 @@
       "kollusionsfara": "Kollusionsfara",
       "recidivfara": "Recidivfara",
       "identitet_oklar": "Identiteten ej fastställd",
+      "annan": "Annat, anges i journalen"
+    },
+    "frigivningsgrund": {
       "ej_anhallen": "Ej anhållen av åklagare",
-      "beslut_upphavt": "Beslutet hävt",
+      "beslut_upphavt": "Beslutet upphävt",
       "tiden_ute": "Fristen har löpt ut",
       "annan": "Annat, anges i journalen"
     },
@@ -1717,7 +1722,7 @@
     "action": {
       "decide": "Fatta beslut",
       "verkstall": "Registrera verkställighet",
-      "upphav": "Häv beslutet"
+      "upphav": "Upphäv beslutet"
     },
     "grund": {
       "skalig_misstanke": "Skälig misstanke",
@@ -1730,7 +1735,7 @@
     "status": {
       "live": "Gällande",
       "expired": "Utgånget",
-      "upphavd": "Hävt",
+      "upphavd": "Upphävt",
       "not_yet": "Ej i kraft ännu",
       "verkstalld": "Verkställt"
     },
@@ -1743,10 +1748,13 @@
       "delgivning": "Delgivning",
       "forsvunnen": "Försvunnen person",
       "oidentifierad": "Oidentifierad",
-      "annan": "Annat",
+      "annan": "Annat"
+    },
+    "avlysningsgrund": {
       "gripen": "Gripen",
       "aterkallad": "Återkallad",
-      "preskriberad": "Preskriberad"
+      "preskriberad": "Preskriberad",
+      "annan": "Annat"
     },
     "column": {
       "number": "Diarienummer",
@@ -1768,7 +1776,7 @@
     "target": {
       "person": "Person",
       "vehicle": "Fordon",
-      "other": "Endast signalement"
+      "other": "Endast beskrivning"
     },
     "banner": {
       "alert": "Larm",
@@ -1783,7 +1791,7 @@
       "area": "Område",
       "issued": "Utfärdat",
       "expires": "Upphör",
-      "description": "Signalement"
+      "description": "Beskrivning"
     },
     "action": {
       "create": "Lägg ut spaningsuppdrag",
@@ -1795,6 +1803,9 @@
       "stulet_fordon": "Stulet fordon",
       "misstankt_fordon": "Fordon kopplat till brott",
       "eftersokt_person": "Person som söks för förhör",
+      "annan": "Annat"
+    },
+    "avslutsgrund": {
       "gripen": "Gripen",
       "omhandertaget": "Fordonet omhändertaget",
       "aterkallad": "Återkallat",

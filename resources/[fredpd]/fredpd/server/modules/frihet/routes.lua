@@ -4,7 +4,7 @@
 --- one place in FredPD where a permission stands for a *legal capacity* rather
 --- than for a job in the department:
 ---
----   * `frihet.gripande` -- seize somebody (RB 24:7). Patrol work.
+---   * `frihet.gripande` -- arrest somebody (RB 24:7). Patrol work.
 ---   * `frihet.anhallande` -- the åklagare's decision (RB 24:6).
 ---   * `frihet.haktning` -- the tingsrätt's decision (RB 24:13).
 ---   * `frihet.frigiv` -- release, held by everyone who can do any of the above

@@ -236,12 +236,31 @@
     return t('brott.straffskala.upTo', { max });
   }
 
+  /**
+   * A month count as words, in whichever unit reads cleanly.
+   *
+   * `t()` has no plural machinery — it substitutes `{name}` and nothing else —
+   * so the singular is a key of its own, chosen here. That is not pedantry
+   * about "1 months": a straffskala of one month is the floor of a great many
+   * offences in brottsbalken, so it is one of the strings an officer reads
+   * most often.
+   *
+   * Swedish `år` happens to be invariant, and it still gets its own key. A
+   * translator who sees `year` and `years` collapsed into one entry has to
+   * work out whether that was a decision about Swedish or a missing string.
+   */
   function months(value: number): string {
     if (value >= 12 && value % 12 === 0) {
-      return t('brott.straffskala.years', { count: String(value / 12) });
+      const years = value / 12;
+
+      return t(years === 1 ? 'brott.straffskala.year' : 'brott.straffskala.years', {
+        count: String(years),
+      });
     }
 
-    return t('brott.straffskala.months', { count: String(value) });
+    return t(value === 1 ? 'brott.straffskala.month' : 'brott.straffskala.months', {
+      count: String(value),
+    });
   }
 
   void load();

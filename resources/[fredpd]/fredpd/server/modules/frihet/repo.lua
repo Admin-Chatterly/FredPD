@@ -113,7 +113,7 @@ end
 --- Records a gripande, and allocates the number under the counter lock.
 ---
 --- `gripen_at` is `CURRENT_TIMESTAMP(3)` and not a value from input: the moment
---- a person was seized is the instant every statutory deadline in this module
+--- a person was arrested is the instant every statutory deadline in this module
 --- is measured from, and a client that could choose it could move a deadline it
 --- had already missed (invariant 1).
 function Repo.gripande(input, session)

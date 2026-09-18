@@ -72,7 +72,7 @@ end
 --- end would leave the commonest outcome unrecordable.
 ---
 --- There is no transition *out* of `frigiven`. A person released and later
---- seized again is a new chain, with its own gripande, its own number and its
+--- arrested again is a new chain, with its own gripande, its own number and its
 --- own clocks -- not a reopening of the old one, which would restart a
 --- statutory deadline that had already expired.
 local TRANSITIONS <const> = {
@@ -209,7 +209,7 @@ function Frihet.deadlines(row, now, offset)
 
     -- RB 24:13, four dygn from the gripande -- or from the anhållande where
     -- there was no gripande, which is the case where somebody anhållen i sin
-    -- frånvaro presents themselves rather than being seized.
+    -- frånvaro presents themselves rather than being arrested.
     local start = row.gripenAt or row.anhallenAt
 
     if start and not row.haktadAt then

@@ -2057,12 +2057,12 @@ export const schemas = {
    * Recording a gripande (RB 24:7).
    *
    * **There is no time field, and there must not be.** The moment a person was
-   * seized is what every statutory deadline in this module is measured from —
+   * arrested is what every statutory deadline in this module is measured from —
    * RB 24:12's noon and RB 24:13's four dygn both run from it — so the server
    * stamps it from its own clock (invariant 1). A client that could choose it
    * could move a deadline it had already missed.
    *
-   * `grund` is a locale key naming the ground for the seizure, never a
+   * `grund` is a locale key naming the ground for the arrest, never a
    * sentence (invariant 6): it is quoted afterwards, and it has to read the
    * same way every time and in both languages.
    */

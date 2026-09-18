@@ -50,7 +50,7 @@ AddEventHandler('fredpd:gripande', function(event)
     if not personId then return end
 
     local cancelled = FredPD.Repo.tvangsmedel.cancelForPerson(
-        personId, event.discordId, 'efterlysning.grund.gripen')
+        personId, event.discordId, 'efterlysning.avlysningsgrund.gripen')
 
     auditCascade(event, personId, cancelled)
 end)

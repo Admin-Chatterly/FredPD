@@ -79,7 +79,7 @@ describe('frihet', function()
         end)
 
         it('has no way out of frigiven', function()
-            -- Somebody seized again is a new chain with its own clocks, not a
+            -- Somebody arrested again is a new chain with its own clocks, not a
             -- reopening of one whose deadlines have already expired.
             for action in pairs({ anhall = 1, framstall = 1, hakta = 1, frigiv = 1 }) do
                 assert.is_nil(frihet.nextStatus('frigiven', action))

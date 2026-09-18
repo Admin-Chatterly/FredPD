@@ -40,7 +40,7 @@ AddEventHandler('fredpd:gripande', function(event)
     if not personId then return end
 
     local resolved = FredPD.Repo.spaning.resolveForTarget(
-        'person', personId, event.discordId, 'spaning.grund.gripen')
+        'person', personId, event.discordId, 'spaning.avslutsgrund.gripen')
 
     auditCascade(event, 'person', personId, resolved)
 end)
@@ -58,7 +58,7 @@ AddEventHandler('fredpd:vehicleImpounded', function(event)
     if not vehicleId then return end
 
     local resolved = FredPD.Repo.spaning.resolveForTarget(
-        'vehicle', vehicleId, event.discordId, 'spaning.grund.omhandertaget')
+        'vehicle', vehicleId, event.discordId, 'spaning.avslutsgrund.omhandertaget')
 
     auditCascade(event, 'vehicle', vehicleId, resolved)
 end)
