@@ -102,10 +102,21 @@ server_scripts {
     'server/modules/intel/routes.lua',
     -- Dispatch (spec 7.16-7.18). The order is load-bearing and the wiring check
     -- enforces it: each of these binds the namespace the one above publishes at
-    -- load, not at call time -- `repo` reads `FredPD.Modules.cad`, `avl` reads
-    -- both the repo and the service, and `routes` reads `FredPD.Cad.avl`.
+    -- load, not at call time -- `repo` reads `FredPD.Modules.cad`, `board` reads
+    -- the repo, `avl` reads both the repo and the service, and `routes` reads
+    -- `FredPD.Cad.avl` and `FredPD.Cad.board`.
     'server/modules/cad/service.lua',
     'server/modules/cad/repo.lua',
+    -- Before `avl`, and that position is the whole point of the file. A board
+    -- row carries the call its unit is on, so every payload that ships one has
+    -- to mask it for readers refused that call (invariant 4) -- and `avl`,
+    -- `routes` and `events` all ship one. The rule used to be a local in
+    -- `routes.lua`; two of the three other senders did not apply it, and one of
+    -- them un-masked what the first had masked. Loaded here it is reachable
+    -- from all three at load. It reads `FredPD.Cad.avl` back, to invalidate the
+    -- cached board, and does it inside a function body precisely because that
+    -- file is listed below rather than above.
+    'server/modules/cad/board.lua',
     'server/modules/cad/avl.lua',
     'server/modules/cad/routes.lua',
     -- Sign-on, last of the four: it binds the repo, the service and

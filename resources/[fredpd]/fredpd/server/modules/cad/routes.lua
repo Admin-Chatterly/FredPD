@@ -53,10 +53,19 @@
 --- stage of whatever its unit is working. Filtered on `page.dispatch` and the
 --- agency and nothing else, that hands a reader who was correctly refused a call
 --- on the queue that same call's number, priority and status one array further
---- down the same response. So `boardFor` below runs each row's call through
---- `mayRead` and takes the five columns off the rows that fail, and
---- `unitChanged` sends the full row and the masked row to two complementary
---- halves of one recipient list rather than one payload to both.
+--- down the same response.
+---
+--- That rule now lives in `board.lua` and not in this file, and the move is the
+--- point rather than tidying. It was a local here, and this is one of *three*
+--- places in the module that ships a board row: `events.lua` pushes one on
+--- sign-on and sign-off, and `avl.lua`'s welfare prompt carries a call id and a
+--- call number. Neither masked, and because the NUI replaces a unit row rather
+--- than merging it, the sign-on push actively un-masked what this file had just
+--- masked -- a hole in an access check that healed itself on the next duty pass.
+--- So `board.mayRead`, `board.boardFor`, `board.withoutCall`, `board.readable`,
+--- `board.callChanged` and `board.unitChanged` are that file's, every push below
+--- goes through them, and a fourth sender gets the rule for free instead of
+--- having to know it exists.
 ---
 --- `Cad.recommendUnits` reasons over the *unmasked* board on purpose: a unit
 --- shown as free because its reader may not see what it is on is a unit a
@@ -73,7 +82,7 @@
 --- day a call can be classified higher, `call` goes into that allowlist and
 --- `call.get` becomes `accessRepo.read` -- **and that fixes the card and nothing
 --- else.** The queue, the board, the map and every push select their own rows
---- and hand them to `mayRead` directly; none of them goes through `Repo.read`,
+--- and hand them to `board.mayRead` directly; none of them goes through `Repo.read`,
 --- so the allowlist entry never reaches them and each one would still need its
 --- compartments and grants loaded by hand. The milestone report says so rather
 --- than leaving it for somebody to infer from this comment.
@@ -94,11 +103,15 @@ local repo = FredPD.Repo.cad
 local accessRules = FredPD.Modules.access
 local accessRepo = FredPD.Repo.access
 local perms = FredPD.Core.perms
-local push = FredPD.Core.push
+-- No `FredPD.Core.push` here, and its absence is load-bearing: every push this
+-- file makes goes through `board.lua`, which is what applies the page key, the
+-- agency and the access check on whatever call the payload carries. A local
+-- back to the raw push layer is how the fourth sender of a board row starts.
 local audit = FredPD.Core.audit
 local agencies = FredPD.Core.agencies
 local ratelimit = FredPD.Core.ratelimit
 local avl = FredPD.Cad.avl
+local board = FredPD.Cad.board
 
 --- The module's settings, merged once. `Cad.settings` is a pure merge over
 --- `Cad.defaults`, so this is the same table the busted spec asserts against.
@@ -110,7 +123,11 @@ local settings = service.settings(FredPD.Config.server.cad)
 
 --- The dispatch reads (Appendix B): the queue, a card, the board, the map and
 --- the broadcast board are gated on the page key and on nothing else.
-local READ <const> = 'page.dispatch'
+---
+--- Taken from `board.lua` rather than written out again: that file pushes on the
+--- same key, and a second copy of the string is how a rename leaves half a
+--- module answering on a permission the other half no longer sends to.
+local READ <const> = board.READ
 
 --- "May act on a call this session is not a unit on."
 ---
@@ -236,105 +253,6 @@ local function actorOf(session, unit)
     }
 end
 
---- May this session read this call? (invariant 4; see the header for the limits
---- of this check.)
-local function mayRead(session, call)
-    return call ~= nil and accessRules.canRead(accessRules.reader(session), call)
-end
-
---- Drops the calls a session may not see from a list.
----
---- Absent rather than stubbed: on a queue a placeholder would carry the count,
---- the priority ordering and the position, which is most of what a call
---- discloses in the first place.
-local function readable(session, calls)
-    local reader = accessRules.reader(session)
-    local out = {}
-
-    for index = 1, #calls do
-        if accessRules.canRead(reader, calls[index]) then
-            out[#out + 1] = calls[index]
-        end
-    end
-
-    return out
-end
-
---- The prefix every column `Repo.listUnits` joins off `fpd_calls` is aliased
---- with.
----
---- A prefix rather than a list of five names, because the list is the thing that
---- goes stale: the next column somebody joins onto the board will be called
---- `onCallSomething` by the convention the other five already follow, and it
---- will be masked the day it is added rather than the day somebody notices.
-local ON_CALL <const> = 'onCall'
-
---- A board row with the call it is on taken off it.
----
---- A copy and never the row itself, because `unitChanged` sends both shapes of
---- the same row in one pass: clearing the fields in place would mask it for the
---- cleared readers too, and the second push would carry the row the first one
---- had already emptied.
-local function withoutCall(unit)
-    local out = {}
-
-    for key, value in pairs(unit) do
-        if key:sub(1, #ON_CALL) ~= ON_CALL then out[key] = value end
-    end
-
-    return out
-end
-
---- The calls a board is standing on, by id, each read once.
----
---- One primary-key lookup per *distinct* call, not per unit, and none at all for
---- a board where nobody is on anything -- which on a quiet shift is all of it.
---- A call that cannot be read back is remembered as `false` and masks its units,
---- because an unknown row is not a readable one.
----
---- `Repo.listUnits` could answer this in the JOIN it already makes by aliasing
---- `c.classification`, which would remove these lookups outright; the milestone
---- report asks for that, and nothing here may wait for it.
-local function callsBehind(agencyId, units)
-    local calls = {}
-
-    for index = 1, #units do
-        local id = units[index].onCallId
-
-        if id ~= nil and calls[id] == nil then
-            calls[id] = repo.getCall(agencyId, id) or false
-        end
-    end
-
-    return calls
-end
-
---- The unit board as one session may see it (invariant 4).
----
---- The row stays -- a callsign, a status, a position and a time in status are
---- the board, and none of them belongs to the call. What comes off is the call:
---- a reader refused call 1042 on the queue must not read its number, its
---- priority and its stage off the row of the unit sitting on it. A masked row is
---- indistinguishable from a unit working nothing, which is the same answer the
---- queue gave them.
-local function boardFor(session, units)
-    local calls = callsBehind(session.agencyId, units)
-    local out = {}
-
-    for index = 1, #units do
-        local unit = units[index]
-        local call = unit.onCallId ~= nil and calls[unit.onCallId] or nil
-
-        if unit.onCallId == nil or mayRead(session, call) then
-            out[index] = unit
-        else
-            out[index] = withoutCall(unit)
-        end
-    end
-
-    return out
-end
-
 --- Takes the diverted-from call off the recommendations naming one this reader
 --- may not open.
 ---
@@ -354,7 +272,7 @@ local function withoutDiverts(session, list)
         if id ~= nil then
             if calls[id] == nil then calls[id] = repo.getCall(session.agencyId, id) or false end
 
-            if not mayRead(session, calls[id] or nil) then
+            if not board.mayRead(session, calls[id] or nil) then
                 list[index].divertFromCallId = nil
             end
         end
@@ -363,88 +281,33 @@ local function withoutDiverts(session, list)
     return list
 end
 
---- Sends a dispatch payload to the sessions of one agency that may read it.
----
---- Never `-1` (invariant 5). `push.toPermission` walks the open sessions and
---- applies the two tests a read applies: the page permission, and the agency --
---- which is read off the recipient's session, not off the payload. A payload
---- carrying a call takes a third test, and two things below add it:
---- `callChanged` for the call itself, `unitChanged` for the call a board row
---- carries without looking like it does.
----
---- @return number recipients
-local function toDispatch(agencyId, event, payload, extra)
-    return push.toPermission(READ, event, FredPD.markArrays(payload), function(session)
-        if session.agencyId ~= agencyId then return false end
-
-        return extra == nil or extra(session)
-    end)
-end
-
---- Tells every session that may see it that a call changed.
----
---- One event for the queue and the card both: a client holding the card open
---- refetches it and one holding the queue re-sorts, and two messages could
---- disagree about which happened. **Every route below that writes anything to a
---- call sends this**, including the ones whose only write is a narrative line,
---- so a client that handles this event alone is never left showing a stale card.
----
---- The recipient list is filtered through the same access check the read makes,
---- which is what invariant 5 asks for: a push is a read nobody asked for.
-local function callChanged(agencyId, call)
-    if not call then return end
-
-    toDispatch(agencyId, 'fredpd:cad:call', { call = call }, function(session)
-        return mayRead(session, call)
-    end)
-end
+-- Every push below is `board.lua`'s, because `events.lua` and `avl.lua` send the
+-- same three messages and each had its own copy of the filters (see the header):
+--
+--   * `board.callChanged` -- the queue and the card. **Every route below that
+--     writes anything to a call sends it**, including the ones whose only write
+--     is a narrative line, so a client that handles that event alone is never
+--     left showing a stale card.
+--   * `board.unitChanged` -- one board row, which is a call payload in disguise,
+--     so it goes out in two complementary halves.
+--   * `board.toDispatch` -- the same delivery with no call on the payload at
+--     all: a broadcast, a cancellation, a log line whose call has already been
+--     checked.
 
 --- Sends one narrative line to the sessions that may read the call it is on.
 ---
---- An optimisation on top of `callChanged` and never a replacement for it: a
---- card that is open can append the line without refetching a long log (12.2's
---- keyset pagination is what it would be paging through). It carries no id and
---- no timestamp, because the insert does not report them.
+--- An optimisation on top of `board.callChanged` and never a replacement for
+--- it: a card that is open can append the line without refetching a long log
+--- (12.2's keyset pagination is what it would be paging through). It carries no
+--- id and no timestamp, because the insert does not report them.
 local function logPushed(agencyId, call, entry)
     if not call then return end
 
-    toDispatch(agencyId, 'fredpd:cad:log', {
+    board.toDispatch(agencyId, 'fredpd:cad:log', {
         callId = call.id,
         entry = entry,
     }, function(session)
-        return mayRead(session, call)
-    end)
-end
-
---- Tells the boards that a unit moved, and drops the cached board behind the AVL
---- sweep so the next pass reads the change rather than the last minute.
----
---- Two pushes rather than one when the unit is on a call, because the row
---- carries that call (see the header) and a push is a read nobody asked for
---- (invariants 4 and 5). The filters are complementary, so every recipient gets
---- exactly one of the two payloads and nobody who would have received the old
---- one is dropped -- the board still says the unit exists, moved and is where it
---- is; it stops saying what they are on. A call that cannot be read back masks
---- for everybody, because an unknown row is not a readable one.
-local function unitChanged(agencyId, unit)
-    avl.invalidate(agencyId)
-
-    if not unit then return end
-
-    if unit.onCallId == nil then
-        toDispatch(agencyId, 'fredpd:cad:unit', { unit = unit })
-        return
-    end
-
-    local call = repo.getCall(agencyId, unit.onCallId)
-    local masked = withoutCall(unit)
-
-    toDispatch(agencyId, 'fredpd:cad:unit', { unit = unit }, function(session)
-        return mayRead(session, call)
-    end)
-
-    toDispatch(agencyId, 'fredpd:cad:unit', { unit = masked }, function(session)
-        return not mayRead(session, call)
+        return board.mayRead(session, call)
     end)
 end
 
@@ -492,7 +355,7 @@ local function openCall(session, callId, field)
     -- `not_found`: FredPD is multi-agency, whether a call exists is itself
     -- information, and a refusal that told the two apart is how the queue gets
     -- enumerated by somebody who may not read it.
-    if not mayRead(session, call) then
+    if not board.mayRead(session, call) then
         return nil, route.refuse(FredPD.ErrorCode.NOT_FOUND)
     end
 
@@ -650,7 +513,7 @@ local function logUnitStatus(agencyId, subject, status, actor)
 
     local call = repo.getCall(agencyId, assignment.callId)
 
-    callChanged(agencyId, call)
+    board.callChanged(agencyId, call)
     logPushed(agencyId, call, entry)
 
     return assignment.callId
@@ -720,7 +583,7 @@ route.define({
 
         local call = repo.getCall(session.agencyId, created.id)
 
-        callChanged(session.agencyId, call)
+        board.callChanged(session.agencyId, call)
 
         -- Server-local, for the resources spec 14 says may listen. Never a
         -- client event: the payload names a record.
@@ -757,7 +620,7 @@ route.define({
             limit = input.limit or 100,
         })
 
-        return { calls = readable(session, calls) }
+        return { calls = board.readable(session, calls) }
     end,
 })
 
@@ -773,7 +636,7 @@ route.define({
     subjectType = 'call',
     handler = function(session, input)
         local call = repo.getCall(session.agencyId, input.id)
-        if not mayRead(session, call) then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+        if not board.mayRead(session, call) then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
 
         -- Invariant 11: *reads of restricted records* are audited. Not every
         -- read -- the console refetches this card on every `fredpd:cad:call`
@@ -974,10 +837,36 @@ route.define({
             return route.refuse(FredPD.ErrorCode.CONFLICT, { leadOfficerId = 'not_assigned' })
         end
 
-        for index = 1, #joinUnits do unitChanged(session.agencyId, joinUnits[index]) end
-        for index = 1, #leaveUnits do unitChanged(session.agencyId, leaveUnits[index]) end
+        -- Read back, every one of them, and not pushed as they were read at the
+        -- top of this handler.
+        --
+        -- `joinUnits` and `leaveUnits` hold the rows `repo.getUnit` answered
+        -- *before* the assignment was written, so their five `onCall*` columns
+        -- are the JOIN as it stood a moment ago: the units just sent to this
+        -- call carry whatever they were on before it -- usually nothing -- and
+        -- the ones just released still carry this call. Pushing those is the
+        -- board briefly contradicting the write that caused the push, which on a
+        -- P1 with four units is four rows saying "available" while the card
+        -- beside them lists all four as dispatched. The console then heals it on
+        -- the next poll, seconds later, which is what made this look like a
+        -- rendering flicker rather than a stale read.
+        --
+        -- One primary-key lookup per unit named in the dispatch, which is what
+        -- every other write in this file already pays for its own row. A unit
+        -- whose row cannot be read back is skipped rather than pushed stale --
+        -- `unitChanged` treats nil as "invalidate the cache and say nothing",
+        -- and the next board poll is the honest answer.
+        for index = 1, #joinUnits do
+            board.unitChanged(session.agencyId,
+                repo.getUnit(session.agencyId, joinUnits[index].officerId))
+        end
 
-        callChanged(session.agencyId, repo.getCall(session.agencyId, input.callId))
+        for index = 1, #leaveUnits do
+            board.unitChanged(session.agencyId,
+                repo.getUnit(session.agencyId, leaveUnits[index].officerId))
+        end
+
+        board.callChanged(session.agencyId, repo.getCall(session.agencyId, input.callId))
 
         return { id = input.callId, joined = #joinUnits, left = #leaveUnits }
     end,
@@ -1029,8 +918,8 @@ route.define({
             return route.refuse(FredPD.ErrorCode.CONFLICT, { callId = 'already_assigned' })
         end
 
-        unitChanged(session.agencyId, repo.getUnit(session.agencyId, session.officerId))
-        callChanged(session.agencyId, repo.getCall(session.agencyId, input.callId))
+        board.unitChanged(session.agencyId, repo.getUnit(session.agencyId, session.officerId))
+        board.callChanged(session.agencyId, repo.getCall(session.agencyId, input.callId))
 
         return { id = input.callId, callNumber = call.callNumber }
     end,
@@ -1071,8 +960,8 @@ route.define({
             return route.refuse(FredPD.ErrorCode.CONFLICT)
         end
 
-        unitChanged(session.agencyId, repo.getUnit(session.agencyId, session.officerId))
-        callChanged(session.agencyId, repo.getCall(session.agencyId, input.callId))
+        board.unitChanged(session.agencyId, repo.getUnit(session.agencyId, session.officerId))
+        board.callChanged(session.agencyId, repo.getCall(session.agencyId, input.callId))
 
         TriggerEvent('fredpd:unitStatusChanged', {
             agencyId = session.agencyId,
@@ -1145,7 +1034,7 @@ route.define({
         -- Every unit on the call came free, so the board the AVL sweep caches is
         -- now wrong.
         avl.invalidate(session.agencyId)
-        callChanged(session.agencyId, after)
+        board.callChanged(session.agencyId, after)
 
         return { id = input.callId, disposition = input.disposition, status = after.status }
     end,
@@ -1190,7 +1079,7 @@ route.define({
             return route.refuse(FredPD.ErrorCode.CONFLICT, { callId = 'nothing_to_change' })
         end
 
-        callChanged(session.agencyId, repo.getCall(session.agencyId, input.callId))
+        board.callChanged(session.agencyId, repo.getCall(session.agencyId, input.callId))
 
         return { id = input.callId }
     end,
@@ -1236,7 +1125,7 @@ route.define({
         -- refresh, and the line itself so an open narrative can append it
         -- without refetching. Both go only to the sessions that may read this
         -- call, because a push is a read nobody asked for (invariants 4 and 5).
-        callChanged(session.agencyId, call)
+        board.callChanged(session.agencyId, call)
         logPushed(session.agencyId, call, entry)
 
         return { id = input.callId }
@@ -1317,7 +1206,7 @@ route.define({
             return route.refuse(FredPD.ErrorCode.INTERNAL)
         end
 
-        callChanged(session.agencyId, repo.getCall(session.agencyId, input.callId))
+        board.callChanged(session.agencyId, repo.getCall(session.agencyId, input.callId))
 
         return { id = input.callId }
     end,
@@ -1337,7 +1226,7 @@ route.define({
         -- recommendation gets them: the board shows where a unit is, and the
         -- stored column is only as fresh as the last sweep.
         --
-        -- `boardFor` is the access check on the call each row carries, and it is
+        -- `board.boardFor` is the access check on the call each row carries, and it is
         -- not optional decoration on a read gated by the page key: without it
         -- this route answers with the number, the priority and the stage of
         -- every call on the board, including the ones `call.list` refused this
@@ -1348,7 +1237,7 @@ route.define({
             limit = input.limit or 100,
         })
 
-        return { units = boardFor(session, units) }
+        return { units = board.boardFor(session, units) }
     end,
 })
 
@@ -1385,7 +1274,7 @@ route.define({
         -- write it and nothing is written (see `logUnitStatus`).
         local callId = logUnitStatus(session.agencyId, unit, input.status, actorOf(session, unit))
 
-        unitChanged(session.agencyId, repo.getUnit(session.agencyId, session.officerId))
+        board.unitChanged(session.agencyId, repo.getUnit(session.agencyId, session.officerId))
 
         TriggerEvent('fredpd:unitStatusChanged', {
             agencyId = session.agencyId,
@@ -1479,7 +1368,7 @@ route.define({
             }, input.status, actorOf(session))
         end
 
-        unitChanged(session.agencyId, repo.getUnit(session.agencyId, input.officerId))
+        board.unitChanged(session.agencyId, repo.getUnit(session.agencyId, input.officerId))
 
         if input.status then
             TriggerEvent('fredpd:unitStatusChanged', {
@@ -1582,23 +1471,29 @@ route.define({
 
         local call = repo.getCall(session.agencyId, created.id)
 
-        unitChanged(session.agencyId, repo.getUnit(session.agencyId, session.officerId))
+        board.unitChanged(session.agencyId, repo.getUnit(session.agencyId, session.officerId))
 
         -- The queue entry goes out like any other call: it is a P1 on the board
         -- and everyone who may read the queue has to see it, whatever their
         -- distance. What is narrow is the *tone* below, which is what 7.16
         -- restricts -- not the existence of the call.
-        callChanged(session.agencyId, call)
-
-        local payload = FredPD.markArrays({ call = call, callsign = unit.callsign })
+        board.callChanged(session.agencyId, call)
 
         -- 7.16: "tone for all dispatchers and units in range", and for nobody
         -- else (invariant 5). Range is measured against each recipient's own ped
         -- on the server; a session whose ped has not spawned is out of range
         -- rather than in it, because an unknown position is not a nearby one.
-        push.toPermission(READ, 'fredpd:cad:emergency', payload, function(other)
-            if other.agencyId ~= session.agencyId then return false end
-            if not mayRead(other, call) then return false end
+        --
+        -- Through `board.toDispatch` like every other push here, so the page key
+        -- and the agency test are the ones `board.lua` applies and this filter
+        -- is only the part that is peculiar to an emergency. The access check on
+        -- the call it carries is not peculiar and is made all the same: the tone
+        -- names the call.
+        board.toDispatch(session.agencyId, 'fredpd:cad:emergency', {
+            call = call,
+            callsign = unit.callsign,
+        }, function(other)
+            if not board.mayRead(other, call) then return false end
 
             if perms.satisfies(other.permissions, SUPERVISE)
                 or perms.satisfies(other.permissions, ASSIGNS)
@@ -1682,7 +1577,7 @@ route.define({
         -- What was just written, without `createdAt` or `expiresAt`: the insert
         -- does not report them. The board has the id and refetches when it wants
         -- the expiry; this is enough to put the message on the air now.
-        toDispatch(session.agencyId, 'fredpd:cad:broadcast', { broadcast = broadcast })
+        board.toDispatch(session.agencyId, 'fredpd:cad:broadcast', { broadcast = broadcast })
 
         return { id = id, broadcast = broadcast }
     end,
@@ -1708,7 +1603,7 @@ route.define({
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
         end
 
-        toDispatch(session.agencyId, 'fredpd:cad:broadcast', { cancelledId = input.id })
+        board.toDispatch(session.agencyId, 'fredpd:cad:broadcast', { cancelledId = input.id })
 
         return { id = input.id }
     end,
@@ -1778,8 +1673,8 @@ route.define({
         -- see the header).
         return {
             subscribed = true,
-            units = boardFor(session, boardWithPositions(session.agencyId, { limit = 200 })),
-            calls = readable(session, repo.listCalls(session.agencyId, { limit = 200 })),
+            units = board.boardFor(session, boardWithPositions(session.agencyId, { limit = 200 })),
+            calls = board.readable(session, repo.listCalls(session.agencyId, { limit = 200 })),
         }
     end,
 })
@@ -2163,7 +2058,7 @@ local function createCall(data)
         detail = { source = 'export', resource = resource, type = callType, priority = priority },
     })
 
-    callChanged(agencyId, repo.getCall(agencyId, created.id))
+    board.callChanged(agencyId, repo.getCall(agencyId, created.id))
 
     TriggerEvent('fredpd:callCreated', {
         id = created.id,
