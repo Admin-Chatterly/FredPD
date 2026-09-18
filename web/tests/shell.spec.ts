@@ -27,9 +27,16 @@ test('draws only the modules the session is permitted to open', async ({ page })
   await expect(rail.getByRole('button', { name: 'Intelligence' })).toBeVisible();
   await expect(rail.getByRole('button', { name: 'Administration' })).toBeVisible();
 
-  // The fixture session holds neither, and the UI must not advertise them.
+  // Dispatch moved from the negative case to the positive one when M4 shipped:
+  // the seed grants `page.dispatch` to `patrol_basic`, so the patrol session
+  // this fixture models genuinely holds it. The assertion is kept rather than
+  // deleted, because "a module the session gained appears" is the other half of
+  // what this test is for.
+  await expect(rail.getByRole('button', { name: 'Dispatch' })).toBeVisible();
+
+  // Court is M6 and nobody holds it, so it stays the negative case: the UI must
+  // not advertise a module the server did not open.
   await expect(rail.getByRole('button', { name: 'Court' })).toHaveCount(0);
-  await expect(rail.getByRole('button', { name: 'Dispatch' })).toHaveCount(0);
 });
 
 test('shows a translated message when a route refuses', async ({ page }) => {
