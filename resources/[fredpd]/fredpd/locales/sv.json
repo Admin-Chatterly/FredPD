@@ -537,10 +537,44 @@
       },
       "version": "Version"
     },
+    "health": {
+      "title": "Systemhälsa",
+      "intro": "Räknare som servern redan har i minnet. Tjänstens status, databasens svarstid, ruttider och ködjup mäts inte ännu och visas därför inte.",
+      "refresh": "Uppdatera",
+      "server": "Server",
+      "version": "Version",
+      "env": "Miljö",
+      "routes": "Registrerade rutter",
+      "sessions": "Sessioner",
+      "open": "Öppna",
+      "stale": "Föråldrad ögonblicksbild",
+      "readOnly": "Endast läsning",
+      "discord": "Discord",
+      "sync": "Synkronisering konfigurerad",
+      "on": "Ja",
+      "off": "Nej",
+      "snapshot": "Senast synkad",
+      "seconds": "för {seconds} s sedan",
+      "never": "Aldrig",
+      "gridTitle": "Osäkrade spår",
+      "gridNote": "Totaler för hela servern, sedan resursen senast startade: aldrig ett enskilt spår, en spelare eller en ägare. Förstörda räknar spår som torkats bort eller plockats upp ur världen; att städa undan blod räknas inte, eftersom en undanstädad pöl ligger kvar och luminol fortfarande hittar den. Förstörelse utförd av en spelare kräver ingen polisbehörighet och ger ingen loggpost, så för dem är räknaren den enda notering som finns; en polis som förstör bevis loggas dessutom som forensics.destroyed i loggen.",
+      "grid": {
+        "items": "Spår i världen",
+        "cells": "Rutor i bruk",
+        "subscribers": "Spelare som strömmas",
+        "placed": "Lagda",
+        "merged": "Sammanslagna med befintligt spår",
+        "collected": "Säkrade som bevis",
+        "destroyed": "Förstörda",
+        "evicted": "Nedbrutna eller utrensade",
+        "refused": "Nekad placering"
+      }
+    },
     "tab": {
       "rolemap": "Rollkoppling",
       "groups": "Grupper",
-      "fleet": "Fordonspark"
+      "fleet": "Fordonspark",
+      "health": "Systemhälsa"
     }
   },
   "registry": {
@@ -936,7 +970,7 @@
       "option": "Säkra spår",
       "description": "Förpacka och för in i beslagskedjan",
       "progress": "Säkrar",
-      "done": "Säkrat",
+      "done": "Säkrat som {number}",
       "cancelled": "Avbrutet innan spåret säkrades"
     },
     "destroy": {
@@ -970,7 +1004,7 @@
       "title": "Bevismarkör",
       "number": "Markör {number}",
       "placed": "Markör {number} placerad",
-      "cleared": "Markörerna borttagna"
+      "cleared": "{count} markörer borttagna"
     },
     "swab": {
       "option": "Ta prov på skottrester",

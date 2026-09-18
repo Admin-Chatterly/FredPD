@@ -68,6 +68,27 @@ local function identifierOf(src)
     return character and character.identifier or nil
 end
 
+--- The share of a grid cell this player's traces are counted against (12.2).
+---
+--- One value per player, which is the property the per-cell cap needs and the
+--- one `ownerKey` deliberately does not have: a print is filed under a character
+--- identifier, a casing under a weapon serial with no identifier at all, and a
+--- magazine under both (8.3.4), so a cap counting owners would give one client
+--- three shares of every cell and a fourth for every further weapon -- enough to
+--- fill a cell and refuse everybody else's evidence a place to land.
+---
+--- The character identifier when there is one, so a player who changes weapons,
+--- reconnects on a new server id or swaps clothes keeps the same share. The
+--- server id is the fallback for a player the framework cannot resolve: it is
+--- stable while they are connected, which is as long as they can generate
+--- anything, and it is prefixed so it can never collide with an identifier.
+---
+--- It never leaves the server. Nothing in `Evidence.renderData` carries it and
+--- no route returns it (8.11).
+local function sourceKeyFor(src)
+    return identifierOf(src) or ('@' .. tostring(src))
+end
+
 --- The weapon the *server* believes this player is holding (8.3.2).
 ---
 --- Read through a bridge, because naming the inventory resource anywhere else
@@ -364,6 +385,13 @@ local function observe(src, kind, input)
     local trace = rule.make(src, input, position)
     if not trace then return true end
 
+    -- Who is generating, for the per-cell share (`service.sourceKeyOf`). Read
+    -- here from the caller the server resolved, never from the rule's output:
+    -- the owner a rule chooses is deliberately not one value per player -- a
+    -- casing carries a weapon serial and no identifier (8.3.4) -- so counting
+    -- the share by owner would hand one client several shares of every cell.
+    trace.sourceKey = sourceKeyFor(src)
+
     grid.place(trace)
 
     return true
@@ -515,12 +543,17 @@ AddEventHandler('weaponDamageEvent', function(sender, data)
             -- profile" for, forever; a player on the other side of the map was
             -- not in this exchange at all, whatever the payload says.
             if identifier and (dx * dx + dy * dy + dz * dz) <= (MAX_HIT_METRES * MAX_HIT_METRES) then
+                -- The blood is the victim's and the share is the attacker's:
+                -- the person generating traces here is the one pulling the
+                -- trigger, and a cap that counted the victim's share would let
+                -- a shooter spend other people's (8.3.3, 12.2).
                 grid.place({
                     type = 'blood',
                     x = at.x,
                     y = at.y,
                     z = at.z,
                     owner = { identifier = identifier },
+                    sourceKey = sourceKeyFor(attacker),
                 })
 
                 -- The round that did it, recovered at the victim. Only from a
@@ -533,6 +566,7 @@ AddEventHandler('weaponDamageEvent', function(sender, data)
                         y = at.y,
                         z = at.z,
                         owner = { weaponSerial = weapon.serial },
+                        sourceKey = sourceKeyFor(attacker),
                     })
                 end
             end
@@ -608,13 +642,28 @@ route.define({
 --- server watching its evidence disappear reads for everybody else (12.3), and
 --- it is a total with no player and no trace in it.
 
---- The two actions that cost nothing (8.10, 8.1.5: "costs time and items").
+--- The actions that spend no item, and the two different reasons they do not.
 ---
---- A sink is a sink and a hand is a hand, and charging for them would make
---- walking back for your own casings something only a prepared player could do.
+--- `wash` and `pickup` cost nothing by design (8.10, 8.1.5: "costs time and
+--- items"). A sink is a sink and a hand is a hand, and charging for them would
+--- make walking back for your own casings something only a prepared player could
+--- do.
+---
+--- `weapon` costs nothing because it *does* nothing. `ACTIONS.weapon` below is
+--- an empty function and says why: the prints and the touch DNA a weapon carries
+--- are not modelled anywhere, so there is no state for a kit to take off it.
+--- 8.10 asks for a wiping kit on weapons and the action is kept for it, but the
+--- half of the mechanic that exists is the timed one -- the eight seconds the
+--- client counts out -- and that is now the whole of what it costs. Spending a
+--- kit on a documented no-op is charging for nothing, which is the one thing
+--- worse than a mechanic that is not finished. When a seized weapon starts
+--- carrying recoverable trace, `weapon` comes back out of this table and the
+--- `destroyItems.weapon` name -- still configured, and read by nothing while
+--- this entry stands -- starts being spent again.
+---
 --- Everything else spends an item, and an action that is not in here and has no
 --- configured item name cannot be paid for -- see `spend`.
-local FREE <const> = { wash = true, pickup = true }
+local FREE <const> = { wash = true, pickup = true, weapon = true }
 
 --- The item an action spends, or nil when its name is not configured.
 ---
@@ -627,7 +676,9 @@ local FREE <const> = { wash = true, pickup = true }
 ---
 --- `wipe` and `weapon` are the same kit by default -- 8.2 names one wiping kit
 --- for surfaces and for weapons -- but that is the configuration's decision and
---- not this file's.
+--- not this file's. `weapon` is not asked for here today: it is in `FREE` above
+--- for as long as wiping a weapon has nothing to remove, so the only name this
+--- function is ever called with in the product is `wipe` or `clean`.
 local function itemFor(action)
     local configured = config.destroyItems
     if type(configured) ~= 'table' then return nil end
@@ -998,14 +1049,27 @@ end
 --- yet, because there is nowhere on an ox_inventory item's metadata that FredPD
 --- owns to put one (8.1.2 keeps item metadata to references and seal state).
 ---
---- So what a player buys today is the kit and the twelve seconds, and the effect
---- is exactly nothing. That is the honest version of the half-built mechanic:
---- the action is offered because 8.10 lists it, it costs what 8.10 says it
---- costs, and it answers `{}` like the other four, so a player cannot tell from
---- the outside that the model behind it is missing. When a seized weapon starts
---- carrying recoverable prints, this function is where the flag is cleared --
---- and until then nothing here should pretend otherwise by deleting a casing or
---- a trace the weapon has nothing to do with.
+--- So what a player buys today is the eight seconds the client counts out, and
+--- the effect is exactly nothing. It used to be the eight seconds *and* a wiping
+--- kit, which is the part that had to go: 8.10 says the mechanic costs time and
+--- items, and charging the item for a documented no-op is taking a kit off a
+--- player in exchange for a progress bar. `weapon` is therefore in `FREE` above
+--- and `spend` never looks its item name up -- the time cost stands, the item
+--- cost waits for the model, and the two come back together.
+---
+--- What the player still cannot tell from the outside is that anything is
+--- missing: the action answers `{}` like the other four (8.11) and the client
+--- draws the prompt, runs the bar and says "done". Telling them would be honest
+--- and it is not a leak -- a refusal that fires every time, for every player,
+--- discloses nothing about the world -- but it is not a change this file can
+--- make on its own: the message would be a new key in both `locales/*.json`, a
+--- refusal `fredpd_forensics/client/destroy.lua` maps to it, and probably a
+--- prompt that stops being drawn at all. It is written down in the report
+--- instead of being half-done here.
+---
+--- When a seized weapon starts carrying recoverable prints, this function is
+--- where the flag is cleared -- and until then nothing here should pretend
+--- otherwise by deleting a casing or a trace the weapon has nothing to do with.
 function ACTIONS.weapon()
 end
 
@@ -1194,24 +1258,49 @@ FredPD.Evidence = FredPD.Evidence or {}
 ---     copy of where they are (8.3.2).
 ---
 --- Taking is destructive, and is the last thing that happens: two officers
---- cannot collect the same casing, because the second one finds nothing. It is
---- also the last thing that *can* happen -- there is no way to put a taken trace
---- back -- so a refusal after this point in `evidence.collect` loses the trace
---- outright. See the note on the claim in that file; the fix is a restore path
---- in the grid and it is not written yet.
+--- cannot collect the same casing, because the second one finds nothing.
 ---
---- `outdoors` is passed through from the stored trace, and on today's server it
---- is nil on every one of them: nothing in the generation pipeline sets it,
---- because there is no server-side interior test behind it yet. There is no
---- `raining` field at all, for the same reason -- the server tracks no weather.
---- Both are half of `evidence.qualityAfter`'s weather term (8.1.4), which is
---- therefore inert: a print left on a car door in a thunderstorm decays by age
---- alone. The plumbing is kept rather than deleted because the term is the
---- spec's and the missing half is a source of truth, not a decision.
+--- **The second return value is how the caller puts it back.** `evidence.collect`
+--- writes the item, the owner row and the first custody link in one transaction
+--- (8.6), and a transaction can fail after the trace has already left the world:
+--- a deadlock, a dropped connection, a constraint. Without a way back that loses
+--- the only casing at a homicide to a database hiccup. So this hands over a
+--- one-shot closure around `Grid.restore`, which files the *same table* again --
+--- its original key, its `createdAt`, its revealed and cleaned state -- rather
+--- than `Grid.place`, which would mint a new key, reset the age and clear the
+--- reveal, so a restored latent print would come back younger and invisible.
+---
+--- One-shot because one take is one restore. `Grid.restore` refuses a key the
+--- grid already holds, so a second call could not duplicate the trace anyway;
+--- the flag is here so that the second call is a no-op that answers false rather
+--- than a refusal that looks like a failed restore.
+---
+--- Between the take and the restore the trace is genuinely not in the world, so
+--- a second officer standing over it is told "not found" for as long as the
+--- insert takes. That is correct and it is the cheap end of the trade: the
+--- alternative is holding the trace in the grid across a database round trip so
+--- that two officers can both claim it and one of them writes a row for evidence
+--- the other one also bagged. **Nobody should widen that window** by claiming
+--- later, restoring earlier, or reserving instead of taking.
+---
+--- `outdoors` is whatever the grid stored on the trace. `Grid.place` sets it
+--- from a server-side interior test on the position it filed the trace at; a
+--- client never supplies it, here or anywhere. It is half of
+--- `evidence.qualityAfter`'s weather term (8.1.4), and the other half is
+--- `raining`, which is **not** in this shape and is not invented here: nothing
+--- on this server tracks weather. It is client state in FiveM, FredPD has no
+--- bridge to a weather resource that could answer it server-side, and asking the
+--- collecting officer's client would be letting a client decide how good the
+--- evidence against them is (invariant 1). So the
+--- term stays inert -- a print left on a car door in a thunderstorm still decays
+--- by age alone -- and `outdoors` is carried because it is the half that has a
+--- source of truth, not because the term works yet.
 ---
 --- @param src number
 --- @param traceKey string the opaque key that came with render data
---- @return table|nil
+--- @return table|nil claim
+--- @return function|nil restore -- puts the trace back, exactly as it was;
+---   answers true when the grid took it back. Present whenever a claim is.
 FredPD.Evidence.claimTrace = function(src, traceKey)
     if type(traceKey) ~= 'string' then return nil end
 
@@ -1231,6 +1320,15 @@ FredPD.Evidence.claimTrace = function(src, traceKey)
     local taken = grid.take(traceKey)
     if not taken then return nil end
 
+    local restored = false
+
+    local function restore()
+        if restored then return false end
+        restored = true
+
+        return grid.restore(taken)
+    end
+
     return {
         type = taken.type,
         quality = taken.quality,
@@ -1239,7 +1337,7 @@ FredPD.Evidence.claimTrace = function(src, traceKey)
         outdoors = taken.outdoors,
         cleaned = taken.cleaned,
         owner = taken.owner,
-    }
+    }, restore
 end
 
 --- Hands the residue on a person over to collection, and takes it off them.
@@ -1294,9 +1392,22 @@ end
 --- the same hands, because the second one finds nothing. It is also why this is
 --- not a "read" that anything else may call casually.
 ---
+--- **There is no second return value here, and no restore.** `claimTrace` hands
+--- `evidence.collect` a way to put its trace back when the insert does not
+--- commit; a swab has nothing to hand over, because `gsr.mark` is the only
+--- writer of the residue table and it stamps the clock at the moment it is
+--- called. Re-marking a target whose insert failed would give them residue that
+--- was fresher than the residue they actually had -- a better sample than the
+--- truth, invented by a failed write (invariant 1) -- so nothing is put back and
+--- a failed swab loses the sample. That is a real hole and it is smaller than it
+--- reads: residue decays from the shot and not from the swab, so the suspect
+--- still has some for as long as the curve says, and a second swab takes it. It
+--- closes when `gsr.lua` gains a restore that files the original timestamp;
+--- nothing on this side can fabricate one.
+---
 --- @param src number the officer taking the swab
 --- @param targetSrc number the player being swabbed
---- @return table|nil
+--- @return table|nil claim, and no restore -- see above
 FredPD.Evidence.claimGsr = function(src, targetSrc)
     if type(targetSrc) ~= 'number' then return nil end
 
@@ -1311,8 +1422,20 @@ FredPD.Evidence.claimGsr = function(src, targetSrc)
 
     if (dx * dx + dy * dy + dz * dz) > (range * range) then return nil end
 
-    local present, level = gsr.present(targetSrc)
-    if not present then return nil end
+    -- The level, and deliberately NOT whether there was one. A swab that
+    -- refused when it found nothing would be an oracle: the difference between
+    -- "swab taken" and a refusal is the lab's answer, delivered at the prompt,
+    -- free, repeatable and to anyone holding the collection permission rather
+    -- than to somebody who may read a lab result. That is exactly what 8.11
+    -- forbids, and the note on `GSR.clear` spells out the same trap for washing.
+    --
+    -- So an empty swab is a swab. It becomes an item, it enters the chain of
+    -- custody, it queues like any other sample, and the lab is what reports
+    -- there was no residue -- which is a real and useful finding, and the answer
+    -- a defence asks for. `Evidence.searchResult` already reads a zero level as
+    -- no result and says so in its own comment; this is what makes that case
+    -- arise.
+    local _, level = gsr.present(targetSrc)
 
     local identifier = identifierOf(targetSrc)
     if not identifier then return nil end

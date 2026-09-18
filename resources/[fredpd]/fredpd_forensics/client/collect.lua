@@ -9,6 +9,14 @@
 ---     The trace's type, its quality, its age and who left it are read from the
 ---     grid there and never travel in either direction (8.1, 8.11); the only
 ---     thing this file sends about the trace is the opaque key it was streamed.
+---   * **The swab.** Gunshot residue is the one row of 8.2 with no position, so
+---     it is not in the grid and has no trace key: it is a state on a person.
+---     The prompt therefore hangs off a *player* rather than off a trace zone,
+---     and names them to the server by their server id alone. Whether they have
+---     any residue, how much, and how long ago they fired are read from the
+---     residue table on the server and are never asked for or answered here --
+---     a swab that reported why it found nothing would be a residue detector an
+---     officer could walk around pointing at people (8.11).
 ---   * **The tools.** Powder, luminol and the forensic light ask
 ---     `forensics.process` to reveal what is within the server's radius of where
 ---     the server says the officer is standing. The client does not know what is
@@ -19,8 +27,9 @@
 --- The permission is checked on the server, on every call, by the route wrapper
 --- (invariant 4). The one client-side thing here that looks like a check --
 --- `suppressed()` -- is tidiness and is documented as such: it stops a prompt
---- that has just been refused from following an officer around a scene. Removing
---- it would change nothing about what anybody can do.
+--- that has just been refused from following an officer around a scene, or down
+--- a street full of people. Removing it would change nothing about what anybody
+--- can do.
 
 FredPDForensics = FredPDForensics or {}
 FredPDForensics.Client = FredPDForensics.Client or {}
@@ -63,9 +72,15 @@ local COLLECT_MS <const> = {
 }
 
 --- The packaging an officer usually reaches for, per type. A default in a
---- dialog and nothing more: the officer picks, and the server validates the
---- choice against the item list in 8.5 -- the wrong container is a mistake an
---- officer is allowed to make, and one the lab will see in the quality.
+--- dialog: the officer picks, and the server validates the choice against the
+--- item list in 8.5 -- the wrong container is a mistake an officer is allowed to
+--- make, and one the lab will see in the quality.
+---
+--- `gsr` is the one entry no dialog ever shows, because residue is not in the
+--- grid and the swab below has nothing to ask about: the swab sends it as the
+--- value rather than as a suggestion. It stays in this table rather than
+--- standing alone so that a server changing what a swab goes into changes it in
+--- one place.
 local SUGGESTED_PACKAGING <const> = {
     print = 'lift_card',
     glove_mark = 'lift_card',
@@ -90,6 +105,14 @@ local PACKAGING <const> = {
     'evidence_bag', 'envelope', 'swab_box', 'lift_card',
     'firearm_box', 'drug_bag', 'phone_bag', 'item_tag',
 }
+
+--- How long a gunshot residue swab takes, in milliseconds (8.2's "GSR kit").
+---
+--- Between bagging a casing and lifting a print: taking a sample off somebody
+--- else's hands and cuffs is more than bending down and less than working a
+--- surface, and it is long enough that doing it to a suspect nobody is holding
+--- is a bad idea.
+local SWAB_MS <const> = 6000
 
 --- How long the tools take (8.4).
 local TOOL_MS <const> = { powder = 7000, luminol = 9000, forensic_light = 7000 }
@@ -144,24 +167,39 @@ end
 -- Prompt tidiness (not a control)
 -- -----------------------------------------------------------------------------
 
---- Until when the collection prompt is hidden.
+--- prompt -> the game time its option comes back at.
 ---
---- Set when the server refuses a collection for want of a permission or a
---- session. Invariant 4 is explicit that hiding something in the interface is
---- never the control, and this does not pretend to be one: the option comes
---- back by itself, anybody who calls the route anyway is refused by the route,
---- and a player who never sees the prompt is refused the same way. It exists so
---- that a civilian standing over a casing is not offered a police action every
---- time they walk past it.
-local hiddenUntil = 0
+--- Set when the server refuses for want of a permission or a session. Invariant
+--- 4 is explicit that hiding something in the interface is never the control,
+--- and this does not pretend to be one: the option comes back by itself,
+--- anybody who calls the route anyway is refused by the route, and a player who
+--- never sees the prompt is refused the same way. It exists so that a civilian
+--- standing over a casing is not offered a police action every time they walk
+--- past it, and is not offered to swab every passer-by.
+---
+--- Keyed by prompt, as `client/destroy.lua` keys its own, because the two
+--- prompts are drawn on different things: a refused swab must not take the
+--- collection option off the casings at a scene, and a refusal at a scene must
+--- not follow the officer onto the next person they stand next to. The trace
+--- prompts share the one `collect` key deliberately -- the marker is placed for
+--- the collection that follows it, and there is no sense in offering to number
+--- something this officer has just been refused permission to bag.
+local hiddenUntil = {}
 
-local function suppressed()
-    return GetGameTimer() < hiddenUntil
+local function suppressed(prompt)
+    return GetGameTimer() < (hiddenUntil[prompt] or 0)
 end
 
-local function noteRefusal(response)
+--- Hides one prompt for a while after a refusal.
+---
+--- Only the refusals that will still be refusals in a second. `not_found` is
+--- deliberately not one of them: at a scene it is the ordinary answer when
+--- somebody else got to the casing first, and on a swab it is every way a swab
+--- can come to nothing -- out of reach, nothing on their hands, residue already
+--- decayed -- each of which the next person is a fresh question about.
+local function noteRefusal(prompt, response)
     if response.err == 'forbidden' or response.err == 'no_session' then
-        hiddenUntil = GetGameTimer() + SUPPRESS_MS
+        hiddenUntil[prompt] = GetGameTimer() + SUPPRESS_MS
     end
 end
 
@@ -404,7 +442,7 @@ local function collect(trace)
         })
 
         if not response.ok then
-            noteRefusal(response)
+            noteRefusal('collect', response)
             showError(response)
             return
         end
@@ -446,6 +484,138 @@ local function placeMarker(trace)
 end
 
 -- -----------------------------------------------------------------------------
+-- The gunshot residue swab (8.2, 8.5)
+-- -----------------------------------------------------------------------------
+
+--- The server id of the player a ped belongs to, or nil when it is not one.
+---
+--- This is the whole of what the swab sends about the person being swabbed, and
+--- it is a name rather than a claim: the server resolves it back to a ped of its
+--- own, measures the distance between its copy of the two positions and refuses
+--- a swab taken across the map (8.3.2). Nothing about the residue -- whether
+--- there is any, how strong it is, how long ago they fired -- is known here or
+--- asked for (8.11).
+---
+--- `NetworkGetPlayerIndexFromPed` answers -1 for an NPC, and `GetPlayerServerId`
+--- answers 0 for an index it cannot place; either is somebody there is no swab
+--- to take, and the schema's `min = 1` would refuse the call anyway.
+---
+--- Both are client natives. They are declared inline here rather than in
+--- `.luacheckrc`, where the rest of this resource's natives live, because this
+--- file was the only part of the tree the change that added the swab could
+--- touch. Moving the two names into that file's `**/client/**/*.lua` block is a
+--- behaviour-free follow-up, and this line goes with them when they move.
+-- luacheck: read globals NetworkGetPlayerIndexFromPed GetPlayerServerId
+local function serverIdOf(ped)
+    if not ped or ped == 0 or not DoesEntityExist(ped) then return nil end
+
+    local player = NetworkGetPlayerIndexFromPed(ped)
+    if not player or player == -1 then return nil end
+
+    local serverId = GetPlayerServerId(player)
+    if not serverId or serverId < 1 then return nil end
+
+    return serverId
+end
+
+--- Swabs a person's hands and clothes for gunshot residue (8.2).
+---
+--- The same route the casing on the pavement goes through, because a swab *is*
+--- a collection: one item, one owner row, one first link of the custody chain,
+--- written in the one transaction (8.5, 8.6). Residue has no position and so no
+--- trace key, which is why the call names a `targetId` instead -- the two are
+--- exclusive and the server refuses a call carrying both.
+---
+--- There is no dialog. The other collections ask for packaging because an
+--- officer reaching for the wrong container is a mistake they are allowed to
+--- make at a scene; a swab goes in a swab box and there is nothing to choose,
+--- so the same value the collection dialog would have offered as its default
+--- for residue is sent directly. No marker number either: a marker stands next
+--- to something on the ground, and this is a person.
+---
+--- Held by `run` for the progress circle *and* the call after it, like every
+--- other action in this resource, so a swab cannot be started underneath a
+--- collection or a wipe and neither can be started underneath a swab.
+local function swab(ped)
+    local targetId = serverIdOf(ped)
+    if not targetId then return end
+
+    -- `run` is the gate as well as the flag, so there is no `idle()` here: with
+    -- no dialog there is nothing to ask the officer before the circle starts.
+    run(function()
+        if not perform(FredPD.t('forensics.swab.progress'), SWAB_MS, TOOL_ANIM) then
+            notify(FredPD.t('forensics.swab.cancelled'))
+            return
+        end
+
+        local response = call('evidence.collect', {
+            targetId = targetId,
+            packaging = SUGGESTED_PACKAGING.gsr,
+        })
+
+        if not response.ok then
+            noteRefusal('swab', response)
+
+            -- One message for every refusal, and `showError` deliberately not
+            -- used here. The server answers `not_found` to every way a swab
+            -- comes to nothing -- no such player, out of reach, nothing on
+            -- their hands, residue already decayed, nobody the sample could be
+            -- attributed to -- precisely so they cannot be told apart, and
+            -- naming the code would start sorting them for the officer (8.11).
+            notify(FredPD.t('forensics.swab.failed'), 'error')
+            return
+        end
+
+        -- Nothing to forget: residue was never streamed to this client and
+        -- there is no prop, no zone and no key to drop. What changed is on the
+        -- server, where `claimGsr` cleared it -- a second officer swabbing the
+        -- same hands finds nothing, exactly as a second officer reaching for
+        -- the same casing does.
+        notify(FredPD.t('forensics.swab.done'), 'success')
+    end)
+end
+
+--- The prompt, on a player rather than on a trace.
+---
+--- `render.registerInteraction` is the wrong mechanism for this one: it hangs
+--- options off the sphere zones this client builds around streamed traces, and
+--- residue is never in the grid, so there is no zone for it to hang off.
+--- `addGlobalPlayer` is the ox_target registry for other players' peds, and it
+--- is registered once at load: it costs nothing until somebody looks at
+--- somebody (12.1).
+---
+--- Drawn for anyone standing next to another player, which is as much as this
+--- machine can honestly say. Whether the person holding the swab may take it is
+--- the server's answer and not this file's (invariant 4): `evidence.collect`
+--- carries `forensics.evidence.collect` and the on-duty condition, and refuses
+--- everybody else. The suppression above only stops that refusal following an
+--- officer down a crowded street.
+local SWAB_NAME <const> = 'fredpd_collect_swab'
+
+exports.ox_target:addGlobalPlayer({
+    {
+        name = SWAB_NAME,
+        icon = 'fa-solid fa-vial',
+        label = FredPD.t('forensics.swab.option'),
+        distance = ZONE_DISTANCE,
+        canInteract = function(entity)
+            return not suppressed('swab') and serverIdOf(entity) ~= nil
+        end,
+        onSelect = function(data) swab(data and data.entity) end,
+    },
+})
+
+--- Never leave the option behind on a restart. ox_target keeps it keyed by
+--- name, and a reload would otherwise leave a prompt on every player that calls
+--- into a Lua state that no longer exists -- the same reason
+--- `client/destroy.lua` removes its global options.
+AddEventHandler('onResourceStop', function(resource)
+    if resource ~= GetCurrentResourceName() then return end
+
+    exports.ox_target:removeGlobalPlayer({ SWAB_NAME })
+end)
+
+-- -----------------------------------------------------------------------------
 -- The prompts on a trace
 -- -----------------------------------------------------------------------------
 
@@ -458,7 +628,7 @@ render.registerInteraction(function(trace)
             type = FredPD.t('evidence.type.' .. trace.type),
         }),
         distance = ZONE_DISTANCE,
-        canInteract = function() return not suppressed() end,
+        canInteract = function() return not suppressed('collect') end,
         onSelect = function() collect(trace) end,
     }
 end)
@@ -469,7 +639,7 @@ render.registerInteraction(function(trace)
         icon = 'fa-solid fa-location-pin',
         label = FredPD.t('forensics.marker.option'),
         distance = ZONE_DISTANCE,
-        canInteract = function() return not suppressed() end,
+        canInteract = function() return not suppressed('collect') end,
         onSelect = function() placeMarker(trace) end,
     }
 end)

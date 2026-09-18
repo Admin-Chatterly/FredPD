@@ -72,10 +72,31 @@ Forensics.defaults = {
     --- owner, are one trace (8.3.5).
     mergeRadius = 0.5,
 
-    --- The cap per cell. Reached only by a generation pipeline that has gone
-    --- wrong or by somebody trying to fill the grid; the oldest trace in the
-    --- cell gives way, so the newest evidence is the evidence that survives.
+    --- The cap per cell: how much evidence one grid cell may hold at once.
+    ---
+    --- A memory bound and nothing else (12.2). It never takes one owner's trace
+    --- to make room for another's -- see `maxPerOwnerPerCell` below and the
+    --- eviction rule in `placeIn` -- so a cell that is full of other people's
+    --- evidence refuses the arriving trace instead of clearing a space in it.
     maxPerCell = 64,
+
+    --- The cap per owner per cell: how much of one cell one source of traces --
+    --- a character, or a weapon's serial -- may hold at once.
+    ---
+    --- This is the cap that actually bounds anybody, and the reason it exists is
+    --- 8.10 rather than 12.2. `forensics.observe` is public (ADR-013): no
+    --- session, no permission, no item and no progress bar stand in front of it,
+    --- so a client can loop it, and with a per-cell cap alone every call past the
+    --- cap threw away the oldest trace in the cell whoever had left it. That made
+    --- an accomplice walking a slow circle a faster, cheaper and quieter way of
+    --- destroying a scene than the wiping kit 8.10 charges time and items for.
+    ---
+    --- A quarter of the cell, so filling one needs four separate sources and no
+    --- single player can deny the rest of the cell to anybody. Well above what a
+    --- scene produces once merging has folded what is within half a metre: six
+    --- casings from a magazine (8.2 at the default sampling), a pool of blood,
+    --- the prints on the doors of a car.
+    maxPerOwnerPerCell = 16,
 
     --- The cap across the whole world. Per-cell caps bound one street corner;
     --- this bounds a player driving across the map generating as they go. Past
@@ -307,9 +328,16 @@ end
 --- `evidence.shouldMerge` needs a single value to compare and the owner is two
 --- nullable fields.
 ---
---- A trace with no owner at all gets a key of its own rather than nil, so two
---- unattributed traces never merge into each other -- they are a bug in the
---- generation pipeline (8.3.4) and merging them would hide it.
+--- A trace with no owner at all answers `'?'`, and `'?'` is one key rather than
+--- one key each: two unattributed traces of the same type lying close together
+--- compare equal, so `evidence.shouldMerge` folds them together and `placeIn`
+--- counts them against one another's share of a cell. Nothing in the generation
+--- pipeline can reach that today -- every rule in `routes.lua` answers nil when
+--- it cannot name an identifier or a serial, and 8.3.4 says the owner is always
+--- whoever left the trace -- so `'?'` exists to keep this total rather than to
+--- describe anything the grid holds. A caller that starts creating unattributed
+--- traces gets one merged pile per type per place, which is a bug made visible
+--- rather than a bug hidden, but it is not a shape to build on.
 ---
 --- @param owner table|nil { identifier, weaponSerial }
 --- @return string
@@ -322,6 +350,30 @@ function Forensics.ownerKey(owner)
     if identifier == '' and serial == '' then return '?' end
 
     return identifier .. '|' .. serial
+end
+
+--- Which share of a cell a trace is counted against (8.3.5, 12.2).
+---
+--- The *generator*, not the owner. `ownerKey` answers "whose trace is this",
+--- which is what merging needs and what a cap must not use: one player leaves
+--- prints under their identifier, casings under a weapon serial with no
+--- identifier at all, and magazines under both, so capping by owner would give
+--- a single client three shares of every cell and a fourth per further weapon --
+--- enough to hold a whole cell and refuse everybody else's evidence a place to
+--- land. `Grid.place` stamps `sourceKey` from the server's own idea of who
+--- called it, so those three collapse back into one.
+---
+--- Hidden truth in the sense of 8.1, like the owner beside it: it is on the
+--- trace, on the server, and `Evidence.renderData` does not carry it.
+---
+--- @param item table
+--- @return string
+function Forensics.sourceKeyOf(item)
+    if type(item) ~= 'table' then return '?' end
+
+    return type(item.sourceKey) == 'string' and item.sourceKey
+        or (type(item.ownerKey) == 'string' and item.ownerKey)
+        or '?'
 end
 
 -- -----------------------------------------------------------------------------
@@ -406,6 +458,45 @@ Forensics.TOOLS = { 'powder', 'luminol', 'forensic_light' }
 --- neighbours to catch it would multiply the cost of the hottest function in
 --- the module by nine (12.1).
 ---
+--- **A cap only ever takes from the owner it is capping.** The rule is one
+--- sentence -- eviction may only remove a trace whose `ownerKey` is the arriving
+--- trace's, and a cell with no such trace in it refuses the arrival instead --
+--- and it closes the cheapest way there was of destroying a crime scene. The
+--- sensor route is public (ADR-013, 8.3.1), so a client can loop it; with a cap
+--- that threw away the oldest trace in the cell whoever had left it, about a
+--- minute of that filled a cell and every call afterwards deleted somebody
+--- else's casings and blood, oldest first, for no item, no timed action and no
+--- audit row. 8.10 prices destroying evidence in time and items; this was free,
+--- instant and unattributable, and the removals were booked as evictions, so the
+--- one counter that means "evidence is being carried away" did not move either.
+---
+--- What a cap is for is bounding each source, so `maxPerOwnerPerCell` is the cap
+--- that bites and `maxPerCell` is the memory bound underneath it (12.2). Two
+--- numbers rather than one scan of the cell for the oldest trace of the arriving
+--- owner: a scan alone still lets one player hold every row of a cell and so
+--- refuse everybody else's evidence a place to land, which is the same attack
+--- with denial in place of deletion.
+---
+--- The cap counts by **who generated the trace**, not by whose it is, and the
+--- difference is the whole of its strength. The owner key is deliberately not
+--- one value per player (8.3.4): a print is filed under a character identifier,
+--- a casing under a weapon serial alone, a magazine under both. So one player
+--- walking one cell produces at least three owner keys, and a fourth for every
+--- further weapon -- capping on that would have let a single client hold the
+--- whole cell and refuse everybody else, which is the denial the paragraph above
+--- rules out. `sourceKey` is the acting player, stamped by `Grid.place` from the
+--- server's own idea of who called (never from the trace), so their share is one
+--- share however many owner keys they spread it across.
+---
+--- It falls back to the owner key when a caller does not stamp one, which is the
+--- only thing busted can construct and the right answer for a trace the world
+--- created rather than a player.
+---
+--- Refusal is an ordinary outcome and not an error. `Grid.place` answers nil for
+--- it exactly as it does for a full world, the sensor route answers the same
+--- empty table it answers for a shot that left no casing, and nothing about what
+--- happened reaches the client (8.11).
+---
 --- The eviction is the fourth return value and not a silent side effect. The
 --- caller keeps a running item count and a key-to-cell lookup, and a swap that
 --- looks like an arrival from the outside corrupts both: the count drifts up
@@ -415,18 +506,22 @@ Forensics.TOOLS = { 'powder', 'luminol', 'forensic_light' }
 ---
 --- @param grid table cellKey -> list of items
 --- @param item table the new trace
---- @param options table|nil { cellSize, mergeRadius, maxPerCell }
---- @return table stored the item now in the grid: the new one, or the one it
----   merged into
+--- @param options table|nil { cellSize, mergeRadius, maxPerCell,
+---   maxPerOwnerPerCell }
+--- @return table|nil stored the item now in the grid: the new one, or the one it
+---   merged into; nil when the cell is full and none of it is the arriving
+---   trace's owner's to give up
 --- @return boolean merged
---- @return string cellKey where it landed
---- @return table|nil evicted the trace the cap threw out to make room, if any
+--- @return string cellKey where it landed, or would have
+--- @return table|nil evicted the trace the cap took from this owner to make room
+---   for their own, if any
 function Forensics.placeIn(grid, item, options)
     options = options or {}
 
     local size = options.cellSize or Forensics.defaults.cellSize
     local radius = options.mergeRadius or Forensics.defaults.mergeRadius
     local maxPerCell = options.maxPerCell or Forensics.defaults.maxPerCell
+    local maxPerOwner = options.maxPerOwnerPerCell or Forensics.defaults.maxPerOwnerPerCell
 
     local key = Forensics.cellKey(item.x, item.y, size)
     local cell = grid[key]
@@ -440,8 +535,24 @@ function Forensics.placeIn(grid, item, options)
 
     local evicted
 
+    -- What this owner already has here, counted on the merge pass rather than on
+    -- a second walk of the cell: the pass is the hottest loop in the module
+    -- (12.1) and the answer is only ever needed at the end of it.
+    local ownerCount, ownerOldest, ownerOldestAt = 0, nil, math.huge
+    local mine = Forensics.sourceKeyOf(item)
+
     for index = 1, #cell do
         local existing = cell[index]
+
+        if Forensics.sourceKeyOf(existing) == mine then
+            ownerCount = ownerCount + 1
+
+            local at = existing.createdAt or 0
+
+            if at < ownerOldestAt then
+                ownerOldest, ownerOldestAt = index, at
+            end
+        end
 
         if shouldMerge(existing, item, radius) then
             existing.count = (existing.count or 1) + (item.count or 1)
@@ -463,19 +574,17 @@ function Forensics.placeIn(grid, item, options)
         end
     end
 
-    -- The cap (12.2). Full means somebody is generating faster than anyone can
-    -- collect, and the oldest trace in the cell is the one worth least.
-    if #cell >= maxPerCell then
-        local oldestIndex, oldestAt = 1, math.huge
-
-        for index = 1, #cell do
-            local at = cell[index].createdAt or 0
-            if at < oldestAt then
-                oldestIndex, oldestAt = index, at
-            end
+    -- The caps. Either one is reached by giving up the oldest trace this owner
+    -- has here, and by nothing else: their own share is full, or the cell is and
+    -- the only rows they may have back are the ones they left.
+    if ownerCount >= maxPerOwner or #cell >= maxPerCell then
+        if not ownerOldest then
+            -- A full cell with nothing of theirs in it. There is no room to make
+            -- that is theirs to make, so the trace is not created at all.
+            return nil, false, key, nil
         end
 
-        evicted = table.remove(cell, oldestIndex)
+        evicted = table.remove(cell, ownerOldest)
     end
 
     cell[#cell + 1] = item

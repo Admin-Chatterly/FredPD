@@ -35,17 +35,20 @@ FredPD.Evidence = FredPD.Evidence or {}
 --- Claiming is destructive by design. The trace leaves the grid before the item
 --- enters the database, so two officers cannot collect the same casing.
 ---
---- What that costs, plainly, because the handler below cannot pay it back: the
---- claim happens before the insert, and a refusal after it -- an unattributable
---- trace, or an insert that fails on a deadlock, a dropped connection or a
---- constraint -- leaves the trace gone from the grid with no row written. The
---- only 9 mm casing at a homicide can be lost to a transient database error, and
---- no officer can re-collect it because there is nothing left to collect. The
---- fix is a non-destructive claim plus a reservation, or a restore path in the
---- grid, and neither exists: `Grid.place` mints a new key, a new `createdAt` and
---- an unrevealed latent flag, so re-placing a taken trace would hand back a
---- younger, invisible copy of it. Until then this is a known hole, written down
---- rather than papered over.
+--- Which is why it hands back a second value: a function that puts the trace
+--- back, under its original key, age, reveal and cleaned state. The claim
+--- happens before the insert and the insert can fail after it -- a deadlock, a
+--- dropped connection, `ck_fpd_evidence_owner_one` refusing an unattributable
+--- owner -- and without a way back the only 9 mm casing at a homicide is lost to
+--- a transient database error with no row written and nothing left to re-collect.
+--- The handler below calls it on every path out of the write that is not a
+--- written row, the raise included. Claiming still comes first and stays first:
+--- the window in which the trace is out of the world is the length of one
+--- transaction, and the alternative -- leaving it there while the insert runs --
+--- is two officers collecting the same casing.
+---
+--- The stub answers nil and no restore, which is the same thing: there was
+--- nothing to claim, so there is nothing to put back.
 ---
 --- @param src number
 --- @param traceKey string the opaque key the client was given with render data
@@ -53,7 +56,9 @@ FredPD.Evidence = FredPD.Evidence or {}
 ---   cleaned, owner = { identifier, weaponSerial } }. `raining` is *not* in the
 ---   shape: no claim produces it and the server tracks no weather, so the
 ---   weather half of `qualityAfter` (8.1.4) is inert -- see the note on
----   `claimTrace` in the forensics module.
+---   `claimTrace` in the forensics module. `outdoors` is real: the grid sets it
+---   from a server-side interior test when the trace is created.
+--- @return function|nil restore -- puts the claimed trace back in the world
 FredPD.Evidence.claimTrace = FredPD.Evidence.claimTrace or function()
     return nil
 end
@@ -69,6 +74,12 @@ end
 --- Registered by `fredpd`'s forensics routes, beside `claimTrace`. Until they
 --- load there is nothing on anybody to collect and every swab is refused, which
 --- is the same stance as above and for the same reason.
+---
+--- What it does *not* answer is a restore. Residue is a timestamp on a player
+--- and the only thing that writes one stamps the current clock, so putting a
+--- failed swab back would hand the suspect fresher residue than they had -- a
+--- better sample invented by a failed write. A swab that does not commit is
+--- therefore lost, and the reason is written out where `claimGsr` is defined.
 ---
 --- @param src number the officer taking the swab
 --- @param targetSrc number the player being swabbed
@@ -291,31 +302,140 @@ route.define({
 --- both is a call that has not decided what it is doing, and guessing which one
 --- it meant would be this file inventing an intent (invariant 1).
 ---
---- The `targetId` half has no caller anywhere in the product yet: no client
---- sends the field, so no swab can be taken and the residue path below is
---- unreachable. The gap is in `fredpd_forensics` -- there is no ox_target option
---- on a player -- and in the MDT's collect form, not here. Said once more where
---- somebody reading this file would otherwise assume the feature is live.
+--- The `targetId` half is reached from the world, not from the MDT: the swab
+--- prompt in `fredpd_forensics/client/collect.lua` sends the target's server id
+--- and no trace key. It is the same route and the same transaction because a
+--- swab is a collection -- it writes an item, an owner row and the first link of
+--- the chain of custody exactly as bagging a casing does (8.5, 8.6), and a
+--- second route for it would be a second way to write a custody chain.
+---
+--- The second value is how a claim is undone. `claimTrace` answers one and
+--- `claimGsr` deliberately does not, so the handler tests it rather than
+--- assuming it: a swab that fails to commit loses the sample, for the reason
+--- written above `claimGsr` in the forensics module.
 ---
 --- @return table|nil trace, or nil when there was nothing to claim
+--- @return function|nil restore, when this claim can be put back
 --- @return table|nil refusal, when the call named neither source or both
 local function claimFor(session, input)
     local byTrace = input.traceKey ~= nil
     local byTarget = input.targetId ~= nil
 
     if not byTrace and not byTarget then
-        return nil, route.refuse(FredPD.ErrorCode.INVALID, { traceKey = 'required' })
+        return nil, nil, route.refuse(FredPD.ErrorCode.INVALID, { traceKey = 'required' })
     end
 
     if byTrace and byTarget then
-        return nil, route.refuse(FredPD.ErrorCode.INVALID, { targetId = 'not_allowed' })
+        return nil, nil, route.refuse(FredPD.ErrorCode.INVALID, { targetId = 'not_allowed' })
     end
 
     if byTrace then
-        return FredPD.Evidence.claimTrace(session.src, input.traceKey), nil
+        local trace, restore = FredPD.Evidence.claimTrace(session.src, input.traceKey)
+        return trace, restore, nil
     end
 
-    return FredPD.Evidence.claimGsr(session.src, input.targetId), nil
+    return FredPD.Evidence.claimGsr(session.src, input.targetId), nil, nil
+end
+
+--- Everything that happens after the claim, so there is one place to put back.
+---
+--- Split out of the handler rather than inlined because the trace is out of the
+--- world from the claim to the row, and every way out of this function that is
+--- not a written row has to put it back -- the refusals *and* a raise out of the
+--- repo. One function, wrapped in one pcall by the caller, is how "every path"
+--- stays true when somebody adds another one to it. Nothing above the claim
+--- belongs in here: a scene that is closed or missing is refused while the trace
+--- is still lying in the world, and there is nothing to undo.
+---
+--- It stays one transaction (8.6). `insertEvidence` writes the item, the owner
+--- row and the first custody link together as it always did; this wraps it, it
+--- does not split it.
+---
+--- It ends at the row and hands the row back rather than the response, and that
+--- is what makes the restore rule exact rather than nearly right: everything
+--- inside this function runs while the trace is out of the world and the
+--- database holds nothing, so "it raised or it refused" and "put the trace back"
+--- are the same statement. Shaping the answer for the client happens in the
+--- caller, after the row exists, where a raise must *not* put a second copy of
+--- the casing into a world the database has already recorded it out of.
+---
+--- @param scene table|nil the scene the item is being attached to, already read
+---   and already checked to be open
+--- @param trace table the claim -- hidden truth, and nothing from the call
+--- @return table the inserted evidence row, or a refusal carrying `__err`
+local function writeCollected(session, input, scene, trace)
+    -- Every trace is left by somebody or by something: 8.3.4 makes the owner
+    -- the source player's hidden identifier, and a casing carries the weapon
+    -- instead. One with neither is a bug in the generation pipeline, which is
+    -- what `ck_fpd_evidence_owner_one` says by refusing to store it. Refused
+    -- here rather than in the transaction, so the officer is told the trace
+    -- cannot be attributed instead of being shown a generic server error -- and
+    -- so the item is not written at all, which is the right outcome: an item
+    -- with no owner would be analysed against an empty profile and come back as
+    -- an exclusion that means nothing. The trace goes back in the world on the
+    -- way out, because a bug in generation is not a reason to delete the only
+    -- casing at a scene.
+    local owner = service.ownerOf(trace)
+
+    if not owner then
+        -- A claim handed over something it should never produce. The console is
+        -- where an operator can see it; the type and the key name the trace and
+        -- disclose nobody. A swab cannot reach here -- `claimGsr` refuses
+        -- residue it cannot attribute -- so the key is the one that is printed,
+        -- and it is nil on the path that has none.
+        print(('[fredpd] evidence.collect: unattributed trace %s (%s)')
+            :format(tostring(input.traceKey), tostring(trace.type)))
+
+        return route.refuse(FredPD.ErrorCode.INVALID, { traceKey = 'unattributed' })
+    end
+
+    -- Contamination is read from the entry log and never from the collecting
+    -- officer's word for it (8.4): anyone who walked the perimeter without
+    -- protective equipment degrades everything taken from it.
+    --
+    -- That is the design and not yet the behaviour. Nothing in the product
+    -- writes `fpd_scene_entries` -- there is no perimeter zone in
+    -- `fredpd_forensics` and no route that logs an entry -- so this COUNT is
+    -- zero on every scene that exists and the contamination term is currently
+    -- dead here and at `lab.analysis.complete`. 8.4's entry log is an
+    -- unimplemented [M], not a wired feature, and the read stays because the
+    -- query is what the log will feed, not because it reports anything today.
+    local contaminated = repo.unprotectedEntries(input.sceneId) > 0
+
+    -- `outdoors` is the grid's: `Grid.place` sets it from a server-side interior
+    -- test at the position the trace was filed at, and the claim carries it
+    -- through. There is still no `raining` and passing one would mean inventing
+    -- it: weather is client state in FiveM, no bridge answers it server-side,
+    -- and asking the officer's client whether it was raining would let a client
+    -- set how good the evidence is (invariant 1). So the outdoor half of 8.1.4's
+    -- weather term arrives and the term itself stays inert until the other half
+    -- has a source of truth -- `service.qualityAfter` charges the 25 points only
+    -- when both are true, which is why carrying `outdoors` changes no number
+    -- today and every number the day `raining` lands.
+    local quality = service.qualityAfter(trace.quality or 100, trace.ageSeconds or 0, {
+        decayPerHour = trace.decayPerHour,
+        outdoors = trace.outdoors,
+        cleaned = trace.cleaned,
+        contaminated = contaminated,
+    })
+
+    local item = repo.insertEvidence(session.agencyId, {
+        sceneId = input.sceneId,
+        caseNumber = text(input.caseNumber) or (scene and scene.caseNumber),
+        -- From the grid, never from the call.
+        type = trace.type,
+        packaging = input.packaging,
+        markerNumber = input.markerNumber,
+        description = text(input.description),
+        quality = quality,
+        fromParty = scene and scene.sceneNumber or nil,
+    }, owner, session.discordId)
+
+    -- The transaction did not commit, so there is no item, no owner row and no
+    -- custody link -- and the caller puts the trace back for exactly this.
+    if not item then return route.refuse(FredPD.ErrorCode.INTERNAL) end
+
+    return item
 end
 
 route.define({
@@ -359,75 +479,43 @@ route.define({
         -- nothing on them, residue that has already decayed -- because a
         -- collection that reported *why* it found nothing is a detector an
         -- officer could walk around pointing at people (8.11).
-        local trace, refusal = claimFor(session, input)
+        local trace, restore, refusal = claimFor(session, input)
 
         if refusal then return refusal end
         if not trace then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
 
-        -- Every trace is left by somebody or by something: 8.3.4 makes the
-        -- owner the source player's hidden identifier, and a casing carries the
-        -- weapon instead. One with neither is a bug in the generation pipeline,
-        -- which is what `ck_fpd_evidence_owner_one` says by refusing to store
-        -- it. Refused here rather than in the transaction, so the officer is
-        -- told the trace cannot be attributed instead of being shown a generic
-        -- server error -- and so the item is not written at all, which is the
-        -- right outcome: an item with no owner would be analysed against an
-        -- empty profile and come back as an exclusion that means nothing.
-        local owner = service.ownerOf(trace)
+        -- From here to the row the trace is out of the world and the database
+        -- holds nothing, so that whole stretch is inside one pcall: a refusal
+        -- and a raise both have to reach the restore below, and only the pcall
+        -- catches the second one. `route.define` has a pcall of its own, but it
+        -- is outside this frame -- by the time it runs, every local here is
+        -- gone and the trace is unreachable.
+        local ok, result = pcall(writeCollected, session, input, scene, trace)
 
-        if not owner then
-            -- A claim handed over something it should never produce. The console
-            -- is where an operator can see it; the type and the key name the
-            -- trace and disclose nobody. A swab cannot reach here -- `claimGsr`
-            -- refuses residue it cannot attribute -- so the key is the one that
-            -- is printed, and it is nil on the path that has none.
-            print(('[fredpd] evidence.collect: unattributed trace %s (%s)')
-                :format(tostring(input.traceKey), tostring(trace.type)))
-
-            return route.refuse(FredPD.ErrorCode.INVALID, { traceKey = 'unattributed' })
-        end
-
-        -- Contamination is read from the entry log and never from the collecting
-        -- officer's word for it (8.4): anyone who walked the perimeter without
-        -- protective equipment degrades everything taken from it.
+        -- No row, so put it back. A refusal carries `__err`; a raise never got
+        -- as far as answering anything; either way the world is short a casing
+        -- it should still have. `restore` files the same trace under the same
+        -- key, age, reveal and cleaned state, so the officer can simply collect
+        -- it again and a revealed latent print comes back revealed instead of
+        -- young and invisible.
         --
-        -- That is the design and not yet the behaviour. Nothing in the product
-        -- writes `fpd_scene_entries` -- there is no perimeter zone in
-        -- `fredpd_forensics` and no route that logs an entry -- so this COUNT is
-        -- zero on every scene that exists and the contamination term is
-        -- currently dead here and at `lab.analysis.complete`. 8.4's entry log is
-        -- an unimplemented [M], not a wired feature, and the read stays because
-        -- the query is what the log will feed, not because it reports anything
-        -- today.
-        local contaminated = repo.unprotectedEntries(input.sceneId) > 0
+        -- A swab has no restore, and that is not an oversight: residue cannot be
+        -- put back without inventing a fresher timestamp than the suspect
+        -- actually had. See `claimGsr`.
+        if restore and (not ok or result.__err) then restore() end
 
-        -- No `raining`: the claim shape does not carry one and the server tracks
-        -- no weather, so passing it would be passing nil. `outdoors` is passed
-        -- and is nil too, for now -- nothing sets it in the grid. Both halves of
-        -- 8.1.4's weather term arrive together or not at all, and when they do
-        -- this is the call that grows the field back.
-        local quality = service.qualityAfter(trace.quality or 100, trace.ageSeconds or 0, {
-            decayPerHour = trace.decayPerHour,
-            outdoors = trace.outdoors,
-            cleaned = trace.cleaned,
-            contaminated = contaminated,
-        })
+        -- Re-raised with the original message so `route.define` logs and audits
+        -- what actually failed and answers the officer `internal`. Level 0
+        -- because the position this file would add is not the position of the
+        -- fault.
+        if not ok then error(result, 0) end
+        if result.__err then return result end
 
-        local item = repo.insertEvidence(session.agencyId, {
-            sceneId = input.sceneId,
-            caseNumber = text(input.caseNumber) or (scene and scene.caseNumber),
-            -- From the grid, never from the call.
-            type = trace.type,
-            packaging = input.packaging,
-            markerNumber = input.markerNumber,
-            description = text(input.description),
-            quality = quality,
-            fromParty = scene and scene.sceneNumber or nil,
-        }, owner, session.discordId)
-
-        if not item then return route.refuse(FredPD.ErrorCode.INTERNAL) end
-
-        return { id = item.id, item = service.public(item) }
+        -- The row exists, which is where the trace went. Nothing below may put
+        -- it back: a second copy in the world of something the database has
+        -- already booked in is the duplication 11.3 warns about, pointing the
+        -- other way.
+        return { id = result.id, item = service.public(result) }
     end,
 })
 

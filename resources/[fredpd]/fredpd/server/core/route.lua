@@ -329,13 +329,14 @@ function Route.public(definition)
             -- when an officer collects it, and `evidence.collect` audits that.
             -- `forensics.destroy` does not, and cannot: destruction leaves
             -- nothing behind to audit, only a trace missing from the in-memory
-            -- grid and a number added to the grid's `destroyed` total. Nothing
-            -- in the product reads that total yet -- there is no `admin.health`
-            -- route, no screen and no command, and system health is M7 (7.30) --
-            -- so a trace destroyed by a sessionless caller currently leaves no
-            -- observable signal on this server at all. ADR-013 accepts that and
-            -- says why; it is not a compensating control and must not be quoted
-            -- as one.
+            -- grid and a number added to the grid's `destroyed` total. That
+            -- total is what the `admin.health` route returns and the Health tab
+            -- of the Administration screen draws, behind `admin.health.view`,
+            -- and it is the compensating control ADR-013 argues from: without a
+            -- reader, a trace destroyed by a sessionless caller would leave no
+            -- observable signal on the server at all. It counts since the
+            -- resource last started, which the screen says, so it is a signal
+            -- and not a ledger.
             -- The one row destruction can produce is written on that route's own
             -- side and never here, because only it can tell its two callers
             -- apart: a caller who does happen to hold a session is an officer
@@ -366,9 +367,11 @@ end
 
 --- Every registered route name, both tiers.
 ---
---- Its one caller today is the boot banner in `server/main.lua`, which prints
---- how many routes came up. The admin health screen this was written for is
---- `[S]` in 7.30 and lands in M7.
+--- Two callers, and both want the count rather than the names: the boot banner
+--- in `server/main.lua`, and the `admin.health` route, which reports how many
+--- routes came up on the Health tab. Both take `#` of what comes back, so this
+--- must keep returning a sequence -- a set keyed by name would read as zero on
+--- both, on a server that is perfectly healthy, with nothing failing anywhere.
 function Route.names()
     local names = {}
     for name in pairs(registered) do names[#names + 1] = name end

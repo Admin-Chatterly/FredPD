@@ -6,6 +6,7 @@
   import RoleMap from './modules/admin/RoleMap.svelte';
   import Groups from './modules/admin/Groups.svelte';
   import Fleet from './modules/admin/Fleet.svelte';
+  import Health from './modules/admin/Health.svelte';
   import Records from './modules/records/Records.svelte';
   import Evidence from './modules/evidence/Evidence.svelte';
   import Lab from './modules/lab/Lab.svelte';
@@ -69,16 +70,20 @@
   }
 
   /**
-   * Administration is three screens, not one: the role map, the groups those
-   * roles grant, and the motor pool fleet. They are a sub-navigation rather
-   * than three rail entries because the rail draws the *modules* the server
-   * opened, and all three sit behind the one `admin` module.
+   * Administration is four screens, not one: the role map, the groups those
+   * roles grant, the motor pool fleet, and the server's own counters. They are
+   * a sub-navigation rather than four rail entries because the rail draws the
+   * *modules* the server opened, and all four sit behind the one `admin`
+   * module.
    *
    * Which of them a session may actually use is still the server's answer —
    * each screen's own routes refuse independently, and a tab that leads to a
-   * refusal is drawn as a refusal (invariant 4).
+   * refusal is drawn as a refusal (invariant 4): the seed gives `page.admin`
+   * and `admin.health.view` to the same group, but a server that authors its
+   * own groups can separate them, and a session holding one without the other
+   * gets the tab and a refusal behind it.
    */
-  const ADMIN_TABS = ['rolemap', 'groups', 'fleet'] as const;
+  const ADMIN_TABS = ['rolemap', 'groups', 'fleet', 'health'] as const;
   type AdminTab = (typeof ADMIN_TABS)[number];
 
   let adminTab = $state<AdminTab>('rolemap');
@@ -168,8 +173,10 @@
           <RoleMap agencyId={session.agencyId} />
         {:else if adminTab === 'groups'}
           <Groups />
-        {:else}
+        {:else if adminTab === 'fleet'}
           <Fleet />
+        {:else}
+          <Health />
         {/if}
       {:else if current !== null && !BUILT.has(current)}
         <!-- A module the session is cleared for that has no screen yet. Saying

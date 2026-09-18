@@ -537,10 +537,44 @@
       },
       "version": "Version"
     },
+    "health": {
+      "title": "System health",
+      "intro": "Counters the server already holds. Gateway status, database latency, route timings and queue depths are not measured yet, so they are not shown.",
+      "refresh": "Refresh",
+      "server": "Server",
+      "version": "Version",
+      "env": "Environment",
+      "routes": "Routes registered",
+      "sessions": "Sessions",
+      "open": "Open",
+      "stale": "Stale snapshot",
+      "readOnly": "Read-only",
+      "discord": "Discord",
+      "sync": "Sync configured",
+      "on": "Yes",
+      "off": "No",
+      "snapshot": "Last synced",
+      "seconds": "{seconds} s ago",
+      "never": "Never",
+      "gridTitle": "Uncollected traces",
+      "gridNote": "Totals for the whole server, since the resource last started: never a trace, a player or an owner. Destroyed counts traces wiped away or picked up out of the world; cleaning blood is not counted, because a cleaned pool stays where it is and luminol still finds it. Destruction by a player takes no police clearance and leaves no audit entry, so for them this counter is the only record there is; an officer who destroys evidence is also logged as forensics.destroyed in the audit log.",
+      "grid": {
+        "items": "Traces in the world",
+        "cells": "Grid cells in use",
+        "subscribers": "Players being streamed",
+        "placed": "Placed",
+        "merged": "Merged into an existing trace",
+        "collected": "Collected as evidence",
+        "destroyed": "Destroyed",
+        "evicted": "Decayed or evicted",
+        "refused": "Placement refused"
+      }
+    },
     "tab": {
       "rolemap": "Role map",
       "groups": "Groups",
-      "fleet": "Fleet"
+      "fleet": "Fleet",
+      "health": "Health"
     }
   },
   "registry": {
@@ -936,7 +970,7 @@
       "option": "Secure trace",
       "description": "Package it and enter it in the chain of custody",
       "progress": "Securing",
-      "done": "Secured",
+      "done": "Secured as {number}",
       "cancelled": "Interrupted before it was secured"
     },
     "destroy": {
@@ -970,7 +1004,7 @@
       "title": "Evidence marker",
       "number": "Marker {number}",
       "placed": "Marker {number} placed",
-      "cleared": "Markers cleared"
+      "cleared": "{count} markers cleared"
     },
     "swab": {
       "option": "Swab for gunshot residue",

@@ -1122,3 +1122,76 @@ route.define({
         return { permissions = permissions }
     end,
 })
+
+--- =============================================================================
+--- System health (spec 7.30, ADR-013)
+---
+--- The counter panel, and nothing more. 7.30's full health screen -- gateway
+--- status, database latency, route timings, queue depths -- is `[S]` and lands
+--- in M7; none of those four numbers is computed anywhere in the tree today, so
+--- none of them is returned here. What is returned is what the server already
+--- has in memory by the time somebody asks for it.
+---
+--- It exists now because ADR-013 needs it to. That ADR gives two routes to
+--- every connected player with no permission in front of them, and the second
+--- of them destroys evidence. Destruction writes no audit row -- a public
+--- caller has no `discordId` to attribute one to -- so the only mark it leaves
+--- anywhere is the grid's `destroyed` total, and a counter nobody can read is
+--- not a signal. This route is what makes it one.
+---
+--- **Totals only: never a trace, never a player, never an owner.** The comment
+--- above `stats` in `forensics/grid.lua` says the same thing about the table
+--- this reads, and it is the rule that keeps a health screen from becoming an
+--- oracle: a count of what is lying in the world tells an operator the grid is
+--- filling up, while a list of it would tell them where the evidence is.
+--- =============================================================================
+
+route.define({
+    name = 'admin.health',
+    perm = 'admin.health.view',
+    -- No schema, and deliberately: it takes no input at all, the same as
+    -- `session.get` above. `Route.define` leaves `schema` optional for exactly
+    -- this case -- it is `Route.public` that makes an empty schema mandatory,
+    -- because there the validator is the only thing bounding what arrives
+    -- (ADR-013). Here the permission is already in front of the call.
+    --
+    -- Nor is it audited. Invariant 11 audits reads of restricted *records*, and
+    -- there is no record here: counts of things, a version string and a clock.
+    handler = function(_session, _input)
+        -- Resolved per call rather than at load. The manifest lists
+        -- `forensics/grid.lua` before this file today, so a load-time local
+        -- would work -- but this is a route called by hand a few times an hour,
+        -- and one table lookup is cheaper than a file that breaks when somebody
+        -- reorders the manifest.
+        local grid = FredPD.Forensics.grid
+
+        local open, stale, readOnly = 0, 0, 0
+
+        for _, other in pairs(FredPD.Core.session.all()) do
+            open = open + 1
+            if FredPD.Core.session.isStale(other) then stale = stale + 1 end
+            if FredPD.Core.session.isReadOnly(other) then readOnly = readOnly + 1 end
+        end
+
+        -- The same aggregate `admin.rolemap.list` reads, and the operator's
+        -- first question during a Discord outage: how old is the role data
+        -- everything is being decided from? Null when the sync has never run.
+        local snapshotAge = db.scalar(
+            'SELECT TIMESTAMPDIFF(SECOND, MAX(synced_at), NOW()) FROM fpd_discord_members'
+        )
+
+        return {
+            version = FredPD.version,
+            env = FredPD.env(),
+            routes = #FredPD.Core.route.names(),
+            sessions = { open = open, stale = stale, readOnly = readOnly },
+            discord = {
+                enabled = FredPD.Core.discord.enabled(),
+                snapshotAgeSeconds = snapshotAge,
+            },
+            -- Totals. `Grid.stats()` returns items, cells, subscribers and the
+            -- six counters; it has no per-trace or per-player field to leak.
+            grid = grid.stats(),
+        }
+    end,
+})

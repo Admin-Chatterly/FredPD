@@ -147,24 +147,41 @@ that says which clause grants it.
     `destroyed` total, a per-server counter with no player and no trace in it.
     There is nothing downstream to carry the act into the log.
 
-    Nor is there anything upstream reading that counter today, and the first
-    version of this bullet implied otherwise. It called `destroyed` "a per-server
-    counter for the health screen (12.3)", which reads as a compensating control
-    and is not one: `Grid.stats()` has no caller anywhere in the product — the
-    only references outside its own definition are in `spec/forensics_spec.lua`
-    — there is no `admin.health` route (the permission key `admin.health.view`
-    sits in the catalogue with nothing claiming it), no NUI screen and no console
-    command. Spec 12.3 is route timings and a load-test harness; system health is
-    `[S]` in 7.30 and lands in **M7**. So the honest statement of this
-    consequence is the flat one: **a trace destroyed by a sessionless caller
-    currently leaves no observable signal on the server at all.** A criminal who
-    wipes a door handle clean of a murderer's prints is invisible to everyone
-    investigating it. That is the price of this tier as shipped, and it is
-    accepted here rather than dressed up as a counter somebody can read.
-    `destroyed` is kept for the M7 health screen — the milestone that ends this,
-    by exposing `Grid.stats()` behind the `admin.health.view` that already exists
-    — and until that screen lands it is a number incremented into a table nothing
-    reads.
+    That counter is now read, and the wording here has been wrong in both
+    directions before it was. The first version of this bullet called
+    `destroyed` "a per-server counter for the health screen (12.3)" while
+    `Grid.stats()` had no caller anywhere in the product, no `admin.health`
+    route existed, `admin.health.view` sat in the catalogue granted to no
+    group, and there was no screen and no console command — a compensating
+    control described in the future tense and argued from in the present one.
+    The correction was to say so flatly: a trace destroyed by a sessionless
+    caller left no observable signal on the server at all, and that was the
+    price of this tier as shipped.
+
+    What exists now is the reader, and it is what this bullet may be argued
+    from:
+
+    - **`admin.health`**, a `route.define` in
+      `server/modules/admin/routes.lua` behind `admin.health.view`, returning
+      `Grid.stats()` alongside the route count, the session totals and the age
+      of the Discord snapshot. It takes no input and declares no schema, which
+      `Route.define` allows and `Route.public` would not.
+    - **The grant**, `('admin', 'admin.health.view')` in
+      `database/seeds/0001_permissions.sql`. Without it the route would have
+      been written and unreachable, which is the same as unwritten.
+    - **The screen**, `web/src/modules/admin/Health.svelte`, a fourth tab
+      beside the role map, the groups and the fleet, with a fixture so it
+      renders under `pnpm dev:web`.
+
+    Two things this does **not** claim. It is not attribution: the counter is
+    a total, so it says a trace was destroyed and never who destroyed it, and
+    an administrator watching `destroyed` climb learns that evidence is being
+    wiped somewhere in the city and nothing more. And it is not spec 12.3,
+    which is route timings and a load-test harness; 7.30's full health screen —
+    gateway status, database latency, route timings, queue depths — is still
+    `[S]` and still lands in **M7**, and none of those four is measured
+    anywhere in the tree today, so none of them is on this screen. What M3
+    ships is the counter panel and the permission that reaches it.
 
   The one row destruction can produce is written on the route's own side and not
   by the tier, because only the route can tell its two callers apart: an officer

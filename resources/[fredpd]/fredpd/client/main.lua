@@ -58,6 +58,7 @@ local NUI_ROUTES <const> = {
     'admin.rolemap.list',
     'admin.rolemap.create',
     'admin.rolemap.delete',
+    'admin.health',
     'placement.list',
     'placement.update',
     'placement.delete',

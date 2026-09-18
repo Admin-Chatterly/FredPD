@@ -318,6 +318,136 @@ describe('forensics grid', function()
             assert.is_nil(evicted)
         end)
 
+        it('refuses a full cell rather than evicting another owner\'s evidence', function()
+            -- The most serious thing M3 shipped. `forensics.observe` is public
+            -- (8.3.1, ADR-013): no session, no permission, no item, no progress
+            -- bar. With a cap that threw away the oldest trace in the cell
+            -- whoever had left it, an accomplice standing on a murder scene and
+            -- looping one call emptied it of casings and blood, oldest first, in
+            -- about two minutes -- while 8.10 charges everybody else time and
+            -- items for the same result. A cap is for bounding the source it
+            -- caps, so it takes from that source and from nobody else.
+            local grid = {}
+            local options = { cellSize = 32, maxPerCell = 2, maxPerOwnerPerCell = 8 }
+
+            forensics.placeIn(grid, trace({ key = 'casing1', x = 2.0, createdAt = 1000 }), options)
+            forensics.placeIn(grid, trace({ key = 'casing2', x = 4.0, createdAt = 1001 }), options)
+
+            local stored, merged, cell, evicted = forensics.placeIn(grid, trace({
+                key = 'grief', type = 'print', ownerKey = 'accomplice|', x = 6.0, createdAt = 2000,
+            }), options)
+
+            assert.is_nil(stored, 'the placement is refused, not made room for')
+            assert.is_false(merged)
+            assert.are.equal('0:0', cell)
+            assert.is_nil(evicted)
+
+            -- And the scene is exactly as it was.
+            assert.are.equal(2, #grid['0:0'])
+            assert.are.equal('casing1', grid['0:0'][1].key)
+            assert.are.equal('casing2', grid['0:0'][2].key)
+        end)
+
+        it('still takes an owner\'s own oldest to make room for their own', function()
+            -- The other half: the cap has to keep bounding somebody. A source
+            -- that has filled the cell by itself gives its own oldest row up, so
+            -- the newest evidence from it is the evidence that survives (12.2).
+            local grid = {}
+            local options = { cellSize = 32, maxPerCell = 2, maxPerOwnerPerCell = 8 }
+
+            forensics.placeIn(grid, trace({ key = 'k1', x = 2.0, createdAt = 1000 }), options)
+            forensics.placeIn(grid, trace({ key = 'k2', x = 4.0, createdAt = 1001 }), options)
+
+            local stored, _, _, evicted = forensics.placeIn(
+                grid, trace({ key = 'k3', x = 6.0, createdAt = 1002 }), options
+            )
+
+            assert.is_not_nil(stored)
+            assert.are.equal('k3', stored.key)
+            assert.is_not_nil(evicted)
+            assert.are.equal('k1', evicted.key)
+            assert.are.equal(2, #grid['0:0'])
+        end)
+
+        it('bounds one owner well inside the cell, and leaves the rest for others', function()
+            -- Why the sub-cap exists rather than only a scan for the arriving
+            -- owner's oldest row: a scan alone still lets one player hold every
+            -- row of a cell, and a cell one player holds entirely is a cell where
+            -- everybody else's evidence is refused. At a share each, filling one
+            -- takes as many separate sources as there are shares.
+            local grid = {}
+            local options = { cellSize = 32, maxPerCell = 64, maxPerOwnerPerCell = 3 }
+
+            for index = 1, 5 do
+                forensics.placeIn(grid, trace({
+                    key = 'mine' .. index, x = 1.0 + index * 2, createdAt = 1000 + index,
+                }), options)
+            end
+
+            assert.are.equal(3, #grid['0:0'], 'one owner may hold their share and no more')
+
+            local stored = forensics.placeIn(grid, trace({
+                key = 'theirs', ownerKey = 'char9|', x = 20.0, createdAt = 1100,
+            }), options)
+
+            assert.is_not_nil(stored, 'the cell still has room for somebody else')
+            assert.are.equal(4, #grid['0:0'])
+        end)
+
+        it('counts one player as one share however many owner keys they leave', function()
+            -- The hole the source key closes. `ownerKey` is not one value per
+            -- player and must not be: 8.3.4 files a print under a character
+            -- identifier, a casing under a weapon serial with no identifier at
+            -- all, and a magazine under both. Counting the share by owner
+            -- therefore gave one client three shares of every cell and a fourth
+            -- for every further weapon -- enough to hold the whole cell and
+            -- refuse everybody else's evidence a place to land, which is the
+            -- denial the sub-cap exists to prevent, arriving through the door
+            -- the sub-cap was supposed to be.
+            local grid = {}
+            local options = { cellSize = 32, maxPerCell = 64, maxPerOwnerPerCell = 3 }
+
+            -- One player, four owner keys, the shapes the rules really produce.
+            local owners = { 'char1|', 'char1|SER1', '|SER1', '|SER2' }
+
+            for index = 1, 8 do
+                forensics.placeIn(grid, trace({
+                    key = 'spam' .. index,
+                    ownerKey = owners[(index - 1) % #owners + 1],
+                    sourceKey = 'char1',
+                    x = 1.0 + index * 2,
+                    createdAt = 1000 + index,
+                }), options)
+            end
+
+            assert.are.equal(
+                3, #grid['0:0'],
+                'four owner keys from one player are still one share'
+            )
+
+            local stored = forensics.placeIn(grid, trace({
+                key = 'victim', ownerKey = 'char2|', sourceKey = 'char2',
+                x = 20.0, createdAt = 1100,
+            }), options)
+
+            assert.is_not_nil(stored, 'somebody else can still leave evidence here')
+        end)
+
+        it('falls back to the owner key for a trace nobody stamped', function()
+            -- Everything busted can build, and anything the world creates rather
+            -- than a player. Without the fallback an unstamped trace would count
+            -- against the single '?' share and the cell would fill with four of
+            -- them.
+            local grid = {}
+            local options = { cellSize = 32, maxPerCell = 64, maxPerOwnerPerCell = 2 }
+
+            forensics.placeIn(grid, trace({ key = 'a', ownerKey = 'x|', x = 2.0 }), options)
+            forensics.placeIn(grid, trace({ key = 'b', ownerKey = 'x|', x = 4.0 }), options)
+            forensics.placeIn(grid, trace({ key = 'c', ownerKey = 'y|', x = 6.0 }), options)
+
+            assert.are.equal(3, #grid['0:0'])
+        end)
+
         it('evicts nothing when the trace merged instead of landing', function()
             -- A merge does not add a row, so it can never need to make room --
             -- and a caller that decremented its count for an eviction reported
@@ -749,7 +879,8 @@ end)
 --- called directly so a test drives the streaming loop a tick at a time instead
 --- of waiting a second for it.
 local NATIVES <const> = {
-    'AddEventHandler', 'CreateThread', 'GetEntityCoords', 'GetPlayerPed', 'GetPlayers', 'Wait',
+    'AddEventHandler', 'CreateThread', 'GetEntityCoords', 'GetInteriorAtCoords',
+    'GetPlayerPed', 'GetPlayers', 'Wait',
 }
 
 --- Decay is a function of the clock, so the clock has to be a thing a test can
@@ -879,6 +1010,9 @@ describe('forensics grid, in memory', function()
         -- source lookup. Zero means "no ped", which is what the grid checks for.
         _G.GetPlayerPed = function(src) return positions[src] and src or 0 end
         _G.GetEntityCoords = function(ped) return positions[ped] end
+        -- Zero is "not inside an interior", so the whole test world is outdoors
+        -- unless a test says otherwise (8.1.4).
+        _G.GetInteriorAtCoords = function() return 0 end
 
         load(nil)
     end)
@@ -1177,9 +1311,12 @@ describe('forensics grid, in memory', function()
 
             local keys = {}
 
+            -- One weapon, so every casing carries the same `ownerKey` and the
+            -- fourth is the same source filling its own cell -- which is the
+            -- only thing a cap is allowed to make room for (8.10).
             for index = 1, 4 do
                 clock = clock + 1
-                keys[index] = casing(1.0 + index * 2).key
+                keys[index] = casing(1.0 + index * 2, 'SN-1').key
             end
 
             -- Three in the cell, and three is what the grid believes it holds.
@@ -1196,6 +1333,75 @@ describe('forensics grid, in memory', function()
             end
 
             assert.are.equal(0, grid.stats().items)
+        end)
+
+        it('will not let one player push another player\'s evidence out of a cell', function()
+            -- The attack, end to end and through the same door a client has.
+            -- `forensics.observe` is public, so the loop below is what a hostile
+            -- client can do for nothing: no wiping kit, no cleaning chemicals,
+            -- no eight-second bar, no audit row. Before this it emptied the cell.
+            load({ maxPerCell = 4, maxPerOwnerPerCell = 4 })
+
+            local scene = {}
+
+            for index = 1, 4 do
+                clock = clock + 1
+                scene[index] = grid.place({
+                    type = 'blood', x = 1.0 + index, y = 10.0, z = 30.0,
+                    owner = { identifier = 'victim' },
+                })
+            end
+
+            assert.are.equal(4, grid.stats().items)
+
+            -- The accomplice, walking a slow circle so nothing ever merges.
+            for step = 1, 20 do
+                clock = clock + 1
+                grid.place({
+                    type = 'print', x = 10.0 + step * 0.6, y = 10.0, z = 30.0,
+                    owner = { identifier = 'accomplice' },
+                })
+            end
+
+            -- Every one of the victim's rows is where it was left.
+            for index = 1, 4 do
+                local still = grid.peek(scene[index].key)
+
+                assert.is_not_nil(still, 'a looping client must not be able to delete a scene')
+                assert.are.equal('blood', still.type)
+            end
+
+            -- Twenty calls, twenty refusals, nothing removed and nothing booked
+            -- as a destruction: the loop cost the grid a walk of one cell each
+            -- time and cost the scene nothing at all.
+            assert.are.equal(4, grid.stats().items)
+            assert.are.equal(20, grid.stats().refused)
+            assert.are.equal(0, grid.stats().evicted)
+            assert.are.equal(0, grid.stats().destroyed)
+        end)
+
+        it('answers a refused placement the way it answers one that merged away', function()
+            -- 8.11: a call that creates nothing must look exactly like one that
+            -- does. `Grid.place` answers nil and the route above it returns the
+            -- same empty table either way, so a client cannot read a full cell,
+            -- somebody else's scene or its own refusal off the response.
+            load({ maxPerCell = 1, maxPerOwnerPerCell = 1 })
+
+            local theirs = grid.place({
+                type = 'casing', x = 1.0, y = 10.0, z = 30.0, owner = { weaponSerial = 'SN-1' },
+            })
+
+            local stored, merged = grid.place({
+                type = 'casing', x = 5.0, y = 10.0, z = 30.0, owner = { weaponSerial = 'SN-2' },
+            })
+
+            assert.is_nil(stored)
+            assert.is_false(merged)
+
+            assert.are.equal(1, grid.stats().items)
+            assert.are.equal(1, grid.stats().refused)
+            assert.are.equal(0, grid.stats().evicted)
+            assert.is_not_nil(grid.peek(theirs.key))
         end)
     end)
 
@@ -1397,6 +1603,156 @@ describe('forensics grid, in memory', function()
             assert.are.equal(1, grid.stats().destroyed)
             assert.are.equal(0, grid.stats().collected)
             assert.are.equal(0, grid.stats().items)
+        end)
+    end)
+
+    -- -------------------------------------------------------------------------
+    -- Restore (8.5): the trace a failed transaction must not destroy
+    -- -------------------------------------------------------------------------
+
+    describe('restore', function()
+        it('puts a taken trace back under its own key, age and state', function()
+            -- Collection takes the trace out of the world and *then* writes the
+            -- item, the owner row and the first custody link in one transaction.
+            -- A deadlock, a dropped connection or the owner CHECK failing leaves
+            -- the evidence destroyed by an infrastructure hiccup, and nothing
+            -- but this path puts it back.
+            --
+            -- Every assertion below is also the reason `Grid.place` cannot serve
+            -- as the restore: it mints a new key, stamps `createdAt` at now and
+            -- clears `revealed`, so the print would come back under a key the
+            -- officer's client has never seen, younger than it is, and invisible
+            -- to the officer who had just dusted it.
+            local placedAt = clock
+
+            local print_ = grid.place({
+                type = 'print', x = 10.0, y = 10.0, z = 30.0, owner = { identifier = 'char1' },
+            })
+
+            assert.are.equal(1, grid.reveal(10.0, 10.0, 30.0, 4.0, 'powder'))
+
+            clock = clock + 600
+
+            local taken = grid.take(print_.key)
+
+            assert.is_not_nil(taken)
+            assert.are.equal(0, grid.stats().items)
+
+            assert.is_true(grid.restore(taken))
+
+            local back = grid.peek(print_.key)
+
+            assert.is_not_nil(back, 'the restored trace has to be findable by its own key')
+            assert.are.equal(print_.key, back.key)
+            assert.are.equal(placedAt, back.createdAt, 'a restored trace must not come back younger')
+            assert.is_true(back.revealed, 'a restored print must not need dusting again')
+            assert.are.equal(1, grid.stats().items)
+        end)
+
+        it('keeps a cleaned pool cleaned', function()
+            -- The same argument as `revealed`, on the field that decides what the
+            -- lab gets: restoring through a fresh placement would hand the
+            -- murderer's mopping back to them (8.10).
+            local pool = grid.place({
+                type = 'blood', x = 0.0, y = 0.0, z = 0.0, owner = { identifier = 'char1' },
+            })
+
+            assert.is_true(grid.clean(pool.key))
+
+            local taken = grid.take(pool.key)
+
+            assert.is_true(grid.restore(taken))
+
+            local back = grid.peek(pool.key)
+
+            assert.is_true(back.cleaned)
+            assert.is_true(back.latent)
+        end)
+
+        it('keeps the count honest and never files a second copy', function()
+            local trace = grid.place({
+                type = 'casing', x = 0.0, y = 0.0, z = 0.0, owner = { weaponSerial = 'SN-1' },
+            })
+
+            local taken = grid.take(trace.key)
+
+            assert.is_true(grid.restore(taken))
+            assert.is_false(grid.restore(taken), 'a second restore is a bug in the caller, not a second row')
+            assert.are.equal(1, grid.stats().items)
+
+            -- And it is an ordinary trace again: collectable exactly once more.
+            assert.is_not_nil(grid.take(trace.key))
+            assert.is_nil(grid.take(trace.key))
+            assert.are.equal(0, grid.stats().items)
+        end)
+
+        it('tells the clients standing over it that it is back', function()
+            positions[1] = { x = 10.0, y = 10.0, z = 30.0 }
+
+            local trace = casing(10.0, 'SN-1')
+            grid.push(1)
+
+            assert.is_true(drawing(1)[trace.key])
+
+            local taken = grid.take(trace.key)
+            grid.push(1)
+
+            assert.is_nil(drawing(1)[trace.key])
+
+            grid.restore(taken)
+            grid.push(1)
+
+            assert.is_true(drawing(1)[trace.key], 'a restored casing has to be drawn again')
+        end)
+
+        it('refuses anything that is not a trace', function()
+            assert.is_false(grid.restore(nil))
+            assert.is_false(grid.restore('a key'))
+            assert.is_false(grid.restore({ type = 'casing', x = 0.0, y = 0.0, z = 0.0 }))
+
+            assert.are.equal(0, grid.stats().items)
+        end)
+    end)
+
+    -- -------------------------------------------------------------------------
+    -- Outdoors (8.1.4): the half of the weather term the grid owns
+    -- -------------------------------------------------------------------------
+
+    describe('outdoors', function()
+        it('asks the world, and ignores what the caller said', function()
+            -- `evidence.qualityAfter` takes rain off an outdoor trace and leaves
+            -- an indoor one alone, so this flag decides how much of a print the
+            -- lab gets. A caller that could set it could tell the lab that the
+            -- print it left in a thunderstorm was on a steering wheel.
+            _G.GetInteriorAtCoords = function(x) return x >= 100.0 and 57 or 0 end
+
+            local outside = grid.place({
+                type = 'casing', x = 10.0, y = 10.0, z = 30.0,
+                owner = { weaponSerial = 'SN-1' }, outdoors = false,
+            })
+
+            local inside = grid.place({
+                type = 'casing', x = 100.0, y = 10.0, z = 30.0,
+                owner = { weaponSerial = 'SN-2' }, outdoors = true,
+            })
+
+            assert.is_true(outside.outdoors)
+            assert.is_false(inside.outdoors)
+        end)
+
+        it('leaves it unknown rather than raising where the native is not there', function()
+            -- Server-side native availability is a property of the FXServer
+            -- build, and a nil global here would raise inside every observation,
+            -- every shot and every damage event. Unknown is what every trace
+            -- carried before the test existed: the weather term stays inert.
+            _G.GetInteriorAtCoords = nil
+
+            local trace = grid.place({
+                type = 'casing', x = 10.0, y = 10.0, z = 30.0, owner = { weaponSerial = 'SN-1' },
+            })
+
+            assert.is_not_nil(trace)
+            assert.is_nil(trace.outdoors)
         end)
     end)
 

@@ -468,10 +468,12 @@ local ANALYSIS_RESULT <const> = {
     --- stores that level as the item's quality. So the sample is the search: a
     --- level at all is the hit, and how much there was decides whether the
     --- result is worth anything, through the same insufficiency floor every
-    --- other search goes through. The zero case cannot arise today -- a swab is
-    --- only created when `gsr.present` says there is residue, and zero is below
-    --- the floor in any event -- and it is written out rather than assumed, so
-    --- that moving that floor cannot turn an empty swab into a lead.
+    --- other search goes through. The zero case is the ordinary one: a swab is
+    --- taken whether or not there is anything on the hands, because refusing an
+    --- empty swab at the prompt would tell the officer the lab's answer before
+    --- the lab ever saw it (8.11, and see `claimGsr`). So this is where "no
+    --- residue" is reported, which is a real finding and the one a defence asks
+    --- for -- not an impossible input, and not a lead either.
     gsr = function(facts)
         return Evidence.searchResult(facts.quality > 0 and 1 or 0, facts.quality)
     end,

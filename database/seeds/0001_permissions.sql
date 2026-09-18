@@ -197,6 +197,20 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('admin', 'admin.audit.view'),
     ('admin', 'garage.fleet.edit'),
 
+    -- The health screen (7.30). It goes to `admin` and to nobody else, because
+    -- it is the one group whose job is the running system rather than the
+    -- records in it -- and because what the screen shows is totals about the
+    -- server, not anything about a case: counts of sessions, how old the
+    -- Discord snapshot is, and the forensics grid's counters.
+    --
+    -- It is granted here rather than left in the catalogue for somebody to add
+    -- because the route is unreachable without a grant, and `admin.health` is
+    -- what ADR-013 leans on: the public tier writes no audit row for a trace a
+    -- criminal destroys, and the grid's `destroyed` counter is the only mark
+    -- the act leaves anywhere. A counter behind a permission no group holds is
+    -- the same as no counter at all.
+    ('admin', 'admin.health.view'),
+
     -- The crime scene technician (8.4). Collecting is a specialist job: a
     -- patrol officer who picks a casing up off the ground has not collected
     -- evidence, they have contaminated a scene.

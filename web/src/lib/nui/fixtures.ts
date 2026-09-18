@@ -620,6 +620,34 @@ export const fixtures: FixtureSet = {
       snapshotAgeSeconds: 12,
     }),
 
+    /**
+     * A server with a busy evening behind it.
+     *
+     * The numbers are chosen to be read rather than to be round: `destroyed`
+     * sits well above `collected`, which is the picture ADR-013 says this
+     * screen exists to make visible — traces are being wiped off surfaces
+     * faster than technicians are securing them, and no audit row anywhere
+     * records any of it, because the callers doing the wiping have no session.
+     */
+    'admin.health': () => ({
+      version: '0.3.0',
+      env: 'development',
+      routes: 96,
+      sessions: { open: 7, stale: 1, readOnly: 0 },
+      discord: { enabled: true, snapshotAgeSeconds: 12 },
+      grid: {
+        items: 42,
+        cells: 19,
+        subscribers: 5,
+        placed: 631,
+        merged: 88,
+        evicted: 24,
+        refused: 3,
+        collected: 47,
+        destroyed: 112,
+      },
+    }),
+
     'admin.rolemap.create': (input) => {
       const body = input as {
         discordRoleId: string;

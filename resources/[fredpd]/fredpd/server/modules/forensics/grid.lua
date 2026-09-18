@@ -167,16 +167,21 @@ local itemCount = 0
 --- because they mean completely different things and a single total would
 --- answer "your evidence is going somewhere" without saying where.
 ---
---- **Nothing reads them yet, and no comment in this file may argue from a
---- reader that does not exist.** There is no route, export or console command
---- that returns them; the full Administration health screen is M7 (7.30), spec
---- 12.3 is about route timings and the slow query log rather than about a
---- counter panel, and `admin.health.view` is in Appendix B but granted to no
---- group in `database/seeds/0001_permissions.sql`. Until that screen ships,
---- destruction by a caller with no session leaves no observable trace anywhere:
---- no audit row (ADR-013, deliberately) and a counter nobody can read. They are
---- kept because they cost one addition on paths that are already writing, and
---- because the screen that reads them is a screen, not a rewrite of this file.
+--- They are read by the `admin.health` route in `server/modules/admin/routes.lua`
+--- and drawn on the Health tab of the Administration screen, behind
+--- `admin.health.view`, which is granted in `database/seeds/0001_permissions.sql`.
+--- That reader is the reason ADR-013 is willing to let the public tier write no
+--- audit row: destruction by a caller with no session is otherwise unobservable,
+--- so the counter is the only place it surfaces. Anything that would stop it
+--- surfacing -- dropping an increment, renaming a field the screen reads --
+--- takes a control out of the product, not a line out of a table.
+---
+--- Two limits on what the counter can be argued to prove, both of which the
+--- screen says out loud. It is process-local: a restart zeroes it, so it counts
+--- since the resource last came up and not since the server was installed. And
+--- destruction by an *officer* is additionally audited as `forensics.destroyed`
+--- on the route's own side, so for that half the counter is a summary and the
+--- audit log is the record.
 local stats = { placed = 0, merged = 0, evicted = 0, refused = 0, collected = 0, destroyed = 0 }
 
 --- Trace keys are unique for the life of the resource and mean nothing.
@@ -261,6 +266,40 @@ end
 -- Writing
 -- -----------------------------------------------------------------------------
 
+--- Is this position out in the open, as far as the server can tell?
+---
+--- `outdoors` is half of the weather term in `evidence.qualityAfter` (8.1.4):
+--- rain takes a print off a car door and does nothing to the one on the steering
+--- wheel. It is therefore a fact about the world and not a field, and it is read
+--- here, from the position the server placed the trace at. A client that could
+--- supply it could tell the lab that the print it left in a thunderstorm was
+--- indoors, and `Grid.place` accordingly ignores any `outdoors` on the trace it
+--- is handed.
+---
+--- `GetInteriorAtCoords` answers the interior a position is inside and zero for
+--- a position that is not inside one, which is the question near enough: a
+--- multi-storey car park is an interior and a back garden is not.
+---
+--- Guarded rather than called straight, and the guard is not defensive
+--- programming for its own sake: this is a server-side call of a native whose
+--- availability is a property of the FXServer build, and a nil global would
+--- raise inside `Grid.place` -- which is to say inside every observation, every
+--- shot and every damage event, on a resource that would otherwise have started
+--- cleanly. A build without it answers nil, which is what every trace in the
+--- grid carried before this existed: the weather term stays inert, and nothing
+--- claims a print was indoors that nobody tested.
+---
+--- Declared to luacheck on the line below rather than in `.luacheckrc`: this
+--- file is the only one in the resources that names the native, and a name that
+--- may only be read in one file is better said in that file than in the list
+--- every other file is checked against.
+-- luacheck: read_globals GetInteriorAtCoords
+local function outdoorsAt(x, y, z)
+    if type(GetInteriorAtCoords) ~= 'function' then return nil end
+
+    return GetInteriorAtCoords(x, y, z) == 0
+end
+
 --- Puts a trace into the world.
 ---
 --- The caller has already decided that this trace exists and who it belongs to
@@ -269,7 +308,8 @@ end
 ---
 --- @param trace table { type, x, y, z, model, owner, quality, count }
 --- @return table|nil stored the trace now in the grid, which may be one it
----   merged into (8.3.5); nil when the world is full
+---   merged into (8.3.5); nil when the world is full, or when the cell is and
+---   none of what is in it belongs to this trace's owner
 --- @return boolean merged
 function Grid.place(trace)
     -- The global cap (12.2). Rate limits bound how fast one player can generate;
@@ -297,6 +337,12 @@ function Grid.place(trace)
         -- Hidden truth (8.1). Present on every trace, on the server, always.
         owner = trace.owner,
         ownerKey = service.ownerKey(trace.owner),
+        -- Who generated it, which is not the same question as whose it is, and
+        -- is the one the per-cell share is counted against (`sourceKeyOf`). The
+        -- caller reads it off the acting player server-side; a trace that
+        -- arrives without one falls back to its owner key, which is right for
+        -- anything the world created rather than a player.
+        sourceKey = trace.sourceKey,
         quality = trace.quality or 100,
         count = trace.count or 1,
         createdAt = os.time(),
@@ -306,7 +352,8 @@ function Grid.place(trace)
         latent = service.isLatent(trace.type),
         revealed = false,
         sceneId = trace.sceneId,
-        outdoors = trace.outdoors,
+        -- Asked of the world, never copied off the trace. See `outdoorsAt`.
+        outdoors = outdoorsAt(trace.x, trace.y, trace.z),
         cleaned = false,
         -- Which door, which panel. Recorded for the description an officer
         -- writes at collection; never used as a position, because the client
@@ -316,8 +363,24 @@ function Grid.place(trace)
 
     local stored, merged, cellKey, evicted = service.placeIn(cells, item, config)
 
-    -- A full cell gives up its oldest trace to make room (12.2). That is a swap,
-    -- not a second arrival: counting the new one without counting the old one
+    -- A cell full of other people's evidence (8.10, and the note on the caps in
+    -- `placeIn`). Nothing was created, nothing was removed and nothing is told to
+    -- anybody: the cell is exactly as it was, so there is nothing to touch, and
+    -- the caller answers what it answers for a shot that left no casing (8.11).
+    --
+    -- Counted with the world cap's refusals rather than apart from them. Both are
+    -- the same event to a server owner reading the health screen one day -- the
+    -- grid was asked for room it did not have -- and neither is a destruction: a
+    -- refusal deletes nothing, which is the whole of what changed here.
+    if not stored then
+        stats.refused = stats.refused + 1
+
+        return nil, false
+    end
+
+    -- A cap makes room out of the arriving trace's own owner's oldest row and
+    -- out of nobody else's (`placeIn`). That is a swap, not a second arrival:
+    -- counting the new one without counting the old one
     -- out leaves `itemCount` above the truth until the global cap starts
     -- refusing traces the grid has room for, and leaves the evicted key in
     -- `located` pointing at a cell it is no longer in -- a lookup table that
@@ -385,6 +448,11 @@ end
 --- written in `evidence.collect`, so two officers cannot collect the same
 --- casing and a failed insert cannot leave half a collection behind.
 ---
+--- Taking first is what makes the second of those two officers find nothing, and
+--- it is also what puts the trace at risk if the write then fails. `Grid.restore`
+--- below is the other end of that, and a caller that takes without a failure path
+--- back to it has turned a deadlock into destroyed evidence.
+---
 --- @param traceKey string
 --- @return table|nil the removed trace, owner and all
 function Grid.take(traceKey)
@@ -417,6 +485,74 @@ function Grid.destroy(traceKey)
     stats.destroyed = stats.destroyed + 1
 
     return item
+end
+
+--- Puts a taken trace back exactly as it was.
+---
+--- The undo for `Grid.take`, and it exists because taking is the first half of a
+--- collection and the database write is the second. `evidence.collect` writes the
+--- item, the owner row and the first link of the custody chain in one transaction
+--- (8.5, 8.6); if that transaction fails -- a deadlock, a dropped oxmysql
+--- connection, the owner CHECK on a trace nothing can be attributed to -- the
+--- trace has already left the world and no row was ever written, so a piece of
+--- evidence is destroyed permanently by an infrastructure hiccup. This is what
+--- the failure path calls so that the casing is lying where it was.
+---
+--- **It takes the item, not a description of one**, and `Grid.place` cannot do
+--- its job: `place` mints a new key, stamps `createdAt` at now and clears
+--- `revealed` and `cleaned`, so a restored latent print would come back under a
+--- key the officer's client has never seen, younger than it is, and invisible
+--- again to the officer who dusted it. What went out of `Grid.take` is what comes
+--- back in here, and it is filed as it stands.
+---
+--- No cap applies. Neither the world cap nor the cell's is a reason to refuse a
+--- restore: the trace was inside both of them a moment ago, its place was
+--- counted out by the take that is being undone, and refusing it would destroy
+--- the evidence this function exists to save. It cannot merge either -- merging
+--- would hand its `count` to another row and lose the key with it.
+---
+--- The counters do not move. `Grid.take` has already booked a collection, and a
+--- restore does not un-book it: `collected` therefore counts claims handed to
+--- `evidence.collect`, including the rare one that was rolled back afterwards.
+--- That is a real overcount and it is left alone deliberately -- the shape of
+--- `Grid.stats` is what the M7 health screen (7.30) will be written against and
+--- it should be settled once, with that screen, rather than grown a counter at a
+--- time by whoever is passing.
+---
+--- The three field checks are not ceremony either. This is the path a failure
+--- runs down, and a `nil` position reaching `cellKey` would raise inside
+--- whatever was already handling the first failure.
+---
+--- @param item table the trace `Grid.take` or `Grid.destroy` handed out
+--- @return boolean whether the grid now holds it because of this call; false for
+---   something that is not a trace, and for a key the grid already holds -- a
+---   second restore of the same trace is a bug in the caller and must not put a
+---   duplicate row in the world
+function Grid.restore(item)
+    if type(item) ~= 'table' then return false end
+    if type(item.key) ~= 'string' then return false end
+    if type(item.x) ~= 'number' or type(item.y) ~= 'number' then return false end
+
+    if locate(item.key) then return false end
+
+    local cellKey = service.cellKey(item.x, item.y, config.cellSize)
+    local cell = cells[cellKey]
+
+    if not cell then
+        cell = {}
+        cells[cellKey] = cell
+    end
+
+    cell[#cell + 1] = item
+    located[item.key] = cellKey
+    itemCount = itemCount + 1
+
+    -- So the clients standing over it are told, within the second, that it is
+    -- there again -- and only the clients whose own tier changed, which for a
+    -- latent print nobody has revealed is nobody at all (8.11).
+    touch(cellKey)
+
+    return true
 end
 
 --- Reads a trace without removing it. Server-side callers only: what comes back
