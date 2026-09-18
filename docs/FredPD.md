@@ -1699,6 +1699,17 @@ because 7.16 lists what a dispatcher does and these are what an officer does:
   `cad.call.note` because it reaches into the registers, and the handler runs
   the access check the register itself would.
 
+**A group that holds `cad.call.link` must also hold `rms.person.view` and
+`rms.vehicle.view`.** `call.link` takes a register row id and refuses a typed
+name or plate (7.16), so the only way to produce one is `person.search` or
+`vehicle.search`, and those two routes are gated on the register keys. A group
+given the link key without them is given a route it cannot reach: every search
+on the call card's picker answers `forbidden`. The seed grants both to
+`dispatch` beside the ALPR keys — granted again rather than inherited, since
+`dispatch` inherits `patrol_basic` and not `patrol` — and they unlock four read
+routes (`person.search`, `person.get`, `vehicle.search`, `vehicle.get`) with
+clearance (4.5) and the `fields.*` grants still deciding what comes back.
+
 7.16's *"cannot be cleared without supervisor acknowledgement"* is checked with
 `cad.unit.manage` rather than an acknowledgement key of its own: the groups that
 hold it — supervisor, command, dispatch — are exactly the ones who may give the

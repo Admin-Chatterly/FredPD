@@ -651,7 +651,7 @@
                   disabled={busy}
                   onclick={() => void unlink(link)}
                 >
-                  {t('admin.roleMap.remove')}
+                  {t('cad.link.remove')}
                 </button>
               </li>
             {/each}
@@ -659,7 +659,20 @@
         {/if}
 
         <!-- The picker. A link is to a record, so the id comes from the
-             register and never from a name typed on this form. -->
+             register and never from a name typed on this form.
+
+             `cad.link.add` and `cad.link.remove` are this section's own keys
+             rather than the two that were borrowed first. The link button read
+             `cad.selfAssign.action` -- "Attach to call" -- which is the label
+             on the button further down that attaches *your unit*, so the card
+             carried two differently-behaved buttons under one name: ambiguous
+             to a screen reader, ambiguous to a role-based test, and a dispatcher
+             who meant one and pressed the other joined a call they were only
+             filing a name against. The unlink button read
+             `admin.roleMap.remove`, which is a working label borrowed from a
+             screen this module has nothing to do with: rewording the Discord
+             role table would have silently reworded a call card. -->
+
         <form class="mt-2 flex flex-wrap items-end gap-2 text-xs" onsubmit={searchTargets}>
           <label class="flex flex-col gap-1">
             <span class="text-[var(--color-ink-muted)]">{t('cad.column.type')}</span>
@@ -695,7 +708,12 @@
         </form>
 
         {#if searched}
-          {#if candidates.length === 0}
+          {#if candidates.length === 0 && restrictedCandidates === 0}
+            <!-- Nothing matched at all. A search that matched only records this
+                 reader may not open is a different answer and is given by the
+                 withheld line below instead: "No person matches" over a term
+                 that plainly did match one would have the dispatcher retyping a
+                 name the register knows perfectly well. -->
             <p class="mt-1 text-xs text-[var(--color-ink-muted)]">
               {t(`records.${linkKind}.empty`)}
             </p>
@@ -725,7 +743,7 @@
                     disabled={busy}
                     onclick={() => void linkTarget(candidate)}
                   >
-                    {t('cad.selfAssign.action')}
+                    {t('cad.link.add')}
                   </button>
                 </li>
               {/each}
@@ -733,11 +751,18 @@
           {/if}
 
           {#if restrictedCandidates > 0}
-            <!-- A record this reader may be told about and not read (4.5). It
-                 has no id, so there is nothing to link; saying so beats a
-                 shorter list the dispatcher cannot account for. -->
+            <!-- Records this reader may be told about and not read (4.5). They
+                 have no id, so there is nothing to link; saying how many beats
+                 a shorter list the dispatcher cannot account for.
+
+                 The count and not a row each, unlike the register's own result
+                 list: there the stub is an entry you act on by ringing the unit
+                 named on it, and here it is the reason a name the dispatcher
+                 can see in front of them is missing from the picker. One line
+                 answers that; five rows of "Restricted record" would bury the
+                 candidates that can actually be linked. -->
             <p class="mt-1 text-xs text-[var(--color-ink-muted)]">
-              {t('records.restricted.title')}
+              {t('cad.link.withheld', { count: restrictedCandidates })}
             </p>
           {/if}
         {/if}

@@ -281,6 +281,43 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('dispatch', 'alpr.read.view'),
     ('dispatch', 'alpr.hotlist.manage'),
 
+    -- The register reads, granted again for the same reason and for a sharper
+    -- one: WITHOUT THESE TWO ROWS `cad.call.link` ABOVE IS A KEY WITH NOTHING
+    -- BEHIND IT. `call.link` takes a register row id and refuses a name or a
+    -- plate deliberately (7.16), so the only way to obtain one is
+    -- `person.search` or `vehicle.search` -- and those are gated on these keys.
+    -- A dispatcher granted `cad.call.link` and not these pressed Search on the
+    -- call card, was answered `forbidden`, and could never reach the route the
+    -- seed had just given them. The comment above `('patrol', 'cad.call.link')`
+    -- says linking "reaches into the registers: the handler runs the same
+    -- access check `rms.person.view` would"; this is the other half of that
+    -- sentence written down, because a group that may link has to be able to
+    -- read what it is linking.
+    --
+    -- `page.records` is already here through `patrol_basic`, so the rail has
+    -- been opening the register for dispatchers all along and every search on
+    -- it refused. These rows make the page do what the rail already advertised.
+    --
+    -- What they unlock is four read routes and nothing else: `person.search`,
+    -- `person.get`, `vehicle.search`, `vehicle.get`. Running names and plates
+    -- is the canonical dispatcher job, and every other control still applies
+    -- unchanged -- `dispatch` holds `clearance.internal` and nothing above it,
+    -- so a restricted record still comes back as the 4.5 stub, and the two
+    -- field grants are somebody else's: `fields.victim_address.view` is
+    -- `supervisor`'s and `fields.mental_health.view` is `command`'s.
+    --
+    -- What is deliberately NOT here: every `rms.*.edit` and `rms.vehicle.flag`
+    -- (a dispatcher reads the register, they do not correct it);
+    -- `rms.firearm.view`, because nothing a dispatcher does reaches the weapons
+    -- register and a link is only ever to a person or a vehicle
+    -- (`Repo.linkTarget` knows those two kinds and no other); and the unified
+    -- query keys `query.run`, `query.person.run`, `query.vehicle.run` and
+    -- `query.hit.confirm`, which stay with `patrol` -- opening a record is not
+    -- the same act as running a 7.2 query, and confirming a hot-file hit is a
+    -- decision for the officer standing at the car.
+    ('dispatch', 'rms.person.view'),
+    ('dispatch', 'rms.vehicle.view'),
+
     -- -------------------------------------------------------------------------
     -- Record clearance (spec 4.5, Appendix B and C)
     -- -------------------------------------------------------------------------

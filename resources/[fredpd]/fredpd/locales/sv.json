@@ -1182,6 +1182,11 @@
       "witness": "Vittne",
       "involved": "Inblandad"
     },
+    "link": {
+      "add": "Koppla till händelsen",
+      "remove": "Ta bort koppling",
+      "withheld": "{count} skyddade — kan inte kopplas"
+    },
     "logKind": {
       "created": "Upprättad",
       "note": "Anteckning",

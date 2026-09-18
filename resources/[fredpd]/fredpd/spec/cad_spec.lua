@@ -1218,7 +1218,7 @@ describe('cad', function()
                 assert.is_true(binds(status, '100000000000000041'))
             end)
 
-            it('gives back what the call put them in, and nothing else', function()
+            it('names the two statuses the call itself put them in', function()
                 repo.releaseUnits('lspd', 90, { unit() }, actor())
 
                 local status = statementWith('UPDATE fpd_units')

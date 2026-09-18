@@ -1182,6 +1182,11 @@
       "witness": "Witness",
       "involved": "Involved"
     },
+    "link": {
+      "add": "Link to call",
+      "remove": "Unlink",
+      "withheld": "{count} restricted — cannot be linked"
+    },
     "logKind": {
       "created": "Created",
       "note": "Note",
