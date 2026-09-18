@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
 /**
- * The officer-down banner against the mock bridge (spec 7.16).
+ * The officer-down banner and the call card's acknowledgement (spec 7.16).
  *
  * This file exists because of a button that could only ever be refused. The
  * tone `unit.emergency` sends deliberately reaches past the people who may
@@ -20,6 +20,16 @@ import type { Page } from '@playwright/test';
  * and does not invent one: present when the flag says yes, absent when it says
  * no, and absent when there is no flag at all -- a server that has not learned
  * to send it must not be read as a yes (invariant 4).
+ *
+ * The second describe covers the *card*, and it is here rather than in
+ * `dispatch.spec.ts` because it is the same defect one component further on.
+ * Gating the banner left the identical button on the call card, which
+ * `page.dispatch` alone opens and which the banner's own Respond button walks
+ * you to -- so the officer who had just been correctly refused the button was
+ * offered it again two clicks later, directly above the line telling them the
+ * call cannot be cleared until somebody acknowledges it. `call.get` answers
+ * `mayAcknowledge` for the card the way `unit.emergency` answers it for the
+ * tone, and these assert the card draws that and nothing else.
  *
  * The push arrives as a `window` message, which is the shape the real transport
  * uses inside CEF; `modules/cad/push.ts` is what makes the mock bridge accept
@@ -164,5 +174,85 @@ test.describe('the officer-down banner', () => {
     await expect(page.getByText('3A-12 — nödlarm vid Vespucci Blvd')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Rycker ut' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Kvittera' })).toBeVisible();
+  });
+});
+
+/**
+ * Opens the card of the colleague's panic that the fixtures seed (call 4).
+ *
+ * By type and not by number: a call number carries the date it was allocated
+ * (`260918-0044`, Appendix D), so a test that matched on one would pass on the
+ * day it was written and never again. `Not acknowledged` in the card header is
+ * what proves the card that opened is the emergency and not the P1 above it in
+ * the queue.
+ */
+async function openColleaguePanic(page: Page, locale?: string): Promise<void> {
+  const swedish = locale === 'sv';
+
+  await openConsole(page, locale);
+  await page
+    .getByRole('button', { name: swedish ? /Polis i nöd/ : /Officer in distress/ })
+    .click();
+
+  await expect(
+    page.getByText(swedish ? 'Inte kvitterat' : 'Not acknowledged'),
+  ).toBeVisible();
+}
+
+test.describe('the call card acknowledgement', () => {
+  test('draws Acknowledge on the card of a colleague\'s unacknowledged panic', async ({ page }) => {
+    await openColleaguePanic(page);
+
+    // Nothing was pushed, so no banner is on screen and the only Acknowledge
+    // that can match is the card's. That is also why this cannot be folded into
+    // the banner tests above: with both drawn, neither assertion says which
+    // button it found.
+    await expect(page.getByRole('button', { name: 'Acknowledge' })).toHaveCount(1);
+  });
+
+  test('signs the emergency off and stops offering to do it again', async ({ page }) => {
+    await openColleaguePanic(page);
+
+    await page.getByRole('button', { name: 'Acknowledge' }).click();
+
+    // `call.acknowledge` writes who gave it, and the header reads it back --
+    // the column is `acknowledged_by` and a second press is refused on
+    // `acknowledged_at IS NULL`, so the button has nothing left to do.
+    //
+    // `exact` because the narrative underneath says the same thing in a
+    // sentence ("Emergency acknowledged by 12-40."), which is the generated
+    // line 7.16.1 pairs with this write and not the header being asserted.
+    await expect(page.getByText('Acknowledged by 12-40', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Acknowledge' })).toHaveCount(0);
+  });
+
+  test('draws no Acknowledge on the card the banner\'s own Respond opens', async ({ page }) => {
+    await openConsole(page);
+
+    // The exact walk that made this a defect. The session raises its own panic,
+    // the tone comes back with `mayAcknowledge: false` -- the server refuses
+    // the officer named in `created_by` before it even looks at the permission
+    // -- and Respond then opens the card for that same call. The card used to
+    // draw the button the banner had just withheld.
+    await page.locator('nav').last().getByRole('button', { name: 'Units', exact: true }).click();
+    await page.getByRole('button', { name: 'Emergency', exact: true }).click();
+    await page.getByRole('button', { name: 'Emergency', exact: true }).click();
+
+    await expect(page.getByText('12-40 — emergency')).toBeVisible();
+    await page.getByRole('button', { name: 'Respond' }).click();
+
+    // The card is open on that call: it is a panic, and nobody has signed it
+    // off, so the warning under Clear is drawn -- which is precisely the line
+    // that used to sit under a button this officer could never press.
+    await expect(
+      page.getByText('An emergency call cannot be cleared until a supervisor has acknowledged it.'),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Acknowledge' })).toHaveCount(0);
+  });
+
+  test('renders the card acknowledgement in Swedish', async ({ page }) => {
+    await openColleaguePanic(page, 'sv');
+
+    await expect(page.getByRole('button', { name: 'Kvittera' })).toHaveCount(1);
   });
 });

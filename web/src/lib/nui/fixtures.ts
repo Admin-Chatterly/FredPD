@@ -779,7 +779,11 @@ function callNumberFor(sequence: number): string {
   return `${stamp}-${String(sequence).padStart(4, '0')}`;
 }
 
-let nextCallId = 4;
+// Four calls are seeded below, so the first one raised in the browser is 5. A
+// stale counter here would hand `unit.emergency` an id a seeded row already
+// holds, and `findCall` returns the first match — so the panic would open
+// somebody else's card.
+let nextCallId = 5;
 let nextLogId = 20;
 let nextAssignmentId = 10;
 let nextBroadcastId = 3;
@@ -789,6 +793,7 @@ let callSequence = 44;
 const shotsFired = minutesAgo(4);
 const collision = minutesAgo(26);
 const welfare = minutesAgo(52);
+const colleaguePanic = minutesAgo(2);
 
 let cadCalls: CadCall[] = [
   {
@@ -875,6 +880,50 @@ let cadCalls: CadCall[] = [
     acknowledgedBy: null,
     acknowledgedAt: null,
   },
+  {
+    /**
+     * Somebody else's panic, still unacknowledged.
+     *
+     * The console could not reach this state before, and that is why the call
+     * card's Acknowledge button shipped ungated: the only emergency a browser
+     * could produce was the session's own, raised through the button on the
+     * unit board, and `call.acknowledge` refuses that one on `created_by`
+     * whatever permission the presser holds. So the one card that has a live
+     * Acknowledge on it — a colleague's panic, opened by somebody who may sign
+     * it off — had never been drawn outside the game, in a module whose whole
+     * failure mode is a button drawn to more people than may press it.
+     *
+     * `2L-30` raised it, which is what `mayAcknowledge` below reads: the unit
+     * row and the lead assignment are seeded to match, because
+     * `unit.emergency` writes all three (the call, the assignment, the status)
+     * and a fixture that seeded one of them would be a board state the route
+     * cannot produce.
+     */
+    id: 4,
+    agencyId: 'lspd',
+    callNumber: callNumberFor(44),
+    type: 'officer_emergency',
+    priority: 1,
+    status: 'dispatched',
+    x: 402.8,
+    y: -996.1,
+    z: 29.4,
+    locationText: null,
+    beatId: 2,
+    callerName: null,
+    callerPhone: null,
+    source: 'panic',
+    sourceResource: null,
+    receivedAt: colleaguePanic.at,
+    receivedAtUnix: colleaguePanic.unix,
+    dispatchedAt: colleaguePanic.at,
+    enRouteAt: null,
+    onSceneAt: null,
+    clearedAt: null,
+    disposition: null,
+    acknowledgedBy: null,
+    acknowledgedAt: null,
+  },
 ];
 
 let cadAssignments: CadAssignment[] = [
@@ -885,6 +934,18 @@ let cadAssignments: CadAssignment[] = [
     callsign: '3A-12',
     isLead: 1,
     joinedAt: minutesAgo(24).at,
+    leftAt: null,
+    active: 1,
+  },
+  {
+    // The officer who pressed the button, on their own call and lead on it,
+    // exactly as `unit.emergency` attaches them.
+    id: 2,
+    callId: 4,
+    officerId: 3,
+    callsign: '2L-30',
+    isLead: 1,
+    joinedAt: colleaguePanic.at,
     leftAt: null,
     active: 1,
   },
@@ -958,6 +1019,28 @@ let cadLog: CadLogEntry[] = [
     callsign: null,
     createdAt: welfare.at,
     createdAtUnix: welfare.unix,
+  },
+  {
+    id: 7,
+    callId: 4,
+    entryType: 'created',
+    body: null,
+    messageKey: 'cad.log.created',
+    messageArgs: null,
+    callsign: '2L-30',
+    createdAt: colleaguePanic.at,
+    createdAtUnix: colleaguePanic.unix,
+  },
+  {
+    id: 8,
+    callId: 4,
+    entryType: 'unit_status',
+    body: null,
+    messageKey: 'cad.log.unit_status',
+    messageArgs: { callsign: '2L-30', status: 'emergency' },
+    callsign: '2L-30',
+    createdAt: colleaguePanic.at,
+    createdAtUnix: colleaguePanic.unix,
   },
 ];
 
@@ -1050,9 +1133,12 @@ let cadUnits: CadUnit[] = [
     officerId: 3,
     agencyId: 'lspd',
     callsign: '2L-30',
-    status: 'busy',
-    statusSince: minutesAgo(6).at,
-    statusSinceUnix: minutesAgo(6).unix,
+    // In distress, on the call they raised. `Cad.CALL_ENDED` is the only rule
+    // that frees `emergency`, so this row stays as it is until call 4 closes —
+    // which is the state a dispatcher is looking at when they acknowledge.
+    status: 'emergency',
+    statusSince: colleaguePanic.at,
+    statusSinceUnix: colleaguePanic.unix,
     beatId: 2,
     division: 'traffic',
     vehiclePlate: 'LSPD0501',
@@ -1062,11 +1148,11 @@ let cadUnits: CadUnit[] = [
     z: 29.4,
     heading: 10,
     positionAtUnix: minutesAgo(1).unix,
-    onCallId: null,
-    onCallLead: null,
-    onCallNumber: null,
-    onCallPriority: null,
-    onCallStatus: null,
+    onCallId: 4,
+    onCallLead: 1,
+    onCallNumber: callNumberFor(44),
+    onCallPriority: 1,
+    onCallStatus: 'dispatched',
   },
   {
     officerId: 4,
@@ -1208,6 +1294,31 @@ function refreshUnitAssignments(): void {
       onCallStatus: call ? call.status : null,
     };
   });
+}
+
+/**
+ * `call.get`'s answer to "may this session sign this emergency off?" (7.16).
+ *
+ * `Cad.canAcknowledge` makes four tests and three of them are answerable here,
+ * in the same order: only a `panic` call has anything to acknowledge, a second
+ * press is refused because `acknowledged_at IS NULL` is in the repo's WHERE,
+ * and the officer named in `created_by` may not sign off their own distress
+ * call. The fourth is the permission — `cad.unit.manage`, which neither
+ * `patrol` nor `patrol_basic` holds — and fixtures are not a permission model
+ * (see the header): they describe what an authorized session sees, so that one
+ * is taken as satisfied.
+ *
+ * Who raised it is read off the lead assignment rather than a `createdBy` field
+ * invented for the fixture: `unit.emergency` attaches the caller to the call it
+ * creates and makes them lead in the same breath, so on a panic call the two
+ * are the same officer by construction.
+ */
+function mayAcknowledge(call: CadCall): boolean {
+  if (call.source !== 'panic' || call.acknowledgedAt !== null) return false;
+
+  const raisedBy = cadAssignments.find((row) => row.callId === call.id && row.isLead === 1);
+
+  return raisedBy?.officerId !== OWN_OFFICER_ID;
 }
 
 /**
@@ -1567,6 +1678,12 @@ export const fixtures: FixtureSet = {
         // coordinates to measure from — the welfare check above has none, so
         // opening it draws no recommendation panel at all.
         ...(call.x === null ? {} : { recommended: recommendFor(call) }),
+        // Whether this card may offer 7.16's supervisor sign-off, decided here
+        // and not on the card. Sent on every call and not only on a panic, the
+        // way the route sends it: a field that appeared and vanished with the
+        // call's source would have the card reasoning about why it is missing,
+        // and absent already means something — no.
+        mayAcknowledge: mayAcknowledge(call),
       };
     },
 
@@ -2224,7 +2341,8 @@ export const fixtures: FixtureSet = {
       //
       // For the other half — a colleague's emergency, which a supervisor may
       // sign off — post one from the devtools console with the same shape and
-      // `mayAcknowledge: true`; `tests/dispatch.spec.ts` covers both.
+      // `mayAcknowledge: true`, or open call 4, which is seeded as one.
+      // `tests/emergency.spec.ts` covers both, on the banner and on the card.
       push({
         type: 'fredpd:cad:emergency',
         call,

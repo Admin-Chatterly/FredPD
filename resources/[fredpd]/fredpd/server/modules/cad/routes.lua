@@ -433,6 +433,51 @@ local function supervises(session)
     return perms.satisfies(session.permissions, SUPERVISE)
 end
 
+--- May this session acknowledge this call (7.16), and may it be told so?
+---
+--- One definition with two readers, because the answer is drawn twice on two
+--- screens and the two had drifted apart with nothing to notice it. The
+--- emergency tone carries it as `mayAcknowledge` so the banner knows whether to
+--- offer the button; `call.get` carries the same field for the card, which is
+--- where the banner's own Respond button lands.
+---
+--- The recipients of that tone deliberately reach past `cad.unit.manage` -- a
+--- patrol officer 200 m away is exactly who should be running -- so most of the
+--- people who see an emergency may not acknowledge it. Drawn to them, the
+--- button was guaranteed to refuse: it never cleared the banner, and every
+--- press wrote an `audit.denied` row against somebody who had done nothing
+--- wrong. Gating the banner alone left the identical button on the call card,
+--- which is drawn to every `page.dispatch` holder, so the same press was one
+--- screen further along.
+---
+--- Every test `call.acknowledge` itself makes, in its order, so the field
+--- cannot say yes to a button that would be refused:
+---
+---   * only an emergency call has anything to acknowledge, and the route
+---     answers `not_supported` for anything else;
+---   * a second press is `nothing_to_change` -- `acknowledged_at IS NULL` is in
+---     the repo's WHERE, because who acknowledged an officer's emergency is not
+---     a field a later press rewrites;
+---   * the person in distress may not sign off their own emergency, which is
+---     the one thing 7.16 asks to be impossible. `created_by` is written by the
+---     server from the raiser's own session, so the comparison is against a
+---     fact rather than a claim -- and it is why a *supervisor* who presses
+---     panic is not shown the one Acknowledge button in the department that can
+---     never work;
+---   * and the permission, which is `cad.unit.manage` (Appendix B).
+---
+--- A nil call is not acknowledgeable, for the reason `board.mayRead` gives:
+--- an unknown row is not a readable one, and this is called on rows read back
+--- after a write.
+local function canAcknowledge(session, call)
+    if not call then return false end
+
+    return call.source == EMERGENCY.source
+        and not call.acknowledgedAt
+        and call.createdBy ~= session.discordId
+        and perms.satisfies(session.permissions, SUPERVISE)
+end
+
 --- Turns a list of officer id strings into integers, or refuses.
 ---
 --- The validator has no integer-list type, so `CallDispatch` sends ids as
@@ -803,6 +848,13 @@ route.define({
             log = log,
             links = repo.callLinks(session.agencyId, input.id),
             recommended = recommended,
+            -- Beside `recommended`, and for the same reason it is here rather
+            -- than on the row: both are answers about *this reader*, and a
+            -- field on the call itself would be pushed to everybody and
+            -- computed against nobody. The card draws the Acknowledge button on
+            -- it (see `canAcknowledge`), which is the button the emergency
+            -- banner's own Respond lands in front of.
+            mayAcknowledge = canAcknowledge(session, call),
         }
     end,
 })
@@ -1173,9 +1225,33 @@ route.define({
         -- no rows if somebody closed the call between the read above and the
         -- write. So the call is read back: this is a conflict rather than a
         -- quiet success, or the second officer would believe they closed it.
+        --
+        -- **What it is read back for is the signature, not the status.** Asking
+        -- whether the call is closed is the one question that cannot tell the
+        -- two apart: losing the race means it is closed *by definition*, so
+        -- `CLOSED[after.status]` is true precisely when this handler changed
+        -- nothing, and the guard let the loser through every time. It only ever
+        -- fired for a row that had vanished. What the loser then returned was
+        -- their own disposition, which was never stored -- and `route.define`'s
+        -- declarative entry wrote `cad.call.cleared` naming them as having
+        -- closed the call with it, into a log that is append-only (invariant
+        -- 11) and cannot be corrected afterwards. Their own console reloads and
+        -- shows the winner's disposition, so nothing on screen contradicts it.
+        --
+        -- `cleared_by` and `disposition` are written by the same guarded UPDATE
+        -- in the same statement, and nothing else in the module writes either,
+        -- so a row carrying this session's Discord id and the disposition they
+        -- sent is this session's write and no other's. The repo's transaction
+        -- cannot answer it directly: `Db.transaction` reports commitment and
+        -- not row counts, and `@fpd_changed` is a connection variable that does
+        -- not survive the connection going back to the pool.
         local after = repo.getCall(session.agencyId, input.callId)
 
-        if not after or not CLOSED[after.status] then
+        if not after
+            or not CLOSED[after.status]
+            or after.clearedBy ~= session.discordId
+            or after.disposition ~= input.disposition
+        then
             return route.refuse(FredPD.ErrorCode.CONFLICT, { callId = 'call_cleared' })
         end
 
@@ -1501,6 +1577,42 @@ route.define({
             return route.refuse(FredPD.ErrorCode.INVALID, { status = 'nothing_to_change' })
         end
 
+        -- **A unit nobody is behind is not put back on the board from here.**
+        --
+        -- This handler is the only writer that can move a row out of
+        -- `off_duty`, and it is coupled to nothing that owns the row's
+        -- lifecycle. `events.lua` puts a unit on the board by observing duty,
+        -- keeps a grace clock per dropped officer and signs them off when it
+        -- expires; all three of those live in `known`, `dropped` and the
+        -- sessions the duty pass walks. A row resurrected here has none of
+        -- them: the officer went home an hour ago, `Events.pass` never observes
+        -- them, `playerDropped` has already fired, and nothing will ever take
+        -- the row down again until the server restarts. What dispatch sees in
+        -- the meantime is a unit at an hour-old position that `Cad.isFree`
+        -- reports as free and `recommendUnits` offers first.
+        --
+        -- It is reachable rather than theoretical: `UnitList` accepts every
+        -- member of `UNIT_STATUSES` and `listUnits` honours a status filter
+        -- ahead of its `off_duty` default, so a supervisor can list the
+        -- signed-off units and manage one straight off that list.
+        --
+        -- The refusal pairs with `ownUnit`'s, which already answers `off_duty`
+        -- for a session trying to work from a signed-off row of their own, and
+        -- it leaves `events.lua` the single owner of putting a row on the board
+        -- -- which is what Appendix B states: an officer who is missing from
+        -- the board is missing the grant, duty, or a callsign, and a supervisor
+        -- cannot add them with `unit.manage`.
+        --
+        -- Only the status half is refused. A callsign or a beat corrected on a
+        -- signed-off unit changes nothing about who is on the board, and a
+        -- supervisor tidying the roster between shifts is doing the job.
+        if unit.status == FredPD.UnitStatus.OFF_DUTY
+            and input.status ~= nil
+            and input.status ~= FredPD.UnitStatus.OFF_DUTY
+        then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { officerId = 'off_duty' })
+        end
+
         -- The two changes that read as discipline afterwards need a reason, and
         -- the schema cannot say "required unless". Taking a unit off the road or
         -- signing somebody else off is what an audit entry has to explain months
@@ -1513,6 +1625,65 @@ route.define({
         end
 
         local callsign = text(input.callsign)
+
+        -- **Signing a unit off takes them off the call, before the status
+        -- moves.** `off_duty` is on `SUPERVISOR_UNIT_STATUSES` precisely so a
+        -- supervisor can end somebody's shift, and until this ran that path
+        -- relabelled the row and left `fpd_call_units` alone -- which is the
+        -- first of the three states `events.lua`'s header enumerates and
+        -- rejects, "the worst of the three, and it is what doing nothing gives
+        -- you". The unit drops off the board (`listUnits` excludes `off_duty`
+        -- and no reload brings it back) while its assignment is still live, so
+        -- the call card goes on listing them, `unitCount` goes on counting
+        -- them, and `uq_fpd_call_units_live` refuses to let them rejoin. A
+        -- dispatcher reading the queue sees a P1 that is covered and sends
+        -- nobody.
+        --
+        -- It does not heal. `events.pass` compares against `known[officerId]`,
+        -- where the officer is still on duty and still connected -- the normal
+        -- case for an end-of-shift or disciplinary sign-off -- sees no
+        -- transition, and writes nothing.
+        --
+        -- The call first, as `events.signOff` argues: stopping half way leaves
+        -- a unit still on the board, which is a state a dispatcher can act on,
+        -- where the other order leaves a call held by a unit nobody can see.
+        -- Doing it first is also what lets the release give the status back:
+        -- `releaseUnits` frees `en_route` and `on_scene`, and after the row
+        -- reads `off_duty` it would match nothing.
+        --
+        -- `CALL_RELEASED` through `releaseUnits`, so the call stays open and a
+        -- live panic stays raised -- a supervisor ending a shift has not
+        -- established that the robbery is over, and it is not theirs to close
+        -- with a disposition nobody chose.
+        --
+        -- The subject's callsign is on the `unit_left` line and the supervisor
+        -- is in the author columns, which is the difference between this and
+        -- the duty path: the narrative reads as the unit coming off the call,
+        -- and who took them off is beside it. There is no `unit_status` line to
+        -- go with it -- `logUnitStatus` below finds no assignment by then, and
+        -- the line that belongs to the call is the one saying they left it. The
+        -- reason the supervisor typed is on the audit row.
+        --
+        -- Guarded on the unit not already being `off_duty`, so nothing is
+        -- written behind the `nothing_to_change` refusal below: with the status
+        -- genuinely moving, `setUnitStatus` matches its row and `changed` is
+        -- never zero.
+        local leftCallId = nil
+
+        if input.status == FredPD.UnitStatus.OFF_DUTY
+            and unit.status ~= FredPD.UnitStatus.OFF_DUTY
+        then
+            local assignment = repo.activeAssignment(session.agencyId, unit.discordId)
+
+            if assignment then
+                repo.releaseUnits(session.agencyId, assignment.callId, {
+                    { discordId = unit.discordId, callsign = callsign or unit.callsign },
+                }, actorOf(session))
+
+                leftCallId = assignment.callId
+            end
+        end
+
         local changed = repo.updateUnit(session.agencyId, input.officerId, {
             callsign = callsign,
             beatId = input.beatId,
@@ -1542,6 +1713,18 @@ route.define({
         end
 
         board.unitChanged(session.agencyId, repo.getUnit(session.agencyId, input.officerId))
+
+        -- And the call the sign-off took them off, which is a call this handler
+        -- was never asked about. Its card lost a unit and its queue row lost a
+        -- unit from the count, and the consoles holding it are not the console
+        -- that made this write -- so without this push they keep a call that
+        -- reads as covered by somebody who has gone home. Through
+        -- `board.callChanged` like every other call push, so the recipients are
+        -- filtered by the same access check a read makes (invariants 4 and 5).
+        if leftCallId then
+            board.callChanged(
+                session.agencyId, repo.getCall(session.agencyId, leftCallId))
+        end
 
         if input.status then
             TriggerEvent('fredpd:unitStatusChanged', {
@@ -1695,24 +1878,15 @@ route.define({
 
         --- May this recipient act on the banner they are about to be shown?
         ---
-        --- The recipient rule above deliberately reaches past `cad.unit.manage`:
-        --- a patrol officer 200 m away is exactly who should be running, so most
-        --- of the people this tone reaches are people who may not acknowledge
-        --- it. The banner has to say which it is, and it could not: the NUI drew
-        --- Acknowledge for every recipient, `call.acknowledge` is gated on
-        --- `cad.unit.manage`, so a patrol officer got a banner whose only button
-        --- was guaranteed to refuse -- it never cleared, and every press wrote an
-        --- `audit.denied` row against somebody who had done nothing wrong.
-        ---
-        --- The same two tests `call.acknowledge` itself makes, and not just the
-        --- permission: the officer who pressed the button is refused there by
-        --- `created_by`, so a *supervisor* who presses panic would otherwise be
-        --- shown the one Acknowledge button in the department that can never
-        --- work. `call.createdBy` is this session's own Discord id, written by
-        --- the server a moment ago, which is what makes that comparison safe.
+        --- `canAcknowledge` and not a rule of its own: the card draws the same
+        --- button off the same field and the two answers have to be the one
+        --- answer. The row it is asked about is the call this handler has just
+        --- written, so `createdBy` is this session's own Discord id and
+        --- `acknowledgedAt` is NULL -- the two tests that are peculiar to a call
+        --- somebody else raised earlier cost nothing here and keep the rule in
+        --- one place.
         local function mayAcknowledge(other)
-            return other.discordId ~= session.discordId
-                and perms.satisfies(other.permissions, SUPERVISE)
+            return canAcknowledge(other, call)
         end
 
         -- Two complementary pushes and not `push.perSession`, for the reason
@@ -1799,14 +1973,29 @@ route.define({
         local id = repo.createBroadcast(session.agencyId, broadcast, session.discordId)
         if not id then return route.refuse(FredPD.ErrorCode.INTERNAL) end
 
-        broadcast.id = id
+        -- The row, and not the table this handler assembled from input.
+        --
+        -- They are not the same message. The row carries `expiresAt`, computed
+        -- by the database from its own clock, where the input carries the
+        -- minutes that were asked for; and it carries `createdAt`, `callId` and
+        -- `cancelledAt`, which the board renders and the assembled table has
+        -- never had. The comment that stood here said the board "refetches when
+        -- it wants the expiry", and nothing refetches: `broadcast.list` runs on
+        -- mount and when a filter moves, and the console does not poll. So a
+        -- BOLO put out mid-shift sat on every other console with no time on it
+        -- and no expiry until that console was remounted.
+        --
+        -- A read-back rather than a guess, and the same columns the list read
+        -- answers in (`BROADCAST_COLUMNS`), which is the property that matters:
+        -- a push and a list of the same thing have to be the same shape, or the
+        -- merge on the other side is comparing two different records.
+        local written = repo.getBroadcast(session.agencyId, id) or broadcast
 
-        -- What was just written, without `createdAt` or `expiresAt`: the insert
-        -- does not report them. The board has the id and refetches when it wants
-        -- the expiry; this is enough to put the message on the air now.
-        board.toDispatch(session.agencyId, 'fredpd:cad:broadcast', { broadcast = broadcast })
+        written.id = id
 
-        return { id = id, broadcast = broadcast }
+        board.toDispatch(session.agencyId, 'fredpd:cad:broadcast', { broadcast = written })
+
+        return { id = id, broadcast = written }
     end,
 })
 

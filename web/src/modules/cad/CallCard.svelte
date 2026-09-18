@@ -46,13 +46,23 @@
    * a button would be a second access control in the one place it cannot be
    * enforced (invariant 4).
    *
-   * The one thing that is drawn conditionally is the **recommendation**, and
-   * that is because the server decides whether to send it at all: `call.get`
-   * returns `recommended` only for a session that may dispatch, and only for a
-   * call that has coordinates to measure from. Absent is not the same as empty
-   * — no panel, against a panel that says there is nobody to recommend — and a
-   * card that assumed the list was always there would draw an empty picker at
-   * every officer in the department.
+   * Two things are drawn conditionally, and in both cases the server is what
+   * decided:
+   *
+   *   * the **recommendation**. `call.get` returns `recommended` only for a
+   *     session that may dispatch, and only for a call that has coordinates to
+   *     measure from. Absent is not the same as empty — no panel, against a
+   *     panel that says there is nobody to recommend — and a card that assumed
+   *     the list was always there would draw an empty picker at every officer
+   *     in the department.
+   *   * the **acknowledgement**, on `mayAcknowledge`. That one is here because
+   *     a refusal the card cannot read out is not a refusal an officer can act
+   *     on: `call.acknowledge` is gated on `cad.unit.manage`, and the
+   *     permission check runs before any handler, so it answers a bare
+   *     `forbidden` with no `fields` — nothing for the panel at the bottom of
+   *     this card to name — and leaves an `audit.denied` row behind every
+   *     press. Everything else listed above refuses with a code, which is the
+   *     line between an action that explains itself and a dead end.
    */
 
   interface Props {
@@ -974,10 +984,27 @@
           {/if}
         </div>
 
-        {#if card.call.source === 'panic' && !card.call.acknowledgedAt}
+        {#if card.call.source === 'panic' && !card.call.acknowledgedAt && card.mayAcknowledge === true}
           <!-- 7.16: an emergency call cannot be cleared until a supervisor has
                acknowledged it, and the officer who raised it may not sign off
-               their own. Both refusals come from the server. -->
+               their own.
+
+               Both of those are still the server's answer — this draws it
+               rather than deciding it. `mayAcknowledge` is computed by
+               `call.get` from the two tests `call.acknowledge` itself makes,
+               and `=== true` is what makes a missing field draw less rather
+               than more: invariant 4 says the UI is never the access control,
+               so the failure worth defaulting away from is this card offering
+               something the server did not authorise. A server that has not
+               learned to send the field yet costs a supervisor one press on
+               the banner instead, which is the cheap half of being wrong.
+
+               It is read here as well as on the banner because the banner's own
+               Respond button lands on this card, and `page.dispatch` — which
+               every officer on the console holds — is all it takes to open one.
+               A gate on the banner alone left the identical button one
+               component away for the same session that had just been correctly
+               refused it. -->
           <div class="flex flex-col gap-1 text-xs">
             <span class="text-[var(--color-ink-muted)]">{t('cad.emergency.title')}</span>
             <button

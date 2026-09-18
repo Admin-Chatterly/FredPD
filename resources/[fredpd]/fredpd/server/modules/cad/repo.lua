@@ -407,16 +407,41 @@ function Repo.createCall(agencyId, input, actor)
     )
 end
 
---- One call.
+--- One call, in the same shape `listCalls` answers in.
 ---
 --- Cost: a primary-key lookup with the agency checked on the row, so a call id
 --- from another agency answers nothing rather than answering somebody else's
 --- call. FredPD is multi-agency and a read that forgets the agency does not
 --- return an empty list -- it returns the sheriff's calls to a city dispatcher,
 --- quietly (0007).
+---
+--- **`unitCount` is here because every push is built from this function.** It
+--- is the only queue field that changes when who-is-on-a-call changes, and it
+--- was on the list read and on no push at all. The NUI merges a pushed call
+--- over the queue row it already has and carries the previous count forward
+--- when the push omits the field -- which is the right merge, because the
+--- alternative is a call flashing "no unit" every time somebody writes a note
+--- on it. The consequence of the omission was therefore not a flicker but a
+--- number frozen at whatever it was when that console last read the list: a
+--- dispatch of three units left every other console reading "Unassigned", and
+--- a unit diverted away left the call it abandoned still counting them. Neither
+--- heals, because the console does not poll and `reload()` runs only on the
+--- client that made the write.
+---
+--- It is deliberately **not** in `CALL_COLUMNS`: `listCalls` appends its own
+--- copy of this subquery, and a column selected twice is an ambiguous name in
+--- the row that comes back. The two copies are the same statement on purpose,
+--- so the card and the queue row can never disagree about the count.
+---
+--- Cost of the subquery: one seek on `idx_fpd_call_units_call` per call read,
+--- beside the primary-key lookup every `callChanged` already pays.
 function Repo.getCall(agencyId, id)
     return db().single(
-        ([[SELECT %s FROM fpd_calls c WHERE c.agency_id = ? AND c.id = ?]]):format(CALL_COLUMNS),
+        ([[SELECT %s,
+                  (SELECT COUNT(*) FROM fpd_call_units cu
+                    WHERE cu.call_id = c.id AND cu.active = 1) AS unitCount
+             FROM fpd_calls c
+            WHERE c.agency_id = ? AND c.id = ?]]):format(CALL_COLUMNS),
         { agencyId, id }
     )
 end
@@ -667,6 +692,16 @@ end
 --- a link asserts nothing about what happened -- it is an index entry -- and the
 --- log line is the record that it was made and taken away.
 ---
+--- **The line is guarded on the DELETE having removed something**, the same
+--- `@fpd_changed` the clear and the release carry. `call.link` checks that the
+--- link is there before it asks for this, and says in as many words that the
+--- check exists so a removal writes no `unlinked` line about nothing -- but a
+--- check followed by a write is two statements two dispatchers can interleave,
+--- and both of them find the link. Without the guard the second one deletes
+--- nothing and still files a line, signed by them, saying they took off a link
+--- somebody else had already taken off. `fpd_call_log` is append-only
+--- (invariant 11), so that line stands for the life of the call.
+---
 --- @param link table { targetType, targetId, label }
 --- @return boolean committed
 function Repo.removeLink(agencyId, callId, link, actor)
@@ -676,7 +711,10 @@ function Repo.removeLink(agencyId, callId, link, actor)
                        WHERE agency_id = ? AND call_id = ? AND target_type = ? AND target_id = ?]],
             values = { agencyId, callId, link.targetType, link.targetId },
         },
-        logStatement(agencyId, callId, {
+        -- Immediately after the DELETE: `ROW_COUNT()` reports the statement
+        -- before it, so one statement in between would capture that one.
+        captureChanged(),
+        changedLogStatement(agencyId, callId, {
             entryType = 'unlinked',
             messageKey = service().logMessageKey('unlinked'),
             args = { label = link.label },
@@ -968,6 +1006,25 @@ end
 --- correctness here, which is why this is one function and not two calls from a
 --- route.
 ---
+--- **The line is guarded on the second statement having found the unit.** The
+--- route checks that the new lead is on the call after the dispatch it is
+--- applying, off a read taken before any of it was written; a unit that leaves
+--- the call in that window -- their own `call.dispatch`, their own sign-off,
+--- their own panic diverting them -- matches nothing here, and the transaction
+--- still commits. Unguarded, that wrote `lead_changed` naming an officer who is
+--- not on the call, into a log nothing can edit afterwards, while the call
+--- ended up with no lead at all.
+---
+--- What the guard does not fix is that the clear above has already run by then,
+--- so the previous lead loses the flag either way. That is the lesser of the
+--- two -- a call with nobody marked in charge is a state the card can show and
+--- a dispatcher can correct, where a narrative saying the lead moved to
+--- somebody who was not there is one nobody can correct -- and it cannot be
+--- guarded here: the clear has to run first for the unique key, and MariaDB
+--- will not have an UPDATE's own table in a subquery of its WHERE (error 1093).
+--- `call.dispatch` reads the board rows back and pushes both ends of the
+--- transfer, which is what puts the missing marker in front of somebody.
+---
 --- @param unit table { discordId, callsign }
 --- @return boolean committed
 function Repo.setLead(agencyId, callId, unit, actor)
@@ -982,7 +1039,11 @@ function Repo.setLead(agencyId, callId, unit, actor)
                        WHERE agency_id = ? AND call_id = ? AND left_at IS NULL AND discord_id = ?]],
             values = { agencyId, callId, unit.discordId },
         },
-        logStatement(agencyId, callId, {
+        -- Immediately after the statement whose count the line is guarded on,
+        -- for the reason `LOG_INSERT_CHANGED` gives: `ROW_COUNT()` reports the
+        -- statement before it and nothing else.
+        captureChanged(),
+        changedLogStatement(agencyId, callId, {
             entryType = 'lead_changed',
             messageKey = service().logMessageKey('lead_changed'),
             args = { callsign = unit.callsign },
@@ -1721,6 +1782,41 @@ function Repo.createBroadcast(agencyId, broadcast, discordId)
     )
 end
 
+--- What a broadcast is, wherever one is read.
+---
+--- A constant rather than a column list per statement, because the board is
+--- drawn from two sources that have to agree: `listBroadcasts` on mount, and
+--- the push `broadcast.create` sends to everybody else. The push used to carry
+--- the table the route had assembled from its own input, which was the same
+--- message in a different shape -- `minutes` where the row has `expiresAt`, and
+--- no `createdAt`, `cancelledAt` or `callId` at all. The board renders the
+--- expiry and the time it went out, and nothing re-reads it: a supervisor's
+--- BOLO therefore sat on every other console with both columns blank until that
+--- console was remounted.
+local BROADCAST_COLUMNS <const> = [[
+    b.id, b.kind, b.priority, b.title, b.body, b.plate,
+    b.call_id AS callId, b.expires_at AS expiresAt,
+    b.cancelled_at AS cancelledAt, b.cancelled_by AS cancelledBy,
+    b.created_by AS createdBy, b.created_at AS createdAt
+]]
+
+--- One broadcast, for the push that follows writing it.
+---
+--- `DATE_ADD` computes the expiry from the database's clock inside the INSERT
+--- and `db().insert` reports only the id, so this is the one way to answer with
+--- the expiry a supervisor was actually given rather than the minutes they
+--- asked for -- which are not the same number if the row was clamped.
+---
+--- Cost: one primary-key lookup with the agency on the row, so another agency's
+--- id answers nothing.
+function Repo.getBroadcast(agencyId, id)
+    return db().single(
+        ([[SELECT %s FROM fpd_broadcasts b WHERE b.agency_id = ? AND b.id = ?]])
+            :format(BROADCAST_COLUMNS),
+        { agencyId, id }
+    )
+end
+
 --- Takes a broadcast off the air.
 ---
 --- Stamped, never deleted: "what was out on the air at the time" is a question
@@ -1776,14 +1872,11 @@ function Repo.listBroadcasts(agencyId, filter)
     values[#values + 1] = filter.limit or 100
 
     return db().query(
-        ([[SELECT b.id, b.kind, b.priority, b.title, b.body, b.plate,
-                  b.call_id AS callId, b.expires_at AS expiresAt,
-                  b.cancelled_at AS cancelledAt, b.cancelled_by AS cancelledBy,
-                  b.created_by AS createdBy, b.created_at AS createdAt
+        ([[SELECT %s
              FROM fpd_broadcasts b
             WHERE %s
             ORDER BY b.priority, b.created_at DESC
-            LIMIT ?]]):format(table.concat(where, ' AND ')),
+            LIMIT ?]]):format(BROADCAST_COLUMNS, table.concat(where, ' AND ')),
         values
     )
 end

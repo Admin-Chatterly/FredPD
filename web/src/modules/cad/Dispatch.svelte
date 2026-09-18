@@ -157,6 +157,21 @@
    * could only describe has nothing to measure a distance from. Absent and
    * empty are different answers and the card draws them differently: no panel
    * at all, against a panel that says no unit can be recommended.
+   *
+   * `mayAcknowledge` is the same arrangement for 7.16's supervisor sign-off,
+   * and it is on the card because the banner's flag was not enough. The banner
+   * and the card carry the identical button, the banner's own Respond opens the
+   * card, and the card is drawn to every session holding `page.dispatch` —
+   * which is `patrol_basic` upwards — while `call.acknowledge` is gated on
+   * `cad.unit.manage` and refuses the officer named in `created_by`. So a
+   * patrol officer who pressed Respond on a colleague's panic met the button
+   * the banner had correctly withheld one component earlier, directly above the
+   * line telling them the call cannot be cleared until somebody acknowledges
+   * it. Pressing it answered `forbidden` with no field, so there was nothing to
+   * read, and wrote an `audit.denied` row against them — in a log that is
+   * append-only (invariant 11), so it cannot be taken back out.
+   *
+   * Optional because absent must read as no: see `CallCard`'s `=== true`.
    */
   export interface CallCardData {
     id: number;
@@ -165,6 +180,7 @@
     log: LogEntry[];
     links: CallLink[];
     recommended?: Recommendation[] | null;
+    mayAcknowledge?: boolean;
   }
 
   /** A row of the unit board, with whatever call it is on joined on. */

@@ -1350,6 +1350,126 @@ describe('cad', function()
         end)
 
         -- ---------------------------------------------------------------------
+        -- A line about something that did not happen
+        -- ---------------------------------------------------------------------
+
+        --- The same rule the release and the clear already carry, applied to the
+        --- two writes that did not have it.
+        ---
+        --- Both are a check in a route followed by a write here, which is two
+        --- statements two dispatchers can interleave: they both find the link,
+        --- or they both find the unit on the call, and the second one's write
+        --- matches nothing. `fpd_call_log` is append-only (invariant 11), so a
+        --- line written by the one that changed nothing is a line describing
+        --- something that did not happen, signed by somebody who did not do it,
+        --- and nothing can take it back out.
+        describe('a line guarded on its own write', function()
+            it('writes no unlinked line when the link was already gone', function()
+                repo.removeLink('lspd', 90, {
+                    targetType = 'person', targetId = 5, label = 'K. Berg',
+                }, actor())
+
+                local line = statementWith('INSERT INTO fpd_call_log')
+
+                assert.is_not_nil(line.sql:find('@fpd_changed > 0', 1, true))
+                -- The capture reports the statement before it and nothing else,
+                -- so it has to sit between the DELETE and the line.
+                assert.is_true(positionOf('DELETE FROM fpd_call_links')
+                    < positionOf('SET @fpd_changed = ROW_COUNT()'))
+                assert.is_true(positionOf('SET @fpd_changed = ROW_COUNT()')
+                    < positionOf('INSERT INTO fpd_call_log'))
+            end)
+
+            it('writes no lead_changed line when the unit had left the call', function()
+                -- The route checks that the new lead is on the call off a read
+                -- taken before any of the dispatch was written. A unit that
+                -- leaves in that window matches nothing here -- and the line
+                -- said the lead had moved to an officer who was not there.
+                repo.setLead('lspd', 90, unit(), actor())
+
+                local line = statementWith('INSERT INTO fpd_call_log')
+
+                assert.is_not_nil(line.sql:find('@fpd_changed > 0', 1, true))
+                assert.is_true(binds(line, 'lead_changed'))
+            end)
+
+            it('captures the count of the set and not of the clear', function()
+                -- `uq_fpd_call_units_lead` forces the clear to run first, so
+                -- the capture has to sit after the *second* update: after the
+                -- first it would report the old lead being cleared, which is a
+                -- count the line has no business being guarded on.
+                repo.setLead('lspd', 90, unit(), actor())
+
+                local updates = statementsWith('UPDATE fpd_call_units')
+
+                assert.are.equal(2, #updates)
+                assert.is_not_nil(updates[2].sql:find('is_lead = 1', 1, true))
+                assert.is_true(positionOf('is_lead = 1')
+                    < positionOf('SET @fpd_changed = ROW_COUNT()'))
+            end)
+        end)
+
+        -- ---------------------------------------------------------------------
+        -- What a push carries
+        -- ---------------------------------------------------------------------
+
+        --- A push and the list read of the same thing are one shape.
+        ---
+        --- Every call push is built from `getCall` and every board of calls
+        --- from `listCalls`, and the NUI merges the first over the second. A
+        --- field the list has and the push has not is therefore not a field
+        --- that arrives late -- it is one the merge carries forward from
+        --- whenever that console last read the list, for as long as the console
+        --- stays mounted. Nothing polls, and `reload()` runs on the client that
+        --- made the write and nowhere else.
+        describe('the shape a push carries', function()
+            it('answers the count the queue merges on', function()
+                repo.getCall('lspd', 90)
+
+                local read = statementWith('FROM fpd_calls c')
+
+                assert.is_not_nil(read.sql:find('AS unitCount', 1, true))
+                assert.is_not_nil(read.sql:find('FROM fpd_call_units cu', 1, true))
+                assert.is_not_nil(read.sql:find('cu.active = 1', 1, true))
+            end)
+
+            it('counts the units once on the list that already counted them', function()
+                -- The reason this subquery is not in `CALL_COLUMNS`: `listCalls`
+                -- appends its own copy, and a column selected twice is an
+                -- ambiguous name in the row that comes back.
+                repo.listCalls('lspd', {})
+
+                local read = statementWith('FROM fpd_calls c')
+                local counted = select(2, read.sql:gsub('AS unitCount', ''))
+
+                assert.are.equal(1, counted)
+            end)
+
+            it('reads a broadcast back in the shape the board lists', function()
+                -- The push used to carry the table the route assembled from
+                -- input: the minutes that were asked for rather than the expiry
+                -- the database computed, and no `createdAt` at all. Both
+                -- statements name one constant, so the two cannot drift.
+                repo.getBroadcast('lspd', 5)
+                local read = statementWith('FROM fpd_broadcasts b')
+
+                db.statements = {}
+                repo.listBroadcasts('lspd', {})
+                local list = statementWith('FROM fpd_broadcasts b')
+
+                for _, column in ipairs({
+                    'b.expires_at AS expiresAt', 'b.created_at AS createdAt',
+                    'b.cancelled_at AS cancelledAt', 'b.call_id AS callId',
+                }) do
+                    assert.is_not_nil(read.sql:find(column, 1, true), column)
+                    assert.is_not_nil(list.sql:find(column, 1, true), column)
+                end
+
+                assert.are.same({ 'lspd', 5 }, read.values)
+            end)
+        end)
+
+        -- ---------------------------------------------------------------------
         -- Reporting progress
         -- ---------------------------------------------------------------------
 
