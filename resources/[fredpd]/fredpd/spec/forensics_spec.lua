@@ -15,7 +15,7 @@
 local helper = require('spec.helper')
 
 describe('forensics grid', function()
-    local forensics
+    local forensics, evidence
 
     before_each(function()
         -- The evidence service comes first: `placeIn` merges through
@@ -27,6 +27,9 @@ describe('forensics grid', function()
         })
 
         forensics = fredpd.Modules.forensics
+        -- Kept for the two rules that span the pair: merging, and what the lab
+        -- makes of a residue level this module computed.
+        evidence = fredpd.Modules.evidence
     end)
 
     -- -------------------------------------------------------------------------
@@ -518,19 +521,6 @@ describe('forensics grid', function()
         end)
     end)
 
-    describe('dueForPush', function()
-        it('always pushes a cell a client has never been sent', function()
-            assert.is_true(forensics.dueForPush(nil, 1000, 1))
-        end)
-
-        it('holds a client to one update per second per cell', function()
-            -- Spec 12.1, as an acceptance criterion rather than a property of
-            -- how often a loop happens to run.
-            assert.is_false(forensics.dueForPush(1000, 1000.5, 1))
-            assert.is_true(forensics.dueForPush(1000, 1001, 1))
-        end)
-    end)
-
     -- -------------------------------------------------------------------------
     -- Gunshot residue (8.2) -- the arithmetic, without a clock
     -- -------------------------------------------------------------------------
@@ -579,6 +569,20 @@ describe('forensics grid', function()
             -- GSR is on the shooter, not on the ground (8.2). A lifetime entry
             -- for it would mean the grid sweep believed it was in the grid.
             assert.is_nil(forensics.defaults.lifetimeSeconds.gsr)
+        end)
+
+        it('is what the lab reads a swab off, from the level alone', function()
+            -- The two halves of the residue mechanic meet here and used to
+            -- disagree: `claimGsr` stores this level as the item's quality, and
+            -- the GSR rule used to search for a weapon serial that 8.2 says a
+            -- swab never carries -- so a suspect swabbed with residue all over
+            -- their hands was formally reported as not having fired.
+            local config = forensics.settings()
+            local fresh = forensics.gsrLevel(0, 0, config)
+            local stale = forensics.gsrLevel(0, 3 * 3600, config)
+
+            assert.are.equal('candidate_match', evidence.resultFor('gsr', { quality = fresh }))
+            assert.are.equal('insufficient', evidence.resultFor('gsr', { quality = stale }))
         end)
     end)
 

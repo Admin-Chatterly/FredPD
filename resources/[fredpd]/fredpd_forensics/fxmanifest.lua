@@ -49,11 +49,16 @@ client_scripts {
     -- The world half of M3 (spec 8.3, 8.4, 8.10). `report` is the one path to
     -- the core's ingest, so the sensors call it rather than the route.
     --
-    -- The order inside this block is a load-time dependency chain, not a
-    -- preference: each file resolves the table the one above it published at
-    -- load rather than at call time. `sensors` takes `report`; `collect` and
-    -- `destroy` take `render`; and `destroy` takes the one timed-action gate,
-    -- which `collect` publishes -- which is why `collect` must precede it.
+    -- Three of the orderings below are load-time dependencies rather than
+    -- preferences, because the file resolves the table at load and not at call
+    -- time: `sensors` takes `report`; `collect` and `destroy` take `render`;
+    -- and `destroy` takes the one timed-action gate, which `collect` publishes
+    -- -- which is why `collect` must precede it.
+    --
+    -- `render` is the exception and resolves nothing from the files above it;
+    -- it only creates the namespace and publishes `Render`. Its position here
+    -- is free, and it sits above its two consumers so the chain reads in one
+    -- direction.
     'client/report.lua',
     'client/sensors.lua',
     'client/render.lua',

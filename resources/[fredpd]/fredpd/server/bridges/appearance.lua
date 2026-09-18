@@ -71,16 +71,8 @@ end
 --- resource that errors must leave a print rather than take down the sensor
 --- route that asked (8.3.2).
 ---
---- Deliberately not cached, although an appearance changes only when a player
---- changes clothes. A cache would be read stale for its lifetime, and stale in
---- the direction that matters: an officer who has just taken their gloves off
---- would go on leaving glove marks instead of the prints they are actually
---- leaving. The callers are already bounded by the per-kind sensor limits in
---- routes.lua, so the export call is a few per player per minute at worst
---- (12.1), which is cheaper than being wrong about who touched what.
----
 --- @return table|nil
-local function rawAppearance(src)
+local function readAppearance(src)
     local list = candidates()
 
     for index = 1, #list do
@@ -100,6 +92,76 @@ local function rawAppearance(src)
     end
 
     return nil
+end
+
+--- How long a read may be reused, in milliseconds, and how often the table of
+--- reused reads is swept of players who have stopped asking.
+---
+--- One second, and the horizon is the whole argument for it. Nobody takes their
+--- gloves off and touches a door handle inside the same second, so the answer
+--- cannot go stale in the direction that matters -- which is the direction that
+--- would have an officer who has just degloved go on leaving glove marks
+--- instead of the prints they are actually leaving.
+local MEMO_MS <const> = 1000
+local SWEEP_MS <const> = 60000
+
+--- src -> { at = GetGameTimer() when read, appearance = table|false }.
+---
+--- `false` rather than nil for "nothing answered", so that a server with no
+--- appearance resource memoises its no as well: that is the case where every
+--- candidate is tried and every one of them misses, which is the most expensive
+--- read there is.
+---
+--- Keyed by server id, which FXServer reuses. A player who drops and a player
+--- who joins onto the same id inside the same second would share one read; that
+--- is one touch of one trace, and the alternative is a `playerDropped` handler
+--- in a file that has no event handlers in it at all.
+local memo = {}
+local sweptAt = 0
+
+--- Drops entries nobody has read within `MEMO_MS`, at most once a minute.
+---
+--- Without it the table keeps one entry per server id that has ever generated a
+--- trace. Assigning nil to the key `pairs` is currently on is allowed in Lua.
+local function sweep(now)
+    if now - sweptAt < SWEEP_MS then return end
+    sweptAt = now
+
+    for src, entry in pairs(memo) do
+        if now - entry.at >= MEMO_MS then memo[src] = nil end
+    end
+end
+
+--- The appearance of a player, read at most once a second.
+---
+--- The callers are bounded by the per-kind sensor ceilings in routes.lua, and
+--- those ceilings are higher than they look: `surface`, `vehicle_door` and
+--- `reload` are the three rules that ask, at 30, 30 and 20 per 30 seconds, so a
+--- client that spends its whole budget on them asks 160 times a minute -- 32000
+--- cross-resource export calls a minute at 200 players, against a forensics
+--- budget of under a millisecond of server tick (12.1). Those ceilings sit
+--- behind `route.public`, with no session and no permission in front of them,
+--- so a hostile client reaches them by looping and an ordinary player never
+--- does.
+---
+--- Memoising for a second bounds it by the clock instead: 60 reads per player
+--- per minute at the very worst, whatever arrives in between.
+---
+--- @return table|nil
+local function rawAppearance(src)
+    local now = GetGameTimer()
+    local cached = memo[src]
+
+    if cached and (now - cached.at) < MEMO_MS then
+        return cached.appearance or nil
+    end
+
+    local appearance = readAppearance(src)
+
+    sweep(now)
+    memo[src] = { at = now, appearance = appearance or false }
+
+    return appearance
 end
 
 --- One clothing component, whatever shape the resource stores them in.
@@ -122,6 +184,14 @@ end
 --- table named its own component id, which is exactly when the table is a map
 --- and not a list.
 ---
+--- An entry that names the component asked for but carries no readable drawable
+--- is passed over rather than answered as drawable 0. Zero is a real drawable
+--- and reporting it would be an invention: the resource did not say what is on
+--- those arms, and "do not know" has to stay distinguishable, because every
+--- caller here degrades safely on nil and none of them does on a wrong number.
+--- The keyed branch has always required a numeric drawable; this is the list
+--- branch doing the same thing.
+---
 --- Pure and native-free, and exported below as `Appearance.component` so the
 --- three shapes can be covered by busted without a game running (spec 15).
 ---
@@ -142,10 +212,11 @@ local function component(appearance, id, flatKey)
                 positional = true
 
                 if tonumber(entry.component_id) == id then
-                    return {
-                        drawable = tonumber(entry.drawable) or 0,
-                        texture = tonumber(entry.texture) or 0,
-                    }
+                    local drawable = tonumber(entry.drawable)
+
+                    if drawable then
+                        return { drawable = drawable, texture = tonumber(entry.texture) or 0 }
+                    end
                 end
             end
         end
@@ -184,13 +255,16 @@ end
 --- exist. That is evidence destroyed by a guess, which is worse than the
 --- absence this file degrades to instead.
 ---
---- `config/server.lua` does ship a starting list, for the two vanilla freemode
---- models only, so a stock install is not silently glove-blind. It is
---- configuration an operator owns and edits, not a default this bridge falls
---- back on: a server running a clothing pack replaces it, and a server whose
---- players are on some other ped model gets nil here and leaves prints.
+--- `config/server.lua` ships the block commented out and empty for the same
+--- reason: a list nobody checked against a running server is still a guess
+--- wherever it is typed, and one typed into the config would be a guess that no
+--- longer prints a warning. A stock install is therefore glove-blind, loudly:
+--- `verify` says so on every start, and until an operator lists their own
+--- drawables every touch leaves a print. A ped model that is not listed gets
+--- nil here and leaves prints too.
 ---
---- Shape, in `config/server.lua`:
+--- Shape, in `config/server.lua`. The drawable ids below illustrate the shape
+--- and nothing else -- there is no set of them that is right everywhere:
 ---   appearance = {
 ---       gloves = {
 ---           ['mp_m_freemode_01'] = { [12] = true, [13] = true },
@@ -272,14 +346,34 @@ function Appearance.footwear(src)
     return component(appearance, COMPONENT_FEET, 'shoes')
 end
 
+--- Is there at least one arms drawable listed, for any ped model?
+---
+--- An empty `gloves` table and an absent one mean the same thing to
+--- `wearingGloves` -- nobody is ever gloved -- so they have to mean the same
+--- thing to `verify` too. Shipping the block commented out and empty is what
+--- makes this the ordinary state of a fresh install rather than an edge case,
+--- and an operator who uncomments it and leaves the models empty is told the
+--- same thing as one who never touched it.
+local function gloveListed()
+    local gloves = configured().gloves
+    if type(gloves) ~= 'table' then return false end
+
+    for _, set in pairs(gloves) do
+        if type(set) == 'table' and next(set) ~= nil then return true end
+    end
+
+    return false
+end
+
 --- Startup check (spec 3.8).
 ---
 --- Two separate failures, reported separately, because they have different
---- fixes: no appearance resource at all, and an appearance resource whose glove
---- drawables are not listed in `config/server.lua` -- which, since that file
---- ships a list for the vanilla freemode models, means the section was emptied
---- or removed. Both are silent at runtime -- the traces they affect simply never
---- appear -- so this print is the only notice an operator gets.
+--- fixes: no appearance resource at all, and an appearance resource with no
+--- glove drawables listed in `config/server.lua` -- which is every fresh
+--- install, since that file ships the block commented out rather than guessing
+--- numbers on the operator's behalf. Both are silent at runtime -- the traces
+--- they affect simply never appear -- so this print is the only notice an
+--- operator gets.
 function Appearance.verify()
     local list = candidates()
     local found
@@ -303,13 +397,13 @@ function Appearance.verify()
         return false
     end
 
-    if type(configured().gloves) ~= 'table' then
-        print(('[fredpd] appearance bridge: %s is started but FredPD.Config.server.appearance.gloves is not configured.')
-            :format(found))
+    if not gloveListed() then
+        print(('[fredpd] appearance bridge: %s is started but no arms drawable is listed under'
+            .. ' FredPD.Config.server.appearance.gloves.'):format(found))
         print('[fredpd] appearance bridge: every touch leaves a fingerprint and no glove mark is ever created,'
-            .. ' because which arms drawables are gloves depends on this server\'s clothing pack and is not guessed.')
-        print('[fredpd] appearance bridge: config/server.lua ships a list for the vanilla freemode models --'
-            .. ' restore it, or list the arms drawables your own clothing pack draws with gloves.')
+            .. ' because which arms drawables are gloves depends on this server\'s clothing and is not guessed.')
+        print('[fredpd] appearance bridge: config/server.lua has the block commented out, with instructions --'
+            .. ' fill in the arms drawables your own clothing draws with gloves, per ped model.')
         return false
     end
 

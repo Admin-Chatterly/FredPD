@@ -272,12 +272,24 @@ export const schemas = {
   // refuses a call that sends neither or both. Making `traceKey` required
   // again, which it was before residue had a reader, deletes the swab path:
   // a swab names a person and there is no trace in the grid to key it by.
+  //
+  // There is no second route for the swab. Residue is collected by this one
+  // with a `targetId` in place of a `traceKey`, because a swab is a collection
+  // -- the same item, the same owner row and the same first link of the custody
+  // chain, written in the one transaction (8.5, 8.6).
   EvidenceCollect: {
     traceKey: { type: 'string', required: false, min: 1, max: 64 },
     // The person being swabbed, as a server id (8.2's "shooter's hands and
-    // clothes"). Resolved and range-checked server-side exactly as in
-    // `ForensicsSwab`; whether there is residue on them, and how much, is never
-    // in the call and never answered back (8.11).
+    // clothes"). The server resolves it to a ped itself and range-checks it
+    // against its own copy of where both of them are standing (8.3.2), exactly
+    // as `ForensicsObserve` treats a `netId` -- a client naming somebody across
+    // the map is not swabbing them.
+    //
+    // Nothing about the residue is in here, and nothing may be added. Whether
+    // there is any, how much, how old it is and what it is worth to the lab are
+    // all read on the server from the residue table (8.11) -- a `level` or a
+    // `present` field would let a shooter's own client tell them whether it was
+    // worth washing, and let an officer file a swab that found what it did not.
     targetId: { type: 'integer', required: false, min: 1 },
     sceneId: { type: 'integer', required: false, min: 1 },
     caseNumber: { type: 'string', required: false, max: 32 },
@@ -1090,27 +1102,6 @@ export const schemas = {
   /** Powder, luminol or a forensic light, worked over a surface (8.4). */
   ForensicsProcess: {
     tool: { type: 'enum', required: true, values: ['powder', 'luminol', 'forensic_light'] },
-  },
-
-  /**
-   * A GSR kit on somebody's hands (8.2, 8.7).
-   *
-   * Residue is the one type in 8.2 that is not in the world: it sits on the
-   * shooter, so there is no trace in the grid and no key to send. What the
-   * officer names is a person, and `targetId` is that person's **server id** --
-   * which the server resolves to a ped itself and range-checks against its own
-   * copy of where both of them are standing (8.3.2), exactly as
-   * `ForensicsObserve` treats a `netId`. A client naming somebody across the
-   * map is not swabbing them.
-   *
-   * Nothing about the residue is in here, and nothing may be added. Whether
-   * there is any, how much, how old it is and what it is worth to the lab are
-   * all read on the server from the residue table (8.11) -- a `level` or a
-   * `present` field would let a shooter's own client tell them whether it was
-   * worth washing, and let an officer file a swab that found what it did not.
-   */
-  ForensicsSwab: {
-    targetId: { type: 'integer', required: true, min: 1 },
   },
 
   /**

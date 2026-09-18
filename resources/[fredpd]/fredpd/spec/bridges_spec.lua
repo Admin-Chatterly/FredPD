@@ -70,6 +70,28 @@ describe('appearance bridge', function()
 
             assert.are.same({ drawable = 12, texture = 0 }, Appearance.component(appearance, ARMS, 'arms'))
         end)
+
+        it('answers nil for a matching entry that carries no drawable', function()
+            -- A missing drawable is not drawable 0. Zero is a real garment, so
+            -- answering it would be inventing what the resource declined to
+            -- say -- and inventing it in the direction that matters: a
+            -- fabricated arms drawable is a glove verdict about nothing, where
+            -- nil is the "do not know" every caller degrades safely on.
+            local appearance = { components = { { component_id = 3, texture = 2 } } }
+
+            assert.is_nil(Appearance.component(appearance, ARMS, 'arms'))
+        end)
+
+        it('keeps looking past a matching entry with no drawable', function()
+            local appearance = {
+                components = {
+                    { component_id = 3, texture = 2 },
+                    { component_id = 3, drawable = 12, texture = 1 },
+                },
+            }
+
+            assert.are.same({ drawable = 12, texture = 1 }, Appearance.component(appearance, ARMS, 'arms'))
+        end)
     end)
 
     describe('component, keyed shape', function()
@@ -130,7 +152,13 @@ describe('appearance bridge', function()
             assert.is_nil(Appearance.component({ components = {} }, ARMS, 'arms'))
         end)
 
-        it('answers nil for a list of entries that carry no drawable at all', function()
+        it('answers nil for a list whose entries all name some other component', function()
+            -- Every entry names a component id, so the list branch is the one
+            -- that runs and the keyed branch stays off -- and none of them is
+            -- the arms, so there is nothing to answer with. The entries carry
+            -- no drawable either, which is not what this case is about: see
+            -- "answers nil for a matching entry that carries no drawable"
+            -- above for that.
             local appearance = { components = { { component_id = 9 }, { component_id = 10 } } }
 
             assert.is_nil(Appearance.component(appearance, ARMS, 'arms'))

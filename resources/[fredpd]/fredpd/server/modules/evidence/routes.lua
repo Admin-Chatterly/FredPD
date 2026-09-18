@@ -32,14 +32,28 @@ FredPD.Evidence = FredPD.Evidence or {}
 --- is refused rather than served with an invented owner: fabricating that one
 --- fact would undo the whole of section 8.
 ---
---- Claiming is destructive by design. The trace leaves the grid as the item
---- enters the database, so two officers cannot collect the same casing, and a
---- failed insert does not leave a half-collected trace behind.
+--- Claiming is destructive by design. The trace leaves the grid before the item
+--- enters the database, so two officers cannot collect the same casing.
+---
+--- What that costs, plainly, because the handler below cannot pay it back: the
+--- claim happens before the insert, and a refusal after it -- an unattributable
+--- trace, or an insert that fails on a deadlock, a dropped connection or a
+--- constraint -- leaves the trace gone from the grid with no row written. The
+--- only 9 mm casing at a homicide can be lost to a transient database error, and
+--- no officer can re-collect it because there is nothing left to collect. The
+--- fix is a non-destructive claim plus a reservation, or a restore path in the
+--- grid, and neither exists: `Grid.place` mints a new key, a new `createdAt` and
+--- an unrevealed latent flag, so re-placing a taken trace would hand back a
+--- younger, invisible copy of it. Until then this is a known hole, written down
+--- rather than papered over.
 ---
 --- @param src number
 --- @param traceKey string the opaque key the client was given with render data
 --- @return table|nil { type, quality, ageSeconds, decayPerHour, outdoors,
----   raining, cleaned, owner = { identifier, weaponSerial } }
+---   cleaned, owner = { identifier, weaponSerial } }. `raining` is *not* in the
+---   shape: no claim produces it and the server tracks no weather, so the
+---   weather half of `qualityAfter` (8.1.4) is inert -- see the note on
+---   `claimTrace` in the forensics module.
 FredPD.Evidence.claimTrace = FredPD.Evidence.claimTrace or function()
     return nil
 end
@@ -277,6 +291,12 @@ route.define({
 --- both is a call that has not decided what it is doing, and guessing which one
 --- it meant would be this file inventing an intent (invariant 1).
 ---
+--- The `targetId` half has no caller anywhere in the product yet: no client
+--- sends the field, so no swab can be taken and the residue path below is
+--- unreachable. The gap is in `fredpd_forensics` -- there is no ox_target option
+--- on a player -- and in the MDT's collect form, not here. Said once more where
+--- somebody reading this file would otherwise assume the feature is live.
+---
 --- @return table|nil trace, or nil when there was nothing to claim
 --- @return table|nil refusal, when the call named neither source or both
 local function claimFor(session, input)
@@ -367,15 +387,28 @@ route.define({
             return route.refuse(FredPD.ErrorCode.INVALID, { traceKey = 'unattributed' })
         end
 
-        -- Contamination is read from the entry log, not from the collecting
+        -- Contamination is read from the entry log and never from the collecting
         -- officer's word for it (8.4): anyone who walked the perimeter without
         -- protective equipment degrades everything taken from it.
+        --
+        -- That is the design and not yet the behaviour. Nothing in the product
+        -- writes `fpd_scene_entries` -- there is no perimeter zone in
+        -- `fredpd_forensics` and no route that logs an entry -- so this COUNT is
+        -- zero on every scene that exists and the contamination term is
+        -- currently dead here and at `lab.analysis.complete`. 8.4's entry log is
+        -- an unimplemented [M], not a wired feature, and the read stays because
+        -- the query is what the log will feed, not because it reports anything
+        -- today.
         local contaminated = repo.unprotectedEntries(input.sceneId) > 0
 
+        -- No `raining`: the claim shape does not carry one and the server tracks
+        -- no weather, so passing it would be passing nil. `outdoors` is passed
+        -- and is nil too, for now -- nothing sets it in the grid. Both halves of
+        -- 8.1.4's weather term arrive together or not at all, and when they do
+        -- this is the call that grows the field back.
         local quality = service.qualityAfter(trace.quality or 100, trace.ageSeconds or 0, {
             decayPerHour = trace.decayPerHour,
             outdoors = trace.outdoors,
-            raining = trace.raining,
             cleaned = trace.cleaned,
             contaminated = contaminated,
         })
@@ -793,9 +826,16 @@ route.define({
 
         local result = service.resultFor(facts.analysis, {
             quality = facts.quality,
+            -- Zero on every scene until 8.4's entry log is written by something;
+            -- see the same read in `evidence.collect` for why.
             contaminated = repo.unprotectedEntries(facts.sceneId) > 0,
             referenceHits = referenceHits,
             indexHits = indexHits,
+            -- Read by no rule in `service.lua` today: the GSR rule that used to
+            -- ask for it now measures the residue level instead, which is the
+            -- only fact a swab carries (8.2, and the note on `ANALYSIS_RESULT
+            -- .gsr`). Passed on because it is hidden truth about the item that a
+            -- future rule would ask for by this name, and it costs one nil test.
             hasWeapon = facts.weaponSerial ~= nil,
         })
 

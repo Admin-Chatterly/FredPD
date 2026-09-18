@@ -15,15 +15,28 @@
 ---   * **Nothing is broadcast.** Pushes name one player at a time, to the
 ---     players subscribed to the cell that changed (invariant 5). The `-1`
 ---     target does not appear in this file and must not.
----   * **One update per second per cell per client** (12.1). The loop runs at
----     one hertz and sends one message per client carrying every cell whose
----     contents *as that client may see them* changed since their last message.
----     A change only an officer with tools may be told about is not a change to
----     anybody else, and sending it to them anyway would be an oracle (8.11).
----     Pushing per item would blow the budget with a single magazine.
+---   * **One update per second per cell per client** (12.1). The streaming
+---     loop at the foot of this file is what enforces that, and it is the only
+---     thing that does: it waits `pushIntervalSeconds` between passes and it is
+---     the only caller of `Grid.push`. Each pass sends one message per client
+---     carrying every cell whose contents *as that client may see them* changed
+---     since their last message. A change only an officer with tools may be
+---     told about is not a change to anybody else, and sending it to them
+---     anyway would be an oracle (8.11). Pushing per item would blow the budget
+---     with a single magazine, and so would calling `Grid.push` from a route.
 ---
 --- Decay is swept on a timer, not on read. A read happens once per client per
 --- second; the sweep happens once every half minute for the whole world.
+---
+--- **Rotation is not modelled.** 8.1.6 lists render data as type, position,
+--- rotation and model, and a trace here carries no rotation at all. Nothing in
+--- the generation pipeline observes one -- a shot reports a position, a door
+--- reports an entity -- so the only heading the grid could store is a constant,
+--- and a constant travelling as a field would tell a client that the casing is
+--- lying the way it fell when it is not. Props therefore all spawn at the
+--- client's default heading. Giving them a real one means a heading observed
+--- where the trace is created, and that is a change to the generation routes
+--- and to `fredpd_forensics`, not a field added here.
 
 FredPD = FredPD or {}
 FredPD.Forensics = FredPD.Forensics or {}
@@ -145,14 +158,25 @@ local subscriptions = {}
 --- does not cost a walk of the world to check.
 local itemCount = 0
 
---- Counters for the admin health screen (spec 12.3). Never per-player, never
---- per-trace: totals only, so nothing here can become a record.
+--- In-memory totals for the grid. Never per-player, never per-trace: totals
+--- only, so nothing here can become a record.
 ---
 --- `evicted` is what the grid threw away to stay inside its caps or its decay
 --- times, `collected` what an officer turned into evidence, and `destroyed` what
 --- a player wiped away or picked up under 8.10. Three counters rather than one
---- because a server whose evidence is disappearing needs to know which of the
---- three is doing it, and they mean completely different things.
+--- because they mean completely different things and a single total would
+--- answer "your evidence is going somewhere" without saying where.
+---
+--- **Nothing reads them yet, and no comment in this file may argue from a
+--- reader that does not exist.** There is no route, export or console command
+--- that returns them; the full Administration health screen is M7 (7.30), spec
+--- 12.3 is about route timings and the slow query log rather than about a
+--- counter panel, and `admin.health.view` is in Appendix B but granted to no
+--- group in `database/seeds/0001_permissions.sql`. Until that screen ships,
+--- destruction by a caller with no session leaves no observable trace anywhere:
+--- no audit row (ADR-013, deliberately) and a counter nobody can read. They are
+--- kept because they cost one addition on paths that are already writing, and
+--- because the screen that reads them is a screen, not a rewrite of this file.
 local stats = { placed = 0, merged = 0, evicted = 0, refused = 0, collected = 0, destroyed = 0 }
 
 --- Trace keys are unique for the life of the resource and mean nothing.
@@ -243,7 +267,7 @@ end
 --- (`routes.lua`, 8.3.2). This function decides nothing about truth: it fills in
 --- the bookkeeping -- key, age, latency, merge key -- and files it.
 ---
---- @param trace table { type, x, y, z, heading, model, owner, quality, count }
+--- @param trace table { type, x, y, z, model, owner, quality, count }
 --- @return table|nil stored the trace now in the grid, which may be one it
 ---   merged into (8.3.5); nil when the world is full
 --- @return boolean merged
@@ -266,7 +290,7 @@ function Grid.place(trace)
         x = trace.x,
         y = trace.y,
         z = trace.z,
-        heading = trace.heading or 0.0,
+        -- No rotation. See the note on it in this file's header.
         -- The prop is a rendering decision and comes from configuration, never
         -- from the observation that created the trace.
         model = (config.models or {})[trace.type],
@@ -322,8 +346,8 @@ end
 --- The shared half of `Grid.take` and `Grid.destroy`. Everything about the
 --- removal is the same -- the lookup, the cell, the running count and what the
 --- clients standing there are told -- and the only difference between an officer
---- bagging a casing and a criminal pocketing one is which counter moves (12.3).
---- That difference is the caller's, so it is not in here.
+--- bagging a casing and a criminal pocketing one is which of the totals above
+--- moves. That difference is the caller's, so it is not in here.
 ---
 --- @param traceKey string
 --- @return table|nil the removed trace, owner and all
@@ -374,13 +398,13 @@ end
 
 --- Takes a trace out of the world because somebody destroyed it (8.10).
 ---
---- The same removal as `Grid.take` and a different counter, and the difference
---- is the whole point. There is deliberately no audit row on the destruction
---- path -- there is no session and no `discordId` to attribute one to (ADR-013)
---- -- so `destroyed` on the health screen (12.3) is the only signal a server has
---- that its evidence is being carried away rather than collected. Counting a
---- criminal picking up thirty casings as thirty collections would put that
---- signal into the number that is supposed to contradict it.
+--- The same removal as `Grid.take` and a different counter. There is
+--- deliberately no audit row on this path when the caller holds no session --
+--- there is no `discordId` to attribute one to (ADR-013) -- and, until the M7
+--- health screen ships, nothing reads the counter either, so a criminal
+--- emptying a scene is unobservable from inside and outside the game. Counting
+--- them as collections would not merely lose the signal, it would forge the
+--- opposite one: `collected` is the number an officer's work is read off.
 ---
 --- Keyed, unlike `Grid.takeNear`: the player could see this trace and named it.
 ---
@@ -454,15 +478,15 @@ end
 --- luminol on it. A cleaned scene is a worse scene, never an innocent one.
 ---
 --- No counter moves here, and that is a decision rather than an omission. The
---- four totals in `stats` count traces *leaving* the grid and say which of the
---- four ways it happened; cleaning removes nothing, and the pool it marked is
---- still in the world to be collected at a quarter yield or swept when it ages
---- out. Counting it as destroyed would book the same trace twice, and the second
---- booking would land in the one number a server watching its evidence disappear
---- reads (12.3) -- so a scene somebody cleaned would look like a scene somebody
---- had emptied. A fifth counter for cleanings would be honest, but `Grid.stats`
---- is read by the admin health screen and widening its shape is a change to that
---- screen, not to this file.
+--- totals in `stats` count traces *leaving* the grid and say which way it
+--- happened; cleaning removes nothing, and the pool it marked is still in the
+--- world to be collected at a quarter yield or swept when it ages out. Counting
+--- it as destroyed would book the same trace twice, and the second booking would
+--- land in the number that is supposed to mean a trace is gone -- so a scene
+--- somebody cleaned would read as a scene somebody had emptied. A fifth counter
+--- for cleanings would be honest and is not added here, because the shape of
+--- `Grid.stats` is the thing a future health screen is written against and it
+--- should be settled once, with that screen.
 ---
 --- @return boolean whether anything was cleaned
 function Grid.clean(traceKey)
@@ -890,7 +914,12 @@ function Grid.settings()
     return config
 end
 
---- Totals for the admin health screen (12.3). No trace, no player, no owner.
+--- The grid's totals. No trace, no player, no owner.
+---
+--- Read by busted today and by nothing else in the product -- see the note on
+--- `stats` above, which is the one place that says so. The reader this is shaped
+--- for is the Administration health screen in M7 (7.30), behind
+--- `admin.health.view`.
 function Grid.stats()
     local cellCount = 0
     for _ in pairs(cells) do cellCount = cellCount + 1 end
@@ -898,7 +927,8 @@ function Grid.stats()
     -- How many players are being told anything, which is the number the idle
     -- cost in 12.1 turns on: it should be the officers and criminals actually
     -- standing over evidence, not "everyone who has connected since the
-    -- restart". A health screen showing the latter is showing the bug.
+    -- restart". `spec/forensics_spec.lua` asserts on exactly that, which is
+    -- what this counter is for until the M7 screen reads it.
     local subscriberCount = 0
     for _ in pairs(subscriptions) do subscriberCount = subscriberCount + 1 end
 

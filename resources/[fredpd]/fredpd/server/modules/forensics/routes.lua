@@ -13,8 +13,15 @@
 ---   * the owner is the source player's hidden identifier, looked up here and
 ---     never returned (8.3.4, 8.11). The answer to a sensor call carries no
 ---     information at all about what was created;
----   * victim blood comes only from the server-side `weaponDamageEvent` pair,
----     which no client can send (8.3.3).
+---   * victim blood comes only from the `weaponDamageEvent` pair the server
+---     receives itself, and never from a sensor call (8.3.3). That is not the
+---     same as "no client can send it", and reading it that way is how the
+---     handler below went unchecked for a round: the event is raised by the
+---     shooter's own client and every field in the payload is theirs. What the
+---     server takes from it is the *sender*; the victim, the position, the
+---     identifier and the weapon are all resolved here, and a hit further off
+---     than a shot carries is refused. See the handler for what that buys and
+---     what it does not.
 ---
 --- Collection does not define a route of its own. `evidence.collect` in the
 --- evidence module is the officer's route -- it is the only path that writes an
@@ -416,12 +423,44 @@ route.public({
 -- Victim blood, from the server's own event (8.3.3)
 -- -----------------------------------------------------------------------------
 
+--- How far a hit may be from the shooter before the server stops believing it.
+---
+--- The event's `hitGlobalIds` are network ids chosen by the sender's client, so
+--- without a bound a modified client can name players anywhere on the map and
+--- have their blood -- their hidden identifier, at their own coordinates --
+--- written into the grid by somebody else's gun. That is the framing 11.3 warns
+--- about, reachable forty times per ten seconds.
+---
+--- `entityRange` is the wrong number to bound it with: six metres is the reach a
+--- *sensor* may name an entity at, and a rifle shot crosses thirty times it, so
+--- reusing it here would delete blood from every shooting that was not a scuffle.
+--- This is the other kind of bound -- the longest engagement the game's weapons
+--- can actually produce -- and its job is only to keep a hit inside the fight it
+--- claims to belong to. It is not a marksmanship model, and a client can still
+--- name a bystander standing near its victim; what it takes away is the whole
+--- map.
+local MAX_HIT_METRES <const> = 250.0
+
 --- Blood, and the bullet that drew it, from `weaponDamageEvent`.
 ---
---- 8.3.3 is explicit that this pair may never come from a client claim, and it
---- does not have to: `weaponDamageEvent` fires on the server with both ends of
---- the exchange. The attacker is the sender, which the server resolved; the
---- victim is a network id the server resolves itself.
+--- 8.3.3 is explicit that this pair may never come from a *sensor* claim, and it
+--- does not have to: `weaponDamageEvent` reaches the server with both ends of
+--- the exchange in it. The attacker is the sender, which the server resolved and
+--- which no payload field can move.
+---
+--- Everything else in `data` is the sender's client talking, and is treated that
+--- way: the hit ids are checked for type, resolved to entities the server looks
+--- up itself, required to be players (`playerForEntity` maps a ped handle to a
+--- server id from the server's own table), and required to be inside
+--- `MAX_HIT_METRES` of where the server says the attacker is standing. The
+--- position, the identifier and the weapon are all read here and none of them
+--- are in the payload at all.
+---
+--- What is still the client's word is whether a hit happened and how hard: a
+--- sender that reports a hit on the player standing next to it gets that
+--- player's blood on the ground. Short of simulating ballistics on the server
+--- there is no cure for that, and the rate limit plus the distance bound is what
+--- keeps it to a nuisance rather than a framing tool.
 ---
 --- The blood is the *victim's* -- their hidden identifier, not the attacker's --
 --- which is what makes it worth anything: it puts the victim at the scene, and
@@ -449,21 +488,33 @@ AddEventHandler('weaponDamageEvent', function(sender, data)
     local hits = data.hitGlobalIds
     if type(hits) ~= 'table' then return end
 
+    -- Where the server says the shooter is. Nothing is written when it cannot
+    -- say, because every hit below is measured against it.
+    local from = positionOf(attacker)
+    if not from then return end
+
     local weapon = heldWeapon(attacker)
 
     for index = 1, #hits do
-        local entity = NetworkGetEntityFromNetworkId(hits[index])
+        local netId = hits[index]
+        -- A network id, and a number before it is one: the payload is the
+        -- sender's and `NetworkGetEntityFromNetworkId` raises on a string. A
+        -- raise inside a game-event handler is not caught by a route wrapper,
+        -- because this is not a route.
+        local entity = type(netId) == 'number' and NetworkGetEntityFromNetworkId(netId) or 0
 
-        if entity and entity ~= 0 and DoesEntityExist(entity) then
+        if entity ~= 0 and DoesEntityExist(entity) then
+            local at = GetEntityCoords(entity)
+            local dx, dy, dz = at.x - from.x, at.y - from.y, at.z - from.z
             local victim = playerForEntity(entity)
             local identifier = victim and identifierOf(victim)
 
-            -- Only players. An NPC has no hidden identifier, so their blood
-            -- could never be matched to anything and would be a row the lab
-            -- returns "no profile" for, forever.
-            if identifier then
-                local at = GetEntityCoords(entity)
-
+            -- Only players, and only players the shooter could plausibly have
+            -- hit. An NPC has no hidden identifier, so their blood could never
+            -- be matched to anything and would be a row the lab returns "no
+            -- profile" for, forever; a player on the other side of the map was
+            -- not in this exchange at all, whatever the payload says.
+            if identifier and (dx * dx + dy * dy + dz * dz) <= (MAX_HIT_METRES * MAX_HIT_METRES) then
                 grid.place({
                     type = 'blood',
                     x = at.x,
@@ -640,10 +691,20 @@ end
 ---
 --- Silent when there is no session, which is the ordinary case.
 ---
+--- The session a player *already has*, and never one opened for them.
+--- `Session.get` opens on first use and does not cache a miss, so for a caller
+--- with no `fpd_officers` row -- which is who this route is for -- it costs a
+--- framework character lookup and a blocking `SELECT` on `fpd_officers` every
+--- single call, thirty a minute per player, returning nothing and remembering
+--- nothing. That is the shape `server/main.lua` rate-limits ahead of the session
+--- lookup rather than behind it (11.1, 12.1). `Session.all()` is the same
+--- non-opening read the grid's `isPrivileged` uses, and it answers the question
+--- this function actually asks: is the caller an officer who is already here.
+---
 --- @param src number
 --- @param action string the action that was carried out
 local function auditDestruction(src, action)
-    local session = FredPD.Core.session.get(src)
+    local session = FredPD.Core.session.all()[src]
     if not session then return end
 
     FredPD.Core.audit.write({
@@ -740,19 +801,36 @@ end
 
 --- The sink and shower models 8.2 destroys residue at, as model hashes.
 ---
---- The set is the server's, not the client's, and that is the whole point of it.
---- `fredpd_forensics` has a list of the same models, but it decides which prompt
---- to *draw*; a list on a client cannot gate a check on a server, and while the
---- wash route accepted "no entity" as "no sink to check" the honest client's own
---- prompt was the only thing standing between a player and washing in a field.
+--- The set is the server's, and it decides -- but only for a sink the server can
+--- resolve, which today means a networked one. `READY.wash` below says plainly
+--- what that does and does not cover, and it is worth reading before this list
+--- is trusted as a gate.
 ---
---- Names are hashed once at load because `GetEntityModel` answers a hash. A
---- server whose map has other sinks lists them under `forensics.washModels` in
---- `config/server.lua` -- a list of model names, which replaces this one whole
---- rather than adding to it, because a server that names its own sinks has said
---- which sinks it has. A model name is not a world position, so this is not a
---- placement (3.10): the same sink model is a sink wherever it stands, including
---- in a house nobody configured.
+--- **There are two of these lists and nothing keeps them in step.** This one is
+--- read from `forensics.washModels` in `config/server.lua` (a Lua table of model
+--- names, which replaces this default whole rather than adding to it, because a
+--- server that names its own sinks has said which sinks it has). The other is in
+--- `fredpd_forensics/client/destroy.lua`, which decides which prompt is *drawn*
+--- and reads the replicated convar `fredpd:forensics:washModels`, comma
+--- separated. Neither is derived from the other, and an operator who configures
+--- one has silently changed half of washing: set only the convar and the server
+--- refuses the new sink; set only `forensics.washModels` and no prompt is drawn
+--- at the sinks it accepts. Until one source feeds both, a server that changes
+--- either must change both. Neither is documented in the `forensics` block of
+--- `config/server.lua`, which is a gap this file cannot close from here.
+---
+--- Names are hashed once at load because `GetEntityModel` answers a hash, and
+--- folded to unsigned because the two natives disagree about the sign: `joaat`
+--- answers an unsigned 32-bit value and `GetEntityModel` a signed int32, so four
+--- of the twelve names below (`prop_sink_01`, `prop_sink_02`,
+--- `prop_shower_glass01`, `v_ilev_shwr2` -- every one with the high bit set)
+--- were stored under one number and looked up under another, and washing at them
+--- could not be made to work. `server/bridges/appearance.lua` carries the same
+--- fold and the same warning.
+---
+--- A model name is not a world position, so this is not a placement (3.10): the
+--- same sink model is a sink wherever it stands, including in a house nobody
+--- configured.
 local DEFAULT_WASH_MODELS <const> = {
     'prop_sink_01', 'prop_sink_02', 'prop_sink_03',
     'prop_sink_04', 'prop_sink_05', 'prop_sink_06',
@@ -768,10 +846,14 @@ local WASH_MODELS <const> = (function()
     for index = 1, #names do
         local name = names[index]
 
+        -- Both branches folded into the unsigned range, and the lookup in
+        -- `READY.wash` folded the same way. A configured numeric hash may have
+        -- been copied out of either native, so it gets the same treatment as a
+        -- name.
         if type(name) == 'string' then
-            hashes[joaat(name)] = true
+            hashes[joaat(name) % 0x100000000] = true
         elseif type(name) == 'number' then
-            hashes[name] = true
+            hashes[name % 0x100000000] = true
         end
     end
 
@@ -794,43 +876,72 @@ function READY.weapon(src)
     return heldWeapon(src) ~= nil
 end
 
---- The kit has to have a reach configured before anybody pays for it.
+--- The kit has to have a sane reach configured before anybody pays for it.
 ---
 --- `wipeRadius` comes from `Forensics.defaults` and is a number on every server
 --- that has not gone out of its way to make it something else. A server that has
 --- is refused here, before the kit is spent, rather than having this file invent
 --- a radius of its own: a second default is how the two drift apart, and a wipe
---- at a guessed radius is exactly the bug this route was just repaired for.
+--- at a guessed radius is exactly the bug this route was repaired for.
+---
+--- A type check alone was not that. `ACTIONS.wipe` pulls the centre of the
+--- sphere back to `entityRange - wipeRadius` from the player so that the whole
+--- of it fits inside their own reach, and that subtraction floors at zero: at a
+--- configured radius above `entityRange` the clamp collapses to the player's own
+--- position and the oversized sphere is then used from there. Thirty metres
+--- configured is thirty metres wiped, ten times `collectRange`, from a check
+--- that reported the configuration was fine. So the band is checked and not
+--- merely the type: positive, and no wider than the reach every other entity
+--- rule in this file is measured against.
 function READY.wipe()
     return type(wipeRadius) == 'number'
+        and wipeRadius > 0
+        and wipeRadius <= config.entityRange
 end
 
---- A sink in a field is not a sink.
+--- A named sink has to be a sink -- and an unnamed one cannot be checked at all.
 ---
---- 8.2 destroys residue by "washing at sinks and showers", so an entity the
---- server can resolve, that is within reach of where the server says the player
---- is (8.3.2), and whose model is in the set above. All three, every time.
+--- 8.2 destroys residue by "washing at sinks and showers", and this is as much
+--- of that as a server can enforce today. Read both halves before changing it,
+--- because both have already shipped as bugs.
 ---
---- A missing network id used to be read as "there is nothing to check", which
---- made this a gate that gated nothing: the honest client sends no id for an
---- unnetworked map prop, so `{ action = 'wash' }` with no id was the ordinary
---- call and it washed anywhere in the world -- in a field, in a car, mid-chase.
---- The two cases genuinely are indistinguishable from here, which is why the
---- lenient one cannot be kept: the only way to tell a player standing at a sink
---- from a player standing in a field is to make them name the sink.
+--- **When the call names an entity**, all three checks apply, every time: the
+--- network id resolves, the entity is within reach of where the server says the
+--- player is (8.3.2), and its model is in the set above. That is the honest
+--- gate, and it is the one that works for sinks a resource spawns as networked
+--- objects.
 ---
---- What that costs is stated plainly, because it is a real cost and the next
---- reader should not have to discover it: a map prop is not networked and has no
---- network id, so washing at one is refused until the client can name it. Until
---- then washing works at the sinks and showers a resource spawns as networked
---- objects, and residue decays on its own everywhere else (8.2: "Washing at
---- sinks and showers, **time**"). A wash that works everywhere is not a smaller
---- version of the mechanic, it is the absence of it.
+--- **When the call names nothing**, the wash is allowed. That is not a gate and
+--- is not dressed up as one. The reason is that the props 8.2 actually means are
+--- part of the map: `prop_sink_01` and the rest are static, `NetworkGetEntityIs
+--- Networked` is false for them, they have no network id for any client to send,
+--- and there is no server native that can look one up from a position. Requiring
+--- an id therefore does not make washing stricter, it deletes it: the only wash
+--- prompt in the game is `ox_target:addModel` over exactly that list of map
+--- props (`fredpd_forensics/client/destroy.lua`), so every wash in the product
+--- sent no id, was refused after the player had stood through nine seconds of
+--- progress bar, and `gsr.clear` became unreachable -- with residue then ending
+--- only by decay, which is half of 8.2's row and none of 8.10's [M] mechanic.
+---
+--- So what stands between a player and washing in a field is the client's own
+--- prompt, and invariant 4 is explicit that a client-side control is not a
+--- control. This is a known, stated hole and not a claim: a player with a
+--- modified client can clear their own residue anywhere, which costs them the
+--- nine seconds and no item, and is a smaller exploit than the one the strict
+--- version created (nobody can wash at all). Closing it properly needs a change
+--- neither this file nor the satellite can make alone -- a networked stand-in
+--- object at each sink, a `placement` kind for washing points (3.10), or a
+--- server-verifiable claim in `ForensicsDestroy` -- and that is a spec decision,
+--- recorded in the report rather than invented here.
 function READY.wash(_src, input, position)
+    if input.netId == nil then return true end
+
     local entity = entityNear(input.netId, position)
     if not entity then return false end
 
-    return WASH_MODELS[GetEntityModel(entity)] == true
+    -- Folded unsigned to match how the set was built. `GetEntityModel` answers a
+    -- signed int32 and `joaat` an unsigned one.
+    return WASH_MODELS[GetEntityModel(entity) % 0x100000000] == true
 end
 
 --- The five actions of 8.10. Each one has already been paid for.
@@ -850,7 +961,11 @@ local ACTIONS = {}
 --- the line to the player until the whole sphere fits inside `entityRange` of
 --- them. The two ranges no longer add up -- naming a car at the far edge of
 --- `entityRange` now wipes a sphere that still ends where the player's own reach
---- ends, instead of one that ends twice as far out.
+--- ends, instead of one that ends twice as far out. That holds because
+--- `READY.wipe` has already refused a `wipeRadius` wider than `entityRange`:
+--- above it the subtraction below floors at zero, the clamp collapses to the
+--- player's own position and the oversized sphere is used from there, which is
+--- the sentence above stopping being true.
 ---
 --- A network id that resolves to nothing near them falls back to the player's
 --- own position rather than refusing. The two cases are the same case a second
@@ -945,9 +1060,11 @@ end
 ---
 --- Residue is on the player, so there is nothing in the world to name and no key
 --- to send; whose hands these are comes from the source of the call and from
---- nowhere else. `READY.wash` has already checked that they are standing at a
---- sink or a shower the server resolved and recognised, so by here the only
---- question left is whose hands.
+--- nowhere else. `READY.wash` has run by here, which means either the call named
+--- a sink the server resolved and recognised, or it named nothing -- the
+--- ordinary case for a map prop, and the hole `READY.wash` documents. Either
+--- way the only question left here is whose hands, and that one the call cannot
+--- answer.
 ---
 --- Whether there was any residue to wash off is deliberately dropped on the
 --- floor. `gsr.clear` answers it because the server needs the difference; a
@@ -1036,10 +1153,18 @@ route.public({
         -- never a silent success that charged somebody for nothing.
         ACTIONS[action](src, input, position)
 
-        -- The one row there is somebody to sign, written after the act and
-        -- never before it: a refusal above leaves no row, because nothing was
-        -- destroyed. Silent for every caller without a session, which is most
-        -- of them and is the point of this tier.
+        -- The one row there is somebody to sign. What it records is that the
+        -- action was carried out and paid for -- not that anything was
+        -- destroyed, and the difference is worth stating because internal
+        -- affairs reads this log and the log is append-only (invariant 11). A
+        -- refusal *above* leaves no row: the action never ran. A refusal
+        -- *inside* the action leaves one, because every one of those is silent
+        -- by design (8.11) -- a wipe over a clean pavement, a clean on a key
+        -- that names nothing, a pickup with no brass in reach, and `weapon`,
+        -- which by construction destroys nothing at all until a seized firearm
+        -- carries recoverable trace. Reporting which of those happened would
+        -- put in the audit log exactly the oracle the response withholds, so
+        -- the row says who and which action and stops there.
         auditDestruction(src, action)
 
         -- Empty, always. See rule 1 above.
@@ -1069,7 +1194,20 @@ FredPD.Evidence = FredPD.Evidence or {}
 ---     copy of where they are (8.3.2).
 ---
 --- Taking is destructive, and is the last thing that happens: two officers
---- cannot collect the same casing, because the second one finds nothing.
+--- cannot collect the same casing, because the second one finds nothing. It is
+--- also the last thing that *can* happen -- there is no way to put a taken trace
+--- back -- so a refusal after this point in `evidence.collect` loses the trace
+--- outright. See the note on the claim in that file; the fix is a restore path
+--- in the grid and it is not written yet.
+---
+--- `outdoors` is passed through from the stored trace, and on today's server it
+--- is nil on every one of them: nothing in the generation pipeline sets it,
+--- because there is no server-side interior test behind it yet. There is no
+--- `raining` field at all, for the same reason -- the server tracks no weather.
+--- Both are half of `evidence.qualityAfter`'s weather term (8.1.4), which is
+--- therefore inert: a print left on a car door in a thunderstorm decays by age
+--- alone. The plumbing is kept rather than deleted because the term is the
+--- spec's and the missing half is a source of truth, not a decision.
 ---
 --- @param src number
 --- @param traceKey string the opaque key that came with render data
@@ -1106,14 +1244,23 @@ end
 
 --- Hands the residue on a person over to collection, and takes it off them.
 ---
---- The other half of 8.2's residue row. `gsr.mark` has been called on every shot
---- since M3 and `gsr.clear` on every wash, and until now nothing read either:
---- `GSR.present` had no caller in the product at all, so residue was write-only,
---- the decay curve was unobservable and washing destroyed a state nothing could
---- ever have asked about. 8.2 collects it with a "GSR kit" and analyses it as
---- "GSR analysis"; this is the kit's end of that, and `evidence.collect` is the
---- officer's route on top of it -- the same one that bags a casing, taking a
---- `targetId` where a swab has no `traceKey` to give it.
+--- The other half of 8.2's residue row. `gsr.mark` is called on every shot and
+--- `gsr.clear` on every wash; this is the only thing in the product that reads
+--- what either of them wrote. 8.2 collects residue with a "GSR kit" and analyses
+--- it as "GSR analysis"; this is the kit's end of that, and `evidence.collect`
+--- is the officer's route on top of it -- the same one that bags a casing,
+--- taking a `targetId` where a swab has no `traceKey` to give it (spec 8.2: "the
+--- swab has no route of its own").
+---
+--- **Nothing calls that route with a `targetId` yet, so on today's server this
+--- function is still unreachable and residue is still write-only.** The missing
+--- piece is entirely in the satellite: `fredpd_forensics` registers ox_target
+--- options on vehicles, objects and models and none on a player or a ped, and
+--- the MDT's collect form posts a `traceKey` only. Until a swab prompt exists
+--- that sends the swabbed player's server id, `gsr.present` has no caller, the
+--- decay curve is unobservable and washing clears a state nobody can ask about.
+--- That is a wiring gap and not a decision -- everything on this side of it, the
+--- schema field, the permission grant and the spec paragraph, is already here.
 ---
 --- The shape is `claimTrace`'s, exactly, because the route that writes the item
 --- is the same one and it must not learn where its claim came from. What differs

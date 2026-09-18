@@ -201,13 +201,14 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     -- patrol officer who picks a casing up off the ground has not collected
     -- evidence, they have contaminated a scene.
     --
-    -- `forensics.evidence.collect` is deliberately one key for two routes.
-    -- `evidence.collect` takes a trace out of the grid and `forensics.swab`
-    -- takes residue off a person's hands, and they are the same act -- a
-    -- technician securing a sample -- so they are the same grant. A separate
-    -- `forensics.swab` key would be a fifth forensics permission the spec does
-    -- not have (Appendix B lists four) and a group nobody remembered to give it
-    -- to, which is how a route ships dead.
+    -- `forensics.evidence.collect` gates one route, `evidence.collect`, which
+    -- is the only route that writes an evidence item. It covers both ways of
+    -- securing a sample: a `traceKey` takes a trace out of the grid, and a
+    -- `targetId` takes residue off a person's hands (8.2). They are the same
+    -- act -- a technician securing a sample -- so they are the same grant, and
+    -- there is no separate swab key: it would be a fifth forensics permission
+    -- the spec does not have (Appendix B lists four) and a group nobody
+    -- remembered to give it to, which is how a route ships dead.
     ('evidence_tech', 'page.evidence'),
     ('evidence_tech', 'forensics.scene.create'),
     ('evidence_tech', 'forensics.scene.release'),

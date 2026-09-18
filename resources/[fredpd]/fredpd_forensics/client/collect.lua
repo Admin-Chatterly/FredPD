@@ -181,19 +181,59 @@ end
 ---
 --- `client/destroy.lua` runs timed actions of its own and takes this same flag
 --- through `Collect.runExclusive` at the bottom of this file, rather than
---- keeping a second one or reading `lib.progressActive()`. Two flags, or a
---- progress check, would both be open during exactly the window above -- the
---- server round trip after a circle has finished -- and a wipe could start on
---- top of an in-flight collection. `collect.lua` loads first (see
---- `fxmanifest.lua`), which is what lets the flag live here.
+--- keeping a second one. A second flag would be open during exactly the window
+--- above -- the server round trip after a circle has finished -- and a wipe
+--- could start on top of an in-flight collection. `collect.lua` loads first
+--- (see `fxmanifest.lua`), which is what lets the flag live here.
+---
+--- `lib.progressActive()` is *also* still consulted, in `idle()` below, and it
+--- is not redundant: it is ox_lib-wide, so it sees the timed actions of every
+--- other resource on the server, which this flag cannot. Dropping it would have
+--- let a player eating through ox_inventory start a wipe on top of a live
+--- progress bar. The flag is the half this resource knows about; the ox_lib
+--- check is the half it does not.
 local busy = false
+
+--- Game time the flag must be released by, come what may. Zero while free.
+---
+--- `run()` holds the flag across `lib.callback.await`, and an await can fail to
+--- return at all -- the core resource restarts mid-flight, the callback is
+--- dropped -- in a way no `pcall` can see, because nothing was raised. Without
+--- a deadline that leaves the flag set for the life of the Lua state, and since
+--- `client/destroy.lua` shares it, it would permanently block destruction for
+--- that player, which 8.10 says must never be blocked.
+local busyUntil = 0
+
+--- The longest a holder is believed, in milliseconds.
+---
+--- Comfortably over the longest timed action either file runs (cleaning blood,
+--- 15 s) plus a server round trip, so an action that is merely slow is never
+--- interrupted; short enough that a dropped callback costs a player half a
+--- minute rather than a session. Past it the holder is treated as gone and the
+--- next action takes the flag -- which is a bounded overlap, not a guarantee of
+--- exclusivity, and is the trade made deliberately in destruction's favour.
+local BUSY_MAX_MS <const> = 30000
+
+--- Whether the flag is genuinely held, releasing an expired holder.
+local function held()
+    if not busy then return false end
+
+    if GetGameTimer() >= busyUntil then
+        busy = false
+        busyUntil = 0
+
+        return false
+    end
+
+    return true
+end
 
 --- Whether another action can be started, said out loud once.
 ---
 --- Checked before the dialog rather than after it, so an officer who is already
 --- kneeling over something is told now instead of after choosing packaging.
 local function idle()
-    if busy then
+    if held() or lib.progressActive() then
         notify(FredPD.t('forensics.busy'), 'error')
         return false
     end
@@ -204,12 +244,20 @@ end
 --- Runs one whole action -- the timed part in the world and the question for
 --- the server -- with `busy` held for all of it.
 ---
---- `pcall` is not decoration. Anything raising inside `body` -- a route
---- answering something unexpected, ox_lib raising while the player disconnects
---- with a call in flight -- would otherwise leave the flag set for the rest of
---- the session, and the officer would be told they are busy at every trace on
---- every scene until they reconnect. The error is re-raised so it still reaches
---- the console: swallowing it would trade one silent failure for another.
+--- Two different failures are covered here, and only together:
+---
+---   * **A raise.** `pcall` catches anything thrown inside `body` -- a route
+---     answering something unexpected, ox_lib raising while the player
+---     disconnects -- so the release below still runs. The error is re-raised
+---     afterwards so it still reaches the console: swallowing it would trade
+---     one silent failure for another.
+---   * **A hang.** `pcall` cannot see one. `lib.callback.await` that never
+---     returns raises nothing; the coroutine simply stops, and neither the
+---     release nor the re-raise is ever reached. That is what `busyUntil` is
+---     for: the flag carries a deadline from the moment it is taken, and
+---     `held()` treats a holder past it as gone. Nothing rescues the hung
+---     action itself -- it stays parked forever -- but it stops taking the rest
+---     of the resource, and destruction in particular, down with it.
 ---
 --- @param body function
 --- @return boolean started false when another action already holds the flag
@@ -217,8 +265,12 @@ local function run(body)
     if not idle() then return false end
 
     busy = true
+    busyUntil = GetGameTimer() + BUSY_MAX_MS
+
     local ok, err = pcall(body)
+
     busy = false
+    busyUntil = 0
 
     if not ok then error(err, 0) end
 
@@ -227,12 +279,15 @@ end
 
 --- The resource's one timed-action gate, for `client/destroy.lua`.
 ---
---- Same flag, same `pcall`, and the same single `forensics.busy` notification
---- when it is already held -- so a wipe refuses underneath a collection and a
---- collection refuses underneath a wipe, in both cases for the whole action
---- including the server round trip. Destruction is not a police feature (8.10)
---- and this grants nothing: it is the same one-at-a-time rule, not a check on
---- who the player is.
+--- Same flag, same deadline, same `pcall`, the same `lib.progressActive()`
+--- check against the rest of the server, and the same single `forensics.busy`
+--- notification when it is already held -- so a wipe refuses underneath a
+--- collection and a collection refuses underneath a wipe, in both cases for the
+--- whole action including the server round trip. Destruction is not a police
+--- feature (8.10) and this grants nothing: it is the same one-at-a-time rule,
+--- not a check on who the player is. It is also the reason the hold is bounded:
+--- a flag that could stick would block a wipe for ever, and 8.10 is explicit
+--- that nothing may.
 ---
 --- @param body function
 --- @return boolean started

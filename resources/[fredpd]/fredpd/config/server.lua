@@ -120,38 +120,44 @@ FredPD.Config.server = {
     --- export) only if you run something else; naming one replaces the list
     --- rather than adding to it.
     ---
-    --- `gloves` is the part that matters to section 8, and it is the part that
-    --- cannot be guessed. Gloves are what turn a fingerprint into a glove mark,
-    --- and GTA has no "wearing gloves" flag: gloves are drawn as part of the
-    --- arms, so the only way to tell is to know which arms drawables are the
-    --- gloved ones. That is a property of the clothing *your* server ships, so
-    --- it lives here and not in the code.
+    --- `gloves` is the part that matters to section 8, and it is the part
+    --- nobody can fill in for you. Gloves are what turn a fingerprint into a
+    --- glove mark, and GTA has no "wearing gloves" flag: gloves are drawn as
+    --- part of the arms, so the only way to tell is to know which arms
+    --- drawables are the gloved ones. That is a property of the clothing *your*
+    --- server ships, so it lives here and not in the code.
     ---
-    --- Keyed by ped model name, then by arms drawable id (clothing component 3),
-    --- and below is a starting list for the two vanilla freemode models. Check
-    --- it once on your own server before you rely on the mechanic -- step
-    --- through the arms drawables in your clothing menu and note which of them
-    --- put gloves on the hands -- and replace it outright if you run a clothing
-    --- pack, EUP or add-on DLC clothing, where the numbering is your pack's and
-    --- not the base game's.
+    --- It ships commented out, and FredPD keeps no built-in list to fall back
+    --- on, because the two mistakes do not cost the same. Leaving a gloved drawable
+    --- out is the cheap one: that touch leaves a fingerprint, which an
+    --- investigator can still work with. Listing a drawable that is *not*
+    --- gloved is the expensive one: every touch in that garment leaves a glove
+    --- mark, and the fingerprints those touches should have left never exist --
+    --- and a fingerprint is the only trace that reaches a fingerprint index
+    --- search, the one analysis that can put a name to an offender nobody has
+    --- named yet. A list guessed by us would make the expensive mistake on
+    --- every server at once, so there is no guess here.
     ---
-    --- Leaving a gloved drawable out is the cheap mistake: that touch leaves a
-    --- fingerprint, which an investigator can still work with. Listing one that
-    --- is not gloved is the expensive one: every touch in that garment leaves a
-    --- glove mark, and the prints those touches should have left never exist.
+    --- Until you fill it in, every touch leaves a fingerprint and nobody ever
+    --- leaves a glove mark. The resource prints that on every start rather than
+    --- leaving you to wonder.
     ---
-    --- A ped model that is not listed here leaves prints and never glove marks.
-    --- Remove `gloves` entirely and no player ever leaves a glove mark, which
-    --- the resource says on startup rather than leaving you to wonder.
+    --- To fill it in: on your own server, open your clothing menu and step
+    --- through the arms drawables (clothing component 3), noting the ids that
+    --- put gloves on the hands. Key them by ped model name, then by drawable
+    --- id. Do it once per ped model -- `mp_m_freemode_01` and
+    --- `mp_f_freemode_01` have different component 3 tables, so one list copied
+    --- to both is wrong for at least one of them -- and do it again if you add
+    --- a clothing pack, EUP or add-on DLC clothing, where the numbering is your
+    --- pack's and not the base game's. A ped model that is not listed leaves
+    --- fingerprints and never glove marks.
     appearance = {
-        gloves = {
-            ['mp_m_freemode_01'] = {
-                [4] = true, [5] = true, [7] = true, [8] = true, [9] = true, [11] = true, [12] = true,
-            },
-            ['mp_f_freemode_01'] = {
-                [4] = true, [5] = true, [7] = true, [8] = true, [9] = true, [11] = true, [12] = true,
-            },
-        },
+        -- gloves = {
+        --     -- The arms drawable ids you checked, per ped model. Nothing is
+        --     -- filled in here because nothing here can know your clothing.
+        --     ['mp_m_freemode_01'] = {},
+        --     ['mp_f_freemode_01'] = {},
+        -- },
     },
 
     --- Evidence in the world (spec 8).
@@ -162,26 +168,31 @@ FredPD.Config.server = {
     --- section is merged over them, two levels deep: setting one item name below
     --- leaves the rest of the defaults alone.
     ---
-    --- `destroyItems` is here because it is the one part of section 8 that
-    --- cannot have a correct default. These are ox_inventory item names, and
-    --- which names exist is a property of your item list, not of FredPD:
+    --- `destroyItems` is the part most servers end up touching. It maps each
+    --- destruction action to the ox_inventory item it spends, and the item
+    --- names are a property of your item list rather than of FredPD:
     ---
     ---   wipe   -- the kit spent wiping a surface down
     ---   weapon -- the kit spent cleaning a weapon (the same kit by default)
     ---   clean  -- the chemicals spent cleaning up a pool of blood
     ---
+    --- The three names FredPD ships with are in `Forensics.defaults.destroyItems`
+    --- in `server/modules/forensics/service.lua`, and that file is the only copy
+    --- of them. Write a key here only for an action whose item you actually
+    --- renamed: the merge is per key, so overriding `clean` leaves `wipe` and
+    --- `weapon` on whatever the release ships -- including a release that
+    --- renames one. Restating a name you did not change pins it silently.
+    ---
     --- Washing your hands and picking your own casings up cost nothing and have
     --- no entry: they are not items you can fail to own.
     ---
     --- An action whose item your server does not have is refused every time, and
-    --- the officer is told they have no item. If destruction never works, these
-    --- three names are the first thing to check against your item list.
+    --- the officer is told they have no item. If destruction never works, check
+    --- those three names against your item list before overriding anything.
     forensics = {
-        destroyItems = {
-            wipe = 'wiping_kit',
-            weapon = 'wiping_kit',
-            clean = 'cleaning_chemicals',
-        },
+        -- destroyItems = {
+        --     clean = 'my_cleaning_chemicals',
+        -- },
     },
 
     --- The gateway is a separate Node service for media, PDF rendering and

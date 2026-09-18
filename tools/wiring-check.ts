@@ -42,6 +42,17 @@ import { fileURLToPath } from 'node:url';
  *      one back to `route.define` and adding a permission — which is spec
  *      8.10's named bug, "police-only restrictions must never block criminal
  *      gameplay", reintroduced with a green build.
+ *   8. a file that reads another file's namespace field at load — a top-level
+ *      `local x = Namespace.field` — where the file that fills that field is
+ *      listed *later* in the same load order. Check 1 proves every file is
+ *      listed; it cannot see that the order is wrong, and the order is what
+ *      took the resource down: `client/bridges/doorlock.lua` resolved
+ *      `FredPDForensics.Client.sensors` at load, passed every test and passed
+ *      this tool, and killed `fredpd_forensics` at load because the file that
+ *      publishes that table was listed after it. The forensics client is now a
+ *      five-deep chain of exactly that shape. See the scan's own scope note
+ *      below: it is a floor, deliberately narrow, and reports nothing it cannot
+ *      prove from one manifest and the files it names.
  *
  * Both route tiers count as declaring a name: `route.define` and, since
  * ADR-013, `route.public`. A public route has no permission by construction, so
@@ -195,6 +206,160 @@ function manifestPaths(source: string): Set<string> {
   }
 
   return loaded;
+}
+
+/**
+ * Every script declaration in one `fxmanifest.lua`, in the order it is written.
+ *
+ * `manifestPaths` answers "is this file loaded at all", so a set is all it
+ * needs. Check 8 asks the question a set cannot answer — is this file listed
+ * before that one — so it keeps the sequence, and it keeps the blocks apart,
+ * because `shared_scripts` loads into both states while `server_scripts` and
+ * `client_scripts` never see each other.
+ *
+ * One regex over the whole file rather than one per block kind, so the singular
+ * `client_script 'x.lua'` form lands in its true position beside the blocks
+ * instead of being appended after them.
+ */
+function manifestScripts(source: string): { kind: string; path: string }[] {
+  const scripts: { kind: string; path: string }[] = [];
+
+  const declarations = withoutComments(source).matchAll(
+    /\b(shared|server|client)_scripts?\s*(?:\{([\s\S]*?)\n\}|'([^']+)')/g,
+  );
+
+  for (const declaration of declarations) {
+    const kind = declaration[1] ?? '';
+    const single = declaration[3];
+
+    if (single !== undefined) {
+      scripts.push({ kind, path: single });
+      continue;
+    }
+
+    for (const quoted of (declaration[2] ?? '').matchAll(/'([^']+)'/g)) {
+      scripts.push({ kind, path: quoted[1] ?? '' });
+    }
+  }
+
+  return scripts;
+}
+
+/**
+ * Where a manifest entry's source lives, or null when this tool cannot say.
+ *
+ * `@resource/file.lua` is another resource's file and loads from there, so it
+ * is resolved under `resources/[fredpd]` and simply skipped when that resource
+ * is not ours (`@ox_lib/init.lua`). A glob is skipped outright: FiveM's
+ * expansion order is not something to guess at, and a wrong guess here is a
+ * false positive in check 8.
+ */
+function scriptFile(resource: string, path: string): string | null {
+  if (path.includes('*')) return null;
+
+  if (path.startsWith('@')) {
+    const slash = path.indexOf('/');
+    if (slash === -1) return null;
+    return join(RESOURCES, path.slice(1, slash), path.slice(slash + 1));
+  }
+
+  return join(resource, path);
+}
+
+/**
+ * Lua comments and string literals blanked out, one space per character, so
+ * line numbers and columns survive.
+ *
+ * `withoutComments` deletes, which is right for the scans that only need words
+ * back. Check 8 reports a line number and reads column 0, so it needs the shape
+ * of the file kept. Long strings go too: `persons/repo.lua` holds SQL with
+ * `CASE … END` in a `[[ ]]`, and the block-depth count below would read that
+ * `END` as closing a Lua block.
+ */
+function blanked(source: string): string {
+  const blank = (match: string): string => match.replaceAll(/[^\n]/g, ' ');
+
+  return source
+    .replaceAll(/--\[\[[\s\S]*?\]\]/g, blank)
+    .replaceAll(/--[^\n]*/g, blank)
+    .replaceAll(/\[\[[\s\S]*?\]\]/g, blank)
+    .replaceAll(/'(?:[^'\\\n]|\\.)*'/g, blank)
+    .replaceAll(/"(?:[^"\\\n]|\\.)*"/g, blank);
+}
+
+/**
+ * What one file publishes into a namespace at load, and what it reads out of
+ * one at load.
+ *
+ * **This is a floor, and the narrowness is the point.** A check that reports a
+ * load order as broken when it is fine would be worse than no check at all —
+ * the manifests carry hand-written ordering comments that someone would then
+ * "fix" to silence it. So three gates have to agree before a line counts, and
+ * anything that does not clear all three is left alone:
+ *
+ *   * it starts in column 0, and
+ *   * it sits at block depth zero, counted over the file with comments and
+ *     strings blanked, so a `local` written inside a function does not qualify
+ *     however it is indented, and
+ *   * its root identifier is not declared `local` anywhere in the file, which
+ *     is what keeps `Access.LEVELS = …` beside `local Access = {}` out of it.
+ *
+ * What it therefore does not see: a read reached through a helper, a read
+ * written `local a, b = X.y, X.z`, and anything in a file a glob matched. Those
+ * stay the reviewer's. A field filled inside `CreateThread` or an event handler
+ * is not seen either, and that one is correct rather than a gap: such a field is
+ * not there at load whatever the manifest order is, so reporting it against an
+ * ordering would send someone to move a line that was never the problem.
+ */
+function loadTimeNamespace(source: string): {
+  assigns: Map<string, number>;
+  reads: { field: string; line: number }[];
+} {
+  const text = blanked(source);
+
+  const locals = new Set(
+    [...text.matchAll(/\blocal\s+(?:function\s+)?([A-Za-z_][A-Za-z0-9_]*)/g)].map(
+      (match) => match[1] ?? '',
+    ),
+  );
+
+  const assigns = new Map<string, number>();
+  const reads: { field: string; line: number }[] = [];
+
+  let depth = 0;
+
+  const lines = text.split('\n');
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? '';
+
+    if (depth === 0) {
+      const read =
+        /^local\s+[A-Za-z_][A-Za-z0-9_]*\s*(?:<const>\s*)?=\s*([A-Z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)/.exec(
+          line,
+        );
+      const field = read?.[1];
+
+      if (field !== undefined && !locals.has(field.split('.')[0] ?? '')) {
+        reads.push({ field, line: index + 1 });
+      }
+
+      const assign = /^([A-Z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)\s*=(?!=)/.exec(line);
+      const written = assign?.[1];
+
+      if (written !== undefined && !locals.has(written.split('.')[0] ?? '') && !assigns.has(written)) {
+        assigns.set(written, index + 1);
+      }
+    }
+
+    // `for`/`while` are not counted: the `do` that ends their header is.
+    const opens = line.match(/\b(?:function|do|if|repeat)\b/g)?.length ?? 0;
+    const closes = line.match(/\b(?:end|until)\b/g)?.length ?? 0;
+
+    depth = Math.max(0, depth + opens - closes);
+  }
+
+  return { assigns, reads };
 }
 
 /** Does any pattern in the manifest cover this path, glob included? */
@@ -516,6 +681,105 @@ for (const file of await walk(RESOURCES)) {
       `${shown}: calls 'fredpd:${name}', which no route.define or route.public declares — ` +
         `the call answers nothing on a real server`,
     );
+  }
+}
+
+// ------------------------------------ 8: load order inside one manifest block
+
+console.log('wiring: a namespace read at load is listed after the file that fills it');
+
+/** Already reported, because a `shared_scripts` file is scanned in both states. */
+const reportedOrder = new Set<string>();
+
+for (const resource of resources) {
+  const manifest = join(resource, 'fxmanifest.lua');
+
+  let source: string;
+  try {
+    source = await readFile(manifest, 'utf8');
+  } catch {
+    continue; // Check 1 has already failed on this resource.
+  }
+
+  const scripts = manifestScripts(source);
+
+  // One list per Lua state, because that is what "listed later" means: a client
+  // file cannot see `server_scripts` at all, and both states see the shared
+  // block, ahead of their own.
+  const states: Record<string, { path: string; file: string }[]> = { server: [], client: [] };
+
+  for (const script of scripts) {
+    const file = scriptFile(resource, script.path);
+    if (file === null) continue;
+
+    const entry = { path: script.path, file };
+
+    if (script.kind === 'shared') {
+      states.server?.push(entry);
+      states.client?.push(entry);
+    } else {
+      states[script.kind]?.push(entry);
+    }
+  }
+
+  for (const [state, list] of Object.entries(states)) {
+    const scanned: { path: string; scan: ReturnType<typeof loadTimeNamespace> }[] = [];
+
+    for (const entry of list) {
+      let body: string;
+      try {
+        body = await readFile(entry.file, 'utf8');
+      } catch {
+        // Another resource's file, or one check 1 has already reported missing.
+        continue;
+      }
+
+      scanned.push({ path: entry.path, scan: loadTimeNamespace(body) });
+    }
+
+    // Where each namespace field is first filled. First rather than last: a
+    // field written twice is available from the earlier of the two.
+    const filledAt = new Map<string, { at: number; path: string }>();
+
+    for (let index = 0; index < scanned.length; index += 1) {
+      for (const field of scanned[index]?.scan.assigns.keys() ?? []) {
+        if (!filledAt.has(field)) filledAt.set(field, { at: index, path: scanned[index]?.path ?? '' });
+      }
+    }
+
+    for (let index = 0; index < scanned.length; index += 1) {
+      const reader = scanned[index];
+      if (!reader) continue;
+
+      for (const read of reader.scan.reads) {
+        const segments = read.field.split('.');
+
+        // Every prefix, because both failures are real: the whole field filled
+        // later leaves the local nil, and a shorter prefix filled later means
+        // the read indexes nil and raises at load. Shortest first, so the
+        // message names the earliest thing that is missing.
+        for (let cut = 2; cut <= segments.length; cut += 1) {
+          const prefix = segments.slice(0, cut).join('.');
+          const filled = filledAt.get(prefix);
+
+          if (!filled || filled.at <= index) continue;
+
+          const message =
+            `${relative(REPO, resource)}/fxmanifest.lua: ${reader.path} reads ${read.field} at ` +
+            `load (line ${read.line}), but ${filled.path} — which fills ${prefix} — is listed ` +
+            `after it in ${state === 'server' ? 'server_scripts' : 'client_scripts'}. On a real ` +
+            `server that file has not run yet, so the read resolves nil and the resource dies at ` +
+            `load. Move it above, the way the ordering comments in the manifest describe`;
+
+          if (!reportedOrder.has(message)) {
+            reportedOrder.add(message);
+            fail(message);
+          }
+
+          break;
+        }
+      }
+    }
   }
 }
 

@@ -187,6 +187,19 @@ end
 ---
 --- Everything a client needs to draw it and nothing else. No owner, no id that
 --- could be used to ask about it, no quality.
+---
+--- There is no `revealed` flag here, and there is nothing to put one on: a
+--- latent trace nobody has processed is not in the payload at all (8.4), and a
+--- revealed one appears only in the privileged of the two lists `renderLists`
+--- builds in `forensics/grid.lua`. Which of those two a client is sent is
+--- decided in `Grid.push`, against the same permission a read would go through,
+--- so visibility is a question of whether the row was sent and never a field a
+--- client could read the other way round (8.11).
+---
+--- 8.1.6 names rotation as part of render data and this does not carry one, on
+--- purpose: nothing in the generation pipeline observes a heading, so the only
+--- value there is to send is a constant, and a constant in the payload is a
+--- field that reads as truth and is not. See the note in `forensics/grid.lua`.
 function Evidence.renderData(item)
     return {
         key = item.key,
@@ -194,9 +207,9 @@ function Evidence.renderData(item)
         x = item.x,
         y = item.y,
         z = item.z,
-        -- Latent evidence is invisible until processed (8.4). The client is
-        -- told whether it has been revealed, never that it is there while it is
-        -- still latent -- the server does not send it at all until then.
+        -- The prop, chosen by configuration from the type (`forensics.models`).
+        -- Absent when the server has configured none, and `fredpd_forensics`
+        -- draws a marker instead of guessing one.
         model = item.model,
     }
 end
@@ -442,8 +455,25 @@ local ANALYSIS_RESULT <const> = {
     --- Residue is only ever "consistent with having fired", never proof that
     --- this person fired this gun -- which is exactly what `candidate_match`
     --- means, so GSR speaks the search language rather than the comparison one.
+    ---
+    --- The only fact it has is the sample itself, and that is not an oversight.
+    --- 8.2 is explicit that "a swab says this person fired something, never
+    --- what", so the owner a swab is filed under carries an identifier and
+    --- deliberately no weapon serial: there is nothing on file for it to be
+    --- searched against, and a rule that looked for one -- as this did -- says
+    --- `no_match` for every swab that can exist, which is the lab formally
+    --- reporting that a suspect with residue all over their hands did not fire.
+    ---
+    --- What the swab measures is the residue level, and `forensics.claimGsr`
+    --- stores that level as the item's quality. So the sample is the search: a
+    --- level at all is the hit, and how much there was decides whether the
+    --- result is worth anything, through the same insufficiency floor every
+    --- other search goes through. The zero case cannot arise today -- a swab is
+    --- only created when `gsr.present` says there is residue, and zero is below
+    --- the floor in any event -- and it is written out rather than assumed, so
+    --- that moving that floor cannot turn an empty swab into a lead.
     gsr = function(facts)
-        return Evidence.searchResult(facts.hasWeapon and 1 or 0, facts.quality)
+        return Evidence.searchResult(facts.quality > 0 and 1 or 0, facts.quality)
     end,
 
     --- A substance either identifies or the sample is too far gone to say.
@@ -470,7 +500,7 @@ end
 --- it and receives only the code this returns.
 ---
 --- @param analysis string
---- @param facts table { quality, contaminated, referenceHits, indexHits, hasWeapon }
+--- @param facts table { quality, contaminated, referenceHits, indexHits }
 --- @return string|nil result code, or nil when the analysis is not one we run
 function Evidence.resultFor(analysis, facts)
     local rule = ANALYSIS_RESULT[analysis]
@@ -486,7 +516,6 @@ function Evidence.resultFor(analysis, facts)
         contaminated = facts.contaminated,
         referenceHits = facts.referenceHits,
         indexHits = facts.indexHits,
-        hasWeapon = facts.hasWeapon,
     })
 end
 

@@ -971,11 +971,12 @@ Decay times, success rates and caps are configured per type.
 Gunshot residue is the one row above with no position, so it is the one that is
 not in the evidence grid: it is a state on the shooter, set by every shot,
 decaying from the most recent one, cleared outright by washing (8.10) and taken
-off a person with a swab — `forensics.swab`, gated by
-`forensics.evidence.collect` because a swab is a collection, and writing the
-item, the owner row and the first link of the custody chain in the one
-transaction every other collection uses (8.5, 8.6); `evidence.collect` takes the
-same target as an alternative to a trace key. What is
+off a person with a swab. The swab has no route of its own: it is
+`evidence.collect`, gated by `forensics.evidence.collect`, taking a `targetId`
+— the swabbed person's server id, resolved and range-checked server-side —
+where a trace would give it a `traceKey`. A swab is a collection, so it writes
+the item, the owner row and the first link of the custody chain in the one
+transaction every other collection uses (8.5, 8.6). What is
 deliberately not modelled: residue does not transfer to a passenger, a seat or
 anything handled afterwards, and it carries no weapon — a swab says this person
 fired something, never what.

@@ -91,15 +91,21 @@ end
 
 --- Washed at a sink or a shower (8.10).
 ---
---- Answers whether there was anything to wash off, which is what the route turns
---- into the difference between "you scrub your hands" and a refusal. It is read
---- through `present`, not off the table, so a player washing residue that had
---- already decayed to nothing is told the same thing as one who never fired --
---- otherwise the sink becomes a detector that tells a suspect whether the swab
---- would have found anything.
+--- The answer is the server's own bookkeeping, and it must not become a reply.
+--- Both callers drop it -- `ACTIONS.wash` (`forensics/routes.lua`, and the
+--- comment above it says why) and `claimGsr`, which has already read the level
+--- out of `present` before it clears -- so the only thing that reads it is
+--- busted, proving the table was actually emptied. A wash route that turned it
+--- into the difference between "you scrub your hands" and a refusal would hand
+--- every player a free, repeatable detector for whether a GSR swab would have
+--- found anything on them, which is exactly what 8.11 forbids.
+---
+--- It is read through `present` rather than off the table so that the server's
+--- own answer is consistent: residue that has already decayed to nothing reads
+--- as nothing, the same as never having fired.
 ---
 --- @param src number
---- @return boolean whether there was residue to remove
+--- @return boolean whether there was residue to remove; for the server only
 function GSR.clear(src)
     local present = GSR.present(src)
 

@@ -392,8 +392,14 @@ describe('evidence', function()
         end)
 
         it('says GSR is consistent with firing, never that it proves it', function()
-            assert.are.equal('candidate_match', evidence.resultFor('gsr', { quality = 80, hasWeapon = true }))
-            assert.are.equal('no_match', evidence.resultFor('gsr', { quality = 80, hasWeapon = false }))
+            -- Read off the sample and nothing else. 8.2: "a swab says this
+            -- person fired something, never what" -- so there is no weapon
+            -- serial on a swab's owner row to search against, and a rule that
+            -- looked for one answered `no_match` for every swab that can exist.
+            assert.are.equal('candidate_match', evidence.resultFor('gsr', { quality = 100 }))
+            assert.are.equal('candidate_match', evidence.resultFor('gsr', { quality = 80 }))
+            assert.are.equal('insufficient', evidence.resultFor('gsr', { quality = 5 }))
+            assert.is_false(evidence.isCourtGrade(evidence.resultFor('gsr', { quality = 100 })))
         end)
 
         it('identifies a substance, or admits the sample is gone', function()

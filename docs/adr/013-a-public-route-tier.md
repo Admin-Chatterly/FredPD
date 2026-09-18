@@ -144,9 +144,27 @@ that says which clause grants it.
     when an officer collects it, and `evidence.collect` writes the row.
   - `forensics.destroy` is not, and cannot be. Destruction produces no record at
     all: it removes a trace from the in-memory grid and adds one to the grid's
-    `destroyed` total, a per-server counter for the health screen (12.3) with no
-    player and no trace in it. There is nothing downstream to carry the act into
-    the log.
+    `destroyed` total, a per-server counter with no player and no trace in it.
+    There is nothing downstream to carry the act into the log.
+
+    Nor is there anything upstream reading that counter today, and the first
+    version of this bullet implied otherwise. It called `destroyed` "a per-server
+    counter for the health screen (12.3)", which reads as a compensating control
+    and is not one: `Grid.stats()` has no caller anywhere in the product — the
+    only references outside its own definition are in `spec/forensics_spec.lua`
+    — there is no `admin.health` route (the permission key `admin.health.view`
+    sits in the catalogue with nothing claiming it), no NUI screen and no console
+    command. Spec 12.3 is route timings and a load-test harness; system health is
+    `[S]` in 7.30 and lands in **M7**. So the honest statement of this
+    consequence is the flat one: **a trace destroyed by a sessionless caller
+    currently leaves no observable signal on the server at all.** A criminal who
+    wipes a door handle clean of a murderer's prints is invisible to everyone
+    investigating it. That is the price of this tier as shipped, and it is
+    accepted here rather than dressed up as a counter somebody can read.
+    `destroyed` is kept for the M7 health screen — the milestone that ends this,
+    by exposing `Grid.stats()` behind the `admin.health.view` that already exists
+    — and until that screen lands it is a number incremented into a table nothing
+    reads.
 
   The one row destruction can produce is written on the route's own side and not
   by the tier, because only the route can tell its two callers apart: an officer

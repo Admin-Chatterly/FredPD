@@ -226,6 +226,52 @@ end
 
 exports('surfaceTouched', surfaceTouched)
 
+-- -----------------------------------------------------------------------------
+-- Handled items and tools (8.2)
+-- -----------------------------------------------------------------------------
+
+--- Reports that this player consumed or handled something: a bottle, a
+--- cigarette, a mask (8.2, "Saliva / touch DNA").
+---
+--- There is no context at all. The route's `item_use` rule reads nothing from
+--- the call but the fact of it: the position is the server's own copy of where
+--- the player is standing, the owner is their hidden identifier, and what the
+--- item *was* is not sent, because the trace is touch DNA either way and gloves
+--- do not help against saliva.
+local function itemUsed()
+    report.observe('item_use')
+end
+
+--- Reports that this player worked a lock or forced a vehicle (8.2, "Tool marks
+--- and broken glass").
+---
+--- The tool itself is not named here and must not be. The route reads the held
+--- tool and its serial from ox_inventory's server state, exactly as it reads a
+--- weapon, and creates nothing for a player who is not carrying one -- so a
+--- client claiming a crowbar it does not have gets a mark with nobody's serial
+--- on it, which is to say no mark.
+---
+--- @param netId number|nil the networked vehicle or entity worked on, if it is
+---   one; the server resolves it, range-checks it and takes the position from
+---   it, and falls back to the player's own position when there is none.
+local function toolUsed(netId)
+    report.observe('tool', { netId = type(netId) == 'number' and netId or nil })
+end
+
+--- Both of these are exports and nothing else.
+---
+--- Nothing in `fredpd_forensics` fires them, because neither moment belongs to
+--- this resource: using an item is ox_inventory's event and picking a lock is
+--- the break-in script's. They are reached the way a door is -- from a bridge
+--- file beside `client/bridges/doorlock.lua`, which is the only kind of file in
+--- here allowed to name another resource. **No such bridge ships yet**, so on a
+--- server that adds none, `dna_touch` and `tool_mark` are never created and the
+--- forensic light and the powder's tool-mark entry have nothing to reveal.
+exports('itemUsed', itemUsed)
+exports('toolUsed', toolUsed)
+
 FredPDForensics.Client.sensors = {
     surfaceTouched = surfaceTouched,
+    itemUsed = itemUsed,
+    toolUsed = toolUsed,
 }

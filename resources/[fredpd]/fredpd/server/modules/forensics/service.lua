@@ -56,6 +56,11 @@ Forensics.defaults = {
     --- The push budget from spec 12.1: at most one update per second per cell
     --- per client. The grid coalesces everything that happened in the interval
     --- into a single message rather than pushing per item.
+    ---
+    --- This number *is* the budget and there is no second rule enforcing it:
+    --- the streaming thread in `grid.lua` waits this long between passes, and
+    --- that thread is the only caller of `Grid.push`. Anything that wants to
+    --- push a client outside the loop has to answer 12.1 for itself.
     pushIntervalSeconds = 1,
 
     --- How often decayed traces are swept out of the grid, in seconds. On a
@@ -578,28 +583,6 @@ function Forensics.sampleShot(shotCount, config)
     if every <= 1 then return true end
 
     return (math.floor(shotCount) - 1) % every == 0
-end
-
--- -----------------------------------------------------------------------------
--- The push budget (12.1)
--- -----------------------------------------------------------------------------
-
---- May a cell be pushed to a client again yet?
----
---- Spec 12.1 makes "at most one update per second per grid cell per client" an
---- acceptance criterion, so the rule is a function rather than an implicit
---- property of how often a loop happens to run. A client that has never been
---- sent this cell is always due.
----
---- @param lastPushedAt number|nil
---- @param now number
---- @param interval number|nil seconds
-function Forensics.dueForPush(lastPushedAt, now, interval)
-    if lastPushedAt == nil then return true end
-
-    interval = interval or Forensics.defaults.pushIntervalSeconds
-
-    return (now - lastPushedAt) >= interval
 end
 
 FredPD.Modules.forensics = Forensics

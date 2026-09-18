@@ -725,10 +725,6 @@ FredPD.Schema = {
         tool = { type = 'enum', required = true, values = { 'powder', 'luminol', 'forensic_light' } },
     },
 
-    ForensicsSwab = {
-        targetId = { type = 'integer', required = true, min = 1 },
-    },
-
     ForensicsDestroy = {
         action = { type = 'enum', required = true, values = { 'wipe', 'weapon', 'clean', 'wash', 'pickup' } },
         traceKey = { type = 'string', required = false, max = 64 },

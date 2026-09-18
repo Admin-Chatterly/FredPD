@@ -238,12 +238,20 @@ end
 --- destroys anything -- this file only spends the player's time.
 ---
 --- Both halves run inside `collect.runExclusive`, which is this resource's one
---- timed-action flag and not a second copy of it. `lib.progressActive()` was
---- what stood here, and it was open during precisely the half that matters:
+--- timed-action flag and not a second copy of it. `lib.progressActive()` alone
+--- used to stand here, and it was open during precisely the half that matters:
 --- `collect.lua` holds its flag across the server round trip that follows its
 --- progress circle, and during that round trip no circle is drawn, so a wipe
 --- could be started on top of a collection that was still in flight. The flag
 --- covers the call as well as the circle, in both files, in both directions.
+--- `runExclusive` still consults `lib.progressActive()` as well, because that
+--- is the only half that sees the other resources on the server -- eating
+--- through ox_inventory still blocks a wipe, exactly as it did before.
+---
+--- The hold is bounded (`BUSY_MAX_MS` in `collect.lua`). A collection whose
+--- callback never comes back would otherwise leave the flag set for the life of
+--- the Lua state, and destruction -- the one thing 8.10 says must never be
+--- blocked -- would be the thing it blocked.
 ---
 --- What the flag is not is a permission. Destruction is open to every player
 --- (8.10) and nothing here asks who anybody is; one action at a time is the
