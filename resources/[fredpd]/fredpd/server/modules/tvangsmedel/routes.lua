@@ -17,6 +17,20 @@ local accessRules = FredPD.Modules.access
 --- allowlist and is what a grant would be written against.
 local TVANG <const> = 'warrant'
 
+--- And a wanted notice gets its own, which is not the measure's.
+---
+--- Both used `warrant` at first. Access control is keyed `(record_type,
+--- record_id)`, `fpd_tvangsmedel` and `fpd_efterlysning` have independent
+--- auto-increment ids, and the two draw from the same counter -- so the ids
+--- overlap from the first day and a grant written on husrannsakan #42 would
+--- also open efterlysning #42. Permissive, and silent.
+---
+--- Fixed before any route writes a grant, which is the only window in which it
+--- can be fixed without orphaning real ones. `query/service.lua` already
+--- labelled these hits `efterlysning`, so the two halves of the codebase
+--- disagreed about what record type this was.
+local EFTERLYSNING <const> = 'efterlysning'
+
 --- Which capacity this session decides in.
 ---
 --- Derived from permissions, never sent. A `domare` grant outranks an
@@ -28,6 +42,34 @@ local function capacityOf(session)
     if FredPD.Core.perms.satisfies(perms, 'tvang.decide.aklagare') then return 'aklagare' end
 
     return 'fu_ledare'
+end
+
+--- Reads a measure the session is allowed to see, or refuses.
+---
+--- `tvang.upphav` and `efterlysning.cancel` went straight from a repo read to
+--- an UPDATE. An officer holding the write grant but not the clearance could
+--- revoke a husrannsakan above it, and learned the record existed from the
+--- `not_found` versus `conflict` split -- the disclosure 4.5 exists to prevent.
+--- The restricted read went unaudited too (invariant 11).
+local function readableTvang(session, id)
+    local row = repo.byId(id, session.agencyId)
+    if not row then return nil, route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+
+    local allowed = access.read(session, TVANG, row)
+    if not allowed then return nil, route.refuse(FredPD.ErrorCode.RESTRICTED) end
+
+    return allowed
+end
+
+--- The same, for a wanted notice, under its own record type.
+local function readableEfterlysning(session, id)
+    local row = repo.efterlysningById(id, session.agencyId)
+    if not row then return nil, route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+
+    local allowed = access.read(session, EFTERLYSNING, row)
+    if not allowed then return nil, route.refuse(FredPD.ErrorCode.RESTRICTED) end
+
+    return allowed
 end
 
 -- -----------------------------------------------------------------------------
@@ -120,12 +162,8 @@ route.define({
     audit = 'tvang.verkstalld',
     subjectType = TVANG,
     handler = function(session, input)
-        local row = repo.byId(input.id, session.agencyId)
-        if not row then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
-
-        if not access.read(session, TVANG, row) then
-            return route.refuse(FredPD.ErrorCode.RESTRICTED)
-        end
+        local row, refusal = readableTvang(session, input.id)
+        if not row then return refusal end
 
         -- Executing a measure that is not live is the one thing this route
         -- exists to stop being recorded as though it were lawful.
@@ -151,8 +189,8 @@ route.define({
     audit = 'tvang.upphavd',
     subjectType = TVANG,
     handler = function(session, input)
-        local row = repo.byId(input.id, session.agencyId)
-        if not row then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+        local row, refusal = readableTvang(session, input.id)
+        if not row then return refusal end
 
         if repo.upphav(row.id, session.agencyId, session.discordId, input.version) == 0 then
             return route.refuse(FredPD.ErrorCode.CONFLICT)
@@ -183,7 +221,7 @@ route.define({
             rows[index].detainOnSight = service.detainOnSight(rows[index].grund)
         end
 
-        return { efterlysningar = access.filterSearch(session, TVANG, rows) }
+        return { efterlysningar = access.filterSearch(session, EFTERLYSNING, rows) }
     end,
 })
 
@@ -194,7 +232,7 @@ route.define({
     writes = true,
     sensitive = true,
     audit = 'efterlysning.issued',
-    subjectType = TVANG,
+    subjectType = EFTERLYSNING,
     auditDetail = function(input)
         return { personId = input.personId, grund = input.grund }
     end,
@@ -220,10 +258,10 @@ route.define({
     schema = 'EfterlysningCancel',
     writes = true,
     audit = 'efterlysning.cancelled',
-    subjectType = TVANG,
+    subjectType = EFTERLYSNING,
     handler = function(session, input)
-        local row = repo.efterlysningById(input.id, session.agencyId)
-        if not row then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+        local row, refusal = readableEfterlysning(session, input.id)
+        if not row then return refusal end
 
         if repo.cancel(row.id, session.agencyId, session.discordId,
                        input.grund, input.version) == 0 then
@@ -290,18 +328,30 @@ exports('HasSearchWarrant', hasSearchWarrant)
 local function isWanted(citizenid)
     if type(citizenid) ~= 'string' or citizenid == '' then return false end
 
-    local personId = FredPD.Core.db.scalar(
-        'SELECT id FROM fpd_persons WHERE identifier = ? LIMIT 1', { citizenid })
+    -- Every matching person, not the first.
+    --
+    -- `uq_fpd_persons_identifier` is `(agency_id, identifier)`, so one
+    -- citizenid has one master row *per agency*. A `LIMIT 1` with no ORDER BY
+    -- picked whichever the optimiser reached first, so on a two-force server
+    -- this answered `false` for somebody genuinely wanted whenever the other
+    -- agency's row came back. The restrictive direction, but arbitrary rather
+    -- than deliberate -- and it threw away the cross-agency reach that is the
+    -- whole point of the export.
+    local persons = FredPD.Core.db.query(
+        'SELECT id FROM fpd_persons WHERE identifier = ?', { citizenid })
 
-    if not personId then return false end
+    if #persons == 0 then return false end
 
     local now = os.time()
-    local rows = repo.forPerson(personId)
 
-    for index = 1, #rows do
-        if service.detainOnSight(rows[index].grund)
-            and service.isLive(rows[index], now) then
-            return true
+    for personIndex = 1, #persons do
+        local rows = repo.forPerson(persons[personIndex].id)
+
+        for index = 1, #rows do
+            if service.detainOnSight(rows[index].grund)
+                and service.isLive(rows[index], now) then
+                return true
+            end
         end
     end
 

@@ -709,8 +709,7 @@
       "internal_affairs": "Internutredningen",
       "narcotics": "Narkotikaroteln",
       "records": "Registerenheten"
-    },
-    "restrictedRecord": "Skyddad handling"
+    }
   },
   "records": {
     "aliasKind": {
@@ -1556,14 +1555,16 @@
       "author": "Upprättad av",
       "occurred": "Inträffade",
       "place": "Brottsplats",
-      "fu": "Förundersökning"
+      "fu": "Förundersökning",
+      "version": "Version"
     },
     "action": {
       "create": "Ny anmälan",
       "submit": "Lämna in för granskning",
       "approve": "Godkänn",
       "atersand": "Återsänd med kommentar",
-      "supplement": "Lägg till tilläggsuppgift"
+      "supplement": "Lägg till tilläggsuppgift",
+      "atersandNote": "Kommentar till upprättaren"
     },
     "section": {
       "brott": "Brott",
@@ -1582,6 +1583,18 @@
     },
     "detail": {
       "none": "Välj en anmälan för att öppna den."
+    },
+    "brott": {
+      "empty": "Inga brott angivna."
+    },
+    "personer": {
+      "empty": "Inga personer är angivna i anmälan."
+    },
+    "returnedHeading": "Återsänd av befäl",
+    "returnedNoReason": "Ingen motivering angavs.",
+    "confirm": {
+      "approve": "Att godkänna innebär att du signerar anmälan och låser den. Därefter kan den endast kompletteras med en tilläggsuppgift.",
+      "atersand": "Anmälan återsänds till den som upprättat den, tillsammans med din kommentar."
     }
   },
   "fu": {

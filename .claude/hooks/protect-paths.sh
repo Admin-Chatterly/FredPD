@@ -54,7 +54,12 @@ case "$relative" in
         exit 2
       fi
 
-      if git -C "$repo_root" ls-files --error-unmatch "$relative" >/dev/null 2>&1; then
+      # `cat-file -e HEAD:<path>`, not `ls-files`. The index is not the
+      # proxy we want: `git rm --cached` on a shipped migration would take it
+      # out of the index while the file still sits on disk and in every other
+      # server's schema history, and the hook would then wave an edit through.
+      # What "has shipped" means is "is in a commit".
+      if git -C "$repo_root" cat-file -e "HEAD:$relative" 2>/dev/null; then
         echo "Blocked: $relative has already shipped." >&2
         echo "database/migrations/ is append-only (invariant 8). Add a new numbered migration instead -- do not edit this one, not even a comment." >&2
         exit 2

@@ -709,8 +709,7 @@
       "internal_affairs": "Internal Affairs",
       "narcotics": "Narcotics",
       "records": "Records"
-    },
-    "restrictedRecord": "Restricted record"
+    }
   },
   "records": {
     "aliasKind": {
@@ -1556,14 +1555,16 @@
       "author": "Author",
       "occurred": "Occurred",
       "place": "Place",
-      "fu": "Investigation"
+      "fu": "Investigation",
+      "version": "Version"
     },
     "action": {
       "create": "New report",
       "submit": "Submit for approval",
       "approve": "Approve",
       "atersand": "Return with comments",
-      "supplement": "Add supplemental"
+      "supplement": "Add supplemental",
+      "atersandNote": "Comment to the author"
     },
     "section": {
       "brott": "Offences",
@@ -1582,6 +1583,18 @@
     },
     "detail": {
       "none": "Select a report to open it."
+    },
+    "brott": {
+      "empty": "No offences charged."
+    },
+    "personer": {
+      "empty": "Nobody is recorded on this report."
+    },
+    "returnedHeading": "Returned by the supervisor",
+    "returnedNoReason": "No reason was given.",
+    "confirm": {
+      "approve": "Approving signs this report and locks it. It can then only be amended by a supplemental.",
+      "atersand": "Returning sends this report back to its author with your comment."
     }
   },
   "fu": {

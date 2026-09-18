@@ -52,6 +52,12 @@ local RECORD_TYPES <const> = {
     person = true, vehicle = true, firearm = true, location = true,
     report = true, case = true, note = true, arrest = true, citation = true,
     warrant = true, bolo = true, evidence = true, scene = true,
+    -- 7.12 and 7.13. `efterlysning` is its own type rather than sharing
+    -- `warrant` with the coercive measures: the two tables have independent
+    -- ids drawn from the same counter, so a grant on one would have opened the
+    -- other. `spaning` likewise rather than sharing `bolo`, so the hit that
+    -- names it and the record it is checked against agree.
+    efterlysning = true, spaning = true,
     lab_request = true, intel_person = true, intel_org = true, intel_note = true,
     intel_case = true, surveillance = true, ia_case = true, uof_report = true,
 }

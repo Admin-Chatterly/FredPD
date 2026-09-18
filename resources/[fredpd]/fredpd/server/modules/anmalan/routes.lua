@@ -77,6 +77,23 @@ local function readable(session, id)
     return allowed
 end
 
+--- Reads a förundersökning the session is allowed to see, or refuses.
+---
+--- The FU half had no equivalent of `readable` and its write routes went
+--- straight from `repo.fuById` to an UPDATE. An officer holding `inv.fu.lead`
+--- but not the clearance could close an investigation above it -- and learned
+--- the record existed from the `not_found` versus `conflict` split, which is
+--- the disclosure 4.5 exists to prevent.
+local function readableFu(session, id)
+    local row = repo.fuById(id, session.agencyId)
+    if not row then return nil, route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+
+    local allowed = access.read(session, FU, row)
+    if not allowed then return nil, route.refuse(FredPD.ErrorCode.RESTRICTED) end
+
+    return allowed
+end
+
 -- -----------------------------------------------------------------------------
 -- Reads
 -- -----------------------------------------------------------------------------
@@ -142,7 +159,14 @@ route.define({
             anmalan = row,
             brott = charges,
             personer = repo.personer(row.id),
-            supplements = repo.supplements(row.id, session.agencyId),
+            -- Through the filter, not raw. A tilläggsuppgift is a full
+            -- anmälan with its own classification and its own access rows --
+            -- an informant statement attached to a routine burglary report --
+            -- and handing the list over unfiltered let anyone who could open
+            -- the parent read every child (invariant 4), unaudited
+            -- (invariant 11). `anmalan.list` always filtered; this did not.
+            supplements = access.filterSearch(
+                session, ANMALAN, repo.supplements(row.id, session.agencyId)),
             straffskala = #skalor > 0 and brott.gemensamStraffskala(skalor) or nil,
             aklagareIndicated = service.aklagareIndicated(skalor),
             may = {
@@ -491,16 +515,13 @@ route.define({
     perm = 'inv.fu.view',
     schema = 'FuGet',
     handler = function(session, input)
-        local row = repo.fuById(input.id, session.agencyId)
-        if not row then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
-
-        local allowed = access.read(session, FU, row)
-        if not allowed then return route.refuse(FredPD.ErrorCode.RESTRICTED) end
+        local allowed, refusal = readableFu(session, input.id)
+        if not allowed then return refusal end
 
         return {
             fu = allowed,
             anmalningar = access.filterSearch(session, ANMALAN,
-                repo.list(session.agencyId, { fuId = row.id, includeSupplements = true }, 100)),
+                repo.list(session.agencyId, { fuId = allowed.id, includeSupplements = true }, 100)),
         }
     end,
 })
@@ -534,8 +555,8 @@ route.define({
     audit = 'fu.assigned',
     subjectType = FU,
     handler = function(session, input)
-        local row = repo.fuById(input.id, session.agencyId)
-        if not row then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+        local row, refusal = readableFu(session, input.id)
+        if not row then return refusal end
 
         if not service.fuIsOpen(row) then
             return route.refuse(FredPD.ErrorCode.CONFLICT, { status = 'fu_closed' })
@@ -556,8 +577,8 @@ route.define({
 --- a route name that is not a literal is a route `tools/wiring-check.ts` cannot
 --- see.
 local function runFuDecision(session, input, action)
-    local row = repo.fuById(input.id, session.agencyId)
-    if not row then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+    local row, refusal = readableFu(session, input.id)
+    if not row then return refusal end
 
     local ledAny = FredPD.Core.perms.satisfies(session.permissions, 'inv.fu.assign')
 

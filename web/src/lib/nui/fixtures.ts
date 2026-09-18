@@ -1636,6 +1636,8 @@ interface FixtureAnmalan {
   status: string;
   createdBy: string;
   version: number;
+  /** The supervisor's reason, on a report that came back. */
+  returnedNote?: string | null;
   brott: {
     id: number;
     code: string;
@@ -1710,13 +1712,25 @@ const anmalningar: FixtureAnmalan[] = [
 ];
 
 /**
+ * Two records the reader may be told about and may not read (4.5).
+ *
+ * **Two, not one, deliberately.** A stub carries no `id`, so a list keyed by
+ * `row.id` gives them the same `undefined` key and Svelte refuses to render the
+ * list at all — the whole tab goes blank. One stub would not have caught it.
+ */
+const restrictedAnmalningar = [
+  { restricted: true as const, recordType: 'report', contact: 'internal_affairs' },
+  { restricted: true as const, recordType: 'report', contact: 'narcotics' },
+];
+
+/**
  * A workflow transition against the fixture rows.
  *
  * Enforces the two rules the screen is tested against: an approved anmälan is
  * locked, and nobody approves their own.
  */
 function moveAnmalan(input: unknown, to: string): unknown {
-  const { id } = (input ?? {}) as { id?: number };
+  const { id, note } = (input ?? {}) as { id?: number; note?: string };
   const row = anmalningar.find((entry) => entry.id === id);
 
   if (!row) return refuse('not_found');
@@ -1724,6 +1738,15 @@ function moveAnmalan(input: unknown, to: string): unknown {
 
   if (to === 'godkand' && row.createdBy === FIXTURE_VIEWER) {
     return refuse('forbidden', { status: 'own_report' });
+  }
+
+  // The note follows the same rule `Repo.transition` applies on the server:
+  // a return carries the supervisor's reason, and resubmitting clears it, so
+  // an approved report never displays an objection to the version approved.
+  if (to === 'atersand') {
+    row.returnedNote = note ?? null;
+  } else if (to === 'inlamnad') {
+    row.returnedNote = null;
   }
 
   row.status = to;
@@ -1757,7 +1780,12 @@ export const fixtures: FixtureSet = {
       );
 
       return {
-        anmalningar: found.map(({ brott: _brott, personer: _personer, ...row }) => row),
+        anmalningar: [
+          ...found.map(({ brott: _brott, personer: _personer, ...row }) => row),
+          // Appended rather than interleaved so the readable rows keep stable
+          // positions in the tests that click them.
+          ...restrictedAnmalningar,
+        ],
       };
     },
 

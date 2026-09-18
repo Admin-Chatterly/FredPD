@@ -377,6 +377,55 @@ function Repo.hitTarget(agencyId, hitType, hitId)
         }
     end
 
+    -- The two 7.13 sources, before the caution fallthrough below.
+    --
+    -- Without these branches an efterlysning hit fell through and was looked up
+    -- in `fpd_person_cautions` **by the efterlysning's id**. Usually a 404;
+    -- when a caution happened to carry that id it passed the access checks for
+    -- an unrelated person and wrote a confirmation reading
+    -- `hit_type='efterlysning', record_type='person', record_id=<someone
+    -- else>`. Not a permission bypass -- the checks did run -- but 7.2 says the
+    -- confirmation log is what an officer points at afterwards, and it named
+    -- the wrong record. The hit that most needs confirming could not be.
+    --
+    -- Each notice is its own record: it carries its own classification and its
+    -- own access rows, so the record checked is the notice, not the person.
+    if hitType == 'efterlysning' then
+        local notice = db().single(
+            [[SELECT e.id, e.agency_id AS agencyId, e.person_id AS personId, e.grund,
+                     e.classification, e.cancelled_at AS cancelledAt,
+                     (e.expires_at IS NOT NULL AND e.expires_at <= NOW(3)) AS expired
+                FROM fpd_efterlysning e
+               WHERE e.agency_id = ? AND e.id = ?]],
+            { agencyId, hitId }
+        )
+
+        if not notice then return nil end
+
+        return {
+            record = notice, child = notice, recordType = 'efterlysning',
+            recordId = notice.id, kind = notice.grund,
+        }
+    end
+
+    if hitType == 'spaning' then
+        local lookout = db().single(
+            [[SELECT s.id, s.agency_id AS agencyId, s.grund, s.priority,
+                     s.classification, s.resolved_at AS resolvedAt,
+                     (s.expires_at IS NOT NULL AND s.expires_at <= NOW(3)) AS expired
+                FROM fpd_spaning s
+               WHERE s.agency_id = ? AND s.id = ?]],
+            { agencyId, hitId }
+        )
+
+        if not lookout then return nil end
+
+        return {
+            record = lookout, child = lookout, recordType = 'spaning',
+            recordId = lookout.id, kind = lookout.grund,
+        }
+    end
+
     local caution = db().single(
         [[SELECT c.id, c.agency_id AS agencyId, c.person_id AS personId, c.kind,
                  c.field_key AS fieldKey, c.classification, c.cancelled_at AS cancelledAt,

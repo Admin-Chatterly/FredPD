@@ -365,7 +365,7 @@ route.define({
                     row.hits = service.vehicleHits(visibleFlags(reader, flags[row.id] or {}), row.id)
 
                     merge(row.hits, service.spaningHits(
-                        accessRules.filterSearchResults(reader, vehicleSpaning[row.id] or {}), now))
+                        access.filterSearch(session, 'spaning', vehicleSpaning[row.id] or {}), now))
                 elseif row.kind == 'firearm' then
                     row.hits = service.firearmHits(row)
                 else
@@ -373,12 +373,23 @@ route.define({
                         visibleCautions(session, reader, cautions[row.id] or {}), row.id
                     )
 
-                    -- Each notice carries its own classification, so each is
-                    -- filtered before it can become a banner (invariant 4).
+                    -- Through `access.filterSearch`, not the pure half.
+                    --
+                    -- The pure filter reads compartments, seals and grants off
+                    -- the row, and only `Repo.prepare` puts them there -- so
+                    -- filtering these with it enforced the classification
+                    -- column and nothing else. A sealed or compartmented
+                    -- efterlysning still became a red "detain on sight" banner
+                    -- carrying its ground, and no read was audited.
+                    --
+                    -- Unlike the flags and cautions beside them, these are
+                    -- standalone records with their own rows in
+                    -- `fpd_record_compartments` and `fpd_record_seals`; a
+                    -- caution is a child of a record already checked.
                     merge(row.hits, service.efterlysningHits(
-                        accessRules.filterSearchResults(reader, efterlysningar[row.id] or {}), now))
+                        access.filterSearch(session, 'efterlysning', efterlysningar[row.id] or {}), now))
                     merge(row.hits, service.spaningHits(
-                        accessRules.filterSearchResults(reader, personSpaning[row.id] or {}), now))
+                        access.filterSearch(session, 'spaning', personSpaning[row.id] or {}), now))
 
                     redactAddress(session, row)
                 end

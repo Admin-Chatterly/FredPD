@@ -5,6 +5,25 @@
 --- net event here would let a client resolve every lookout on the server by
 --- naming a target, which is invariant 3 read backwards.
 
+--- Records what a cascade took down.
+---
+--- Deliberately not scoped by agency (the van has been found), which makes it
+--- the widest-reaching write here and the one that most needs a line in the
+--- log. Spec 11.2: an entry for every sensitive action. One row per cascade,
+--- carrying the count -- which is what somebody reviewing the gripande needs.
+local function auditCascade(event, targetKind, targetId, resolved)
+    if (resolved or 0) == 0 then return end
+
+    FredPD.Core.audit.write({
+        action = 'spaning.auto_resolved',
+        discordId = event.discordId,
+        agencyId = event.agencyId,
+        subjectType = 'spaning',
+        subjectId = tostring(targetId),
+        detail = { targetKind = targetKind, targetId = targetId, resolved = resolved },
+    })
+end
+
 --- 7.13: "auto-resolve on arrest or impound".
 ---
 --- The thing being looked for has turned up, so the lookout has done its job.
@@ -20,8 +39,10 @@ AddEventHandler('fredpd:gripande', function(event)
     local personId = tonumber(event.personId)
     if not personId then return end
 
-    FredPD.Repo.spaning.resolveForTarget(
+    local resolved = FredPD.Repo.spaning.resolveForTarget(
         'person', personId, event.discordId, 'spaning.grund.gripen')
+
+    auditCascade(event, 'person', personId, resolved)
 end)
 
 --- The vehicle half of the same rule.
@@ -36,6 +57,8 @@ AddEventHandler('fredpd:vehicleImpounded', function(event)
     local vehicleId = tonumber(event.vehicleId)
     if not vehicleId then return end
 
-    FredPD.Repo.spaning.resolveForTarget(
+    local resolved = FredPD.Repo.spaning.resolveForTarget(
         'vehicle', vehicleId, event.discordId, 'spaning.grund.omhandertaget')
+
+    auditCascade(event, 'vehicle', vehicleId, resolved)
 end)

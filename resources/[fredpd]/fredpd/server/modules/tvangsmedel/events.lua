@@ -5,6 +5,30 @@
 --- net event here would be a client able to cancel every efterlysning on the
 --- server by naming a person id, which is invariant 3 read backwards.
 
+--- Records what a cascade took down.
+---
+--- These UPDATEs are deliberately not scoped by agency -- the person is in a
+--- cell, and another department's wanted notice for them is as stale as this
+--- one's. That makes them the widest-reaching writes in the suite, and until
+--- now the only thing in the log was the gripande itself: nothing said which
+--- notices had been cancelled, or how many, or across which agencies.
+---
+--- Spec 11.2 wants an entry for every sensitive action. One row per cascade
+--- rather than one per notice: the gripande is the act, and the count is what
+--- somebody reviewing it needs.
+local function auditCascade(event, personId, cancelled)
+    if (cancelled or 0) == 0 then return end
+
+    FredPD.Core.audit.write({
+        action = 'efterlysning.auto_cancelled',
+        discordId = event.discordId,
+        agencyId = event.agencyId,
+        subjectType = 'efterlysning',
+        subjectId = tostring(personId),
+        detail = { personId = personId, cancelled = cancelled, frihetId = event.frihetId },
+    })
+end
+
 --- 7.13: "auto-resolve on arrest".
 ---
 --- The frihetsberövande module announces a gripande; this module decides what
@@ -25,6 +49,8 @@ AddEventHandler('fredpd:gripande', function(event)
     local personId = tonumber(event.personId)
     if not personId then return end
 
-    FredPD.Repo.tvangsmedel.cancelForPerson(
+    local cancelled = FredPD.Repo.tvangsmedel.cancelForPerson(
         personId, event.discordId, 'efterlysning.grund.gripen')
+
+    auditCascade(event, personId, cancelled)
 end)

@@ -176,6 +176,28 @@ route.define({
             return route.refuse(FredPD.ErrorCode.FORBIDDEN, { classification = 'over_clearance' })
         end
 
+        -- The person has to be one this session may read, and the check has
+        -- to happen before anything is written.
+        --
+        -- Without it `personId` was an unvalidated number: `frihet.gripande` is
+        -- granted to patrol, so an officer could walk the id space, create a
+        -- chain against a person in another agency, and -- through the event
+        -- below -- take down every agency's efterlysningar and lookouts for
+        -- them. The route also echoed back `person_number` from the JOIN,
+        -- which made it an existence oracle for other agencies' records.
+        -- `Repo.readPerson` is the persons module's own entry point: it scopes
+        -- to the agency, runs the access check and audits a restricted read
+        -- (invariant 11). Reusing it rather than writing a second lookup means
+        -- there is one definition of "may this session see this person".
+        local person, visibility = FredPD.Repo.persons.readPerson(session, input.personId)
+
+        if not person then
+            return route.refuse(
+                visibility == 'missing' and FredPD.ErrorCode.NOT_FOUND
+                    or FredPD.ErrorCode.RESTRICTED,
+                { personId = visibility == 'missing' and 'unknown' or 'restricted' })
+        end
+
         local row = repo.gripande(input, session)
         if not row then return route.refuse(FredPD.ErrorCode.INTERNAL) end
 

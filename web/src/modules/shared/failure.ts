@@ -128,6 +128,60 @@ const REASONS = new Set([
   // off. Distinct from `unknown`, because "there is no such beat" and "that
   // district was retired last week" are different mistakes.
   'disabled',
+
+  // ------------------------------------------------ the M2 records workflow
+
+  // Brottskatalogen (7.10). A straffskala that is not one, a citation with
+  // half its parts, a fixed term above the eighteen years BrB 26:1 allows.
+  'straffskala',
+  'incomplete_citation',
+  'over_max',
+
+  // Anmälan (7.7). `own_report` is the one that matters most: it is the rule
+  // no permission reaches, and without a key here the panel prints the literal
+  // word `own_report` under a message about Discord roles — which is exactly
+  // the wrong conclusion for the officer to draw.
+  'own_report',
+  'locked',
+  'under_review',
+  'not_author',
+  'not_submitted',
+  'not_submittable',
+
+  // Tilläggsuppgifter (7.7). The chain rules the schema cannot hold.
+  'self_parent',
+  'too_deep',
+
+  // Charges. `stage_unavailable` is BrB 23: the statute does not make the
+  // attempt punishable for this offence.
+  'stage_unavailable',
+  'length_mismatch',
+
+  // Förundersökning (7.8) and frihetsberövande (7.9). `wrong_capacity` is an
+  // officer trying to take the åklagare's decision, which is a different
+  // refusal from not holding a grant.
+  'not_ledare',
+  'fu_closed',
+  'wrong_capacity',
+  'already_released',
+
+  // Tvångsmedel (7.12). A measure aimed at the wrong kind of target, and the
+  // three ways one stops authorising anything.
+  'not_a_place',
+  'not_a_person',
+  'upphavd',
+  'not_yet',
+  'expired',
+  'cancelled',
+
+  // Spaningsuppdrag (7.13).
+  'required_without_target',
+  'resolved',
+  'no_expiry',
+  'out_of_range',
+
+  // Record-level access (4.5): a classification above the writer's clearance.
+  'over_clearance',
 ]);
 
 export interface FieldMessage {

@@ -727,6 +727,23 @@ function Query.hitIsLive(hitType, row)
         return registry().FIREARM_HOTFILE[row.status] == true
     end
 
+    -- The 7.13 sources, asked of the modules that own them rather than
+    -- re-decided here. Without these two the fallthrough below treated an
+    -- efterlysning as a person caution and asked `PERSON_HOTFILE` about its
+    -- ground, which is never a caution kind -- so a genuine wanted notice
+    -- could never be confirmed live.
+    if hitType == 'efterlysning' then
+        local tvang = FredPD.Modules.tvangsmedel
+
+        return tvang.detainOnSight(row.kind) and tvang.isLive(row, os.time())
+    end
+
+    if hitType == 'spaning' then
+        local spaning = FredPD.Modules.spaning
+
+        return spaning.needsConfirmation(row) and spaning.isLive(row, os.time())
+    end
+
     return row.cancelledAt == nil and Query.PERSON_HOTFILE[row.kind] == true
 end
 

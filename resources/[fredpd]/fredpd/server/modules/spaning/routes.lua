@@ -18,8 +18,13 @@ local service = FredPD.Modules.spaning
 local access = FredPD.Repo.access
 local accessRules = FredPD.Modules.access
 
---- The access record type. `bolo` is already in the access module's allowlist.
-local SPANING <const> = 'bolo'
+--- The access record type.
+---
+--- `spaning` rather than `bolo`: the hit this module raises is labelled
+--- `spaning` in `query/service.lua`, and the record type a confirmation is
+--- checked against has to be the one the hit names, or the confirmation log
+--- points at the wrong register.
+local SPANING <const> = 'spaning'
 
 --- Adds the derived fields a screen needs.
 local function decorate(row, now)
@@ -103,8 +108,16 @@ route.define({
     audit = 'spaning.resolved',
     subjectType = SPANING,
     handler = function(session, input)
+        -- Read before write, the same as `spaning.get`. Without it an officer
+        -- holding `spaning.create` but not the clearance could close a lookout
+        -- above it, and the `not_found` versus `conflict` split told them the
+        -- record was there (4.5, invariant 11).
         local row = repo.byId(input.id, session.agencyId)
         if not row then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+
+        if not access.read(session, SPANING, row) then
+            return route.refuse(FredPD.ErrorCode.RESTRICTED)
+        end
 
         if repo.resolve(row.id, session.agencyId, session.discordId,
                         input.grund, input.version) == 0 then
