@@ -96,6 +96,14 @@ server_scripts {
     'server/modules/frihet/repo.lua',
     'server/modules/frihet/routes.lua',
 
+    -- Tvångsmedel och efterlysning (spec 7.12, 7.13). After frihet, whose
+    -- chain an efterlysning links to.
+    'server/modules/tvangsmedel/service.lua',
+    'server/modules/tvangsmedel/repo.lua',
+    'server/modules/tvangsmedel/routes.lua',
+    -- Events last: the handler reads the repo above it.
+    'server/modules/tvangsmedel/events.lua',
+
     'server/modules/placements/service.lua',
     'server/modules/placements/repo.lua',
     'server/modules/placements/routes.lua',

@@ -181,6 +181,16 @@ local NUI_ROUTES <const> = {
     'frihet.charges.set',
     'frihet.log.add',
 
+    -- Tvångsmedel och efterlysning (spec 7.12, 7.13).
+    'tvang.list',
+    'tvang.get',
+    'tvang.decide',
+    'tvang.verkstall',
+    'tvang.upphav',
+    'efterlysning.list',
+    'efterlysning.create',
+    'efterlysning.cancel',
+
     -- Crime scenes, evidence and the chain of custody (spec 8).
     'scene.create',
     'scene.release',

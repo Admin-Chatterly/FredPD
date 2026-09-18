@@ -113,6 +113,13 @@ local REQUIRED_TABLES <const> = {
     'fpd_frihetsberovande',
     'fpd_frihet_brott',
     'fpd_frihet_log',
+
+    -- Migration 0011. Tvångsmedel och efterlysning (spec 7.12, 7.13). Listed
+    -- because `HasSearchWarrant` (spec 14) reads the first of them: a server
+    -- missing it answers every door script `false` and locks the department
+    -- out of its own raids with no error anywhere.
+    'fpd_tvangsmedel',
+    'fpd_efterlysning',
 }
 
 --- Columns a migration added to a table that already existed, which the table

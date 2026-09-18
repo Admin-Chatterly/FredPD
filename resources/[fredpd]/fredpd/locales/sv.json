@@ -123,7 +123,13 @@
     "stage_unavailable": "Lagen gör inte det stadiet straffbart för det här brottet.",
     "over_clearance": "Över din behörighet.",
     "wrong_capacity": "Det beslutet är inte ditt att fatta.",
-    "already_released": "Personen är redan frigiven."
+    "already_released": "Personen är redan frigiven.",
+    "not_a_place": "Tvångsmedlet riktas mot en plats, inte mot en person.",
+    "not_a_person": "Tvångsmedlet riktas mot en person, inte mot en plats.",
+    "upphavd": "Beslutet är hävt.",
+    "not_yet": "Beslutet har inte trätt i kraft.",
+    "expired": "Beslutet har upphört att gälla.",
+    "cancelled": "Avlyst."
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -1651,5 +1657,82 @@
     },
     "empty": "Ingen är frihetsberövad.",
     "attention": "En lagstadgad frist kräver åtgärd."
+  },
+  "tvang": {
+    "kind": {
+      "husrannsakan_reell": "Reell husrannsakan",
+      "husrannsakan_personell": "Personell husrannsakan",
+      "kroppsvisitation": "Kroppsvisitation",
+      "kroppsbesiktning": "Kroppsbesiktning",
+      "beslag": "Beslag"
+    },
+    "target": {
+      "person": "Person",
+      "vehicle": "Fordon",
+      "address": "Adress"
+    },
+    "decider": {
+      "fu_ledare": "Förundersökningsledare",
+      "aklagare": "Åklagare",
+      "domare": "Domare"
+    },
+    "column": {
+      "number": "Diarienummer",
+      "kind": "Tvångsmedel",
+      "target": "Riktat mot",
+      "decided": "Beslutat av",
+      "valid": "Giltigt till",
+      "scope": "Omfattning",
+      "status": "Status"
+    },
+    "action": {
+      "decide": "Fatta beslut",
+      "verkstall": "Registrera verkställighet",
+      "upphav": "Häv beslutet"
+    },
+    "grund": {
+      "skalig_misstanke": "Skälig misstanke",
+      "sannolika_skal": "Sannolika skäl",
+      "eftersokande_person": "Eftersökande av person som ska gripas",
+      "sakra_bevis": "Säkra bevisning",
+      "fara_i_drojsmal": "Fara i dröjsmål",
+      "annan": "Annat, anges i omfattningen"
+    },
+    "status": {
+      "live": "Gällande",
+      "expired": "Utgånget",
+      "upphavd": "Hävt",
+      "not_yet": "Ej i kraft ännu",
+      "verkstalld": "Verkställt"
+    },
+    "empty": "Inga tvångsmedel matchar."
+  },
+  "efterlysning": {
+    "grund": {
+      "anhallen_i_franvaro": "Anhållen i sin frånvaro",
+      "haktad_i_franvaro": "Häktad i sin frånvaro",
+      "delgivning": "Delgivning",
+      "forsvunnen": "Försvunnen person",
+      "oidentifierad": "Oidentifierad",
+      "annan": "Annat",
+      "gripen": "Gripen",
+      "aterkallad": "Återkallad",
+      "preskriberad": "Preskriberad"
+    },
+    "column": {
+      "number": "Diarienummer",
+      "person": "Person",
+      "grund": "Grund",
+      "priority": "Prioritet",
+      "issued": "Utfärdad",
+      "expires": "Upphör"
+    },
+    "action": {
+      "create": "Efterlys",
+      "cancel": "Avlys"
+    },
+    "detainOnSight": "Ska gripas",
+    "notAnArrest": "Efterlyst, men inte för gripande.",
+    "empty": "Ingen är efterlyst."
   }
 }

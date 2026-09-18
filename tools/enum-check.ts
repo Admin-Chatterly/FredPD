@@ -115,6 +115,14 @@ const PAIRED: Record<string, keyof typeof enums> = {
   ck_fpd_frihet_status: 'FRIHET_STATUSES',
   ck_fpd_frihet_class: 'CLASSIFICATIONS',
   ck_fpd_frihet_brott_stage: 'BROTT_STAGES',
+
+  // Tvångsmedel och efterlysning (0011).
+  ck_fpd_tvang_kind: 'TVANG_KINDS',
+  ck_fpd_tvang_target: 'TVANG_TARGETS',
+  ck_fpd_tvang_decider: 'TVANG_DECIDERS',
+  ck_fpd_tvang_class: 'CLASSIFICATIONS',
+  ck_fpd_efterlysning_grund: 'EFTERLYSNING_GRUNDER',
+  ck_fpd_efterlysning_class: 'CLASSIFICATIONS',
 };
 
 /**

@@ -179,6 +179,26 @@ route.define({
         local row = repo.gripande(input, session)
         if not row then return route.refuse(FredPD.ErrorCode.INTERNAL) end
 
+        -- 7.13's auto-resolve, announced rather than performed. A gripande is
+        -- what an efterlysning existed to produce, so every live one on this
+        -- person has to come down -- otherwise the next officer to run them
+        -- gets a red "detain on sight" banner for somebody already in a cell,
+        -- and the one after that stops believing the banners.
+        --
+        -- Fired as a **server-local event** (spec 14) instead of reaching into
+        -- the tvångsmedel module, because this resource's rule is that a module
+        -- talks to another through its service and never its repo. Cancelling
+        -- an efterlysning is a write, the service holds no writes, and the way
+        -- out is not to bend the rule: the module that owns the efterlysningar
+        -- listens for this and decides for itself what a gripande means for
+        -- them. It also gives other resources the same hook for free.
+        TriggerEvent('fredpd:gripande', {
+            frihetId = row.id,
+            personId = input.personId,
+            agencyId = session.agencyId,
+            discordId = session.discordId,
+        })
+
         return {
             id = row.id,
             number = row.number,

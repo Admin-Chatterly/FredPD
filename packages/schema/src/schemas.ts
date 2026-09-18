@@ -16,6 +16,7 @@ import {
   EVIDENCE_TYPES,
   FIREARM_STATUSES,
   FIREARM_TYPES,
+  EFTERLYSNING_GRUNDER,
   FRIHET_STATUSES,
   FU_LEDARE_KINDS,
   FU_STATUSES,
@@ -34,6 +35,8 @@ import {
   PLACEMENT_INTERACTIONS,
   PLACEMENT_KINDS,
   SCENE_STATUSES,
+  TVANG_KINDS,
+  TVANG_TARGETS,
   SELF_SET_UNIT_STATUSES,
   SUPERVISOR_UNIT_STATUSES,
   UNIT_STATUSES,
@@ -2104,6 +2107,92 @@ export const schemas = {
     id: { type: 'integer', required: true, min: 1 },
     kind: { type: 'string', required: true, min: 1, max: 64 },
     note: { type: 'string', required: false, max: 500 },
+  },
+
+  // ------------------------------------------------------------- tvångsmedel
+
+  TvangList: {
+    kind: { type: 'enum', required: false, values: TVANG_KINDS },
+    fuId: { type: 'integer', required: false, min: 1 },
+    /** Only measures that authorise something right now. */
+    liveOnly: { type: 'boolean', required: false },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  TvangGet: {
+    id: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
+   * Deciding a coercive measure (RB 27-28).
+   *
+   * **`deciderKind` is not a field.** The capacity a session decides in comes
+   * from its permissions on the server: a client that could name its own
+   * capacity could decide a kroppsbesiktning as though it were a prosecutor.
+   *
+   * `validSeconds` bounds the decision in time. Absent gives the module's
+   * default, which exists because a decision with no end is a standing
+   * authority to enter somebody's home — not a thing RB grants.
+   *
+   * `grund` is a locale key naming the ground, never a sentence (invariant 6);
+   * `scope` is the free text saying what may be searched for and seized, which
+   * is the one part that genuinely cannot be a key.
+   */
+  TvangDecide: {
+    kind: { type: 'enum', required: true, values: TVANG_KINDS },
+    targetKind: { type: 'enum', required: true, values: TVANG_TARGETS },
+    targetId: { type: 'integer', required: true, min: 1 },
+    targetLabel: { type: 'string', required: false, max: 191 },
+    fuId: { type: 'integer', required: false, min: 1 },
+    grund: { type: 'string', required: true, min: 1, max: 128 },
+    scope: { type: 'string', required: false, max: 500 },
+    // One hour to thirty days. The floor stops a measure that expires before
+    // anybody can act on it; the ceiling stops one that is a standing authority
+    // in all but name.
+    validSeconds: { type: 'integer', required: false, min: 3600, max: 2592000 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
+  TvangVerkstall: {
+    id: { type: 'integer', required: true, min: 1 },
+    note: { type: 'string', required: false, max: 500 },
+  },
+
+  TvangUpphav: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+  },
+
+  // ------------------------------------------------------------ efterlysning
+
+  EfterlysningList: {
+    grund: { type: 'enum', required: false, values: EFTERLYSNING_GRUNDER },
+    includeCancelled: { type: 'boolean', required: false },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  /**
+   * Wanting somebody (spec 7.13).
+   *
+   * `expiresInSeconds` absent means the efterlysning stands until it is
+   * cancelled, which is the right default for an anhållen i sin frånvaro: the
+   * prosecutor's decision does not lapse because time passed.
+   */
+  EfterlysningCreate: {
+    personId: { type: 'integer', required: true, min: 1 },
+    grund: { type: 'enum', required: true, values: EFTERLYSNING_GRUNDER },
+    frihetId: { type: 'integer', required: false, min: 1 },
+    fuId: { type: 'integer', required: false, min: 1 },
+    note: { type: 'string', required: false, max: 500 },
+    priority: { type: 'integer', required: false, min: 1, max: 4 },
+    expiresInSeconds: { type: 'integer', required: false, min: 3600, max: 31536000 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
+  EfterlysningCancel: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    grund: { type: 'string', required: false, max: 128 },
   },
 
 } as const satisfies Record<string, Schema>;

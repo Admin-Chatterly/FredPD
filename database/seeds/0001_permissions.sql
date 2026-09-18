@@ -264,6 +264,31 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('domare', 'frihet.haktning'),
     ('domare', 'frihet.frigiv'),
 
+    -- Tvångsmedel (spec 7.12). Reading them is ordinary work -- an officer
+    -- about to force a door has to be able to see what authorises it. Deciding
+    -- one is the förundersökningsledare's, which on the police side means a
+    -- supervisor; `tvang.decide.aklagare` and `.domare` raise the capacity, and
+    -- the capacity is what decides whether a kroppsbesiktning may be ordered.
+    --
+    -- `tvang.verkstall` is separate from `tvang.decide` on purpose: the officer
+    -- who carries a husrannsakan out is not usually the one who decided it, and
+    -- a server where those were one grant could not record that they differed.
+    ('patrol', 'tvang.view'),
+    ('patrol', 'tvang.verkstall'),
+    ('supervisor', 'tvang.decide'),
+    ('aklagare', 'tvang.view'),
+    ('aklagare', 'tvang.decide'),
+    ('aklagare', 'tvang.decide.aklagare'),
+    ('domare', 'tvang.view'),
+    ('domare', 'tvang.decide'),
+    ('domare', 'tvang.decide.domare'),
+
+    -- Efterlysning (spec 7.13). Issuing one makes somebody turn up wanted on
+    -- every query on the server, so it sits with the prosecutor and with
+    -- command rather than with patrol.
+    ('command', 'efterlysning.issue'),
+    ('aklagare', 'efterlysning.issue'),
+
     -- The two field-level grants of spec 4.5. Without a group holding them the
     -- fields are not protected, they are invisible: the routes read the
     -- permission on every path that returns the field, so a department that

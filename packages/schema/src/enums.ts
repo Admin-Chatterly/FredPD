@@ -996,3 +996,70 @@ export const FRIHET_STATUSES = [
 ] as const;
 
 export type FrihetStatus = (typeof FRIHET_STATUSES)[number];
+
+/**
+ * `ck_fpd_tvang_kind` — the coercive measures (spec 7.12, RB 27-28).
+ *
+ * Swedish names, because the distinctions are Swedish and a translation loses
+ * them. **Husrannsakan** comes in two kinds that are separate decisions with
+ * separate grounds: *reell* (RB 28:1) searches a place for something, and
+ * *personell* (RB 28:2) searches a place for a **person**, to arrest them.
+ * **Kroppsvisitation** (RB 28:11) is clothing and what somebody carries;
+ * **kroppsbesiktning** (RB 28:12) is the body itself, a higher threshold, and
+ * the measure that produces the reference sample the lab compares against.
+ * **Beslag** (RB 27:1) is the decision to seize; the items live in the
+ * evidence module, which has held beslag since M3.
+ *
+ * Only the two husrannsakan kinds authorise entering a place, which is what
+ * `HasSearchWarrant` in spec 14 turns on — see `Tvang.authorisesEntry`.
+ */
+export const TVANG_KINDS = [
+  'husrannsakan_reell',
+  'husrannsakan_personell',
+  'kroppsvisitation',
+  'kroppsbesiktning',
+  'beslag',
+] as const;
+
+export type TvangKind = (typeof TVANG_KINDS)[number];
+
+/** `ck_fpd_tvang_target` — what a coercive measure is directed at. */
+export const TVANG_TARGETS = ['person', 'vehicle', 'address'] as const;
+
+export type TvangTarget = (typeof TVANG_TARGETS)[number];
+
+/**
+ * `ck_fpd_tvang_decider` — the capacity a measure was decided in.
+ *
+ * All three, and `fu_ledare` is the ordinary one: RB gives the everyday
+ * husrannsakan to whoever leads the förundersökning, police or prosecutor. A
+ * model that forced every measure through a judge would stop the commonest
+ * coercive measure in the suite on a server with nobody playing one.
+ */
+export const TVANG_DECIDERS = ['fu_ledare', 'aklagare', 'domare'] as const;
+
+export type TvangDecider = (typeof TVANG_DECIDERS)[number];
+
+/**
+ * `ck_fpd_efterlysning_grund` — why somebody is wanted (spec 7.13).
+ *
+ * **`anhallen_i_franvaro` is the nearest Swedish equivalent of a US arrest
+ * warrant** (Appendix A): the prosecutor has decided to anhålla somebody who is
+ * not present. The decision itself lives in the frihetsberövande chain; an
+ * efterlysning is the consequence that makes them show up on a query.
+ *
+ * Only the two custody grounds mean "detain on sight". Somebody wanted for
+ * **delgivning** is to be served a document, and somebody **forsvunnen** is
+ * wanted for their own sake — one red banner for all of them teaches an officer
+ * to treat them alike, which is the opposite of what the banner is for.
+ */
+export const EFTERLYSNING_GRUNDER = [
+  'anhallen_i_franvaro',
+  'haktad_i_franvaro',
+  'delgivning',
+  'forsvunnen',
+  'oidentifierad',
+  'annan',
+] as const;
+
+export type EfterlysningGrund = (typeof EFTERLYSNING_GRUNDER)[number];

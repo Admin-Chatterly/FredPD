@@ -123,7 +123,13 @@
     "stage_unavailable": "The statute does not make that stage punishable for this offence.",
     "over_clearance": "Above your clearance.",
     "wrong_capacity": "That decision is not yours to take.",
-    "already_released": "This person has already been released."
+    "already_released": "This person has already been released.",
+    "not_a_place": "This measure is directed at a place, not a person.",
+    "not_a_person": "This measure is directed at a person, not a place.",
+    "upphavd": "This decision has been revoked.",
+    "not_yet": "This decision is not yet in force.",
+    "expired": "This decision has expired.",
+    "cancelled": "Cancelled."
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -1651,5 +1657,82 @@
     },
     "empty": "Nobody is being held.",
     "attention": "A statutory deadline needs attention."
+  },
+  "tvang": {
+    "kind": {
+      "husrannsakan_reell": "Search of premises",
+      "husrannsakan_personell": "Search of premises for a person",
+      "kroppsvisitation": "Search of the person",
+      "kroppsbesiktning": "Bodily examination",
+      "beslag": "Seizure"
+    },
+    "target": {
+      "person": "Person",
+      "vehicle": "Vehicle",
+      "address": "Address"
+    },
+    "decider": {
+      "fu_ledare": "Investigation leader",
+      "aklagare": "Prosecutor",
+      "domare": "Judge"
+    },
+    "column": {
+      "number": "Reference",
+      "kind": "Measure",
+      "target": "Directed at",
+      "decided": "Decided by",
+      "valid": "Valid until",
+      "scope": "Scope",
+      "status": "Status"
+    },
+    "action": {
+      "decide": "Decide a measure",
+      "verkstall": "Record execution",
+      "upphav": "Revoke"
+    },
+    "grund": {
+      "skalig_misstanke": "Reasonable suspicion",
+      "sannolika_skal": "Probable cause",
+      "eftersokande_person": "To locate a person to be arrested",
+      "sakra_bevis": "To secure evidence",
+      "fara_i_drojsmal": "Danger in delay",
+      "annan": "Other, stated in the scope"
+    },
+    "status": {
+      "live": "Valid",
+      "expired": "Expired",
+      "upphavd": "Revoked",
+      "not_yet": "Not yet in force",
+      "verkstalld": "Executed"
+    },
+    "empty": "No coercive measures match."
+  },
+  "efterlysning": {
+    "grund": {
+      "anhallen_i_franvaro": "Detained in absentia",
+      "haktad_i_franvaro": "Remanded in absentia",
+      "delgivning": "To be served a document",
+      "forsvunnen": "Missing person",
+      "oidentifierad": "Unidentified",
+      "annan": "Other",
+      "gripen": "Taken into custody",
+      "aterkallad": "Withdrawn",
+      "preskriberad": "Time-barred"
+    },
+    "column": {
+      "number": "Reference",
+      "person": "Person",
+      "grund": "Ground",
+      "priority": "Priority",
+      "issued": "Issued",
+      "expires": "Expires"
+    },
+    "action": {
+      "create": "Issue a wanted notice",
+      "cancel": "Cancel"
+    },
+    "detainOnSight": "Detain on sight",
+    "notAnArrest": "Wanted, but not for arrest.",
+    "empty": "Nobody is wanted."
   }
 }

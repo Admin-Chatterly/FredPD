@@ -1164,4 +1164,60 @@ FredPD.Schema = {
         kind = { type = 'string', required = true, min = 1, max = 64 },
         note = { type = 'string', required = false, max = 500 },
     },
+
+    TvangList = {
+        kind = { type = 'enum', required = false, values = { 'husrannsakan_reell', 'husrannsakan_personell', 'kroppsvisitation', 'kroppsbesiktning', 'beslag' } },
+        fuId = { type = 'integer', required = false, min = 1 },
+        liveOnly = { type = 'boolean', required = false },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    TvangGet = {
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
+    TvangDecide = {
+        kind = { type = 'enum', required = true, values = { 'husrannsakan_reell', 'husrannsakan_personell', 'kroppsvisitation', 'kroppsbesiktning', 'beslag' } },
+        targetKind = { type = 'enum', required = true, values = { 'person', 'vehicle', 'address' } },
+        targetId = { type = 'integer', required = true, min = 1 },
+        targetLabel = { type = 'string', required = false, max = 191 },
+        fuId = { type = 'integer', required = false, min = 1 },
+        grund = { type = 'string', required = true, min = 1, max = 128 },
+        scope = { type = 'string', required = false, max = 500 },
+        validSeconds = { type = 'integer', required = false, min = 3600, max = 2592000 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    TvangVerkstall = {
+        id = { type = 'integer', required = true, min = 1 },
+        note = { type = 'string', required = false, max = 500 },
+    },
+
+    TvangUpphav = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+    },
+
+    EfterlysningList = {
+        grund = { type = 'enum', required = false, values = { 'anhallen_i_franvaro', 'haktad_i_franvaro', 'delgivning', 'forsvunnen', 'oidentifierad', 'annan' } },
+        includeCancelled = { type = 'boolean', required = false },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    EfterlysningCreate = {
+        personId = { type = 'integer', required = true, min = 1 },
+        grund = { type = 'enum', required = true, values = { 'anhallen_i_franvaro', 'haktad_i_franvaro', 'delgivning', 'forsvunnen', 'oidentifierad', 'annan' } },
+        frihetId = { type = 'integer', required = false, min = 1 },
+        fuId = { type = 'integer', required = false, min = 1 },
+        note = { type = 'string', required = false, max = 500 },
+        priority = { type = 'integer', required = false, min = 1, max = 4 },
+        expiresInSeconds = { type = 'integer', required = false, min = 3600, max = 31536000 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    EfterlysningCancel = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        grund = { type = 'string', required = false, max = 128 },
+    },
 }
