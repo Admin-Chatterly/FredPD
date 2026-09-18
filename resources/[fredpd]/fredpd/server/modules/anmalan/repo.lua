@@ -157,7 +157,7 @@ end
 function Repo.personer(anmalanId)
     return FredPD.Core.db.query([[
         SELECT ap.person_id AS personId, ap.roll, ap.note,
-               p.number AS personNumber
+               p.person_number AS personNumber
           FROM fpd_anmalan_personer ap
           JOIN fpd_persons p ON p.id = ap.person_id
          WHERE ap.anmalan_id = ?

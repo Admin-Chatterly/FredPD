@@ -121,7 +121,9 @@
     "too_deep": "Kedjan av tilläggsuppgifter är för lång.",
     "length_mismatch": "Listorna stämmer inte överens.",
     "stage_unavailable": "Lagen gör inte det stadiet straffbart för det här brottet.",
-    "over_clearance": "Över din behörighet."
+    "over_clearance": "Över din behörighet.",
+    "wrong_capacity": "Det beslutet är inte ditt att fatta.",
+    "already_released": "Personen är redan frigiven."
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -1594,5 +1596,60 @@
       "annan": "Annat skäl, anges nedan"
     },
     "empty": "Inga förundersökningar matchar."
+  },
+  "frihet": {
+    "status": {
+      "gripen": "Gripen",
+      "anhallen": "Anhållen",
+      "framstalld": "Häktningsframställan inlämnad",
+      "haktad": "Häktad",
+      "frigiven": "Frigiven"
+    },
+    "action": {
+      "gripande": "Registrera gripande",
+      "anhallande": "Anhåll",
+      "framstallan": "Lämna häktningsframställan",
+      "haktning": "Häkta",
+      "frigiv": "Frige",
+      "underratta": "Registrera underrättelse om misstanke",
+      "log": "Lägg till i arrestjournalen"
+    },
+    "column": {
+      "number": "Diarienummer",
+      "person": "Person",
+      "status": "Status",
+      "gripen": "Gripen",
+      "heldFor": "Frihetsberövad",
+      "deadline": "Nästa frist",
+      "grund": "Grund"
+    },
+    "deadline": {
+      "framstallan": "Häktningsframställan (RB 24:12)",
+      "forhandling": "Häktningsförhandling (RB 24:13)",
+      "passed": "Överskriden med {time}",
+      "remaining": "{time} kvar"
+    },
+    "grund": {
+      "pa_bar_garning": "På bar gärning",
+      "efterlyst": "Efterlyst",
+      "flyktfara": "Flyktfara",
+      "kollusionsfara": "Kollusionsfara",
+      "recidivfara": "Recidivfara",
+      "identitet_oklar": "Identiteten ej fastställd",
+      "ej_anhallen": "Ej anhållen av åklagare",
+      "beslut_upphavt": "Beslutet hävt",
+      "tiden_ute": "Fristen har löpt ut",
+      "annan": "Annat, anges i journalen"
+    },
+    "logKind": {
+      "forhor": "Förhör",
+      "forsvarare": "Försvarare",
+      "maltid": "Måltid",
+      "samtal": "Telefonsamtal",
+      "lakare": "Läkarvård",
+      "annan": "Annat"
+    },
+    "empty": "Ingen är frihetsberövad.",
+    "attention": "En lagstadgad frist kräver åtgärd."
   }
 }

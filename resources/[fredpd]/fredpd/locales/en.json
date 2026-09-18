@@ -121,7 +121,9 @@
     "too_deep": "The supplemental chain is too long.",
     "length_mismatch": "The lists do not line up.",
     "stage_unavailable": "The statute does not make that stage punishable for this offence.",
-    "over_clearance": "Above your clearance."
+    "over_clearance": "Above your clearance.",
+    "wrong_capacity": "That decision is not yours to take.",
+    "already_released": "This person has already been released."
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -1594,5 +1596,60 @@
       "annan": "Other, stated below"
     },
     "empty": "No investigations match."
+  },
+  "frihet": {
+    "status": {
+      "gripen": "Seized",
+      "anhallen": "Detained by the prosecutor",
+      "framstalld": "Remand application filed",
+      "haktad": "Remanded in custody",
+      "frigiven": "Released"
+    },
+    "action": {
+      "gripande": "Record a seizure",
+      "anhallande": "Detain (prosecutor)",
+      "framstallan": "File remand application",
+      "haktning": "Remand in custody",
+      "frigiv": "Release",
+      "underratta": "Record notice of suspicion",
+      "log": "Add to the custody log"
+    },
+    "column": {
+      "number": "Reference",
+      "person": "Person",
+      "status": "Status",
+      "gripen": "Seized",
+      "heldFor": "Held for",
+      "deadline": "Next deadline",
+      "grund": "Ground"
+    },
+    "deadline": {
+      "framstallan": "Remand application (RB 24:12)",
+      "forhandling": "Remand hearing (RB 24:13)",
+      "passed": "Overdue by {time}",
+      "remaining": "{time} remaining"
+    },
+    "grund": {
+      "pa_bar_garning": "Caught in the act",
+      "efterlyst": "Wanted",
+      "flyktfara": "Risk of flight",
+      "kollusionsfara": "Risk of interference with the investigation",
+      "recidivfara": "Risk of reoffending",
+      "identitet_oklar": "Identity not established",
+      "ej_anhallen": "Not detained by the prosecutor",
+      "beslut_upphavt": "Decision revoked",
+      "tiden_ute": "Statutory time expired",
+      "annan": "Other, stated in the log"
+    },
+    "logKind": {
+      "forhor": "Interview",
+      "forsvarare": "Defence counsel",
+      "maltid": "Meal",
+      "samtal": "Telephone call",
+      "lakare": "Medical attention",
+      "annan": "Other"
+    },
+    "empty": "Nobody is being held.",
+    "attention": "A statutory deadline needs attention."
   }
 }

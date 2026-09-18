@@ -99,6 +99,29 @@ ON DUPLICATE KEY UPDATE
     `inherits`    = VALUES(`inherits`),
     `description` = VALUES(`description`);
 
+-- -----------------------------------------------------------------------------
+-- DOJ groups (spec 7.9, 7.12)
+--
+-- The prosecutor and the court. Separate groups rather than ranks inside the
+-- department, because RB gives them decisions the police cannot take: an
+-- åklagare anhåller, a domare häktar, and a förundersökning passes to the
+-- prosecutor once a suspect is anhållen.
+--
+-- Neither inherits a police group. A prosecutor is not a senior officer, and a
+-- server that mapped its DOJ Discord role onto `supervisor` would be giving the
+-- court the power to approve the police reports it later reads.
+-- -----------------------------------------------------------------------------
+
+INSERT INTO `fpd_permission_groups` (`key`, `name`, `inherits`, `description`) VALUES
+    ('aklagare', 'Åklagare', NULL,
+     'The prosecutor: leads a förundersökning, anhåller, decides on coercive measures.'),
+    ('domare',   'Domare',   NULL,
+     'The court: decides häktning, and the measures RB reserves to a judge.')
+ON DUPLICATE KEY UPDATE
+    `name`        = VALUES(`name`),
+    `inherits`    = VALUES(`inherits`),
+    `description` = VALUES(`description`);
+
 INSERT INTO `fpd_permission_groups` (`key`, `name`, `inherits`, `description`) VALUES
     ('intel_analyst', 'Intelligence analyst', NULL,
      'Reads and writes the intelligence register. Cannot see protected sources and cannot delete.'),
@@ -211,6 +234,35 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('supervisor', 'inv.fu.open'),
     ('supervisor', 'inv.fu.lead'),
     ('command', 'inv.fu.assign'),
+
+    -- Frihetsberövande (spec 7.9). The three decisions of RB, and they are the
+    -- one place in FredPD where a permission stands for a **legal capacity**
+    -- rather than for a job in the department.
+    --
+    -- `frihet.gripande` is patrol work: an officer may seize somebody caught in
+    -- the act (RB 24:7), and that decision is theirs and provisional.
+    --
+    -- `frihet.anhallande` is the **åklagare's** (RB 24:6) and
+    -- `frihet.haktning` is the **tingsrätt's** (RB 24:13). Neither is seeded to
+    -- any police group, and that is the whole point of the separation: an
+    -- officer who could anhålla would be taking the decision the prosecutor
+    -- exists to take. They are seeded to their own groups, which a server maps
+    -- its DOJ Discord roles onto.
+    --
+    -- `frihet.frigiv` goes to everybody, including plain patrol. A
+    -- frihetsberövande that should end must be able to end at once -- most
+    -- commonly because the prosecutor did not anhålla -- and making release
+    -- wait for the right rank to be online would hold people for the
+    -- convenience of the permission model.
+    ('patrol', 'frihet.view'),
+    ('patrol', 'frihet.gripande'),
+    ('patrol', 'frihet.frigiv'),
+    ('aklagare', 'frihet.view'),
+    ('aklagare', 'frihet.anhallande'),
+    ('aklagare', 'frihet.frigiv'),
+    ('domare', 'frihet.view'),
+    ('domare', 'frihet.haktning'),
+    ('domare', 'frihet.frigiv'),
 
     -- The two field-level grants of spec 4.5. Without a group holding them the
     -- fields are not protected, they are invisible: the routes read the

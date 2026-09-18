@@ -110,6 +110,11 @@ const PAIRED: Record<string, keyof typeof enums> = {
   ck_fpd_fu_status: 'FU_STATUSES',
   ck_fpd_fu_ledare_kind: 'FU_LEDARE_KINDS',
   ck_fpd_fu_class: 'CLASSIFICATIONS',
+
+  // Frihetsberövande (0010).
+  ck_fpd_frihet_status: 'FRIHET_STATUSES',
+  ck_fpd_frihet_class: 'CLASSIFICATIONS',
+  ck_fpd_frihet_brott_stage: 'BROTT_STAGES',
 };
 
 /**
@@ -121,6 +126,12 @@ const PAIRED: Record<string, keyof typeof enums> = {
  * point of the list — "no enum" is exactly what a forgotten enum looks like too.
  */
 const UNPAIRED: Record<string, string> = {
+  // What the court decided at the häktningsförhandling (0010). Written by
+  // `Repo.decide` from the transition it just made, never sent: the route that
+  // records a häktning is the court's, and the outcome follows from which
+  // route was called rather than from a field on it.
+  ck_fpd_frihet_beslut: 'what the court decided; written by the transition, never sent',
+
   // The status a version snapshot was taken at (0009). The same four values as
   // `ck_fpd_anmalan_status`, and deliberately not paired with the enum: this
   // column is written by `Repo.transition` from the row it just moved, inside

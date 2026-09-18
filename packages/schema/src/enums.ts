@@ -972,3 +972,27 @@ export type FuStatus = (typeof FU_STATUSES)[number];
 export const FU_LEDARE_KINDS = ['polis', 'aklagare'] as const;
 
 export type FuLedareKind = (typeof FU_LEDARE_KINDS)[number];
+
+/**
+ * `ck_fpd_frihet_status` — the stages of a frihetsberövande (spec 7.9), in the
+ * order they happen.
+ *
+ * Swedish procedure deprives somebody of their liberty in three decisions taken
+ * by three different people: an officer **griper** (RB 24:7), the **åklagare**
+ * decides to **anhålla** (RB 24:6), and the **tingsrätt** decides to **häkta**
+ * (RB 24:13). `framstalld` is the step between the last two — the prosecutor's
+ * häktningsframställan has reached the court and the hearing has not happened.
+ *
+ * `frigiven` is reachable from every one of the others and is terminal.
+ * Somebody seized again is a new chain with its own number and its own clocks,
+ * never a reopening of one whose statutory deadline has already expired.
+ */
+export const FRIHET_STATUSES = [
+  'gripen',
+  'anhallen',
+  'framstalld',
+  'haktad',
+  'frigiven',
+] as const;
+
+export type FrihetStatus = (typeof FRIHET_STATUSES)[number];

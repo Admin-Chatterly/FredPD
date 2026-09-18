@@ -90,6 +90,12 @@ server_scripts {
     'server/modules/anmalan/repo.lua',
     'server/modules/anmalan/routes.lua',
 
+    -- Frihetsberövande (spec 7.9). After anmalan, whose förundersökning a
+    -- chain links to, and after brott, whose catalogue it charges from.
+    'server/modules/frihet/service.lua',
+    'server/modules/frihet/repo.lua',
+    'server/modules/frihet/routes.lua',
+
     'server/modules/placements/service.lua',
     'server/modules/placements/repo.lua',
     'server/modules/placements/routes.lua',

@@ -106,6 +106,13 @@ local REQUIRED_TABLES <const> = {
     'fpd_anmalan_brott',
     'fpd_anmalan_personer',
     'fpd_anmalan_versions',
+
+    -- Migration 0010. Frihetsberövande (spec 7.9). The statutory deadlines are
+    -- computed from columns in these, so a server missing them cannot answer
+    -- how long it has been holding somebody.
+    'fpd_frihetsberovande',
+    'fpd_frihet_brott',
+    'fpd_frihet_log',
 }
 
 --- Columns a migration added to a table that already existed, which the table

@@ -16,6 +16,7 @@ import {
   EVIDENCE_TYPES,
   FIREARM_STATUSES,
   FIREARM_TYPES,
+  FRIHET_STATUSES,
   FU_LEDARE_KINDS,
   FU_STATUSES,
   HOTLIST_REASONS,
@@ -2023,6 +2024,86 @@ export const schemas = {
     version: { type: 'integer', required: true, min: 1 },
     reason: { type: 'string', required: false, max: 128 },
     note: { type: 'string', required: false, max: 2000 },
+  },
+
+  // ------------------------------------------------------- frihetsberövande
+
+  /**
+   * Everybody the agency is currently holding — the list a supervisor watches
+   * the statutory countdowns on. No filter at all: "who is in our cells right
+   * now" has one answer, and a filter on it would only ever be used to make
+   * the answer shorter than it is.
+   */
+  FrihetOpen: {
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  FrihetList: {
+    status: { type: 'enum', required: false, values: FRIHET_STATUSES },
+    personId: { type: 'integer', required: false, min: 1 },
+    fuId: { type: 'integer', required: false, min: 1 },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  FrihetGet: {
+    id: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
+   * Recording a gripande (RB 24:7).
+   *
+   * **There is no time field, and there must not be.** The moment a person was
+   * seized is what every statutory deadline in this module is measured from —
+   * RB 24:12's noon and RB 24:13's four dygn both run from it — so the server
+   * stamps it from its own clock (invariant 1). A client that could choose it
+   * could move a deadline it had already missed.
+   *
+   * `grund` is a locale key naming the ground for the seizure, never a
+   * sentence (invariant 6): it is quoted afterwards, and it has to read the
+   * same way every time and in both languages.
+   */
+  FrihetGripande: {
+    personId: { type: 'integer', required: true, min: 1 },
+    grund: { type: 'string', required: true, min: 1, max: 128 },
+    plats: { type: 'string', required: false, max: 191 },
+    fuId: { type: 'integer', required: false, min: 1 },
+    anmalanId: { type: 'integer', required: false, min: 1 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
+  /**
+   * A decision in the chain: anhållande, framställan, häktning or frigivande.
+   *
+   * One shape for all four, because they differ in who may take them and in
+   * nothing a client sends. Which capacity a session acts in is derived from
+   * its permissions on the server and is deliberately not a field here: a
+   * client that could name its own capacity could anhålla itself.
+   */
+  FrihetDecision: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    /** A locale key. Required for an anhållande and for a release. */
+    grund: { type: 'string', required: false, max: 128 },
+  },
+
+  FrihetCharges: {
+    id: { type: 'integer', required: true, min: 1 },
+    brottIds: { type: 'string[]', required: true, maxItems: 25, maxLength: 20 },
+  },
+
+  /**
+   * The custody log: förhör, the defence lawyer's arrival, meals, the calls a
+   * detainee is entitled to.
+   *
+   * `kind` is a locale key and not an enum, because what a department logs is a
+   * matter of its own routines rather than of what the law names — an enum here
+   * would need a migration before a server could record something its own
+   * orders require.
+   */
+  FrihetLog: {
+    id: { type: 'integer', required: true, min: 1 },
+    kind: { type: 'string', required: true, min: 1, max: 64 },
+    note: { type: 'string', required: false, max: 500 },
   },
 
 } as const satisfies Record<string, Schema>;

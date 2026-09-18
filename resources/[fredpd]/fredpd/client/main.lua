@@ -168,6 +168,19 @@ local NUI_ROUTES <const> = {
     'fu.redovisa',
     'fu.lagg_ned',
 
+    -- Frihetsberövande (spec 7.9).
+    'frihet.open',
+    'frihet.list',
+    'frihet.get',
+    'frihet.gripande',
+    'frihet.anhallande',
+    'frihet.framstallan',
+    'frihet.haktning',
+    'frihet.frigiv',
+    'frihet.underratta',
+    'frihet.charges.set',
+    'frihet.log.add',
+
     -- Crime scenes, evidence and the chain of custody (spec 8).
     'scene.create',
     'scene.release',

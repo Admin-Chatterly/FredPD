@@ -1123,4 +1123,45 @@ FredPD.Schema = {
         reason = { type = 'string', required = false, max = 128 },
         note = { type = 'string', required = false, max = 2000 },
     },
+
+    FrihetOpen = {
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    FrihetList = {
+        status = { type = 'enum', required = false, values = { 'gripen', 'anhallen', 'framstalld', 'haktad', 'frigiven' } },
+        personId = { type = 'integer', required = false, min = 1 },
+        fuId = { type = 'integer', required = false, min = 1 },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    FrihetGet = {
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
+    FrihetGripande = {
+        personId = { type = 'integer', required = true, min = 1 },
+        grund = { type = 'string', required = true, min = 1, max = 128 },
+        plats = { type = 'string', required = false, max = 191 },
+        fuId = { type = 'integer', required = false, min = 1 },
+        anmalanId = { type = 'integer', required = false, min = 1 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    FrihetDecision = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        grund = { type = 'string', required = false, max = 128 },
+    },
+
+    FrihetCharges = {
+        id = { type = 'integer', required = true, min = 1 },
+        brottIds = { type = 'string[]', required = true, maxItems = 25, maxLength = 20 },
+    },
+
+    FrihetLog = {
+        id = { type = 'integer', required = true, min = 1 },
+        kind = { type = 'string', required = true, min = 1, max = 64 },
+        note = { type = 'string', required = false, max = 500 },
+    },
 }

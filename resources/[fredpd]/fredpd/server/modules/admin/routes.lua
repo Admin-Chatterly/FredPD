@@ -301,6 +301,10 @@ local PERMISSION_CATALOGUE <const> = {
     'rms.vehicle.view', 'rms.vehicle.edit', 'rms.vehicle.flag',
     'rms.firearm.view', 'rms.firearm.edit', 'rms.firearm.trace',
     'rms.brott.view',
+
+    -- Frihetsberövande (spec 7.9): the three decisions of RB.
+    'frihet.view', 'frihet.gripande', 'frihet.anhallande',
+    'frihet.haktning', 'frihet.frigiv',
     'rms.location.view', 'rms.location.hazard.edit',
 
     -- Reports
