@@ -1,6 +1,7 @@
 <script lang="ts">
   import { nui } from '../../lib/nui';
   import { t } from '../../lib/i18n';
+  import { onPush } from './push';
   import type { ErrorCode } from '@fredpd/schema';
   import { BROADCAST_KINDS, CALL_PRIORITIES } from '@fredpd/schema';
   import { fieldList, type Failure } from '../shared/failure';
@@ -80,7 +81,7 @@
   });
 
   $effect(() =>
-    nui.on('fredpd:cad:broadcast', (message) => {
+    onPush('fredpd:cad:broadcast', (message) => {
       const cancelledId = message['cancelledId'];
 
       if (typeof cancelledId === 'number') {

@@ -414,6 +414,7 @@
 <script lang="ts">
   import type { ErrorCode } from '@fredpd/schema';
   import { fieldList, type Failure } from '../shared/failure';
+  import { onPush } from './push';
   import CallQueue from './CallQueue.svelte';
   import CallCard from './CallCard.svelte';
   import UnitBoard from './UnitBoard.svelte';
@@ -439,6 +440,13 @@
    * card reads out (`no_unit`, `off_duty`, `already_assigned`,
    * `needs_acknowledgement`). Hiding a button would be a second access control
    * in the one place it cannot be enforced (invariant 4).
+   *
+   * The officer-down banner is the one exception, and it is not this screen
+   * deciding anything — it is this screen drawing the answer the server already
+   * sent. See `emergencies` below: `unit.emergency` pushes `mayAcknowledge`
+   * per recipient, because the tone deliberately reaches officers who cannot
+   * hold `cad.unit.manage` and a button that can only ever be refused is not an
+   * action, it is a dead end that writes an `audit.denied` row per press.
    */
 
   type Tab = 'queue' | 'board' | 'map' | 'broadcasts';
@@ -480,8 +488,27 @@
    * with the distance measured server-side off each recipient's own ped. The
    * banner stays up until the call is acknowledged or closed, because a tone
    * that can be clicked away is a tone nobody hears twice.
+   *
+   * `mayAcknowledge` is the server's own answer for *this* recipient, and it is
+   * why the two buttons on the banner are not drawn alike. Respond is for
+   * everybody — an officer 200 m from a panic running to it is the entire point
+   * of the range test. Acknowledge is `call.acknowledge`, gated on
+   * `cad.unit.manage` and refused to the officer who pressed the button in the
+   * first place, so most of the people this tone reaches can never give it.
+   * Drawing it for them meant a banner whose only button answered `forbidden`
+   * with no field reason — and because the banner clears on `acknowledgedAt` or
+   * a terminal status and on nothing else, it then sat there for the rest of
+   * the incident while every press wrote an `audit.denied` row against an
+   * officer who had done nothing wrong.
+   *
+   * A missing flag is false, not true. Invariant 4 says the UI is never the
+   * access control, so the failure this defaults away from is the UI offering
+   * something the server never authorised; the safe default is the one that
+   * draws less. An older server that has not learned to send the field yet
+   * costs a supervisor one extra click through the call card, which is the
+   * cheap half of being wrong.
    */
-  let emergencies = $state<{ call: Call; callsign: string }[]>([]);
+  let emergencies = $state<{ call: Call; callsign: string; mayAcknowledge: boolean }[]>([]);
 
   /** Units dispatch has been asked to check on (7.16 status timers). */
   let welfare = $state<WelfarePrompt[]>([]);
@@ -489,12 +516,17 @@
   /**
    * Why the acknowledgement on the banner was refused.
    *
-   * It is drawn under the banner rather than sent to the card, because the two
-   * refusals this button meets are both about *who is pressing it*: the officer
-   * in distress cannot sign off their own emergency, and a second supervisor
-   * cannot overwrite the first one's name. Neither is anything the card could
-   * explain better, and a refusal with nowhere to appear is the defect this
-   * console was told twice not to ship.
+   * It is drawn under the banner rather than sent to the card, because the
+   * refusals this button meets are all about *who is pressing it*: a second
+   * supervisor cannot overwrite the first one's name, and a session whose
+   * Discord roles changed between the push and the press is answered
+   * `forbidden` by a server that no longer agrees with the flag it sent. None
+   * of it is anything the card could explain better, and a refusal with
+   * nowhere to appear is the defect this console was told twice not to ship.
+   *
+   * The two refusals `mayAcknowledge` now keeps off the screen entirely are the
+   * ones that used to be met constantly: a recipient without `cad.unit.manage`,
+   * and the officer in distress being offered their own sign-off.
    */
   let emergencyFailure = $state<Failure | null>(null);
 
@@ -623,7 +655,7 @@
   }
 
   $effect(() =>
-    nui.on('fredpd:cad:call', (message) => {
+    onPush('fredpd:cad:call', (message) => {
       const incoming = message['call'] as Call | undefined;
       if (!incoming) return;
 
@@ -643,7 +675,7 @@
   );
 
   $effect(() =>
-    nui.on('fredpd:cad:log', (message) => {
+    onPush('fredpd:cad:log', (message) => {
       const callId = message['callId'];
       const entry = message['entry'] as LogEntry | undefined;
 
@@ -656,7 +688,7 @@
   );
 
   $effect(() =>
-    nui.on('fredpd:cad:unit', (message) => {
+    onPush('fredpd:cad:unit', (message) => {
       const unit = message['unit'] as Unit | undefined;
       if (!unit) return;
 
@@ -668,7 +700,7 @@
   );
 
   $effect(() =>
-    nui.on('fredpd:cad:emergency', (message) => {
+    onPush('fredpd:cad:emergency', (message) => {
       const call = message['call'] as Call | undefined;
       const callsign = message['callsign'];
 
@@ -678,13 +710,20 @@
 
       emergencies = [
         ...emergencies.filter((banner) => banner.call.id !== call.id),
-        { call, callsign: typeof callsign === 'string' ? callsign : '' },
+        {
+          call,
+          callsign: typeof callsign === 'string' ? callsign : '',
+          // Strictly `=== true`, so anything that is not the server's yes —
+          // absent, null, a truthy string from a resource pushing its own
+          // shape — is a no. See `emergencies` above for why that direction.
+          mayAcknowledge: message['mayAcknowledge'] === true,
+        },
       ];
     }),
   );
 
   $effect(() =>
-    nui.on('fredpd:cad:welfare', (message) => {
+    onPush('fredpd:cad:welfare', (message) => {
       const due = message['units'] as WelfarePrompt[] | undefined;
       if (!Array.isArray(due)) return;
 
@@ -754,13 +793,19 @@
         >
           {t('cad.emergency.respond')}
         </button>
-        <button
-          type="button"
-          class="border border-[var(--color-alert)] px-3 py-1 text-xs font-semibold text-[var(--color-alert)] hover:bg-[var(--color-surface)]"
-          onclick={() => void acknowledge(banner.call.id)}
-        >
-          {t('cad.emergency.acknowledge')}
-        </button>
+        <!-- Only for the recipients the server said may give it. Respond is
+             drawn for everybody: the 800 m range test exists so the nearest
+             car runs, and that car is usually a patrol unit who will never
+             hold `cad.unit.manage`. -->
+        {#if banner.mayAcknowledge}
+          <button
+            type="button"
+            class="border border-[var(--color-alert)] px-3 py-1 text-xs font-semibold text-[var(--color-alert)] hover:bg-[var(--color-surface)]"
+            onclick={() => void acknowledge(banner.call.id)}
+          >
+            {t('cad.emergency.acknowledge')}
+          </button>
+        {/if}
       </span>
     </div>
   {/each}

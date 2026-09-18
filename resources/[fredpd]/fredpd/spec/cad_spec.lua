@@ -1484,5 +1484,122 @@ describe('cad', function()
                 assert.is_not_nil(read.sql:find('LIMIT 1', 1, true))
             end)
         end)
+
+        -- ---------------------------------------------------------------------
+        -- Signing on, which happens far more often than anyone signs on
+        -- ---------------------------------------------------------------------
+
+        --- The duplicate-key branch, which is the branch that actually runs.
+        ---
+        --- A unit row is inserted once in an officer's career and updated on
+        --- every reconnect, every break and every crash after it, so the
+        --- INSERT half of this upsert is nearly dead code and the UPDATE half
+        --- is the sign-on path. It is also invisible: no caller reads what it
+        --- wrote, `getUnit` returns whatever is there, and a column it flattens
+        --- reads on the board as a supervisor who never made the assignment.
+        ---
+        --- So the assertions below are about which columns the update list
+        --- names, which is the only place that rule exists. The one that
+        --- follows them -- a values list that does not end in a nil -- is the
+        --- header's rule, and it is what lets this statement bind four NULLs in
+        --- the middle safely.
+        describe('signing a unit on', function()
+            --- Everything after `ON DUPLICATE KEY UPDATE`, which is the half of
+            --- the statement these tests are about. Matching against the whole
+            --- SQL would pass for a column that appears only in the INSERT, and
+            --- all four of the columns at issue do.
+            local function updateClause(sql)
+                local at = sql:find('ON DUPLICATE KEY UPDATE', 1, true)
+
+                return at and sql:sub(at) or ''
+            end
+
+            local function signOnClause()
+                repo.signOn('lspd', unit())
+
+                return updateClause(statementWith('INSERT INTO fpd_units').sql)
+            end
+
+            it('leaves a beat, a division and a vehicle exactly as they were', function()
+                -- The bug this test exists for. `events.signOn` sends an
+                -- officer id, a Discord id and a callsign and nothing else, so
+                -- these four bound NULL -- and the branch that assigned them
+                -- from `VALUES(...)` ran on every reconnect and every return
+                -- from a break. A supervisor's `unit.manage` assignment to beat
+                -- 7 therefore survived until its officer next went off duty,
+                -- after which the unit was simply no longer on the beat: not on
+                -- the board's beat column, not in `listUnits(agency, { beatId =
+                -- 7 })`, and not in any log.
+                local clause = signOnClause()
+
+                for _, column in ipairs({
+                    'beat_id', 'division', 'vehicle_plate', 'vehicle_model',
+                }) do
+                    assert.is_nil(clause:find(column, 1, true), column)
+                end
+            end)
+
+            it('follows the roster when an officer changes agency', function()
+                -- `agency_id` is not a guess the caller made: it is
+                -- `session.agencyId`, which is the officer's own roster row.
+                -- Left out of this list, a transferred officer kept a unit row
+                -- under the old agency, and since every other statement here
+                -- keys on `(agency_id, officer_id)` that row is one nothing can
+                -- address -- `no_unit` for the officer, a ghost on the old
+                -- agency's board for its dispatchers.
+                assert.is_not_nil(signOnClause():find('agency_id = VALUES(agency_id)', 1, true))
+            end)
+
+            it('takes the callsign and the Discord id from the session', function()
+                local clause = signOnClause()
+
+                assert.is_not_nil(clause:find('callsign = VALUES(callsign)', 1, true))
+                assert.is_not_nil(clause:find('discord_id = VALUES(discord_id)', 1, true))
+            end)
+
+            it('does not stand a working unit back down to available', function()
+                -- The reconnect rule 0007 is built around: an officer whose
+                -- game crashed on scene comes back on scene, with the time in
+                -- status they had. Guarded by a CASE rather than by the caller,
+                -- because the caller cannot tell a reconnect from a sign-on.
+                local clause = signOnClause()
+
+                assert.is_not_nil(
+                    clause:find("status = CASE WHEN status = 'off_duty'", 1, true))
+
+                for _, column in ipairs({ 'status_since', 'signed_on_at' }) do
+                    assert.is_not_nil(
+                        clause:find(column .. " = CASE WHEN status = 'off_duty'", 1, true), column)
+                end
+
+                -- Order, which MariaDB applies left to right: `status` last, or
+                -- the two stamps read the `available` this statement has just
+                -- written and never fire.
+                assert.is_true(clause:find('signed_on_at =', 1, true)
+                    < clause:find('status = CASE', 1, true))
+            end)
+
+            it('binds a list that ends in a value, with the holes in the middle', function()
+                -- The other half of the header's rule about values lists. Four
+                -- of the eight parameters are nil for every caller there is, so
+                -- the list has holes by design -- which is safe only while the
+                -- last parameter is a NOT NULL column, `callsign`. End it in a
+                -- nil instead and `#values` is a border Lua may put anywhere,
+                -- so what oxmysql receives is a list with fewer parameters than
+                -- the statement has placeholders.
+                repo.signOn('lspd', unit())
+
+                local write = statementWith('INSERT INTO fpd_units')
+
+                assert.are.equal(8, placeholders(write.sql))
+                assert.is_not_nil(write.values[placeholders(write.sql)])
+                assert.are.same({
+                    [1] = 'lspd',
+                    [2] = '100000000000000041',
+                    [7] = 41,
+                    [8] = '3A-12',
+                }, write.values)
+            end)
+        end)
     end)
 end)

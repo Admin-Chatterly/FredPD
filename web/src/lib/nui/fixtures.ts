@@ -22,6 +22,32 @@ import type { Maybe, PersonResult, VehicleResult } from '../../modules/records/t
 
 export type Fixture = (input: unknown) => unknown;
 
+/**
+ * Pushes a message the way the game would (spec 3.6).
+ *
+ * A route that writes something also pushes it to the sessions allowed to see
+ * it, and until this existed no fixture could do the second half: the mock
+ * bridge's own emitter is private to its closure and only ever fires
+ * `fredpd:open`. So a console driven by fixtures showed the answer to the call
+ * it had just made and nothing that a *push* produces — which is how the CAD
+ * module reached a milestone with an officer-down banner that had never been
+ * drawn outside the game.
+ *
+ * `window.postMessage` is the real transport's own shape: inside FiveM a push
+ * arrives at the NUI as exactly this message and `real.ts` fans it out. The
+ * CAD subscriptions pick it up through `modules/cad/push.ts`, which listens for
+ * it in mock mode only, so nothing about the game path changes.
+ *
+ * Asynchronous on purpose. A route's own answer has not been returned yet when
+ * a fixture calls this, and a push that arrived before the write it belongs to
+ * would let a component see an ordering the server can never produce.
+ */
+function push(message: Record<string, unknown> & { type: string }): void {
+  if (typeof window === 'undefined') return;
+
+  setTimeout(() => window.postMessage(message, window.location.origin), 0);
+}
+
 /** A route that should answer with a failure, to exercise the error paths. */
 export interface FixtureFailure {
   err: ErrorCode;
@@ -2184,6 +2210,27 @@ export const fixtures: FixtureSet = {
       });
 
       refreshUnitAssignments();
+
+      // The tone, as `unit.emergency` sends it (7.16): to dispatchers and
+      // supervisors wherever they are, and to the units inside 800 m.
+      //
+      // `mayAcknowledge` is false here and could never be anything else. The
+      // server computes it per recipient and refuses two people: anybody
+      // without `cad.unit.manage`, and the officer named in `created_by` — and
+      // in a browser the session pressing the button *is* that officer, so a
+      // fixture that sent true would be modelling a state the route cannot
+      // produce. The banner therefore arrives with Respond and no Acknowledge,
+      // which is exactly what the officer who pressed panic should see.
+      //
+      // For the other half — a colleague's emergency, which a supervisor may
+      // sign off — post one from the devtools console with the same shape and
+      // `mayAcknowledge: true`; `tests/dispatch.spec.ts` covers both.
+      push({
+        type: 'fredpd:cad:emergency',
+        call,
+        callsign: own.callsign,
+        mayAcknowledge: false,
+      });
 
       return { id: call.id, call };
     },

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { nui } from '../../lib/nui';
   import { t } from '../../lib/i18n';
+  import { onPush } from './push';
   import type { ErrorCode } from '@fredpd/schema';
   import {
     elapsed,
@@ -119,7 +120,7 @@
   });
 
   $effect(() =>
-    nui.on('fredpd:cad:avl', (message) => {
+    onPush('fredpd:cad:avl', (message) => {
       const moved = message['units'] as (Position & { officerId: number })[] | undefined;
       if (!Array.isArray(moved)) return;
 
@@ -137,7 +138,7 @@
   );
 
   $effect(() =>
-    nui.on('fredpd:cad:unit', (message) => {
+    onPush('fredpd:cad:unit', (message) => {
       const unit = message['unit'] as Unit | undefined;
       if (!unit) return;
 
@@ -147,7 +148,7 @@
   );
 
   $effect(() =>
-    nui.on('fredpd:cad:call', (message) => {
+    onPush('fredpd:cad:call', (message) => {
       const incoming = message['call'] as Call | undefined;
       if (!incoming) return;
 

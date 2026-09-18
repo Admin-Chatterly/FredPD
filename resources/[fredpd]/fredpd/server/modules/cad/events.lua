@@ -63,11 +63,18 @@
 --- them as having gone available at the moment their game crashed, and the
 --- welfare timer for a unit lying in a ditch restarts.
 ---
---- So a drop starts a clock instead. Come back inside `signOffGraceSeconds` and
---- nothing happened: the row still says `on_scene`, `status_since` never moved,
---- and the call still has them on it. Stay away past it and the unit is signed
---- off exactly as if they had gone off duty, because by then they are not coming
---- back to this shift.
+--- So a drop starts a clock instead. Come back **on duty** inside
+--- `signOffGraceSeconds` and nothing happened: the row still says `on_scene`,
+--- `status_since` never moved, and the call still has them on it. Stay away past
+--- it and the unit is signed off exactly as if they had gone off duty, because
+--- by then they are not coming back to this shift.
+---
+--- Those two words carry the whole of the bug this file has had three goes at.
+--- Coming back is not the same fact as coming back to work: duty does not
+--- survive a disconnect, so an officer can be reconnected, standing in the
+--- cloakroom, and no more use to a dispatcher than one who is still gone. The
+--- clock answers to duty and to nothing else, and the rule is set out in full at
+--- `dropped`.
 ---
 --- ## A unit that goes off duty on a call is taken off the call
 ---
@@ -126,26 +133,58 @@ local Events = {}
 --- cannot move it is worse than no row: the board would show an available unit
 --- that can never say it is busy, and the recommendation would offer it first.
 --- It also keeps the groups that do not inherit patrol at all -- `admin`,
---- `evidence_tech`, `property_officer`, `lab_analyst`, the intelligence groups
---- -- off the board, which is right: a forensic analyst on duty in the lab is
---- not a car a dispatcher can send to a robbery.
+--- `dispatch`, `evidence_tech`, `property_officer`, `lab_analyst`, the
+--- intelligence groups -- off the board, which is right: a forensic analyst on
+--- duty in the lab is not a car a dispatcher can send to a robbery.
 local UNIT_PERMISSION <const> = 'cad.unit.status'
 
---- The dispatcher's own key, and the one thing that disqualifies a unit.
----
---- The seed says it in as many words: "a dispatcher is not a unit, has no
---- `fpd_units` row and has nowhere to be dispatched to", and `routes.lua` builds
---- `no_unit` on the same understanding. `dispatch` inherits `cad.unit.status`
---- through `patrol_basic`, so the inherited key is not enough to tell the two
---- apart; `cad.console.open` is granted to `dispatch` and to nothing else, which
---- makes it the one fact in Appendix B that distinguishes a console operator
---- from a car.
----
---- Somebody holding both -- a dispatcher who also patrols -- is treated as a
---- dispatcher and does not go on the board. That is the safe direction: a unit
---- who is missing from the board asks dispatch to add them, and a console
---- operator sitting on the board gets sent to a shooting.
-local CONSOLE_PERMISSION <const> = 'cad.console.open'
+-- ## There is no key that takes somebody OFF the board, and there must not be
+--
+-- The test above used to be two: hold `cad.unit.status`, and *not* hold
+-- `cad.console.open`, on the argument that a dispatcher is not a unit and that
+-- `cad.console.open` was granted to `dispatch` and to nothing else. Both halves
+-- of that argument were wrong.
+--
+-- It was wrong about the mechanism. Nothing anywhere ever *checked*
+-- `cad.console.open` as a grant -- not a route, not a push, not the console.
+-- The console is a placement, and a placement carries no permission at all
+-- (ADR-006, `core/placements.lua`: "Geometry only -- no permissions"), so the
+-- key's only effect in the whole product was to disqualify its holder here. A
+-- grantable capability whose one effect is subtraction is a trap, and the group
+-- editor offered it by name: an administrator reading the seed's own claim that
+-- the console placement called it granted it to `supervisor` so field
+-- supervisors could work the console, and within one duty pass every supervisor
+-- was signed off and pulled off the call they were on.
+-- They gain nothing -- the console never needed a key -- and lose the panic
+-- button, because from then on `eligible` is false for them, `Repo.signOn` can
+-- never run again, and `unit.status`, `call.status`, `call.self_assign` and
+-- `unit.emergency` all refuse. The key is retired: out of the seed, out of the
+-- admin catalogue and out of Appendix B.
+--
+-- It was also wrong about the question. `Perms.computeEffective` unions the
+-- permissions of every mapped role, so somebody holding the Dispatcher role and
+-- the Patrol role holds both keys, and a negative test reads that union as
+-- "dispatcher" with the patrol half thrown away: a real patrol officer whose
+-- emergency button answered `no_unit` forever, with nothing on screen to say
+-- why. Deriving the marker from some other grantable key -- `cad.call.create`,
+-- say, which only `dispatch` holds today -- moves that defect one step rather
+-- than fixing it: a department that decides supervisors may raise calls from
+-- the car would be taking them off the board by doing it.
+--
+-- So the split is positive and structural instead, and lives in the seed rather
+-- than here. A pure dispatcher is off the board because `dispatch` does not
+-- hold `cad.unit.status` at all: it no longer inherits `patrol_basic` and is
+-- granted the four keys it actually used from it directly
+-- (`database/seeds/0001_permissions.sql`). Somebody who holds both roles really
+-- does patrol, so they really are a unit, and the board says so.
+--
+-- One consequence has to be stated plainly, because the comment that stood here
+-- claimed the opposite: **nothing puts an officer on the board except the test
+-- above.** No route creates an `fpd_units` row -- `unit.manage` looks one up
+-- with `repo.getUnit` and refuses `not_found` when there is none -- so "a unit
+-- who is missing from the board asks dispatch to add them" was never a remedy
+-- that existed. An officer who is missing is missing one of three things: the
+-- grant, duty, or a callsign on their roster row. Those are the only fixes.
 
 -- -----------------------------------------------------------------------------
 -- Settings
@@ -210,9 +249,44 @@ local known = {}
 --- session to ask.
 local bySrc = {}
 
---- officerId -> { at, agencyId, discordId, callsign }
+--- officerId -> { officerId, at, agencyId, discordId, callsign }
 ---
 --- Units whose officer dropped and whose grace period is running.
+---
+--- ## What a clock means, written down once
+---
+--- Three commits have now been written against a wrong idea of this table, each
+--- of them leaving the same ghost on the board, so the rule lives here rather
+--- than spread across the places that touch it:
+---
+--- > A clock exists while there is a row on the board that this file signed on
+--- > and **nobody is working it**. The fact that starts one is "this officer
+--- > stopped working". Exactly two facts may end one early: this officer is
+--- > working again, or the row is already off the board. Otherwise it runs out
+--- > and the row comes off the board.
+---
+--- "This officer has a session" is not one of those facts and never was. A
+--- session and duty are different things -- duty does not survive a disconnect,
+--- which is the reason this file polls at all -- so a session that has come
+--- back says nothing about whether anybody is working the unit row. Every
+--- version of the ghost has been that one substitution, `sessions.all()` asked
+--- where `entry.onDuty` was meant:
+---
+---   1. Officer 42 is `on_scene` on a call and alt-F4s. `playerDropped` starts
+---      their clock, correctly.
+---   2. They reconnect twenty seconds later and walk to the cloakroom without
+---      pressing duty on. They are connected; they are not working.
+---   3. A pass sees an open session and clears -- or, at the expiry end, spares
+---      -- their clock on the strength of it.
+---   4. They quit for good. `playerDropped` finds no on-duty entry, so it
+---      starts no clock, and there is nothing left anywhere: no session, no
+---      `known` entry, no clock.
+---
+--- The row then sits on the board `on_scene` at the position they crashed at,
+--- counted on the call card, holding its slot in `uq_fpd_call_units_live` and
+--- excluded from every recommendation, until somebody restarts the server --
+--- because the only other things that ever sign a unit off are `unit.manage`
+--- (a human who has to notice first) and the boot sweep.
 local dropped = {}
 
 --- Officers whose roster row has no callsign, so the console line is printed
@@ -260,7 +334,6 @@ local booted = false
 --- `avl.sweep` drops its subscribers on the same test for the same reason.
 local function eligible(session)
     if not session.officerId or not session.agencyId then return false end
-    if perms.satisfies(session.permissions, CONSOLE_PERMISSION) then return false end
 
     return perms.satisfies(session.permissions, UNIT_PERMISSION)
 end
@@ -268,9 +341,19 @@ end
 --- Is this officer working right now?
 ---
 --- Takes the answer `eligible` already gave rather than the session, because
---- the two halves are asked at different moments: `eligible` is pure and runs
---- while `Events.pass` is walking the session table, and the bridge call runs
---- afterwards, once that walk has finished. See the note on the walk itself.
+--- the two halves are asked at different moments. `eligible` is a pure read of
+--- `session.permissions` and is answered during the snapshot walk, where the
+--- session object is in hand. Duty is asked per observation, in the loop that
+--- acts on it, because that loop runs after an arbitrary number of database
+--- round trips and a duty answer carried in from the snapshot would be a claim
+--- about the past.
+---
+--- It is not held back because it suspends -- it does not, and an earlier
+--- version of this comment said it did. `policejob.isOnDuty` is a synchronous
+--- `exports[...]` call behind a `pcall`, with an in-process ESX read as its
+--- fallback (`bridges/policejob.lua`, `bridges/framework.lua`). Nothing in this
+--- file should be built on a belief about what yields; what the two bridges owe
+--- us is an answer about *now*.
 local function onDuty(src, isEligible)
     if not isEligible then return false end
     if not config.dutyRequired then return true end
@@ -382,22 +465,12 @@ local function stillOpen(observation)
     return session ~= nil and session.officerId == observation.officerId
 end
 
---- Is any open session this officer's, right now?
----
---- A walk rather than an index, because there is nothing to index off: `bySrc`
---- is this file's memory of the last pass and the drop handler clears it. It is
---- only asked for an expired grace clock -- usually none per pass, occasionally
---- one -- over a table the size of the server's slot count, so the walk costs
---- less than the map that would replace it. Nothing in it suspends, which is the
---- condition that makes walking the live session table legal at all (see
---- `Events.pass`).
-local function connected(officerId)
-    for _, session in pairs(sessions.all()) do
-        if session.officerId == officerId then return true end
-    end
-
-    return false
-end
+-- There was a `connected(officerId)` helper here -- a walk of `sessions.all()`
+-- looking for any session belonging to an officer -- and it is gone rather than
+-- unused, because leaving it would invite the next person to ask it again. It
+-- had one caller, the grace-clock expiry, and the answer it gave there was the
+-- wrong answer to the wrong question: whether an officer has a session says
+-- nothing about whether anybody is working their unit row (see `dropped`).
 
 --- Starts the grace clock for a unit whose officer has gone away.
 ---
@@ -488,16 +561,28 @@ end
 ---
 --- So the snapshot decides the ORDER of the work and nothing else. Every write
 --- below is re-validated against the live tables at the moment it is made:
---- `stillOpen` re-reads `sessions.all()` after the bridge call and again after
---- the repo round trips, and `known` is read *after* the bridge call rather than
---- before it, because the drop handler clears it and a stale `before` would sign
---- a crashed officer off instantly instead of giving them their grace period.
---- An observation whose session has since gone is not acted on at all: the drop
---- handler has already recorded it correctly and undoing that is the whole bug.
---- The two exceptions are the officer who drops during their own sign-on, whose
---- clock nobody else could have started (`startGrace`), and the one who drops
---- during their own sign-off, whose clock has just been made pointless by the
---- sign-off that already happened.
+--- `stillOpen` re-reads `sessions.all()` before the bridge call and again after
+--- the repo round trips, and `known` is read inside the iteration rather than
+--- captured in the snapshot, because the drop handler clears it and a stale
+--- `before` would sign a crashed officer off instantly instead of giving them
+--- their grace period. An observation whose session has since gone is not acted
+--- on at all: the drop handler has already recorded it correctly and undoing
+--- that is the whole bug. The two exceptions are the officer who drops during
+--- their own sign-on, whose clock nobody else could have started
+--- (`startGrace`), and the one who drops during their own sign-off, whose clock
+--- has just been made pointless by the sign-off that already happened.
+---
+--- ## Re-validating is not enough on its own: it has to be the right question
+---
+--- Read this one too, because the two fixes above closed the traversal bug and
+--- then the write-order bug, and the ghost outlived both of them. `stillOpen`
+--- is the right re-validation for "may I act on this observation at all" and
+--- the wrong one for "may I cancel this officer's grace clock": the first is a
+--- question about a session and the second is a question about whether anybody
+--- is working a unit row, and duty does not survive a disconnect. The rule the
+--- clocks obey is written out at `dropped`: the loop below cancels a clock only
+--- on `entry.onDuty`, and the expiry loop leans on that rather than asking the
+--- live session table a question it cannot answer.
 function Events.pass()
     if not booted then return end
 
@@ -529,10 +614,16 @@ function Events.pass()
         -- disconnected player on, since `eligible` was true when it was asked
         -- and nothing else would contradict it.
         if stillOpen(observation) then
-            -- The bridge call goes first because it can suspend, and `known` is
-            -- read after it for that reason: the drop handler clears `known`,
-            -- and a `before` read before the suspension would still say "on
-            -- duty" for an officer whose grace clock had already started.
+            -- Both of these are read here, in the iteration that acts on them,
+            -- and neither of them yields while doing it -- `isOnDuty` is a
+            -- synchronous export and `known` is a plain table. The order
+            -- between the two does not matter; what matters is that neither is
+            -- carried in from the snapshot. The *previous* iteration suspended
+            -- on its own round trips, and inside that window the drop handler
+            -- can have cleared `known[officerId]` and duty can have changed. A
+            -- `before` taken at snapshot time would still say "on duty" for an
+            -- officer whose grace clock had already started, and would sign
+            -- them off instantly instead of giving them their grace period.
             local working = onDuty(observation.src, observation.eligible)
             local before = known[officerId]
 
@@ -562,15 +653,29 @@ function Events.pass()
                 entry.onDuty = false
             end
 
-            -- The second re-validation, and the one the ghost came through.
-            -- Everything under here is a write whose justification is "this
-            -- officer is connected", so it is asked again here rather than
-            -- trusted from the snapshot.
+            -- The second re-validation. Two different writes sit under it and
+            -- they do not ask the same question: remembering an observation is
+            -- justified by "this session is still the one I observed", and
+            -- cancelling a grace clock is justified by nothing less than "this
+            -- officer is working again".
             if stillOpen(observation) then
-                -- Back inside the grace period: the drop never happened as far
-                -- as the board is concerned, and the row still carries their
-                -- status, their time in status and their call.
-                dropped[officerId] = nil
+                -- The clock goes only if this iteration established they are
+                -- back on the board: either it just signed them on, or they
+                -- were on duty before and still are. `entry.onDuty` is that
+                -- answer, and it is emphatically not the same answer as
+                -- `stillOpen` -- an officer who reconnects and walks to the
+                -- cloakroom without pressing duty on is connected and is not
+                -- working, and clearing their clock here is precisely what left
+                -- their unit on the board forever (see `dropped`).
+                --
+                -- Left running, the clock expires at its original `at` and the
+                -- row comes off the board, which is what the grace period is
+                -- for: the line past which 0007 stops promising the same unit,
+                -- the same call and the same time in status. Nothing is lost by
+                -- being strict here -- go on duty before it runs out and this
+                -- branch clears it; go on duty after and `signOn` puts them
+                -- back, available and on no call, which is what expiry means.
+                if entry.onDuty then dropped[officerId] = nil end
 
                 -- A unit a supervisor signed off with `unit.manage` while its
                 -- officer is still on duty in the job stays off: this pass sees
@@ -611,27 +716,33 @@ function Events.pass()
         local entry = expired[index]
         local officerId = entry.officerId
 
-        -- The same re-validation as the loop above, against the table this
-        -- snapshot was taken from. `signOff` suspends, so by the time this
-        -- iteration runs the clock it meant to act on may be gone, or may have
-        -- been replaced by a newer one -- a second drop writes a fresh table
-        -- with a fresh `at` under the same key. The identity test is what tells
-        -- "the clock I measured" apart from "a clock", and without it an officer
-        -- whose grace period had just restarted would be signed off on the
-        -- strength of the one before it.
+        -- The identity test, and it is the only test left here.
+        --
+        -- `signOff` suspends, so by the time this iteration runs the clock it
+        -- measured may be gone, or may have been replaced by a newer one -- a
+        -- second drop writes a fresh table with a fresh `at` under the same
+        -- key. Comparing the table rather than the key is what tells "the clock
+        -- I measured" apart from "a clock", and without it an officer whose
+        -- grace period had just restarted would be signed off on the strength
+        -- of the one before it.
+        --
+        -- There used to be a second test here, `connected(officerId)`, and it
+        -- was the other half of the ghost: it spared the sign-off for anybody
+        -- holding an open session, which includes the officer who reconnected
+        -- and never went back on duty -- and since this branch discards the
+        -- clock either way, no later pass had anything left to act on. Asking
+        -- "are they working?" instead of "are they connected?" would be the
+        -- literal fix, but the honest one is to ask nothing: a clock that is
+        -- still here has not been cleared by the loop above, and that loop
+        -- clears a clock exactly when it establishes the officer is working
+        -- again (see `dropped`). So a clock that reaches this line, still the
+        -- one that was measured, means the grace period ran out with nobody
+        -- working the row, and the row comes off the board. An officer who goes
+        -- on duty a moment later is signed on by the next pass -- available, at
+        -- their own position, on no call -- which is what expiry means.
         if dropped[officerId] == entry then
             dropped[officerId] = nil
-
-            -- And the clock expiring is not the same fact as the officer being
-            -- gone. They can have reconnected after the snapshot was taken and
-            -- after the loop above had already walked past their slot, in which
-            -- case nothing in this pass has cleared their clock and nothing
-            -- will. Clearing it and leaving them alone puts them back where
-            -- 0007 wants them: the next pass finds an officer on duty with no
-            -- memory behind them and signs them back on, still on their call,
-            -- rather than this one pulling a unit off a scene they are standing
-            -- on.
-            if not connected(officerId) then signOff(entry) end
+            signOff(entry)
         end
     end
 end
@@ -660,6 +771,13 @@ AddEventHandler('playerDropped', function()
     -- case where that reasoning is wrong -- a drop landing inside a sign-on
     -- this handler could not see -- and it covers it from the other side,
     -- because only that iteration knows the INSERT went through.
+    --
+    -- Note what this return does not do: it does not touch `dropped`. An
+    -- officer who reconnected inside their grace period and quit again without
+    -- ever going on duty reaches exactly this line, with `known` saying they
+    -- were not working, and their original clock is still running underneath --
+    -- which is the whole point of it, and is why the pass may not clear a clock
+    -- on the strength of a session having reopened.
     if not entry or not entry.onDuty then return end
 
     startGrace(officerId, entry)

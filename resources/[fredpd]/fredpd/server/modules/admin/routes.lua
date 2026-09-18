@@ -329,7 +329,17 @@ local PERMISSION_CATALOGUE <const> = {
     'cad.call.create', 'cad.call.dispatch', 'cad.call.self_assign', 'cad.call.clear',
     'cad.call.note', 'cad.call.link',
     'cad.unit.manage', 'cad.unit.status', 'cad.emergency',
-    'cad.broadcast', 'cad.console.open',
+    'cad.broadcast',
+    -- `cad.console.open` was here and is deliberately gone. Nothing in the
+    -- product ever checked it as a grant -- the dispatch console is a placement
+    -- and placements carry no permissions (ADR-006) -- while `cad/events.lua`
+    -- used holding it as a reason to keep somebody OFF the unit board. Offering
+    -- it here meant an administrator could hand out what reads as a capability
+    -- and silently sign a whole group off the board instead: field supervisors
+    -- pulled off their calls, their panic button answering `no_unit`, and no
+    -- screen saying why. It is retired from the seed and from Appendix B too;
+    -- leaving it in this list is the one thing that would put it back in front
+    -- of an administrator.
     'alpr.read.view', 'alpr.hotlist.manage',
 
     -- Forensics

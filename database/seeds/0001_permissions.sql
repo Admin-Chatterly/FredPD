@@ -29,8 +29,31 @@ INSERT INTO `fpd_permission_groups` (`key`, `name`, `inherits`, `description`) V
      'A field supervisor: everything patrol has, plus oversight.'),
     ('command',      'Command',          'supervisor',
      'Command staff.'),
-    ('dispatch',     'Dispatch',         'patrol_basic',
-     'A dispatcher: the CAD console and the internal channel.'),
+    -- `dispatch` is a ROOT GROUP, and the NULL is load-bearing. It used to
+    -- inherit `patrol_basic`, which meant every dispatcher held
+    -- `cad.unit.status` -- the key `cad/events.lua` reads to decide who belongs
+    -- on the unit board. The file compensated with a negative test (hold
+    -- `cad.console.open` and you are disqualified), and that is the arrangement
+    -- this row exists to be rid of: a grantable capability whose only effect
+    -- anywhere was to take its holder off the board, and a union of roles that
+    -- could never describe somebody who both dispatches and patrols. Now the
+    -- split is the absence of a key rather than the presence of one. A
+    -- dispatcher is not on the board because nothing grants them
+    -- `cad.unit.status`; somebody holding the Dispatcher *and* Patrol roles
+    -- gets it from the patrol half and is on the board, which is correct,
+    -- because they really do patrol.
+    --
+    -- The four keys `dispatch` actually used from `patrol_basic` are granted
+    -- to it directly below. The two it did not -- `cad.unit.status` and
+    -- `cad.emergency` -- are the two that were unusable anyway: both handlers
+    -- read the caller's `fpd_units` row and a console operator has none.
+    --
+    -- Re-running this seed on a server that ran the old one flips the edge:
+    -- the statement's `inherits` = VALUES(`inherits`) below is an update, not
+    -- an insert-only. That is deliberate, and it is the only part of this
+    -- change that is not additive.
+    ('dispatch',     'Dispatch',         NULL,
+     'A dispatcher: the CAD console, the registers and the internal channel. Not a unit on the board.'),
     ('admin',        'FredPD administration', NULL,
      'Configures FredPD. Deliberately does NOT inherit patrol: administering the system is not the same as being cleared to read records.')
 ON DUPLICATE KEY UPDATE
@@ -210,9 +233,13 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     -- reason to press it. A panic button a trainee cannot press is a panic
     -- button that fails the only shift it was needed on.
     --
-    -- `dispatch` inherits both through `patrol_basic` and can use neither: the
-    -- handlers read the caller's `fpd_units` row and a dispatcher at a console
-    -- has none, so the inherited key grants nothing rather than something odd.
+    -- `dispatch` used to inherit both and could use neither, and that inherited
+    -- `cad.unit.status` is why `cad/events.lua` needed a negative marker to keep
+    -- console operators off the unit board. `dispatch` inherits nothing now, so
+    -- these two stop at the officer groups and the board test is a plain "holds
+    -- `cad.unit.status`" -- which is also what makes this the key to think
+    -- twice about granting to a non-patrol group: whoever holds it and goes on
+    -- duty is a car a dispatcher can send to a robbery.
     ('patrol_basic', 'cad.unit.status'),
     ('patrol_basic', 'cad.emergency'),
 
@@ -251,21 +278,45 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     -- officer about to stop a car, so it sits a rank up from reading one.
     ('supervisor', 'alpr.hotlist.manage'),
 
-    -- The dispatcher. `page.dispatch` is inherited from `patrol_basic` and
-    -- granted again here on purpose: the console is this group's whole job, and
-    -- it must not stop working because somebody edits an inheritance edge.
+    -- The dispatcher. `dispatch` inherits nothing (see the group row above), so
+    -- everything it holds is written out here -- starting with the four keys it
+    -- used to pick up from `patrol_basic` and genuinely needs: the MDT rail
+    -- entries for records and comms, and the internal channel it runs the shift
+    -- on. `page.dispatch` was granted here even when it was inherited, and the
+    -- reason still stands: the console is this group's whole job and it must not
+    -- stop working because somebody edits an inheritance edge.
+    ('dispatch', 'page.records'),
+    ('dispatch', 'page.comms'),
+    ('dispatch', 'comms.pdchat.send'),
+    ('dispatch', 'comms.pdchat.view'),
+
+    -- `cad.console.open` WAS HERE AND IS RETIRED. The comment that stood in its
+    -- place said it was "what the dispatch console placement calls", and that
+    -- described a mechanism that has never existed: a placement carries no
+    -- permission at all (ADR-006, `core/placements.lua`), and the two
+    -- create-and-assign routes are pinned to the placement by `accessPoint` and
+    -- gated on `cad.call.create` and `cad.call.dispatch`, which are right here.
+    -- Nothing read the key as a grant anywhere in the product. Its only effect
+    -- was in `cad/events.lua`, which disqualified whoever held it from the unit
+    -- board -- so an administrator who granted it to `supervisor` off the
+    -- strength of this comment signed every field supervisor off the board and
+    -- killed their panic button, and the console they were trying to open had
+    -- never needed a key.
     --
-    -- `cad.console.open` is what the dispatch console placement calls; the two
-    -- create-and-assign routes are pinned to that placement (3.10), so a
-    -- dispatcher raises and dispatches calls standing at it. Clearing, noting
-    -- and linking are not pinned, because a dispatcher does them for a unit
-    -- that is on the radio right now.
+    -- Dropping a grant from a seed is safe where dropping a migration is not:
+    -- this file is re-runnable upserts (see the header), not schema history. A
+    -- database that already ran the old seed keeps its row, because the
+    -- statement this comment sits inside is an INSERT IGNORE and nothing here
+    -- deletes; that row is inert, since nothing asks for the key any more. The
+    -- same treatment `forensics.trace.report` got under ADR-013, for the same
+    -- reason. The key is also out of Appendix B and out of the admin catalogue
+    -- in `modules/admin/routes.lua`, which is what stops the group editor
+    -- offering it again.
     --
-    -- `cad.call.self_assign` is absent and the two inherited from
-    -- `patrol_basic` are unusable here, for the same reason: a dispatcher is
-    -- not a unit, has no `fpd_units` row and has nowhere to be dispatched to.
+    -- `cad.call.self_assign` is absent for the reason that has not changed: a
+    -- dispatcher is not a unit, has no `fpd_units` row and has nowhere to be
+    -- dispatched to.
     ('dispatch', 'page.dispatch'),
-    ('dispatch', 'cad.console.open'),
     ('dispatch', 'cad.call.create'),
     ('dispatch', 'cad.call.dispatch'),
     ('dispatch', 'cad.call.clear'),

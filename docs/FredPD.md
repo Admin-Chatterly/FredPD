@@ -796,7 +796,7 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 - [S] Plain language or ten-codes (configurable per agency, localized).
 - [S] Broadcasts (BOLO, all-units messages).
 - **Based on:** PremierOne / HxGN OnCall / Mark43 CAD; ps-dispatch alerts; ox_mdt units and calls.
-- **Permissions:** `cad.call.create`, `cad.call.dispatch`, `cad.call.self_assign`, `cad.call.clear`, `cad.call.note`, `cad.call.link`, `cad.unit.manage`, `cad.unit.status`, `cad.emergency`, `cad.broadcast`, `cad.console.open`. `cad.call.note`, `cad.call.link`, `cad.unit.status` and `cad.emergency` were added while building M4 and are explained under Appendix B. The reads — queue, call card, unit board, map, broadcast board — are gated on `page.dispatch` and have no key of their own.
+- **Permissions:** `cad.call.create`, `cad.call.dispatch`, `cad.call.self_assign`, `cad.call.clear`, `cad.call.note`, `cad.call.link`, `cad.unit.manage`, `cad.unit.status`, `cad.emergency`, `cad.broadcast`. `cad.call.note`, `cad.call.link`, `cad.unit.status` and `cad.emergency` were added while building M4 and are explained under Appendix B; `cad.console.open` was listed here and is retired, also under Appendix B. The reads — queue, call card, unit board, map, broadcast board — are gated on `page.dispatch` and have no key of their own.
 
 #### 7.16.1 The narrative log, and the locale key every generated line carries
 
@@ -1662,7 +1662,7 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Investigations | `inv.case.create`, `inv.case.view`, `inv.case.edit`, `inv.case.assign`, `inv.case.close` |
 | Booking | `booking.create`, `booking.biometrics.capture`, `booking.release` |
 | Court | `court.warrant.request`, `court.warrant.review`, `court.warrant.recall`, `court.referral.review`, `court.calendar.manage`, `court.disposition.enter`, `court.discovery.issue`, `court.discovery.view`, `court.seal.order`, `court.citation.adjudicate`, `court.sentence.calculate` |
-| Dispatch | `cad.call.create`, `cad.call.dispatch`, `cad.call.self_assign`, `cad.call.clear`, `cad.call.note`, `cad.call.link`, `cad.unit.manage`, `cad.unit.status`, `cad.emergency`, `cad.broadcast`, `cad.console.open`, `alpr.read.view`, `alpr.hotlist.manage` |
+| Dispatch | `cad.call.create`, `cad.call.dispatch`, `cad.call.self_assign`, `cad.call.clear`, `cad.call.note`, `cad.call.link`, `cad.unit.manage`, `cad.unit.status`, `cad.emergency`, `cad.broadcast`, `alpr.read.view`, `alpr.hotlist.manage` |
 | Forensics | `forensics.scene.create`, `forensics.scene.release`, `forensics.evidence.collect`, `forensics.tools.use` |
 | Property room | `evidence.item.view`, `evidence.item.intake`, `evidence.item.transfer`, `evidence.item.checkout`, `evidence.item.release`, `evidence.item.dispose`, `evidence.item.reseal`, `evidence.audit.run` |
 | Lab | `lab.request.create`, `lab.queue.view`, `lab.analysis.perform`, `lab.analysis.review`, `lab.report.release` |
@@ -1705,10 +1705,38 @@ name or plate (7.16), so the only way to produce one is `person.search` or
 `vehicle.search`, and those two routes are gated on the register keys. A group
 given the link key without them is given a route it cannot reach: every search
 on the call card's picker answers `forbidden`. The seed grants both to
-`dispatch` beside the ALPR keys — granted again rather than inherited, since
-`dispatch` inherits `patrol_basic` and not `patrol` — and they unlock four read
-routes (`person.search`, `person.get`, `vehicle.search`, `vehicle.get`) with
-clearance (4.5) and the `fields.*` grants still deciding what comes back.
+`dispatch` beside the ALPR keys — written out rather than inherited, since
+`dispatch` inherits nothing — and they unlock four read routes
+(`person.search`, `person.get`, `vehicle.search`, `vehicle.get`) with clearance
+(4.5) and the `fields.*` grants still deciding what comes back.
+
+**`cad.console.open` is retired, and no key replaces it.** It was listed here
+and in 7.16 as the dispatcher's console key, and the seed said the dispatch
+console placement called it. No such mechanism exists: a placement carries
+geometry and nothing else (ADR-006), the two console-pinned routes are gated on
+`cad.call.create` and `cad.call.dispatch`, and no route, push or read ever asked
+for this key. Its only effect anywhere was in `cad/events.lua`, which read
+*holding* it as a reason to keep somebody off the unit board — so the catalog
+offered an administrator something that looked like a capability and worked as
+an amputation. Granted to `supervisor`, it signed every field supervisor off the
+board within one duty pass, pulled them off the calls they were on and left
+their panic button answering `no_unit`, while the console it appeared to open
+had never needed a key at all. It is out of the seed and out of the admin
+catalogue as well as out of this table; an existing database keeps its inert
+row, exactly as with `forensics.trace.report` under ADR-013.
+
+**Who is a unit is decided by `cad.unit.status` alone**, and that is a positive
+test with nothing negative beside it. A console operator is off the board
+because nothing grants them the key: `dispatch` is a root group and does not
+inherit `patrol_basic` (the seed spells out the four keys it used to take from
+it). This is the part a permission union can otherwise never express — an
+officer holding both the Dispatcher and the Patrol role holds the union of both
+groups, so *any* "holds the dispatcher key, therefore not a unit" rule throws
+their patrol half away and leaves a real officer permanently off the board with
+no screen able to say why. There is also no route that creates an `fpd_units`
+row: sign-on is the server's own observation of duty (7.1), so an officer who is
+missing from the board is missing the grant, duty, or a callsign on their roster
+row, and a supervisor cannot add them with `unit.manage`.
 
 7.16's *"cannot be cleared without supervisor acknowledgement"* is checked with
 `cad.unit.manage` rather than an acknowledgement key of its own: the groups that

@@ -610,6 +610,15 @@ end
 --- think to remove. The log line goes in the same transaction, so a link that
 --- exists always has a line saying who made it.
 ---
+--- Unlike `Repo.signOn`, this one may write its update list from `VALUES(...)`:
+--- `call.link` is the only writer of any of the three columns and it sends the
+--- whole link every time, so "the caller did not supply it" and "the caller
+--- means to clear it" are the same statement here. `detail` is the one to watch
+--- -- nothing supplies it today, so the assignment is NULL over NULL -- and the
+--- day a second path starts writing it, this list has to come back out, because
+--- a dispatcher correcting a role from the call card would otherwise wipe what
+--- that path wrote. That is exactly how the beat assignment was lost.
+---
 --- @param link table { targetType, targetId, role, label, detail }
 --- @param actor table { discordId, officerId, callsign }
 --- @return boolean committed
@@ -1391,15 +1400,49 @@ end
 --- their CASE reads the value this same statement has just written and never
 --- fires.
 ---
---- **Nothing calls this yet, and until something does there are no units.**
---- `fpd_units` is new in 0007 and 7.1's unit log-on has no route among M4's
---- schemas, so every CAD route that needs a unit answers `no_unit` until the
---- sign-on path -- the duty bridge, or a route of its own -- calls this. It is
---- written here because the reconnect rule above is the part that is easy to get
---- wrong and expensive to get wrong.
+--- **The duplicate-key branch writes only what the caller actually knows**, and
+--- that rule cost a supervisor's work to learn. It used to assign `beat_id`,
+--- `division`, `vehicle_plate` and `vehicle_model` from `VALUES(...)` as well,
+--- while the only caller -- the duty pass in `events.lua` -- passes none of the
+--- four. Every one of them therefore bound NULL, and the branch that runs on
+--- *every* reconnect and every off-and-back-on wrote those NULLs over the row.
+--- So a supervisor assigning 3A-12 to beat 7 through `unit.manage` held until
+--- that officer took a break: signing back on dropped the assignment, the unit
+--- left the beat column of the board and `listUnits(agency, { beatId = 7 })`
+--- stopped returning it, with nothing on screen or in the log to say so --
+--- `beat_id` is nullable and `fk_fpd_units_beat` is `ON DELETE SET NULL`, so
+--- the database had no reason to refuse it. The comment above `events.signOn`
+--- had said all along that the four are left alone; the statement was what ran.
+---
+--- `COALESCE(VALUES(beat_id), beat_id)` would also have stopped the NULLs, and
+--- it is the wrong shape here twice over. It would keep the four in the update
+--- list, which invites a later caller to pass a beat at sign-on and quietly
+--- outrank the supervisor who set it -- `Repo.updateUnit` is the one writer of
+--- an assignment, for the reason `setUnitStatus` is the one writer of
+--- `status_since`. And it makes clearing a column impossible rather than
+--- merely unused, so the first caller that means "no division" would be
+--- ignored instead of refused, which is this same bug with the sign flipped.
+---
+--- `agency_id` is assigned for the opposite reason: it is not the caller's
+--- guess, it is `session.agencyId`, which is `fpd_officers.agency_id` itself.
+--- Leaving it out meant an officer moved between agencies on the roster kept a
+--- unit row belonging to the old one -- and since every other statement in this
+--- file keys on `(agency_id, officer_id)`, that row is one no read can address:
+--- `getUnit` answers nothing for their real agency, their console gets
+--- `no_unit` for the rest of the shift, and the old agency's board gains a
+--- ghost unit its dispatchers can be sent to. The row has to follow the roster.
+--- A transfer made while the unit is live on the old agency's call leaves that
+--- assignment behind, which is visible and fixable; an unaddressable row is
+--- neither.
+---
+--- `beat_id` and the rest stay in the INSERT, so that whatever eventually owns
+--- unit log-on can seed a brand-new row with them. They are seeded once and
+--- never rewritten here afterwards, which is worth knowing before adding a
+--- caller that expects sign-on to correct them: it will not.
 ---
 --- @param unit table { officerId, discordId, callsign, beatId, division,
----   vehiclePlate, vehicleModel }
+---   vehiclePlate, vehicleModel } -- the last four only ever reach a first
+---   insert; see above
 --- @return number rows affected
 function Repo.signOn(agencyId, unit)
     local values = {}
@@ -1419,12 +1462,9 @@ function Repo.signOn(agencyId, unit)
                officer_id, callsign)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
           ON DUPLICATE KEY UPDATE
+              agency_id = VALUES(agency_id),
               discord_id = VALUES(discord_id),
               callsign = VALUES(callsign),
-              beat_id = VALUES(beat_id),
-              division = VALUES(division),
-              vehicle_plate = VALUES(vehicle_plate),
-              vehicle_model = VALUES(vehicle_model),
               status_since = CASE WHEN status = 'off_duty'
                                   THEN CURRENT_TIMESTAMP(3) ELSE status_since END,
               signed_on_at = CASE WHEN status = 'off_duty'
@@ -1536,8 +1576,8 @@ end
 ---
 --- Every agency at once, because a restart is not per agency.
 ---
---- **Nothing calls this yet.** It belongs on the resource's own start-up path,
---- and until it is called there a restart leaves yesterday's board on screen.
+--- `events.lua`'s boot sweep is the caller, on the tick after the resource
+--- starts and before the duty pass has put anybody back.
 ---
 --- @return number rows affected
 function Repo.signOffAllUnits()

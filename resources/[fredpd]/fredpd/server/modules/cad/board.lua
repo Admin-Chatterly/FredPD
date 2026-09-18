@@ -33,6 +33,24 @@
 --- it decides who may see a call and what comes off a payload that carries one,
 --- and it has no opinion about what any route does.
 ---
+--- ## The key a payload rides on is not always the key its contents need
+---
+--- The move above fixed where the rule lived and not what it asked. `mayRead` is
+--- clearance and agency; every route and every push in the module that can hand
+--- back a call is *also* gated on `page.dispatch`, and for two of the three call
+--- sites that gate is applied outside this file and out of sight -- by the route
+--- wrapper, or by `toDispatch`. The welfare prompt is the third, it rides on
+--- `cad.unit.manage` instead, and so the call fields on its rows were the one
+--- thing in the suite a session without the dispatch key could read. Nobody
+--- decided that; the fields were simply in a table whose permission was chosen
+--- for the prompt.
+---
+--- So the masking functions here ask `mayReceiveCall` -- both keys -- rather than
+--- each of them taking their caller's gate on trust. Redundant on the board,
+--- load-bearing on the welfare row, and one question either way. If you add a
+--- payload to this file, the thing to check is not which key you send it on: it
+--- is which keys every field on it is protected by everywhere else.
+---
 --- ## Why the masking is a copy and never a redaction in place
 ---
 --- `unitChanged` sends both shapes of the same row in one pass -- the full row
@@ -73,6 +91,13 @@ local accessRules = FredPD.Modules.access
 local repo = FredPD.Repo.cad
 local push = FredPD.Core.push
 
+--- Bound here because this file answers a *permission* question and not only a
+--- clearance one; `Board.mayReceiveCall` below is the whole of the reason and
+--- says what went wrong without it. `core/perms.lua` is loaded a long way before
+--- this file (fxmanifest), so this is a local at load like the other three,
+--- rather than a lookup inside a function body the way `avl` has to be.
+local perms = FredPD.Core.perms
+
 local Board = {}
 
 -- -----------------------------------------------------------------------------
@@ -88,6 +113,14 @@ local READ <const> = 'page.dispatch'
 --- Who may be asked to check on a unit (7.16: "a welfare-check prompt to
 --- dispatch"). `cad.unit.manage` is the key dispatch, supervisor and command
 --- hold; deliberately not the page key, which every officer holds.
+---
+--- It says who may be *asked*, and that is all it says. It is not a second way
+--- of being allowed to read a call, and for a while the welfare prompt used it
+--- as one: holding this key is why the prompt reaches you, and `READ` above is
+--- still what decides whether the call on it may be named. The two are not
+--- ordered -- neither implies the other, and the seed granting both to the three
+--- groups that hold this one is a fact about the seed and not about the model
+--- (`Board.mayReceiveCall`).
 local WELFARE <const> = 'cad.unit.manage'
 
 --- The prefix every column `Repo.listUnits` joins off `fpd_calls` is aliased
@@ -128,6 +161,45 @@ function Board.mayRead(session, call)
     return call ~= nil and accessRules.canRead(accessRules.reader(session), call)
 end
 
+--- May a payload this session is about to be handed *name* this call?
+---
+--- Two keys, and the second one is the one that was missing. `mayRead` above is
+--- clearance and agency and nothing else, which is the right question for a
+--- route that has already been gated on its own key -- `call.note` and
+--- `call.clear` are action keys and have nothing to do with the dispatch page,
+--- and `openCall` in `routes.lua` is right to ask only about clearance there.
+--- It is the wrong question for a helper that is deciding by itself what a
+--- payload may carry, because the helper is where the caller's gate stops being
+--- visible.
+---
+--- Every path in the suite that hands back a call is gated on the dispatch read
+--- key: `call.get`, `call.list`, `unit.list` and `map.view` are all `READ`, and
+--- `toDispatch` puts the same key on every push that leaves this file. The
+--- welfare prompt was the one exception, and it was not a deliberate one. It
+--- travels on `WELFARE` because `cad.unit.manage` is who the *prompt* is for
+--- (7.16, "a welfare-check prompt to dispatch"), and the two call fields riding
+--- along on the row inherited that gate by sitting in the same table -- masked
+--- on clearance, gated on a key that says nothing about reading calls.
+---
+--- What that cost: an operator maps a Discord role to a group holding
+--- `cad.unit.manage` and `clearance.internal` and not `page.dispatch` -- which
+--- the group editor allows, and which is the natural shape for a role that
+--- manages units from the MDT rather than from the console. That session is
+--- refused `call.get`, `call.list`, `unit.list` and `map.view` with `forbidden`
+--- and cannot reach a call by any route in the suite; and then the welfare pass
+--- handed it a call id and a call number for every unit sitting too long, every
+--- thirty seconds, from the one payload that never asked for the key the
+--- refusals were made on.
+---
+--- So the rule is one function rather than a line repeated in each masking loop.
+--- On the board it is redundant today -- `boardFor`'s two callers are both
+--- `READ` routes -- and on the welfare row it is load-bearing, and that is
+--- exactly the argument for not leaving each caller to work out which of the two
+--- it is dealing with.
+function Board.mayReceiveCall(session, call)
+    return perms.satisfies(session.permissions, READ) and Board.mayRead(session, call)
+end
+
 --- Drops the calls a session may not see from a list.
 ---
 --- Absent rather than stubbed: on a queue a placeholder would carry the count,
@@ -136,7 +208,16 @@ end
 ---
 --- One `reader` for the whole list rather than one per row -- the queue is two
 --- hundred rows and is polled every few seconds by every open console (12.1).
+---
+--- The dispatch read key is asked for once, for the same reason and in the same
+--- place: it is one answer for the whole list, and this function hands back
+--- whole call rows, so a session without it has nothing to be given here at all.
+--- `call.list` and `map.view` are both `READ` routes and cannot take that
+--- branch; it is written so that the rule belongs to this file rather than to
+--- whoever calls it, which is the difference the welfare prompt cost us.
 function Board.readable(session, calls)
+    if not perms.satisfies(session.permissions, READ) then return {} end
+
     local reader = accessRules.reader(session)
     local out = {}
 
@@ -180,6 +261,33 @@ local function without(row, fields)
     return out
 end
 
+--- Does `row` name a call in any of `fields`?
+---
+--- The board never has to ask this: its five call columns are aliased off one
+--- LEFT JOIN, and the id among them is the joined table's primary key, so with
+--- no call all five come back SQL NULL and are absent from the row together, and
+--- with a call the id is there. Reading `onCallId` really does answer "is there
+--- a call on this row", and reading one field per row is what keeps `boardFor`
+--- inside 12.1 on a two-hundred-row board.
+---
+--- The welfare row has no such guarantee and must not be given the benefit of
+--- the doubt. It is assembled by hand in `avl.lua`, field by field, and this file
+--- is the helper that file trusts to have checked -- which is the whole shape of
+--- the defect above, one level down. A row that arrived carrying `callNumber`
+--- and no `callId` would answer "no call here" on the id alone and be sent
+--- whole, to every holder of the welfare key, with the number still on it. So
+--- the question is asked of every field the masking would take off, and a row
+--- that names a call by any of them goes through the access check -- where a nil
+--- id reads as a call that cannot be read and is masked, because an unknown row
+--- is not a readable one.
+local function namesCall(row, fields)
+    for index = 1, #fields do
+        if row[fields[index]] ~= nil then return true end
+    end
+
+    return false
+end
+
 --- The calls a list of rows is standing on, by id, each read once.
 ---
 --- One primary-key lookup per *distinct* call, not per row, and none at all for
@@ -213,12 +321,36 @@ function Board.callsBehind(agencyId, rows, field)
     return calls
 end
 
+--- The call `callsBehind` remembered for `id`, in the shape `mayRead` wants.
+---
+--- Two absences and a boolean meet here and they must not be confused. A row
+--- that names no call (`id` nil) and a call the repo could not read back
+--- (remembered as `false`, so the miss is not looked up again for every further
+--- row standing on it) are both "no readable call" -- but `false ~= nil` is true
+--- in Lua, so handing `calls[id]` straight to `mayRead` passes its `call ~= nil`
+--- guard and puts a boolean where `canRead` expects a row to index. The `or nil`
+--- that fixes it was written out at each masking loop; it is one function here
+--- so that the loop somebody adds next cannot be the one that leaves it off.
+local function callAt(calls, id)
+    if id == nil then return nil end
+
+    return calls[id] or nil
+end
+
 --- The unit board as one session may see it (invariant 4).
 ---
 --- The row stays -- a callsign, a status, a position and a time in status are
 --- the board, and none of them belongs to the call. What comes off is the call.
 --- A masked row is indistinguishable from a unit working nothing, which is the
 --- same answer the queue gave that reader a second earlier.
+---
+--- The test is `mayReceiveCall` and not `mayRead`, which for this function's two
+--- callers can only ever agree: `unit.list` and `map.view` are both `READ`
+--- routes, so the key is already held by the time a session gets here. It is
+--- written that way so that the two masking loops in this file ask one question
+--- rather than two that look alike, and so that the next caller -- which may not
+--- be a `READ` route, because the welfare push was not -- cannot borrow this
+--- loop and lose the key on the way in.
 ---
 --- @param calls table|nil a `callsBehind` result to reuse, when the caller is
 ---   masking the same list for more than one reader
@@ -231,7 +363,7 @@ function Board.boardFor(session, units, calls)
         local unit = units[index]
         local id = unit.onCallId
 
-        if id == nil or Board.mayRead(session, calls[id] or nil) then
+        if id == nil or Board.mayReceiveCall(session, callAt(calls, id)) then
             out[index] = unit
         else
             out[index] = Board.withoutCall(unit)
@@ -333,6 +465,18 @@ end
 --- they are all right. What they do not get is the number of the call they are
 --- sitting on.
 ---
+--- The row surviving the mask is the property to keep, and it is worth arguing
+--- once more now that a second key decides the other half: the officer, the
+--- callsign, the status and the minutes reach **every** holder of `WELFARE` in
+--- the agency, whatever they hold besides. Dropping the row for a reader who may
+--- not read the call behind it would turn a classification into a reason nobody
+--- checks on an officer, and an alert whose entire content is "somebody should
+--- say something to them" is the last payload that should be failing closed by
+--- going silent. It fails closed by saying less.
+---
+--- The call half is gated on both keys (`mayReceiveCall`), because it is the
+--- half that was reaching sessions the rest of the suite refuses.
+---
 --- @param calls table|nil a `callsBehind` result keyed on `callId`, to reuse
 function Board.welfareFor(session, due, calls)
     calls = calls or Board.callsBehind(session.agencyId, due, 'callId')
@@ -341,9 +485,14 @@ function Board.welfareFor(session, due, calls)
 
     for index = 1, #due do
         local row = due[index]
-        local id = row.callId
 
-        if id == nil or Board.mayRead(session, calls[id] or nil) then
+        -- Asked of every field the mask would take off, and not of `callId`
+        -- alone; `namesCall` has the reason, and it is the same reason this
+        -- function exists at all -- the row is built by another file and this is
+        -- where its assumptions are meant to be checked, not inherited.
+        if not namesCall(row, WELFARE_CALL_FIELDS) then
+            out[index] = row
+        elseif Board.mayReceiveCall(session, callAt(calls, row.callId)) then
             out[index] = row
         else
             out[index] = without(row, WELFARE_CALL_FIELDS)
@@ -369,6 +518,14 @@ end
 --- on no call at all, so there is nothing to mask and the whole list is one
 --- payload sent to everybody -- no copy per recipient and no call lookups.
 ---
+--- `WELFARE` alone is the right gate on that fast path, and only there: a list
+--- in which no row names a call carries nothing the dispatch read key protects.
+--- The moment one row does, the payload becomes a call payload for that
+--- recipient and `welfareFor` adds the second key. Which is why the fast path is
+--- now decided by "does any row name a call" and not by "did any lookup
+--- happen": those differ for exactly one row shape -- a number with no id -- and
+--- that is the shape that would have gone out whole.
+---
 --- @return number recipients
 function Board.welfarePush(agencyId, due)
     if due == nil or #due == 0 then return 0 end
@@ -377,12 +534,21 @@ function Board.welfarePush(agencyId, due)
         return session.agencyId == agencyId
     end
 
-    local calls = Board.callsBehind(agencyId, due, 'callId')
+    local carriesCall = false
 
-    if next(calls) == nil then
+    for index = 1, #due do
+        if namesCall(due[index], WELFARE_CALL_FIELDS) then
+            carriesCall = true
+            break
+        end
+    end
+
+    if not carriesCall then
         return push.toPermission(WELFARE, 'fredpd:cad:welfare',
             FredPD.markArrays({ units = due }), sameAgency)
     end
+
+    local calls = Board.callsBehind(agencyId, due, 'callId')
 
     return push.perSession(WELFARE, 'fredpd:cad:welfare', function(session)
         return FredPD.markArrays({ units = Board.welfareFor(session, due, calls) })

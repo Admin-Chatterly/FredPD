@@ -93,9 +93,20 @@
 --- units then wrote dozens of `cad.call.read` rows per open console, none of
 --- them a read anybody performed, and enough of them to spend the route's own
 --- rate limit in the middle of the incident. `call.list` and `map.view` do not
---- audit either, for the older half of the same reason: they are polled every
---- few seconds by every open console (12.1), and an audit row per poll would
+--- audit either, for the older half of the same reason: a console re-reads both
+--- on mount and after every write it makes, and an audit row per refetch would
 --- bury the log this invariant exists to keep readable.
+---
+--- **The console does not poll.** It was written against a budget (12.1) that
+--- reads as though it does, and this file's comments once said so, but the NUI's
+--- only interval is a one-second clock for the age and time-in-status columns.
+--- Nothing re-reads the queue or the board on a timer, and `reload()` runs on
+--- the client that made the write and on no other. So a row that is not pushed
+--- is not stale for a moment -- it is wrong on every other console until that
+--- console is remounted, which on a night shift is never. Two of the pushes
+--- below were missing on exactly that reasoning: `call.clear` told nobody that
+--- the units it freed had come free, and the three routes that join a unit to a
+--- call told nobody about the call the divert took them off.
 
 local route = FredPD.Core.route
 local service = FredPD.Modules.cad
@@ -287,7 +298,17 @@ end
 --   * `board.callChanged` -- the queue and the card. **Every route below that
 --     writes anything to a call sends it**, including the ones whose only write
 --     is a narrative line, so a client that handles that event alone is never
---     left showing a stale card.
+--     left showing a stale card. "Anything to a call" includes the calls a
+--     handler wrote to without being asked to: `Repo.assignUnits` diverts, so
+--     the three routes that join a unit to a call also close that unit's
+--     assignment on a *different* call, and `callsChanged` is how the second
+--     one reaches the consoles holding its card (see `divertedFrom`).
+--   * There is no polling behind any of this. The console's only interval is a
+--     clock, and `reload()` runs on the client that made the write and nowhere
+--     else, so a row that is not pushed is not stale for a moment -- it is
+--     wrong until that console is remounted. Every "what does this write
+--     change on somebody else's screen" question below is answered on that
+--     assumption.
 --   * `board.unitChanged` -- one board row, which is a call payload in disguise,
 --     so it goes out in two complementary halves.
 --   * `board.toDispatch` -- the same delivery with no call on the payload at
@@ -309,6 +330,46 @@ local function logPushed(agencyId, call, entry)
     }, function(session)
         return board.mayRead(session, call)
     end)
+end
+
+--- Pushes one board row per officer named, each read back and each sent once.
+---
+--- Read back rather than pushed as the handler read them at the top: the rows a
+--- handler holds were answered *before* the write, so their five `onCall*`
+--- columns are the JOIN as it stood a moment ago (see `call.dispatch`). A row
+--- that cannot be read back is skipped rather than pushed stale --
+--- `board.unitChanged` treats nil as "invalidate the cache and say nothing".
+---
+--- Sent once, because the lists that feed this overlap: the unit being made
+--- lead is usually also one of the units being joined, and two pushes for one
+--- row is the console replacing a board entry with itself.
+---
+--- @param officerIds table list of officer ids, nils and duplicates tolerated
+local function unitsChanged(agencyId, officerIds)
+    local sent = {}
+
+    for index = 1, #officerIds do
+        local officerId = officerIds[index]
+
+        if officerId ~= nil and not sent[officerId] then
+            sent[officerId] = true
+            board.unitChanged(agencyId, repo.getUnit(agencyId, officerId))
+        end
+    end
+end
+
+--- Pushes each call named, read back after the write.
+---
+--- For the calls a handler wrote to without being asked to -- today that is the
+--- call a diverted unit was taken off (see `divertedFrom`). Through
+--- `board.callChanged` like every other call push, so the recipient list is
+--- filtered by the same access check a read makes: the abandoned call is not
+--- the one the dispatcher asked about, and a reader who may not open it must
+--- not be told it changed either (invariants 4 and 5).
+local function callsChanged(agencyId, callIds)
+    for index = 1, #callIds do
+        board.callChanged(agencyId, repo.getCall(agencyId, callIds[index]))
+    end
 end
 
 --- The session's own unit row, or a refusal saying why there is not one.
@@ -458,6 +519,49 @@ local function liveUnits(agencyId, callId)
     end
 
     return live
+end
+
+--- The calls a set of units is about to be taken off, read before the write.
+---
+--- `Repo.assignUnits` diverts: a unit joining a call is taken off whatever else
+--- it was live on, inside that same transaction. Three things are written to a
+--- call this handler was never told about -- the assignment closed, a
+--- `unit_left` line, the unit's status reset -- and the rule above says every
+--- route that writes to a call pushes it. This was the write that did not.
+---
+--- What that cost is not cosmetic. A dispatcher holding the abandoned call's
+--- card kept a card listing the unit as `active = 1`, and the queue row kept its
+--- old `unitCount` -- the NUI carries the previous count forward when a push
+--- omits it, and no push arrived at all -- so the call read as covered and
+--- nobody else was sent. Nothing heals it either: the console does not poll, and
+--- `reload()` runs only on the client that made the write, so the wrong card
+--- stands for the rest of the shift. It is not a dispatcher-only path, either:
+--- an officer already on a call who presses panic is diverted onto their own P1
+--- by `unit.emergency`, with nobody at a console involved.
+---
+--- No query. `Repo.getUnit` LEFT JOINs the live assignment already, so
+--- `onCallId` on the row the handler read a moment ago *is* the call
+--- `divertStatements` will close. It has to be read before the write, which is
+--- the whole reason this is a step of its own rather than something the push at
+--- the bottom of a handler could work out for itself -- by then the assignment
+--- it names is closed and the unit's row points at the new call.
+---
+--- @param units table rows from `Repo.getUnit`
+--- @param callId number|nil the call they are joining, which is not a divert
+--- @return table distinct call ids, in the order the units named them
+local function divertedFrom(units, callId)
+    local ids, seen = {}, {}
+
+    for index = 1, #units do
+        local from = units[index].onCallId
+
+        if from ~= nil and from ~= callId and not seen[from] then
+            seen[from] = true
+            ids[#ids + 1] = from
+        end
+    end
+
+    return ids
 end
 
 --- The unit board with the positions the server has just read laid over it.
@@ -753,8 +857,22 @@ route.define({
         local assigned = {}
         local active = repo.callUnits(session.agencyId, input.callId)
 
+        -- Who holds the lead now, kept for the push at the bottom and for
+        -- nothing else. `onCallLead` is one of the five columns the board JOINs
+        -- off the assignment and `UnitBoard.svelte` draws a marker from it, so
+        -- `setLead` moving it changes *two* board rows -- the new lead's and the
+        -- old one's -- and neither is necessarily in `joinUnits`. Transferring
+        -- the lead between two units already on the call pushed neither row, and
+        -- every console except the dispatcher's own kept drawing the marker
+        -- against the unit that no longer has it.
+        local previousLead = nil
+
         for index = 1, #active do
-            if active[index].active == 1 then assigned[active[index].officerId] = true end
+            if active[index].active == 1 then
+                assigned[active[index].officerId] = true
+
+                if active[index].isLead == 1 then previousLead = active[index].officerId end
+            end
         end
 
         local joinUnits, leaveUnits, leadUnit = {}, {}, nil
@@ -812,6 +930,12 @@ route.define({
 
         local actor = actorOf(session)
 
+        -- Read before anything is written, because the write is what destroys
+        -- the answer: `assignUnits` closes each joining unit's other assignment,
+        -- and after it has, nothing on the rows below still names the call they
+        -- were taken off. See `divertedFrom`.
+        local diverted = divertedFrom(joinUnits, input.callId)
+
         -- The first unit on the call stamps `dispatched_at` and moves the status
         -- to `dispatched`, inside `assignUnits`' own transaction and with
         -- `COALESCE`, so re-dispatching to a second unit cannot move a timestamp
@@ -845,28 +969,35 @@ route.define({
         -- are the JOIN as it stood a moment ago: the units just sent to this
         -- call carry whatever they were on before it -- usually nothing -- and
         -- the ones just released still carry this call. Pushing those is the
-        -- board briefly contradicting the write that caused the push, which on a
-        -- P1 with four units is four rows saying "available" while the card
-        -- beside them lists all four as dispatched. The console then heals it on
-        -- the next poll, seconds later, which is what made this look like a
-        -- rendering flicker rather than a stale read.
+        -- board contradicting the write that caused the push, which on a P1 with
+        -- four units is four rows saying "available" while the card beside them
+        -- lists all four as dispatched. It looked like a rendering flicker
+        -- because the dispatcher who pressed Dispatch reloads and sees it
+        -- corrected; every other console does not, and kept the four wrong rows.
         --
         -- One primary-key lookup per unit named in the dispatch, which is what
-        -- every other write in this file already pays for its own row. A unit
-        -- whose row cannot be read back is skipped rather than pushed stale --
-        -- `unitChanged` treats nil as "invalidate the cache and say nothing",
-        -- and the next board poll is the honest answer.
-        for index = 1, #joinUnits do
-            board.unitChanged(session.agencyId,
-                repo.getUnit(session.agencyId, joinUnits[index].officerId))
+        -- every other write in this file already pays for its own row.
+        local rows = {}
+
+        for index = 1, #joinUnits do rows[#rows + 1] = joinUnits[index].officerId end
+        for index = 1, #leaveUnits do rows[#rows + 1] = leaveUnits[index].officerId end
+
+        -- Both ends of a lead transfer, and only when one happened. The new lead
+        -- is usually already in `joinUnits` and `unitsChanged` drops the second
+        -- copy; the unit that *lost* the lead is in neither list and is the half
+        -- that went unpushed (see `previousLead` above).
+        if leadUnit then
+            rows[#rows + 1] = leadUnit.officerId
+            rows[#rows + 1] = previousLead
         end
 
-        for index = 1, #leaveUnits do
-            board.unitChanged(session.agencyId,
-                repo.getUnit(session.agencyId, leaveUnits[index].officerId))
-        end
+        unitsChanged(session.agencyId, rows)
 
+        -- The call the dispatcher asked about, and every call a unit was taken
+        -- off to get here. The second list is empty on an ordinary dispatch to
+        -- units that were free, which is most of them.
         board.callChanged(session.agencyId, repo.getCall(session.agencyId, input.callId))
+        callsChanged(session.agencyId, diverted)
 
         return { id = input.callId, joined = #joinUnits, left = #leaveUnits }
     end,
@@ -904,6 +1035,12 @@ route.define({
             return route.refuse(FredPD.ErrorCode.CONFLICT, { callId = 'already_assigned' })
         end
 
+        -- Before the write, for the reason `call.dispatch` reads it there: this
+        -- is the third caller of `assignUnits` and so the third place the divert
+        -- runs. An officer who takes a second call off the queue is taken off
+        -- the first one, which is a write to a call nobody here named.
+        local diverted = divertedFrom({ unit }, input.callId)
+
         -- A `unit_joined` row either way; `selfAssigned` is what makes the line
         -- read `cad.log.self_assigned` instead (7.16.1), because a unit that took
         -- a call and a unit that was sent to one are different facts and the log
@@ -920,6 +1057,7 @@ route.define({
 
         board.unitChanged(session.agencyId, repo.getUnit(session.agencyId, session.officerId))
         board.callChanged(session.agencyId, repo.getCall(session.agencyId, input.callId))
+        callsChanged(session.agencyId, diverted)
 
         return { id = input.callId, callNumber = call.callNumber }
     end,
@@ -1015,11 +1153,21 @@ route.define({
         -- line and the label can never disagree about which of the two happened.
         local status = service.closureFor(input.disposition)
 
+        -- Kept in a local instead of being passed straight in, because this list
+        -- is needed twice: `clearCall` frees these units, and every one of them
+        -- is a board row on every open console that has to be told.
+        --
+        -- It is exactly the right list. `clearCall` stamps `left_at` on the rows
+        -- this read selected and runs `freeWorked` against these officer ids, so
+        -- "the rows the clear changed" and "the rows read here" are the same set
+        -- by construction rather than by coincidence.
+        local onCall = liveUnits(session.agencyId, input.callId)
+
         repo.clearCall(session.agencyId, input.callId, {
             status = status,
             disposition = input.disposition,
             note = text(input.note),
-        }, liveUnits(session.agencyId, input.callId), actorOf(session))
+        }, onCall, actorOf(session))
 
         -- The transaction reports only that it committed, and its UPDATE matches
         -- no rows if somebody closed the call between the read above and the
@@ -1031,9 +1179,34 @@ route.define({
             return route.refuse(FredPD.ErrorCode.CONFLICT, { callId = 'call_cleared' })
         end
 
-        -- Every unit on the call came free, so the board the AVL sweep caches is
-        -- now wrong.
-        avl.invalidate(session.agencyId)
+        -- Every unit on the call came free, and this route used to say so to
+        -- nobody. It pushed the call and only the call, and the NUI's handler
+        -- for `fredpd:cad:call` merges the queue row and refetches the card --
+        -- it never reloads the board. So on every console but the one that
+        -- pressed Clear, the unit stayed `on_scene`, still carrying the closed
+        -- call's number, priority and status, with its time in status counting
+        -- up from before the clear. Nothing corrected it: the console does not
+        -- poll, and `reload()` runs only on the client that made the write, so
+        -- the row was wrong for the rest of the shift. `CallCard` then never
+        -- offered the unit that had just come free, and dispatch's welfare timer
+        -- went on climbing for somebody sitting at the station.
+        --
+        -- On a panic call it is worse than a stale row. `Cad.CALL_ENDED` is the
+        -- only rule that frees `emergency`, so closing the call is the one event
+        -- that takes an officer out of distress -- and without this push every
+        -- other board went on showing them in distress with no way back.
+        --
+        -- The standalone `avl.invalidate` that used to stand here is gone with
+        -- it, not merely moved: `board.unitChanged` invalidates before it
+        -- pushes, and `onCall` is every board row this clear changed, so the
+        -- cache is dropped by the same event that caused it -- which is the
+        -- ownership `board.lua` already claims. A clear with nobody on the call
+        -- changes no board row and so needs no invalidation either.
+        local rows = {}
+
+        for index = 1, #onCall do rows[#rows + 1] = onCall[index].officerId end
+
+        unitsChanged(session.agencyId, rows)
         board.callChanged(session.agencyId, after)
 
         return { id = input.callId, disposition = input.disposition, status = after.status }
@@ -1450,6 +1623,15 @@ route.define({
         -- first, then somebody is on it, then the board says why. A P1 with
         -- nobody attached is still a P1 on the queue; the reverse would be a unit
         -- flagged in distress with no call to send anyone to.
+
+        -- The call this officer was already working, if any, read off the row
+        -- `ownUnit` answered before any of this was written. `assignUnits`'
+        -- header names this route as the case the divert exists for, so it is
+        -- also the route most likely to abandon a call silently: the first
+        -- dispatcher's card for it keeps listing a unit who is now on their own
+        -- P1 two districts away.
+        local diverted = divertedFrom({ unit }, created.id)
+
         repo.assignUnits(session.agencyId, created.id, { unit }, {
             assignedBy = session.discordId,
             selfAssigned = true,
@@ -1479,6 +1661,10 @@ route.define({
         -- restricts -- not the existence of the call.
         board.callChanged(session.agencyId, call)
 
+        -- And the call this officer just abandoned by pressing the button (see
+        -- `diverted` above).
+        callsChanged(session.agencyId, diverted)
+
         -- 7.16: "tone for all dispatchers and units in range", and for nobody
         -- else (invariant 5). Range is measured against each recipient's own ped
         -- on the server; a session whose ped has not spawned is out of range
@@ -1489,10 +1675,7 @@ route.define({
         -- is only the part that is peculiar to an emergency. The access check on
         -- the call it carries is not peculiar and is made all the same: the tone
         -- names the call.
-        board.toDispatch(session.agencyId, 'fredpd:cad:emergency', {
-            call = call,
-            callsign = unit.callsign,
-        }, function(other)
+        local function hears(other)
             if not board.mayRead(other, call) then return false end
 
             if perms.satisfies(other.permissions, SUPERVISE)
@@ -1508,6 +1691,50 @@ route.define({
             local dx, dy = there.x - at.x, there.y - at.y
 
             return (dx * dx + dy * dy) <= (EMERGENCY_RANGE * EMERGENCY_RANGE)
+        end
+
+        --- May this recipient act on the banner they are about to be shown?
+        ---
+        --- The recipient rule above deliberately reaches past `cad.unit.manage`:
+        --- a patrol officer 200 m away is exactly who should be running, so most
+        --- of the people this tone reaches are people who may not acknowledge
+        --- it. The banner has to say which it is, and it could not: the NUI drew
+        --- Acknowledge for every recipient, `call.acknowledge` is gated on
+        --- `cad.unit.manage`, so a patrol officer got a banner whose only button
+        --- was guaranteed to refuse -- it never cleared, and every press wrote an
+        --- `audit.denied` row against somebody who had done nothing wrong.
+        ---
+        --- The same two tests `call.acknowledge` itself makes, and not just the
+        --- permission: the officer who pressed the button is refused there by
+        --- `created_by`, so a *supervisor* who presses panic would otherwise be
+        --- shown the one Acknowledge button in the department that can never
+        --- work. `call.createdBy` is this session's own Discord id, written by
+        --- the server a moment ago, which is what makes that comparison safe.
+        local function mayAcknowledge(other)
+            return other.discordId ~= session.discordId
+                and perms.satisfies(other.permissions, SUPERVISE)
+        end
+
+        -- Two complementary pushes and not `push.perSession`, for the reason
+        -- `Board.unitChanged` splits the same way: this payload carries exactly
+        -- one call and the answer is one boolean, so the recipients divide
+        -- cleanly in two and everybody gets exactly one of them. It also keeps
+        -- `board.toDispatch` the only way this file pushes, which is what the
+        -- header means by the absence of a `push` local being load-bearing.
+        board.toDispatch(session.agencyId, 'fredpd:cad:emergency', {
+            call = call,
+            callsign = unit.callsign,
+            mayAcknowledge = true,
+        }, function(other)
+            return mayAcknowledge(other) and hears(other)
+        end)
+
+        board.toDispatch(session.agencyId, 'fredpd:cad:emergency', {
+            call = call,
+            callsign = unit.callsign,
+            mayAcknowledge = false,
+        }, function(other)
+            return not mayAcknowledge(other) and hears(other)
         end)
 
         TriggerEvent('fredpd:emergency', {
