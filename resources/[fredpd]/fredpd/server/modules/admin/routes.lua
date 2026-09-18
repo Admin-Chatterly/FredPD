@@ -309,6 +309,7 @@ local PERMISSION_CATALOGUE <const> = {
     -- Tvångsmedel och efterlysning (spec 7.12, 7.13).
     'tvang.view', 'tvang.decide', 'tvang.decide.aklagare', 'tvang.decide.domare',
     'tvang.verkstall', 'efterlysning.issue',
+    'spaning.view', 'spaning.create',
     'rms.location.view', 'rms.location.hazard.edit',
 
     -- Reports

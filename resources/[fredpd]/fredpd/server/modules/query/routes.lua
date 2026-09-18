@@ -336,8 +336,26 @@ route.define({
         -- filtered out would be the same disclosure by a slower route. One
         -- query per register for the whole page (spec 12).
         local reader = access.reader(session)
-        local flags = repo.liveFlagsFor(session.agencyId, idsOfKind(page, 'vehicle'))
-        local cautions = repo.liveCautionsFor(session.agencyId, idsOfKind(page, 'person'))
+        local personIds = idsOfKind(page, 'person')
+        local vehicleIds = idsOfKind(page, 'vehicle')
+
+        local flags = repo.liveFlagsFor(session.agencyId, vehicleIds)
+        local cautions = repo.liveCautionsFor(session.agencyId, personIds)
+
+        -- The two sources 7.13 adds. Read across every agency, unlike the flags
+        -- and cautions above: a wanted notice raised by another department is
+        -- exactly the thing this officer needs to be told about.
+        local efterlysningar = repo.liveEfterlysningarFor(personIds)
+        local personSpaning = repo.liveSpaningFor('person', personIds)
+        local vehicleSpaning = repo.liveSpaningFor('vehicle', vehicleIds)
+
+        local now = os.time()
+
+        --- Joins two hit lists. Both are sequences, so this keeps them one.
+        local function merge(into, extra)
+            for index = 1, #extra do into[#into + 1] = extra[index] end
+            return into
+        end
 
         for index = 1, #page do
             local row = page[index]
@@ -345,12 +363,22 @@ route.define({
             if opened(row) then
                 if row.kind == 'vehicle' then
                     row.hits = service.vehicleHits(visibleFlags(reader, flags[row.id] or {}), row.id)
+
+                    merge(row.hits, service.spaningHits(
+                        accessRules.filterSearchResults(reader, vehicleSpaning[row.id] or {}), now))
                 elseif row.kind == 'firearm' then
                     row.hits = service.firearmHits(row)
                 else
                     row.hits = service.personHits(
                         visibleCautions(session, reader, cautions[row.id] or {}), row.id
                     )
+
+                    -- Each notice carries its own classification, so each is
+                    -- filtered before it can become a banner (invariant 4).
+                    merge(row.hits, service.efterlysningHits(
+                        accessRules.filterSearchResults(reader, efterlysningar[row.id] or {}), now))
+                    merge(row.hits, service.spaningHits(
+                        accessRules.filterSearchResults(reader, personSpaning[row.id] or {}), now))
 
                     redactAddress(session, row)
                 end

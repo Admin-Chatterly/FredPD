@@ -104,6 +104,13 @@ server_scripts {
     -- Events last: the handler reads the repo above it.
     'server/modules/tvangsmedel/events.lua',
 
+    -- Spaningsuppdrag (spec 7.13). The operational lookout, as distinct from
+    -- the efterlysning above it.
+    'server/modules/spaning/service.lua',
+    'server/modules/spaning/repo.lua',
+    'server/modules/spaning/routes.lua',
+    'server/modules/spaning/events.lua',
+
     'server/modules/placements/service.lua',
     'server/modules/placements/repo.lua',
     'server/modules/placements/routes.lua',

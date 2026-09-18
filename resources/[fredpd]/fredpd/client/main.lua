@@ -191,6 +191,12 @@ local NUI_ROUTES <const> = {
     'efterlysning.create',
     'efterlysning.cancel',
 
+    -- Spaningsuppdrag (spec 7.13).
+    'spaning.list',
+    'spaning.get',
+    'spaning.create',
+    'spaning.resolve',
+
     -- Crime scenes, evidence and the chain of custody (spec 8).
     'scene.create',
     'scene.release',

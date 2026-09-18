@@ -267,6 +267,60 @@ function Repo.liveCautionsFor(agencyId, ids)
     ), 'personId')
 end
 
+--- The live efterlysningar on a page of people (7.13).
+---
+--- Across every agency, deliberately, unlike the cautions and flags above: an
+--- efterlysning is a prosecutor's decision that somebody be detained, and a
+--- query run by one department must surface one raised by another. A server
+--- with two forces would otherwise have two blind spots, each the size of the
+--- other's wanted list.
+---
+--- Cancellation is filtered here because it is indexed; expiry is left to
+--- `Tvang.isLive`, so "live" keeps one definition rather than two that drift.
+function Repo.liveEfterlysningarFor(ids)
+    if type(ids) ~= 'table' or #ids == 0 then return {} end
+
+    local values = {}
+    for index = 1, #ids do values[index] = ids[index] end
+
+    return groupBy(db().query(
+        ([[SELECT e.id, e.person_id AS personId, e.grund, e.priority,
+                  e.classification, e.agency_id AS agencyId,
+                  UNIX_TIMESTAMP(e.expires_at)   AS expiresAt,
+                  UNIX_TIMESTAMP(e.cancelled_at) AS cancelledAt
+             FROM fpd_efterlysning e
+            WHERE e.person_id IN (%s) AND e.cancelled_at IS NULL
+            ORDER BY e.priority, e.id]]):format(placeholders(#ids)),
+        values
+    ), 'personId')
+end
+
+--- The live spaningsuppdrag on a page of people or vehicles (7.13).
+---
+--- Also across every agency, and for the same reason: the van somebody else is
+--- looking for is the van this officer has just stopped.
+---
+--- @param targetKind string 'person' or 'vehicle'
+function Repo.liveSpaningFor(targetKind, ids)
+    if type(ids) ~= 'table' or #ids == 0 then return {} end
+
+    local values = { targetKind }
+    for index = 1, #ids do values[#values + 1] = ids[index] end
+
+    return groupBy(db().query(
+        ([[SELECT s.id, s.target_id AS targetId, s.target_kind AS targetKind,
+                  s.grund, s.priority, s.description, s.classification,
+                  s.agency_id AS agencyId,
+                  UNIX_TIMESTAMP(s.issued_at)   AS issuedAt,
+                  UNIX_TIMESTAMP(s.expires_at)  AS expiresAt,
+                  UNIX_TIMESTAMP(s.resolved_at) AS resolvedAt
+             FROM fpd_spaning s
+            WHERE s.target_kind = ? AND s.target_id IN (%s) AND s.resolved_at IS NULL
+            ORDER BY s.priority, s.issued_at DESC]]):format(placeholders(#ids)),
+        values
+    ), 'targetId')
+end
+
 --- One hit and the record it hangs off, for the confirmation route.
 ---
 --- Returns both halves because both are checked: the record decides whether

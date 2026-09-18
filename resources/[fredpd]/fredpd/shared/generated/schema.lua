@@ -1220,4 +1220,35 @@ FredPD.Schema = {
         version = { type = 'integer', required = true, min = 1 },
         grund = { type = 'string', required = false, max = 128 },
     },
+
+    SpaningList = {
+        targetKind = { type = 'enum', required = false, values = { 'person', 'vehicle', 'other' } },
+        priority = { type = 'integer', required = false, min = 1, max = 4 },
+        includeResolved = { type = 'boolean', required = false },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    SpaningGet = {
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
+    SpaningCreate = {
+        targetKind = { type = 'enum', required = true, values = { 'person', 'vehicle', 'other' } },
+        targetId = { type = 'integer', required = false, min = 1 },
+        description = { type = 'string', required = false, max = 500 },
+        grund = { type = 'string', required = true, min = 1, max = 128 },
+        priority = { type = 'integer', required = false, min = 1, max = 4 },
+        beatId = { type = 'integer', required = false, min = 1 },
+        areaNote = { type = 'string', required = false, max = 191 },
+        fuId = { type = 'integer', required = false, min = 1 },
+        anmalanId = { type = 'integer', required = false, min = 1 },
+        validSeconds = { type = 'integer', required = false, min = 3600, max = 7776000 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    SpaningResolve = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        grund = { type = 'string', required = false, max = 128 },
+    },
 }

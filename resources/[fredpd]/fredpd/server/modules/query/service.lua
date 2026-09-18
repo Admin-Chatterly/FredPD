@@ -444,7 +444,14 @@ end
 -- -----------------------------------------------------------------------------
 
 --- What kind of thing a hit hangs off, for `fpd_hotfile_confirmations`.
-Query.HIT_TYPES = { vehicle_flag = true, firearm = true, person_caution = true }
+Query.HIT_TYPES = {
+    vehicle_flag = true, firearm = true, person_caution = true,
+    -- Added with 0012, which widened `ck_fpd_hotfile_confirmations_hit_type`
+    -- to match. These two are the sources that most need the confirmation
+    -- step, because they are the ones that end with an officer stopping
+    -- somebody rather than reading a record.
+    efterlysning = true, spaning = true,
+}
 
 --- The record each hit type belongs to, so the confirmation route knows which
 --- access check to run before it writes anything.
@@ -452,6 +459,12 @@ Query.HIT_RECORD_TYPE = {
     vehicle_flag = 'vehicle',
     firearm = 'firearm',
     person_caution = 'person',
+    -- These two are their own record type rather than the person or vehicle
+    -- they name. An efterlysning carries its own classification -- a wanted
+    -- notice can be restricted while the person's file is not -- so the access
+    -- check the confirmation route runs has to be against the notice.
+    efterlysning = 'efterlysning',
+    spaning = 'spaning',
 }
 
 --- The person cautions that are a hot-file hit (7.2, "officer-safety
@@ -543,6 +556,70 @@ function Query.personHits(cautions, personId)
 
         if type(caution) == 'table' and caution.id and Query.PERSON_HOTFILE[caution.kind] then
             hits[#hits + 1] = hit('person_caution', caution.id, caution.kind, personId)
+        end
+    end
+
+    return hits
+end
+
+--- The hits from the efterlysningar on a person (7.13).
+---
+--- **Only the ones that mean "detain this person".** Somebody wanted for
+--- delgivning is to be served a document and somebody reported missing is
+--- wanted for their own sake; neither is a reason to stop and hold anybody, and
+--- a red banner for all three teaches an officer that the banner does not mean
+--- what it says.
+---
+--- The rule lives in the tvångsmedel service, asked rather than copied, for the
+--- same reason `vehicleHits` asks the register which flags are hot: the module
+--- that owns the concept owns the definition.
+---
+--- Unlike `personHits`, this takes no record id: the hit hangs off the
+--- efterlysning itself rather than off the person, because the notice carries
+--- its own classification and the confirmation route checks that.
+---
+--- @param rows table efterlysningar the reader is allowed to see
+--- @param now number epoch seconds
+function Query.efterlysningHits(rows, now)
+    local hits = {}
+    if type(rows) ~= 'table' then return hits end
+
+    local tvang = FredPD.Modules.tvangsmedel
+
+    for index = 1, #rows do
+        local row = rows[index]
+
+        if type(row) == 'table' and row.id
+            and tvang.detainOnSight(row.grund) and tvang.isLive(row, now) then
+            hits[#hits + 1] = hit('efterlysning', row.id, row.grund, row.id)
+        end
+    end
+
+    return hits
+end
+
+--- The hits from the spaningsuppdrag on a person or vehicle (7.13).
+---
+--- **Only the ones the module itself says are loud enough to interrupt
+--- somebody.** `Spaning.bannerFor` returns `alert` for priority 1 and nothing
+--- else, and only an `alert` becomes a hot-file hit here -- the rest are shown
+--- on the record without stopping anybody.
+---
+--- That asymmetry is the point. A lookout is an officer saying "look for this
+--- van", and if every one of them raised a red banner the banners would stop
+--- being read within a shift.
+function Query.spaningHits(rows, now)
+    local hits = {}
+    if type(rows) ~= 'table' then return hits end
+
+    local spaning = FredPD.Modules.spaning
+
+    for index = 1, #rows do
+        local row = rows[index]
+
+        if type(row) == 'table' and row.id
+            and spaning.needsConfirmation(row) and spaning.isLive(row, now) then
+            hits[#hits + 1] = hit('spaning', row.id, row.grund, row.id)
         end
     end
 

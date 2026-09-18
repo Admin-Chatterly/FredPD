@@ -315,15 +315,6 @@ describe('brott', function()
 
     -- -------------------------------------------------------------------------
     describe('validate', function()
-        --- Removing a field, which an override cannot express as nil.
-        ---
-        --- `{ balk = nil }` is an empty table: assigning nil stores nothing and
-        --- `pairs` never yields the key. The two cases that matter most here --
-        --- livstid (an absent ceiling) and an absent citation -- are both
-        --- *removals*, so a helper without this sentinel silently tests the
-        --- unmodified entry and passes for the wrong reason.
-        local NONE <const> = {}
-
         --- A catalogue entry that should pass, to vary one field at a time.
         local function entry(overrides)
             local base = {
@@ -336,8 +327,14 @@ describe('brott', function()
                 fangelseMaxMonths = 24,
             }
 
+            -- `helper.NONE` removes a field, which an override cannot express
+            -- as nil: assigning nil stores nothing and `pairs` never yields the
+            -- key. The two cases that matter most here -- livstid (an absent
+            -- ceiling) and an absent citation -- are both *removals*, so
+            -- without the sentinel they would silently test the unmodified
+            -- entry and pass for the wrong reason.
             for key, value in pairs(overrides or {}) do
-                base[key] = value ~= NONE and value or nil
+                base[key] = value ~= helper.NONE and value or nil
             end
 
             return base
@@ -373,26 +370,26 @@ describe('brott', function()
 
         it('accepts livstid, which is an absent ceiling', function()
             assert.is_nil(brott.validate(entry({
-                fangelseMinMonths = 120, fangelseMaxMonths = NONE,
+                fangelseMinMonths = 120, fangelseMaxMonths = helper.NONE,
             })))
         end)
 
         it('accepts a citation that is entirely absent', function()
             -- An agency-local code cites no statute; `code` is the citation.
             assert.is_nil(brott.validate(entry({
-                balk = NONE, kapitel = NONE, paragraf = NONE,
+                balk = helper.NONE, kapitel = helper.NONE, paragraf = helper.NONE,
             })))
         end)
 
         it('refuses half a citation', function()
             -- A kapitel with no balk renders as a broken reference on every
             -- record that cites the offence, and gets noticed in court.
-            local code, fields = brott.validate(entry({ balk = NONE }))
+            local code, fields = brott.validate(entry({ balk = helper.NONE }))
 
             assert.are.equal('invalid', code)
             assert.are.equal('incomplete_citation', fields.balk)
 
-            assert.are.equal('invalid', brott.validate(entry({ paragraf = NONE })))
+            assert.are.equal('invalid', brott.validate(entry({ paragraf = helper.NONE })))
         end)
     end)
 

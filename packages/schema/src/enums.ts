@@ -1063,3 +1063,16 @@ export const EFTERLYSNING_GRUNDER = [
 ] as const;
 
 export type EfterlysningGrund = (typeof EFTERLYSNING_GRUNDER)[number];
+
+/**
+ * `ck_fpd_spaning_target` — what a spaningsuppdrag is a lookout for (7.13).
+ *
+ * **`other` is not a placeholder.** A description with no record behind it —
+ * "silver estate, no plate seen, three occupants" — is the commonest lookout
+ * there is, and it is the case a foreign key cannot express. A schema that
+ * demanded a registered vehicle would refuse to record the sighting that
+ * matters most.
+ */
+export const SPANING_TARGETS = ['person', 'vehicle', 'other'] as const;
+
+export type SpaningTarget = (typeof SPANING_TARGETS)[number];

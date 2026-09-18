@@ -289,6 +289,18 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('command', 'efterlysning.issue'),
     ('aklagare', 'efterlysning.issue'),
 
+    -- Spaningsuppdrag (spec 7.13). Raising one is patrol work, and that is the
+    -- difference between this and an efterlysning: an efterlysning is a
+    -- prosecutor's decision that somebody be detained, and a spaningsuppdrag is
+    -- an officer saying "look for this van". A department where the second
+    -- needed command approval would simply not use it, and the sightings would
+    -- stay in the radio traffic where nothing can search them.
+    --
+    -- What patrol cannot do is make a lookout as loud as an efterlysning:
+    -- `Spaning.bannerFor` caps it, and no permission reaches that.
+    ('patrol', 'spaning.view'),
+    ('patrol', 'spaning.create'),
+
     -- The two field-level grants of spec 4.5. Without a group holding them the
     -- fields are not protected, they are invisible: the routes read the
     -- permission on every path that returns the field, so a department that

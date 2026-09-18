@@ -25,8 +25,13 @@ describe('query', function()
     local query
 
     before_each(function()
+        -- The two 7.13 hit builders ask the modules that own the concepts --
+        -- `Tvang.detainOnSight` and `Spaning.needsConfirmation` -- rather than
+        -- keeping a second copy of either rule, so both services load here.
         query = helper.load({
             'server/modules/registry/service',
+            'server/modules/tvangsmedel/service',
+            'server/modules/spaning/service',
             'server/modules/query/service',
         }).Modules.query
     end)
@@ -430,6 +435,97 @@ describe('query', function()
             assert.is_true(query.hitIsLive('person_caution', { kind = 'violent' }))
             assert.is_false(query.hitIsLive('person_caution', { kind = 'violent', cancelledAt = '2026-09-18' }))
             assert.is_false(query.hitIsLive('person_caution', { kind = 'gang' }))
+        end)
+    end)
+    -- -------------------------------------------------------------------------
+    describe('the 7.13 hit sources', function()
+        local NOW <const> = 1000000
+
+        describe('efterlysningHits', function()
+            it('raises a hit for somebody to be detained', function()
+                local hits = query.efterlysningHits({
+                    { id = 5, grund = 'anhallen_i_franvaro' },
+                }, NOW)
+
+                assert.are.equal(1, #hits)
+                assert.are.equal('efterlysning', hits[1].hitType)
+                assert.are.equal('anhallen_i_franvaro', hits[1].kind)
+                assert.is_false(hits[1].confirmed)
+            end)
+
+            it('raises NO hit for a delgivning or a missing person', function()
+                -- The case that protects the banner. Neither is a reason to
+                -- stop and hold anybody, and a red banner for all three teaches
+                -- an officer that the banner does not mean what it says.
+                assert.are.equal(0, #query.efterlysningHits({
+                    { id = 5, grund = 'delgivning' },
+                    { id = 6, grund = 'forsvunnen' },
+                    { id = 7, grund = 'oidentifierad' },
+                }, NOW))
+            end)
+
+            it('raises no hit for one that has expired', function()
+                assert.are.equal(0, #query.efterlysningHits({
+                    { id = 5, grund = 'anhallen_i_franvaro', expiresAt = NOW - 1 },
+                }, NOW))
+            end)
+
+            it('raises no hit for a stub the reader may not see', function()
+                -- `filterSearchResults` answers a stub, which carries no
+                -- `grund`. The banner must not fire on one.
+                assert.are.equal(0, #query.efterlysningHits({
+                    { id = 5, restricted = true },
+                }, NOW))
+            end)
+
+            it('survives an empty list', function()
+                assert.are.equal(0, #query.efterlysningHits({}, NOW))
+                assert.are.equal(0, #query.efterlysningHits(nil, NOW))
+            end)
+        end)
+
+        describe('spaningHits', function()
+            local function lookout(priority)
+                return {
+                    id = 9, grund = 'spaning.grund.iakttagelse',
+                    priority = priority,
+                    issuedAt = NOW - 60, expiresAt = NOW + 3600,
+                }
+            end
+
+            it('raises a hit only for priority 1', function()
+                assert.are.equal(1, #query.spaningHits({ lookout(1) }, NOW))
+            end)
+
+            it('raises NO hit for the quieter priorities', function()
+                -- A lookout is an officer saying "look for this van". If every
+                -- one raised a red banner the banners would stop being read
+                -- within a shift.
+                assert.are.equal(0, #query.spaningHits({ lookout(2) }, NOW))
+                assert.are.equal(0, #query.spaningHits({ lookout(3) }, NOW))
+                assert.are.equal(0, #query.spaningHits({ lookout(4) }, NOW))
+            end)
+
+            it('raises no hit for a resolved or expired lookout', function()
+                local resolved = lookout(1)
+                resolved.resolvedAt = NOW - 1
+                assert.are.equal(0, #query.spaningHits({ resolved }, NOW))
+
+                local expired = lookout(1)
+                expired.expiresAt = NOW - 1
+                assert.are.equal(0, #query.spaningHits({ expired }, NOW))
+            end)
+        end)
+
+        it('files both under their own record type, not the person\'s', function()
+            -- An efterlysning carries its own classification -- a wanted notice
+            -- can be restricted while the person's file is not -- so the access
+            -- check the confirmation route runs is against the notice.
+            assert.are.equal('efterlysning', query.HIT_RECORD_TYPE.efterlysning)
+            assert.are.equal('spaning', query.HIT_RECORD_TYPE.spaning)
+
+            assert.is_true(query.HIT_TYPES.efterlysning)
+            assert.is_true(query.HIT_TYPES.spaning)
         end)
     end)
 end)

@@ -129,7 +129,11 @@
     "upphavd": "Beslutet är hävt.",
     "not_yet": "Beslutet har inte trätt i kraft.",
     "expired": "Beslutet har upphört att gälla.",
-    "cancelled": "Avlyst."
+    "cancelled": "Avlyst.",
+    "required_without_target": "Ange ett signalement när det inte finns någon post att peka på.",
+    "resolved": "Spaningsuppdraget är avslutat.",
+    "no_expiry": "Spaningsuppdraget saknar sluttid och kan inte användas.",
+    "out_of_range": "Utanför tillåtet intervall."
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -678,7 +682,9 @@
     "hit": {
       "vehicle_flag": "Fordonsmarkering",
       "firearm": "Vapen",
-      "person_caution": "Personvarning"
+      "person_caution": "Personvarning",
+      "anhallen_i_franvaro": "EFTERLYST — anhållen i sin frånvaro. Bekräfta före åtgärd.",
+      "haktad_i_franvaro": "EFTERLYST — häktad i sin frånvaro. Bekräfta före åtgärd."
     },
     "caution": {
       "armed": "Beväpnad",
@@ -1734,5 +1740,45 @@
     "detainOnSight": "Ska gripas",
     "notAnArrest": "Efterlyst, men inte för gripande.",
     "empty": "Ingen är efterlyst."
+  },
+  "spaning": {
+    "target": {
+      "person": "Person",
+      "vehicle": "Fordon",
+      "other": "Endast signalement"
+    },
+    "banner": {
+      "alert": "Larm",
+      "notice": "Notering",
+      "quiet": "Endast i akten"
+    },
+    "column": {
+      "number": "Diarienummer",
+      "target": "Söks",
+      "grund": "Grund",
+      "priority": "Prioritet",
+      "area": "Område",
+      "issued": "Utfärdat",
+      "expires": "Upphör",
+      "description": "Signalement"
+    },
+    "action": {
+      "create": "Lägg ut spaningsuppdrag",
+      "resolve": "Avsluta spaningsuppdraget"
+    },
+    "grund": {
+      "iakttagelse": "Iakttagelse att följa upp",
+      "efterlyst_fordon": "Eftersökt fordon",
+      "stulet_fordon": "Stulet fordon",
+      "misstankt_fordon": "Fordon kopplat till brott",
+      "eftersokt_person": "Person som söks för förhör",
+      "gripen": "Gripen",
+      "omhandertaget": "Fordonet omhändertaget",
+      "aterkallad": "Återkallat",
+      "tiden_ute": "Tiden har löpt ut",
+      "annan": "Annat"
+    },
+    "empty": "Inga spaningsuppdrag pågår.",
+    "notAnArrest": "Spaningsuppdrag, inte efterlysning. Rapportera iakttagelsen."
   }
 }

@@ -123,6 +123,10 @@ const PAIRED: Record<string, keyof typeof enums> = {
   ck_fpd_tvang_class: 'CLASSIFICATIONS',
   ck_fpd_efterlysning_grund: 'EFTERLYSNING_GRUNDER',
   ck_fpd_efterlysning_class: 'CLASSIFICATIONS',
+
+  // Spaningsuppdrag (0012).
+  ck_fpd_spaning_target: 'SPANING_TARGETS',
+  ck_fpd_spaning_class: 'CLASSIFICATIONS',
 };
 
 /**

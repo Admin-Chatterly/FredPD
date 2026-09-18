@@ -35,6 +35,7 @@ import {
   PLACEMENT_INTERACTIONS,
   PLACEMENT_KINDS,
   SCENE_STATUSES,
+  SPANING_TARGETS,
   TVANG_KINDS,
   TVANG_TARGETS,
   SELF_SET_UNIT_STATUSES,
@@ -2190,6 +2191,58 @@ export const schemas = {
   },
 
   EfterlysningCancel: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    grund: { type: 'string', required: false, max: 128 },
+  },
+
+  // ---------------------------------------------------------------- spaning
+
+  SpaningList: {
+    targetKind: { type: 'enum', required: false, values: SPANING_TARGETS },
+    /** At most this priority number, so 1 gives only the loudest. */
+    priority: { type: 'integer', required: false, min: 1, max: 4 },
+    includeResolved: { type: 'boolean', required: false },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  SpaningGet: {
+    id: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
+   * Raising a lookout (7.13).
+   *
+   * `targetId` and `description` are both optional **individually** and the
+   * server refuses a request carrying neither: a lookout has to be for
+   * something. That rule cannot be expressed in a flat schema, so it lives in
+   * `Spaning.validate` and in a CHECK in 0012, and the schema's job here is
+   * only to bound what arrives.
+   *
+   * `priority` is what decides how loudly an officer is interrupted
+   * (`Spaning.bannerFor`), and 1 is the only value that reaches a banner. It
+   * defaults to 3 rather than to 1, because the expensive mistake is the loud
+   * one: an officer shown a red banner for every "have a look for this van"
+   * learns within a shift to ignore red banners.
+   */
+  SpaningCreate: {
+    targetKind: { type: 'enum', required: true, values: SPANING_TARGETS },
+    targetId: { type: 'integer', required: false, min: 1 },
+    description: { type: 'string', required: false, max: 500 },
+    grund: { type: 'string', required: true, min: 1, max: 128 },
+    priority: { type: 'integer', required: false, min: 1, max: 4 },
+    beatId: { type: 'integer', required: false, min: 1 },
+    areaNote: { type: 'string', required: false, max: 191 },
+    fuId: { type: 'integer', required: false, min: 1 },
+    anmalanId: { type: 'integer', required: false, min: 1 },
+    // An hour to ninety days. Unlike an efterlysning there is no "until
+    // cancelled": a lookout that never expires is a banner that stays up until
+    // somebody remembers a van from three months ago.
+    validSeconds: { type: 'integer', required: false, min: 3600, max: 7776000 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
+  SpaningResolve: {
     id: { type: 'integer', required: true, min: 1 },
     version: { type: 'integer', required: true, min: 1 },
     grund: { type: 'string', required: false, max: 128 },

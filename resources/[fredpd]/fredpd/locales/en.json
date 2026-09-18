@@ -129,7 +129,11 @@
     "upphavd": "This decision has been revoked.",
     "not_yet": "This decision is not yet in force.",
     "expired": "This decision has expired.",
-    "cancelled": "Cancelled."
+    "cancelled": "Cancelled.",
+    "required_without_target": "Give a description when there is no record to point at.",
+    "resolved": "This lookout has been closed.",
+    "no_expiry": "This lookout has no expiry and cannot be trusted.",
+    "out_of_range": "Outside the permitted range."
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -678,7 +682,9 @@
     "hit": {
       "vehicle_flag": "Vehicle flag",
       "firearm": "Firearm",
-      "person_caution": "Person caution"
+      "person_caution": "Person caution",
+      "anhallen_i_franvaro": "WANTED — detained in absentia. Confirm before acting.",
+      "haktad_i_franvaro": "WANTED — remanded in absentia. Confirm before acting."
     },
     "caution": {
       "armed": "Armed",
@@ -1734,5 +1740,45 @@
     "detainOnSight": "Detain on sight",
     "notAnArrest": "Wanted, but not for arrest.",
     "empty": "Nobody is wanted."
+  },
+  "spaning": {
+    "target": {
+      "person": "Person",
+      "vehicle": "Vehicle",
+      "other": "Description only"
+    },
+    "banner": {
+      "alert": "Alert",
+      "notice": "Notice",
+      "quiet": "On the record only"
+    },
+    "column": {
+      "number": "Reference",
+      "target": "Looking for",
+      "grund": "Reason",
+      "priority": "Priority",
+      "area": "Area",
+      "issued": "Raised",
+      "expires": "Expires",
+      "description": "Description"
+    },
+    "action": {
+      "create": "Raise a lookout",
+      "resolve": "Close the lookout"
+    },
+    "grund": {
+      "iakttagelse": "Sighting to follow up",
+      "efterlyst_fordon": "Vehicle sought",
+      "stulet_fordon": "Stolen vehicle",
+      "misstankt_fordon": "Vehicle linked to an offence",
+      "eftersokt_person": "Person sought for questioning",
+      "gripen": "Taken into custody",
+      "omhandertaget": "Vehicle recovered",
+      "aterkallad": "Withdrawn",
+      "tiden_ute": "Expired",
+      "annan": "Other"
+    },
+    "empty": "No lookouts are running.",
+    "notAnArrest": "A lookout, not a warrant. Report the sighting."
   }
 }

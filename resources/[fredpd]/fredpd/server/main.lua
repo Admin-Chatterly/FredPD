@@ -120,6 +120,10 @@ local REQUIRED_TABLES <const> = {
     -- out of its own raids with no error anywhere.
     'fpd_tvangsmedel',
     'fpd_efterlysning',
+
+    -- Migration 0012. Spaningsuppdrag (spec 7.13), and the widened hot-file
+    -- confirmation constraints.
+    'fpd_spaning',
 }
 
 --- Columns a migration added to a table that already existed, which the table
