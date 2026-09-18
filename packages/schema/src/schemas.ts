@@ -1,9 +1,12 @@
 import {
+
   CLASSIFICATIONS,
   EVIDENCE_DESTINATIONS,
   EVIDENCE_PACKAGING,
   EVIDENCE_STATUSES,
   EVIDENCE_TYPES,
+  FIREARM_STATUSES,
+  FIREARM_TYPES,
   INTEL_CASE_STATUSES,
   INTEL_CONFIDENCE,
   INTEL_ORG_STATUSES,
@@ -13,9 +16,14 @@ import {
   LAB_ANALYSES,
   LAB_ANALYSIS_STATUSES,
   LAB_PRIORITIES,
+  PERSON_CAUTION_KINDS,
+  PERSON_SEXES,
   PLACEMENT_INTERACTIONS,
   PLACEMENT_KINDS,
   SCENE_STATUSES,
+  VEHICLE_FLAG_KINDS,
+  VEHICLE_INSURANCE_STATUSES,
+  VEHICLE_REGISTRATION_STATUSES,
 } from './enums';
 
 /**
@@ -526,6 +534,437 @@ export const schemas = {
     storagePath: { type: 'string', required: false, max: 512 },
     caption: { type: 'string', required: false, max: 512 },
   },
+
+  // ------------------------------------------------------ records (M2)
+  // The master name index (spec 7.2, 7.3).
+  PersonSearch: {
+    // What the officer typed. The floor is `Repo.MIN_TERM` (persons/repo.lua:142):
+    // one character matches a third of the index and answers nothing, and the
+    // handler refuses a shorter term anyway. The ceiling is the column the
+    // search is logged into -- `fpd_query_log.term VARCHAR(191) NOT NULL`
+    // (0005:892) -- because 7.2 logs every query verbatim, including one that
+    // found nothing, and a term the log cannot hold is a search that cannot be
+    // logged. `Repo.normalize` only ever shortens, so 191 in is 191 stored.
+    term: { type: 'string', required: true, min: 2, max: 191 },
+    // `fpd_persons.date_of_birth` is a DATE (0005:416), so this is `YYYY-MM-DD`
+    // and nothing else. There is no pattern type here, so the width is all the
+    // schema can say; the handler checks the shape and answers `format` rather
+    // than handing MariaDB a string to reject with a warning and a zero date.
+    dateOfBirth: { type: 'string', required: false, max: 10 },
+    // `Repo.MAX_LIMIT` clamps a page to 50 and over-fetches four times that to
+    // fill it after access filtering (persons/repo.lua:331-342). A larger number
+    // here would buy a bigger scan for the same page.
+    limit: { type: 'integer', required: false, min: 1, max: 50 },
+    // 7.2: a query that reaches restricted data carries a reason or a case
+    // number. Widths are `fpd_query_log.reason VARCHAR(255)` and
+    // `case_number VARCHAR(32)` (0005:896, 0005:897). Neither carries a `min`:
+    // the handler treats a blank string as "not given" (`blank`,
+    // persons/routes.lua:230), so an empty box must reach it rather than being
+    // refused as too short.
+    reason: { type: 'string', required: false, max: 255 },
+    caseNumber: { type: 'string', required: false, max: 32 },
+  },
+  PersonGet: {
+    // The only thing this route takes. `fpd_persons.id` is BIGINT UNSIGNED
+    // AUTO_INCREMENT (0005:407), so ids start at 1; everything else about the
+    // read -- agency, clearance, whether the record may be named at all --
+    // comes from the session and the access tables.
+    id: { type: 'integer', required: true, min: 1 },
+  },
+  PersonUpdate: {
+    id: { type: 'integer', required: true, min: 1 },
+    // Optimistic locking (spec 13.1): the version the editor was shown goes
+    // into the WHERE clause, so a stale edit affects no rows and the officer is
+    // told to reload rather than overwriting whoever saved first.
+    // `fpd_persons.version INT UNSIGNED NOT NULL DEFAULT 1` (0005:427).
+    version: { type: 'integer', required: true, min: 1 },
+    // The three name columns are VARCHAR(96) each (0005:413-415). No `min`
+    // anywhere below: an empty string is how the editor *clears* a nullable
+    // column -- it travels as `''` and `NULLIF(?, '')` makes it NULL
+    // (persons/repo.lua:668) -- and it cannot travel as a Lua nil, because a nil
+    // in an oxmysql values list shifts every placeholder after it.
+    firstName: { type: 'string', required: false, max: 96 },
+    middleName: { type: 'string', required: false, max: 96 },
+    lastName: { type: 'string', required: false, max: 96 },
+    // `YYYY-MM-DD`, as on the search: a DATE column (0005:416) and no pattern
+    // type here, so the handler checks the shape and answers `format`. The
+    // empty string still clears it, which is why there is no `min` and why the
+    // handler's shape test skips `''` (persons/routes.lua:409).
+    dateOfBirth: { type: 'string', required: false, max: 10 },
+    // `ck_fpd_persons_sex` (0005:463-464). An enum rather than the VARCHAR(16)
+    // the column is, because a value outside the CHECK does not become a field
+    // error, it becomes a 0-row UPDATE that `updateOutcome` reports as CONFLICT
+    // -- "someone else changed this record", which is a lie. The list ends in
+    // 'unknown', which is also the only way to take a sex back off a record: the
+    // validator has no empty-string member, so the `NULLIF(?, '')` clear path
+    // is not available to this one field. See the concern.
+    sex: { type: 'enum', required: false, values: PERSON_SEXES },
+    // `fpd_persons.phone VARCHAR(32)` (0005:418). Stored as the framework wrote
+    // it, separators and all -- the search strips them on both sides rather than
+    // this column being normalized.
+    phone: { type: 'string', required: false, max: 32 },
+    // `fpd_persons.address VARCHAR(191)` (0005:421). Field-gated in both
+    // directions: a reader without `fields.victim_address.view` is not sent it
+    // and may not write it (persons/routes.lua:384).
+    address: { type: 'string', required: false, max: 191 },
+    // `ck_fpd_persons_class` (0005:461-462), the same five levels as every other
+    // record. NOT NULL on the column, so this is the one field the repo sets
+    // directly instead of through `NULLIF` (persons/repo.lua:641, 665-667).
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+    // Booleans on the way in, timestamps in the database: *when* somebody died
+    // or went missing is a fact the server stamps (`deceased_at`,
+    // `missing_since`, 0005:423-424), never a moment a client's clock decides
+    // (invariant 1). `false` clears the flag; setting one that is already set
+    // keeps the original moment (persons/repo.lua:679-687).
+    deceased: { type: 'boolean', required: false },
+    missing: { type: 'boolean', required: false },
+  },
+  PersonCautionSet: {
+    // One route, two operations, and every field optional because which ones
+    // are needed depends on `cancel`: the handler asks for `cautionId` on the
+    // cancel path and for `personId` + `kind` on the create path, and answers
+    // `required` per field itself (persons/routes.lua:455-492). Declaring any
+    // of them required here would make the other operation uncallable.
+    cancel: { type: 'boolean', required: false },
+    // `fpd_person_cautions.id` (0005:585). Cancelling is an UPDATE that stamps
+    // `cancelled_at`, never a delete: "flagged violent for six months and then
+    // withdrawn" is a question an audit asks.
+    cautionId: { type: 'integer', required: false, min: 1 },
+    personId: { type: 'integer', required: false, min: 1 },
+    // `ck_fpd_person_cautions_kind` (0005:606-607). The kind is also what the
+    // server derives the field key from (`CAUTION_FIELD_KEY`,
+    // persons/routes.lua:54), which is why `mental_health` is a member here and
+    // why `fieldKey` is not a field on this schema: a caller who could name the
+    // key could file a mental-health caution declaring itself gated on nothing.
+    kind: { type: 'enum', required: false, values: PERSON_CAUTION_KINDS },
+    // `fpd_person_cautions.detail VARCHAR(512)` (0005:590) -- the part that is
+    // redacted unless the reader holds `fields.<field_key>.view`, and the one
+    // string in this module that never reaches the audit log.
+    detail: { type: 'string', required: false, max: 512 },
+    // `fpd_person_cautions.source_case VARCHAR(32)` (0005:592), the same width
+    // every case number in the suite is stored at.
+    sourceCase: { type: 'string', required: false, max: 32 },
+    // `ck_fpd_person_cautions_class` (0005:608-609). A caution carries its own
+    // classification, so an officer-safety flag can be open while the
+    // intelligence-led one beside it is confidential; the handler refuses a
+    // level above the writer's own clearance and defaults to 'internal'.
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+    // Days, not a moment: the database turns this into `expires_at` with
+    // `DATE_ADD(NOW(3), INTERVAL ? DAY)` (persons/repo.lua:786), so no client
+    // clock can write a caution that expired before it was created (invariant
+    // 1). 0 is the "does not expire" sentinel the handler defaults to and the
+    // repo's CASE turns into NULL, which is why the floor is 0 and not 1. The
+    // ceiling is ten years: longer than any caution should stand without being
+    // re-reviewed, and far inside the range DATE_ADD can still produce a
+    // DATETIME for.
+    expiresInDays: { type: 'integer', required: false, min: 0, max: 3650 },
+  },
+
+  // The vehicle register (spec 7.4).
+  VehicleSearch: {
+    // A plate prefix or a whole VIN: `repo.searchVehicles` matches
+    // `v.plate LIKE term%` OR `v.vin = term` and nothing else. The ceiling is
+    // the longest identifier the register holds, `fpd_vehicles.vin`
+    // VARCHAR(24); `fpd_query_log.term` is wider at VARCHAR(191), so nothing
+    // that passes here is truncated when the query is logged.
+    //
+    // No `min`, deliberately. The field is optional -- a search may filter on
+    // the owner alone -- and an empty string is what a form sends when the box
+    // is cleared, so a floor here would refuse a call that the same client
+    // makes successfully by omitting the key. The floor is
+    // `service.searchTerm`, which is pure and unit-tested; every other optional
+    // search field in this file is bounded the same way (`IntelOrgList.search`),
+    // and the one that carries `min: 2` (`IntelSearch.term`) is required.
+    term: { type: 'string', required: false, max: 24 },
+    ownerPersonId: { type: 'integer', required: false, min: 1 },
+    // `fpd_vehicles.owner_identifier`: the ESX character identifier of the
+    // registered keeper.
+    ownerIdentifier: { type: 'string', required: false, max: 191 },
+    // `service.fetchWindow` clamps to 1..100 and over-fetches three times the
+    // page, because access filtering removes rows after the query. The same
+    // ceiling here, so a client asking for more is told so rather than
+    // silently given a hundred.
+    limit: { type: 'integer', required: false, min: 1, max: 100 },
+    // Spec 7.2: a query that opens restricted data needs a reason or a case
+    // number, and the route refuses the result without one. Both are written
+    // to `fpd_query_log`: `reason` VARCHAR(255), `case_number` VARCHAR(32).
+    reason: { type: 'string', required: false, max: 255 },
+    caseNumber: { type: 'string', required: false, max: 32 },
+  },
+  VehicleGet: {
+    // Any one of the three identifies the vehicle; the handler refuses the
+    // call when all three are absent, because a `vehicle.get` with no selector
+    // is not a read of anything.
+    id: { type: 'integer', required: false, min: 1 },
+    // `fpd_vehicles.plate` VARCHAR(16). No pattern and no case rule here:
+    // `service.normalizePlate` upper-cases the plate and strips the whitespace
+    // inside it before it reaches the query, so `abc 123`, `ABC 123` and
+    // `ABC123` are one plate in the register, on an ALPR read and in a search.
+    // The bound is the column width, which is what a stored plate can be.
+    plate: { type: 'string', required: false, max: 16 },
+    // `fpd_vehicles.vin` VARCHAR(24). A VIN the register generated is
+    // seventeen characters (`service.VIN_LENGTH`, ISO 3779); the column is
+    // wider and the bound follows the column, so a mistyped VIN is refused by
+    // the check digit rather than by a length nobody can explain.
+    vin: { type: 'string', required: false, max: 24 },
+    // A plate or a VIN typed by an officer is a query and is logged as one
+    // (7.2); opening the same record by its id is not. Same two columns as
+    // `VehicleSearch`.
+    reason: { type: 'string', required: false, max: 255 },
+    caseNumber: { type: 'string', required: false, max: 32 },
+  },
+  VehicleRegister: {
+    // Required here and checked again in the handler: the schema bound cannot
+    // tell a plate of three spaces from a plate, and `service.normalizePlate`
+    // can. `fpd_vehicles.plate` VARCHAR(16), and its CHECK refuses a blank.
+    plate: { type: 'string', required: true, min: 1, max: 16 },
+    //
+    // The VIN is absent on purpose and must stay absent: it is generated by
+    // `repo.generateVin` and written once (7.4, invariant 1). A client that
+    // could name one could give a stolen car the identity of a clean one.
+    //
+    // `fpd_vehicles.model` -- the spawn name. The label is a locale key.
+    model: { type: 'string', required: false, max: 64 },
+    colour: { type: 'string', required: false, max: 32 },
+    colourSecondary: { type: 'string', required: false, max: 32 },
+    ownerPersonId: { type: 'integer', required: false, min: 1 },
+    ownerIdentifier: { type: 'string', required: false, max: 191 },
+    // `ck_fpd_vehicles_registration` and `ck_fpd_vehicles_insurance`. Enums
+    // rather than bounded strings because neither column has a blank it could
+    // mean: the insert passes these two straight through as `?` with a repo
+    // default (`valid`, `none`), so an empty string that passed the schema
+    // would reach MariaDB and be refused by the CHECK -- an `error.internal`
+    // for a field the officer can see on the form. The enum makes '' 
+    // unrepresentable, which is the only thing standing between the two.
+    registrationStatus: { type: 'enum', required: false, values: VEHICLE_REGISTRATION_STATUSES },
+    insuranceStatus: { type: 'enum', required: false, values: VEHICLE_INSURANCE_STATUSES },
+    // DATE columns, and there is no date FieldSpec: ten characters is
+    // `YYYY-MM-DD`, and MariaDB is what refuses anything it cannot parse.
+    registrationExpires: { type: 'string', required: false, max: 10 },
+    insuranceExpires: { type: 'string', required: false, max: 10 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+    // Why the vehicle entered the register. It opens the plate history, so it
+    // is bounded by `fpd_vehicle_plates.reason` VARCHAR(191) -- *not* by the
+    // 255 of a query reason, which is a different column on a different table.
+    reason: { type: 'string', required: false, max: 191 },
+  },
+  VehicleUpdate: {
+    id: { type: 'integer', required: true, min: 1 },
+    // Optimistic locking, as on every other editable record: the version goes
+    // into the WHERE clause, so a stale edit touches no rows and the officer
+    // is told to reload rather than quietly overwriting somebody's work.
+    version: { type: 'integer', required: true, min: 1 },
+    // Every field below is optional and none of the strings carries a `min`.
+    // An absent field is left alone and an empty string *clears* the column:
+    // the repo's allowlist writes `NULLIF(?, '')`, because a nil appended to
+    // an oxmysql values list appends nothing and shifts every placeholder
+    // after it. A `min: 1` here would make "clear this field" unreachable.
+    model: { type: 'string', required: false, max: 64 },
+    colour: { type: 'string', required: false, max: 32 },
+    colourSecondary: { type: 'string', required: false, max: 32 },
+    // `min: 0`, not 1: zero is the sentinel that clears the registered keeper
+    // (`NULLIF(?, 0)`), for the same reason the strings clear with `''`.
+    ownerPersonId: { type: 'integer', required: false, min: 0 },
+    ownerIdentifier: { type: 'string', required: false, max: 191 },
+    // The three NOT NULL columns are the three that are enums, so the blank
+    // sentinel is not representable for them: an '' that passed the schema
+    // would become NULL through this path's `NULLIF(?, '')` and be refused by
+    // the column, which the officer would read as `error.internal`.
+    registrationStatus: { type: 'enum', required: false, values: VEHICLE_REGISTRATION_STATUSES },
+    insuranceStatus: { type: 'enum', required: false, values: VEHICLE_INSURANCE_STATUSES },
+    registrationExpires: { type: 'string', required: false, max: 10 },
+    insuranceExpires: { type: 'string', required: false, max: 10 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+  VehiclePlateChange: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    // The new plate. `fpd_vehicles.plate` VARCHAR(16), normalised the same way
+    // a query is (`service.normalizePlate`), so the plate an officer types,
+    // the plate an ALPR reads and the plate on the record compare equal.
+    // Required here; the handler refuses a plate that is only whitespace.
+    plate: { type: 'string', required: true, min: 1, max: 16 },
+    // Why it changed. Written into the new plate period, which is the whole
+    // point of the history table: `fpd_vehicle_plates.reason` VARCHAR(191).
+    reason: { type: 'string', required: false, max: 191 },
+  },
+  VehicleFlag: {
+    // The route names the vehicle `vehicleId`, not `id` -- the handler reads
+    // `input.vehicleId` and the id it returns is the vehicle's.
+    vehicleId: { type: 'integer', required: true, min: 1 },
+    // `ck_fpd_vehicle_flags_kind`. Three of the six are the hot file (stolen,
+    // wanted, bolo) and put a red banner on every plate check, which is why
+    // the kind is an enum and not a free string: a misspelled kind that the
+    // database accepted would be a flag nobody ever sees.
+    kind: { type: 'enum', required: true, values: VEHICLE_FLAG_KINDS },
+    // What the flag points at. `service.validateFlag` requires one of these
+    // two for a hot-file kind, because an officer stopping a car on a hit has
+    // to be able to confirm it against something (7.2 hit confirmation).
+    detail: { type: 'string', required: false, max: 512 },
+    caseNumber: { type: 'string', required: false, max: 32 },
+    // A flag can be more sensitive than the vehicle it sits on -- a BOLO from
+    // the intelligence unit on an ordinary car -- so it carries its own level
+    // and is filtered on it (4.5).
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+    // Seconds from now, never a moment: the database computes the expiry with
+    // `DATE_ADD(NOW(3), INTERVAL ? SECOND)`, so no client clock decides when a
+    // stolen flag lapses (invariant 1). `0` is the documented "does not
+    // lapse", so the floor is 0 rather than 1, and it must not be negative --
+    // that would file a hot-file flag that expired before it existed. The
+    // ceiling is a year, which is longer than any flag should sit unreviewed.
+    expiresIn: { type: 'integer', required: false, min: 0, max: 31536000 },
+  },
+  VehicleFlagClear: {
+    // The only thing the handler reads. The vehicle is not named: it is read
+    // off the flag row, and the reader has to pass the vehicle's access check
+    // and the flag's own before the row is stamped cleared (4.5).
+    flagId: { type: 'integer', required: true, min: 1 },
+  },
+
+  // The firearm register (spec 7.5).
+  FirearmSearch: {
+    // Searched as a serial prefix (`repo.searchFirearms`: `f.serial LIKE ?`),
+    // so the bound is the serial column's, not the query log's. Optional and
+    // with no `min`: a search by owner, status or assignment with nothing typed
+    // is a legitimate query, a cleared search box sends '', and
+    // `service.searchTerm` already drops anything shorter than two characters
+    // as too broad to answer inside the budget (spec 12). A `min` here would
+    // turn one stray character into `too_short` on the whole search.
+    term: { type: 'string', required: false, max: 64 },
+    ownerPersonId: { type: 'integer', required: false, min: 1 },
+    ownerIdentifier: { type: 'string', required: false, max: 191 },
+    status: { type: 'enum', required: false, values: FIREARM_STATUSES },
+    // A Discord id, and deliberately without a `min`: the handler runs it
+    // through `blankToNull`, so the empty string a cleared filter sends has to
+    // validate rather than come back `too_short` and fail the whole search.
+    assignedOfficer: { type: 'string', required: false, max: 32 },
+    // `service.fetchWindow` clamps to 1..100 and over-fetches three times that.
+    // The bound is repeated here so a page of ten thousand is a field error the
+    // officer sees rather than a silent clamp.
+    limit: { type: 'integer', required: false, min: 1, max: 100 },
+    // Spec 7.2: a query that opens restricted data needs one of these. Both are
+    // bounded by `fpd_query_log`, which is the table they are written to.
+    reason: { type: 'string', required: false, max: 255 },
+    caseNumber: { type: 'string', required: false, max: 32 },
+  },
+  FirearmGet: {
+    // Either one. The handler refuses a call carrying neither, because a
+    // schema cannot say "one of these two" (routes.lua: `id = 'required'`).
+    id: { type: 'integer', required: false, min: 1 },
+    // No `min`: `service.normalizeSerial` turns a blank into nil and the
+    // handler's own refusal is what catches an empty call.
+    serial: { type: 'string', required: false, max: 64 },
+    // Only read when the officer typed a serial: opening the same record from a
+    // list by its id is not a query and is not logged (7.2).
+    reason: { type: 'string', required: false, max: 255 },
+    caseNumber: { type: 'string', required: false, max: 32 },
+  },
+  FirearmRegister: {
+    // The one identifying fact this register takes from the officer holding the
+    // object: a serial is stamped on the weapon and read off it, the way a VIN
+    // would be if the vehicle had one before the registry did (repo.lua says so
+    // at length). Everything the *server* authors -- who registered it, when,
+    // the opening event, the id -- is authored in the repo (invariant 1). The
+    // floor mirrors `ck_fpd_firearms_serial`, which refuses a blank one.
+    serial: { type: 'string', required: true, min: 1, max: 64 },
+    make: { type: 'string', required: false, max: 64 },
+    model: { type: 'string', required: false, max: 64 },
+    type: { type: 'enum', required: false, values: FIREARM_TYPES },
+    calibre: { type: 'string', required: false, max: 24 },
+    // Absent means `registered`, which is the column default. `agency_issued`
+    // is accepted here because a duty weapon enters the register as one, and
+    // the repo opens its history with an `issued` event rather than a
+    // `register` event when it does.
+    status: { type: 'enum', required: false, values: FIREARM_STATUSES },
+    ownerPersonId: { type: 'integer', required: false, min: 1 },
+    ownerIdentifier: { type: 'string', required: false, max: 191 },
+    // The keeper as written on the paperwork when no person record exists for
+    // them. It lands on the opening event, not on the firearm, which is why it
+    // is bounded by `fpd_firearm_events.to_party` and not by the register.
+    ownerParty: { type: 'string', required: false, max: 191 },
+    // The officer a duty weapon is issued to: a grantee, never the actor. The
+    // actor is `session.discordId` and signs the event. No `min`, because the
+    // handler blanks it and an ordinary registration sends nothing.
+    assignedOfficer: { type: 'string', required: false, max: 32 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+    // Both land on the opening event, so they carry the event table's widths
+    // rather than the query log's.
+    caseNumber: { type: 'string', required: false, max: 32 },
+    reason: { type: 'string', required: false, max: 512 },
+  },
+  FirearmUpdate: {
+    id: { type: 'integer', required: true, min: 1 },
+    // Optimistic locking, as on every other editable record: a stale version
+    // affects no rows and the officer is told to reload rather than silently
+    // overwriting somebody else's edit.
+    version: { type: 'integer', required: true, min: 1 },
+    // The serial, the owner, the status and the assignment are absent on
+    // purpose and could not be added here: each is an event in the life of the
+    // weapon and has its own route, so the ownership history can never disagree
+    // with the record (7.5). `repo.FIREARM_UPDATABLE` is the same list.
+    //
+    // No `min` on the free-text three: the repo's `setClause` writes an empty
+    // string as NULL, so a blank is how the editor clears a field it filled in
+    // by mistake. `type` and `classification` cannot be cleared that way -- an
+    // enum refuses '' before the repo sees it (see concerns).
+    make: { type: 'string', required: false, max: 64 },
+    model: { type: 'string', required: false, max: 64 },
+    type: { type: 'enum', required: false, values: FIREARM_TYPES },
+    calibre: { type: 'string', required: false, max: 24 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+  FirearmTransfer: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    // Exactly one of a person on file and a named party outside it, checked in
+    // `service.validateTransfer` because a schema cannot express "one of these
+    // two": "transferred to nobody" is how a weapon leaves a register while
+    // staying in circulation.
+    toPersonId: { type: 'integer', required: false, min: 1 },
+    // Where the weapon goes. `toIdentifier` is written onto the firearm and so
+    // carries the register's width; `toParty` and `fromParty` are written onto
+    // the event and carry that table's.
+    toIdentifier: { type: 'string', required: false, max: 191 },
+    toParty: { type: 'string', required: false, max: 191 },
+    fromParty: { type: 'string', required: false, max: 191 },
+    caseNumber: { type: 'string', required: false, max: 32 },
+    reason: { type: 'string', required: false, max: 512 },
+  },
+  FirearmStatus: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    // Reporting a weapon lost or stolen is this route (7.5): the status moves
+    // and the history gains the matching event in one transaction, so the
+    // register can always say when anybody was told.
+    status: { type: 'enum', required: true, values: FIREARM_STATUSES },
+    // Optional here and conditionally required in `service.validateStatus`:
+    // taking a weapon out of circulation (lost, stolen, seized, destroyed)
+    // needs one of the two, recovering one does not.
+    caseNumber: { type: 'string', required: false, max: 32 },
+    reason: { type: 'string', required: false, max: 512 },
+  },
+  FirearmAssign: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    // The one officer id the firearm register takes from an input, and it is a
+    // grantee rather than the actor: a quartermaster issues weapons to other
+    // officers, and the session still signs the event as `recorded_by`
+    // (invariant 1). Absent or blank returns the weapon to the armoury, which
+    // is why there is no `min` -- `blankToNull` is what turns '' into "nobody",
+    // and a Discord-snowflake floor here would refuse the return.
+    assignedOfficer: { type: 'string', required: false, max: 32 },
+    caseNumber: { type: 'string', required: false, max: 32 },
+    reason: { type: 'string', required: false, max: 512 },
+  },
+  FirearmTrace: {
+    // The same two selectors as `firearm.get`, and nothing else: a trace is a
+    // read of the record before it is a report, and `rms.firearm.trace` is an
+    // extra permission on top of clearance rather than a way around it. The
+    // handler refuses a call carrying neither.
+    id: { type: 'integer', required: false, min: 1 },
+    serial: { type: 'string', required: false, max: 64 },
+  },
+
 } as const satisfies Record<string, Schema>;
 
 export type SchemaName = keyof typeof schemas;

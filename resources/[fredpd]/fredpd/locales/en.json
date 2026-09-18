@@ -89,7 +89,11 @@
     "stale": "changed since this screen was loaded",
     "model_changed": "the permissions changed while this was open",
     "scene_released": "the scene has been released",
-    "unattributed": "no owner on record for this trace"
+    "unattributed": "no owner on record for this trace",
+    "format": "not a date in YYYY-MM-DD form",
+    "field_forbidden": "you are not cleared for this field",
+    "clearance": "above your clearance",
+    "no_fields": "no fields to update"
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -534,6 +538,57 @@
       "rolemap": "Role map",
       "groups": "Groups",
       "fleet": "Fleet"
+    }
+  },
+  "registry": {
+    "flag": {
+      "stolen": "Stolen",
+      "wanted": "Wanted",
+      "bolo": "BOLO",
+      "impounded": "Impounded",
+      "evidence_hold": "Evidence hold",
+      "uninsured": "Uninsured"
+    },
+    "registration": {
+      "valid": "Valid",
+      "expired": "Expired",
+      "suspended": "Suspended",
+      "revoked": "Revoked",
+      "unregistered": "Unregistered"
+    },
+    "insurance": {
+      "valid": "Valid",
+      "expired": "Expired",
+      "none": "None on file"
+    },
+    "firearm": {
+      "status": {
+        "registered": "Registered",
+        "lost": "Reported lost",
+        "stolen": "Reported stolen",
+        "seized": "Seized",
+        "destroyed": "Destroyed",
+        "agency_issued": "Agency issued"
+      },
+      "type": {
+        "pistol": "Pistol",
+        "revolver": "Revolver",
+        "rifle": "Rifle",
+        "shotgun": "Shotgun",
+        "smg": "Submachine gun",
+        "other": "Other"
+      },
+      "event": {
+        "register": "Registered",
+        "transfer": "Transferred",
+        "lost": "Reported lost",
+        "stolen": "Reported stolen",
+        "recovered": "Recovered",
+        "seized": "Seized",
+        "destroyed": "Destroyed",
+        "issued": "Issued",
+        "returned": "Returned"
+      }
     }
   }
 }

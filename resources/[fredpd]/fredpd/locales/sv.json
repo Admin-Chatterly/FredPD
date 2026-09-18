@@ -89,7 +89,11 @@
     "stale": "ändrat sedan sidan lästes in",
     "model_changed": "behörigheterna ändrades medan sidan var öppen",
     "scene_released": "brottsplatsen är hävd",
-    "unattributed": "ingen ägare registrerad för spåret"
+    "unattributed": "ingen ägare registrerad för spåret",
+    "format": "inte ett datum i formatet ÅÅÅÅ-MM-DD",
+    "field_forbidden": "du saknar behörighet för den här uppgiften",
+    "clearance": "över din behörighetsnivå",
+    "no_fields": "inga uppgifter att ändra"
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -534,6 +538,57 @@
       "rolemap": "Rollkoppling",
       "groups": "Grupper",
       "fleet": "Fordonspark"
+    }
+  },
+  "registry": {
+    "flag": {
+      "stolen": "Stulet",
+      "wanted": "Efterlyst",
+      "bolo": "Spaningsmeddelande",
+      "impounded": "Omhändertaget",
+      "evidence_hold": "Beslagtaget",
+      "uninsured": "Oförsäkrat"
+    },
+    "registration": {
+      "valid": "Giltig",
+      "expired": "Utgången",
+      "suspended": "Indragen",
+      "revoked": "Återkallad",
+      "unregistered": "Oregistrerad"
+    },
+    "insurance": {
+      "valid": "Giltig",
+      "expired": "Utgången",
+      "none": "Saknas"
+    },
+    "firearm": {
+      "status": {
+        "registered": "Registrerat",
+        "lost": "Förkommet",
+        "stolen": "Stulet",
+        "seized": "I beslag",
+        "destroyed": "Förstört",
+        "agency_issued": "Tjänstevapen"
+      },
+      "type": {
+        "pistol": "Pistol",
+        "revolver": "Revolver",
+        "rifle": "Gevär",
+        "shotgun": "Hagelgevär",
+        "smg": "Kulsprutepistol",
+        "other": "Övrigt"
+      },
+      "event": {
+        "register": "Registrering",
+        "transfer": "Överlåtelse",
+        "lost": "Förlustanmälan",
+        "stolen": "Stöldanmälan",
+        "recovered": "Återfunnet",
+        "seized": "Beslag",
+        "destroyed": "Förstöring",
+        "issued": "Utkvitterat",
+        "returned": "Återlämnat"
+      }
     }
   }
 }

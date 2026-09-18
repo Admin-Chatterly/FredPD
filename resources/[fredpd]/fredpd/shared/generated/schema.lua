@@ -508,4 +508,185 @@ FredPD.Schema = {
         storagePath = { type = 'string', required = false, max = 512 },
         caption = { type = 'string', required = false, max = 512 },
     },
+
+    PersonSearch = {
+        term = { type = 'string', required = true, min = 2, max = 191 },
+        dateOfBirth = { type = 'string', required = false, max = 10 },
+        limit = { type = 'integer', required = false, min = 1, max = 50 },
+        reason = { type = 'string', required = false, max = 255 },
+        caseNumber = { type = 'string', required = false, max = 32 },
+    },
+
+    PersonGet = {
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
+    PersonUpdate = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        firstName = { type = 'string', required = false, max = 96 },
+        middleName = { type = 'string', required = false, max = 96 },
+        lastName = { type = 'string', required = false, max = 96 },
+        dateOfBirth = { type = 'string', required = false, max = 10 },
+        sex = { type = 'enum', required = false, values = { 'male', 'female', 'other', 'unknown' } },
+        phone = { type = 'string', required = false, max = 32 },
+        address = { type = 'string', required = false, max = 191 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+        deceased = { type = 'boolean', required = false },
+        missing = { type = 'boolean', required = false },
+    },
+
+    PersonCautionSet = {
+        cancel = { type = 'boolean', required = false },
+        cautionId = { type = 'integer', required = false, min = 1 },
+        personId = { type = 'integer', required = false, min = 1 },
+        kind = { type = 'enum', required = false, values = { 'armed', 'violent', 'officer_safety', 'mental_health', 'gang' } },
+        detail = { type = 'string', required = false, max = 512 },
+        sourceCase = { type = 'string', required = false, max = 32 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+        expiresInDays = { type = 'integer', required = false, min = 0, max = 3650 },
+    },
+
+    VehicleSearch = {
+        term = { type = 'string', required = false, max = 24 },
+        ownerPersonId = { type = 'integer', required = false, min = 1 },
+        ownerIdentifier = { type = 'string', required = false, max = 191 },
+        limit = { type = 'integer', required = false, min = 1, max = 100 },
+        reason = { type = 'string', required = false, max = 255 },
+        caseNumber = { type = 'string', required = false, max = 32 },
+    },
+
+    VehicleGet = {
+        id = { type = 'integer', required = false, min = 1 },
+        plate = { type = 'string', required = false, max = 16 },
+        vin = { type = 'string', required = false, max = 24 },
+        reason = { type = 'string', required = false, max = 255 },
+        caseNumber = { type = 'string', required = false, max = 32 },
+    },
+
+    VehicleRegister = {
+        plate = { type = 'string', required = true, min = 1, max = 16 },
+        model = { type = 'string', required = false, max = 64 },
+        colour = { type = 'string', required = false, max = 32 },
+        colourSecondary = { type = 'string', required = false, max = 32 },
+        ownerPersonId = { type = 'integer', required = false, min = 1 },
+        ownerIdentifier = { type = 'string', required = false, max = 191 },
+        registrationStatus = { type = 'enum', required = false, values = { 'valid', 'expired', 'suspended', 'revoked', 'unregistered' } },
+        insuranceStatus = { type = 'enum', required = false, values = { 'valid', 'expired', 'none' } },
+        registrationExpires = { type = 'string', required = false, max = 10 },
+        insuranceExpires = { type = 'string', required = false, max = 10 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+        reason = { type = 'string', required = false, max = 191 },
+    },
+
+    VehicleUpdate = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        model = { type = 'string', required = false, max = 64 },
+        colour = { type = 'string', required = false, max = 32 },
+        colourSecondary = { type = 'string', required = false, max = 32 },
+        ownerPersonId = { type = 'integer', required = false, min = 0 },
+        ownerIdentifier = { type = 'string', required = false, max = 191 },
+        registrationStatus = { type = 'enum', required = false, values = { 'valid', 'expired', 'suspended', 'revoked', 'unregistered' } },
+        insuranceStatus = { type = 'enum', required = false, values = { 'valid', 'expired', 'none' } },
+        registrationExpires = { type = 'string', required = false, max = 10 },
+        insuranceExpires = { type = 'string', required = false, max = 10 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    VehiclePlateChange = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        plate = { type = 'string', required = true, min = 1, max = 16 },
+        reason = { type = 'string', required = false, max = 191 },
+    },
+
+    VehicleFlag = {
+        vehicleId = { type = 'integer', required = true, min = 1 },
+        kind = { type = 'enum', required = true, values = { 'stolen', 'wanted', 'bolo', 'impounded', 'evidence_hold', 'uninsured' } },
+        detail = { type = 'string', required = false, max = 512 },
+        caseNumber = { type = 'string', required = false, max = 32 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+        expiresIn = { type = 'integer', required = false, min = 0, max = 31536000 },
+    },
+
+    VehicleFlagClear = {
+        flagId = { type = 'integer', required = true, min = 1 },
+    },
+
+    FirearmSearch = {
+        term = { type = 'string', required = false, max = 64 },
+        ownerPersonId = { type = 'integer', required = false, min = 1 },
+        ownerIdentifier = { type = 'string', required = false, max = 191 },
+        status = { type = 'enum', required = false, values = { 'registered', 'lost', 'stolen', 'seized', 'destroyed', 'agency_issued' } },
+        assignedOfficer = { type = 'string', required = false, max = 32 },
+        limit = { type = 'integer', required = false, min = 1, max = 100 },
+        reason = { type = 'string', required = false, max = 255 },
+        caseNumber = { type = 'string', required = false, max = 32 },
+    },
+
+    FirearmGet = {
+        id = { type = 'integer', required = false, min = 1 },
+        serial = { type = 'string', required = false, max = 64 },
+        reason = { type = 'string', required = false, max = 255 },
+        caseNumber = { type = 'string', required = false, max = 32 },
+    },
+
+    FirearmRegister = {
+        serial = { type = 'string', required = true, min = 1, max = 64 },
+        make = { type = 'string', required = false, max = 64 },
+        model = { type = 'string', required = false, max = 64 },
+        type = { type = 'enum', required = false, values = { 'pistol', 'revolver', 'rifle', 'shotgun', 'smg', 'other' } },
+        calibre = { type = 'string', required = false, max = 24 },
+        status = { type = 'enum', required = false, values = { 'registered', 'lost', 'stolen', 'seized', 'destroyed', 'agency_issued' } },
+        ownerPersonId = { type = 'integer', required = false, min = 1 },
+        ownerIdentifier = { type = 'string', required = false, max = 191 },
+        ownerParty = { type = 'string', required = false, max = 191 },
+        assignedOfficer = { type = 'string', required = false, max = 32 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+        caseNumber = { type = 'string', required = false, max = 32 },
+        reason = { type = 'string', required = false, max = 512 },
+    },
+
+    FirearmUpdate = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        make = { type = 'string', required = false, max = 64 },
+        model = { type = 'string', required = false, max = 64 },
+        type = { type = 'enum', required = false, values = { 'pistol', 'revolver', 'rifle', 'shotgun', 'smg', 'other' } },
+        calibre = { type = 'string', required = false, max = 24 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    FirearmTransfer = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        toPersonId = { type = 'integer', required = false, min = 1 },
+        toIdentifier = { type = 'string', required = false, max = 191 },
+        toParty = { type = 'string', required = false, max = 191 },
+        fromParty = { type = 'string', required = false, max = 191 },
+        caseNumber = { type = 'string', required = false, max = 32 },
+        reason = { type = 'string', required = false, max = 512 },
+    },
+
+    FirearmStatus = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        status = { type = 'enum', required = true, values = { 'registered', 'lost', 'stolen', 'seized', 'destroyed', 'agency_issued' } },
+        caseNumber = { type = 'string', required = false, max = 32 },
+        reason = { type = 'string', required = false, max = 512 },
+    },
+
+    FirearmAssign = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        assignedOfficer = { type = 'string', required = false, max = 32 },
+        caseNumber = { type = 'string', required = false, max = 32 },
+        reason = { type = 'string', required = false, max = 512 },
+    },
+
+    FirearmTrace = {
+        id = { type = 'integer', required = false, min = 1 },
+        serial = { type = 'string', required = false, max = 64 },
+    },
 }

@@ -293,3 +293,162 @@ export const LAB_RESULT_CODES = [
 ] as const;
 
 export type LabResultCode = (typeof LAB_RESULT_CODES)[number];
+
+// -------------------------------------------------------- records (M2)
+
+/**
+ * `ck_fpd_persons_sex`. What is recorded on a person's file, which is a records
+ * field and not a statement about anybody: 'unknown' is a real answer -- a
+ * person can enter the master name index from a scene with nothing known about
+ * them but a description -- and it is also the only way to take a sex back off a
+ * record, because the column is nullable but an enum has no empty member.
+ */
+export const PERSON_SEXES = [
+  'male',
+  'female',
+  'other',
+  'unknown',
+] as const;
+
+export type PersonSex = (typeof PERSON_SEXES)[number];
+
+/**
+ * `ck_fpd_person_cautions_kind` — what a query result turns red for (spec 7.3).
+ * 
+ * `mental_health` is a member because the server derives the caution's
+ * `field_key` from the kind (`CAUTION_FIELD_KEY` in the persons routes) and the
+ * database refuses a mental-health caution that does not carry that key
+ * (`ck_fpd_person_cautions_field`, 0005:611-612). It is a kind that may be
+ * *written* by a reader who holds `fields.mental_health.view`, and it is
+ * deliberately not a filter anywhere: a route that let a caller select persons
+ * by this kind would answer "who is on the mental-health list" by row count
+ * alone, without ever showing a caution (spec 4.5, 7.3).
+ */
+export const PERSON_CAUTION_KINDS = [
+  'armed',
+  'violent',
+  'officer_safety',
+  'mental_health',
+  'gang',
+] as const;
+
+export type PersonCautionKind = (typeof PERSON_CAUTION_KINDS)[number];
+
+/**
+ * `ck_fpd_vehicle_flags_kind` — what a vehicle can be flagged as (spec 7.4).
+ * 
+ * The first three are the hot file (7.2): a plate check that returns one of
+ * them shows a red banner and has to be confirmed before it is acted on, which
+ * is why the list is an enum and not a free string. The other three are
+ * administrative — an impound or a lapsed insurance is something for the
+ * officer to read, not something to stop a car over — and the split between
+ * the two halves lives in `service.VEHICLE_HOTFILE`, not here.
+ * 
+ * Reporting a vehicle stolen is `stolen` on this list and not a route of its
+ * own: one path onto the hot file means one place the case number, the reason
+ * and the audit entry are enforced.
+ */
+export const VEHICLE_FLAG_KINDS = [
+  'stolen',
+  'wanted',
+  'bolo',
+  'impounded',
+  'evidence_hold',
+  'uninsured',
+] as const;
+
+export type VehicleFlagKind = (typeof VEHICLE_FLAG_KINDS)[number];
+
+/**
+ * `ck_fpd_vehicles_registration`. The column is `NOT NULL DEFAULT 'valid'`, so
+ * a write schema declares this as an enum rather than a bounded string: there
+ * is no empty value it could carry. On the register path the repo sends it as
+ * a plain parameter and the CHECK refuses a blank; on the update path the
+ * allowlist clears optional columns with `NULLIF(?, '')` and a blank would
+ * become a NULL the column refuses. Both surface to the officer as
+ * `error.internal` for a field they can see, which is what the enum prevents.
+ */
+export const VEHICLE_REGISTRATION_STATUSES = [
+  'valid',
+  'expired',
+  'suspended',
+  'revoked',
+  'unregistered',
+] as const;
+
+export type VehicleRegistrationStatus = (typeof VEHICLE_REGISTRATION_STATUSES)[number];
+
+/**
+ * `ck_fpd_vehicles_insurance`. `none` is a state, not an absence: a vehicle
+ * with no insurance on file and a vehicle whose insurance has lapsed are
+ * different facts, and only one of them is `uninsured` on the flag list. The
+ * column is `NOT NULL DEFAULT 'none'` for the same reason as the registration
+ * status above.
+ */
+export const VEHICLE_INSURANCE_STATUSES = [
+  'valid',
+  'expired',
+  'none',
+] as const;
+
+export type VehicleInsuranceStatus = (typeof VEHICLE_INSURANCE_STATUSES)[number];
+
+/**
+ * `ck_fpd_firearms_status` (7.5). Where a weapon stands, not who holds it.
+ * 
+ * `agency_issued` is a status on the same table rather than a separate armoury
+ * because a duty weapon recovered from a crime scene has to be as traceable as
+ * any other firearm; who is carrying it is `assigned_officer`, which a return
+ * clears while the status stays. `lost` and `stolen` are the two that make a
+ * serial query a hot-file hit (7.2).
+ */
+export const FIREARM_STATUSES = [
+  'registered',
+  'lost',
+  'stolen',
+  'seized',
+  'destroyed',
+  'agency_issued',
+] as const;
+
+export type FirearmStatus = (typeof FIREARM_STATUSES)[number];
+
+/**
+ * `ck_fpd_firearms_type` (7.5). Nullable in the table: a weapon can be entered
+ * from a serial alone before anybody has the thing in front of them, so every
+ * schema that carries this field leaves it optional.
+ */
+export const FIREARM_TYPES = [
+  'pistol',
+  'revolver',
+  'rifle',
+  'shotgun',
+  'smg',
+  'other',
+] as const;
+
+export type FirearmType = (typeof FIREARM_TYPES)[number];
+
+/**
+ * `ck_fpd_firearm_events_event` — every event in the life of a weapon (7.5).
+ * 
+ * No route accepts one of these, so no schema in this file imports it: the
+ * server picks the event from what the officer did (`service.statusEvent`, and
+ * `issued`/`returned` from whether an assignment names an officer), because the
+ * history is what a trace report reconstructs and a history a client could write
+ * traces nothing. The list is here so the NUI can label a trace and so
+ * `service.lua` can stop keeping its own hand-written copy of the CHECK.
+ */
+export const FIREARM_EVENTS = [
+  'register',
+  'transfer',
+  'lost',
+  'stolen',
+  'recovered',
+  'seized',
+  'destroyed',
+  'issued',
+  'returned',
+] as const;
+
+export type FirearmEvent = (typeof FIREARM_EVENTS)[number];
