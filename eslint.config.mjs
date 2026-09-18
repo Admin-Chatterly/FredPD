@@ -32,7 +32,21 @@ export default tseslint.config(
       globals: { ...globals.node },
     },
     rules: {
-      eqeqeq: ['error', 'always'],
+      // `== null` is allowed, and everything else still needs `===`.
+      //
+      // This is not a style preference, it is a bug class. A SQL NULL comes back
+      // from oxmysql as Lua `nil`, a nil field is simply absent from the row
+      // table, and the client JSON-encodes that table -- so a nullable column
+      // reaches the NUI as `undefined`, never as `null`. Under `always`, the
+      // only spelling the linter permitted for "is this empty" was `=== null`,
+      // which is false for every one of those fields.
+      //
+      // It had shipped three times before anyone noticed: every living person's
+      // edit form opened with "deceased" ticked and "missing" ticked, because
+      // `person.deceasedAt !== null` is true when the key is absent.
+      // `== null` is the one comparison that means "null or undefined", which is
+      // the question these checks are actually asking.
+      eqeqeq: ['error', 'always', { null: 'ignore' }],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       '@typescript-eslint/no-unused-vars': [
         'error',

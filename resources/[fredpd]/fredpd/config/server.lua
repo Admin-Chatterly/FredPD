@@ -195,6 +195,93 @@ FredPD.Config.server = {
         -- },
     },
 
+    --- Dispatch: the unit board, the live map and the call queue (spec 7.16,
+    --- 7.17, 7.18).
+    ---
+    --- Everything here has a working default in
+    --- `server/modules/cad/service.lua` (`Cad.defaults`),
+    --- `server/modules/cad/avl.lua` and `server/modules/cad/events.lua`, and
+    --- anything you write below is merged over them two levels deep -- so
+    --- setting one status in `welfareSeconds` leaves the rest alone.
+    ---
+    --- It ships commented out on purpose. A key written here is *pinned*: a
+    --- later release that improves a default cannot reach a server that has a
+    --- copy of the old one sitting in its configuration. That has bitten this
+    --- project once already (`forensics.destroyItems`, above). Write a key only
+    --- for a number you have actually decided to change.
+    ---
+    --- **Sign-on** (7.1). An officer becomes a unit on the board when the duty
+    --- bridge says they are on duty; nothing in the MDT signs a unit on, because
+    --- a unit row is a fact the server can see for itself.
+    ---
+    ---   dutyPollSeconds     How often duty is checked, and therefore the worst
+    ---                       case between going on duty and appearing on the
+    ---                       board. Default 15; five is the floor.
+    ---   signOffGraceSeconds How long a unit keeps its place on the board after
+    ---                       its officer disconnects. This is what lets a
+    ---                       crashed officer reconnect to the same unit, on the
+    ---                       same call, with the same time in status. Default
+    ---                       300. Zero signs them off the moment they drop.
+    ---   dutyRequired        Whether duty is required at all. Leave it true.
+    ---                       Set it false only on a server with no duty concept:
+    ---                       the duty bridge answers "off duty" when it cannot
+    ---                       answer at all, so on such a server nobody would
+    ---                       ever reach the board. With it off, any officer who
+    ---                       may set a unit status is a unit while connected.
+    ---
+    --- **The welfare check** (7.16: a unit on scene too long).
+    ---
+    ---   welfareSeconds       Per unit status, in seconds. Only `on_scene` is
+    ---                        set by default (1200), because that is the status
+    ---                        where silence means something. Add `en_route` or
+    ---                        `busy` if your agency wants the same prompt there.
+    ---   welfareRepeatSeconds How long before the same unit is prompted about
+    ---                        again. Default 600.
+    ---
+    --- **The call card and the queue.**
+    ---
+    ---   recommendLimit        How many units the card offers as "closest
+    ---                         available". Default 3.
+    ---   positionMaxAgeSeconds How old a position may be before the closest-unit
+    ---                         recommendation flags it as a guess. Default 120.
+    ---   broadcastMinutes      How long a broadcast stands when the dispatcher
+    ---                         does not say. Default 720 -- a shift and a half.
+    ---
+    --- **The live map** (7.17, 3.6). The sweep costs nothing until somebody
+    --- opens the map, so these matter only while one is open.
+    ---
+    ---   avlIntervalSeconds       Seconds between position pushes. Default 2,
+    ---                            and clamped to 3.6's one-to-two second window
+    ---                            whatever you write.
+    ---   avlPersistEverySweeps    How often the positions are written to the
+    ---                            database rather than only pushed. Default 5,
+    ---                            so every ten seconds.
+    ---   avlMoveThreshold         Metres a unit must move before the map is
+    ---                            told. Default 2.0.
+    ---   avlHeadingThreshold      Degrees it must turn, for the same reason.
+    ---                            Default 10.0.
+    ---   avlBoardTtlSeconds       How long a cached unit board stands without an
+    ---                            explicit invalidation. Default 10; every write
+    ---                            invalidates it, so this is a floor and not the
+    ---                            mechanism.
+    ---   avlWelfareIntervalSeconds Seconds between welfare passes. Default 30.
+    ---
+    --- **Plate reads** (7.18).
+    ---
+    ---   alprRetentionDays How long reads are kept. Default 30, which is also
+    ---                     7.18's. Nothing enforces it yet: the sweep belongs to
+    ---                     the gateway scheduler, and the gateway is off
+    ---                     (ADR-010). Shortening this number changes nothing
+    ---                     until something runs the sweep.
+    cad = {
+        -- dutyPollSeconds = 15,
+        -- signOffGraceSeconds = 300,
+        -- dutyRequired = true,
+        -- welfareSeconds = {
+        --     en_route = 15 * 60,
+        -- },
+    },
+
     --- The gateway is a separate Node service for media, PDF rendering and
     --- scheduled jobs. None of that exists yet and FXServer never calls it, so
     --- it is off and you do not need to deploy anything (ADR-010). When it

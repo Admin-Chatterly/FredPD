@@ -33,6 +33,21 @@ local function setOpen(open, placement)
         placementId = open and placement and placement.id or nil,
         placementKind = open and placement and placement.kind or nil,
     })
+
+    -- Closing the MDT hides the interface; it does not unmount it. `main.ts`
+    -- answers `fredpd:close` by setting `hidden` on the root, so every Svelte
+    -- component stays mounted and no teardown runs -- which is how the map's
+    -- own unsubscribe, written as an `$effect` teardown, could never fire. One
+    -- visit to the map then left the server sweeping positions and pushing them
+    -- to this player every two seconds for the rest of the session, against a
+    -- budget (12.1) that assumes a subscriber is somebody actually watching.
+    --
+    -- Said here rather than in the NUI because this is the one place that knows
+    -- the MDT closed at all, and it is unconditional on purpose: a session that
+    -- never opened the map is not subscribed, and unsubscribing is a no-op.
+    if not open and FredPD.Client.cad then
+        FredPD.Client.cad.unsubscribeMap()
+    end
 end
 
 --- The NUI asks to be closed (Escape, or the title bar) rather than closing

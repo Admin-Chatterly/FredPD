@@ -63,7 +63,7 @@ const session = {
   permissionsStale: false,
   // Only what this fake session may open. The real list is derived from
   // Discord roles on the server (invariant 2).
-  modules: ['records', 'evidence', 'lab', 'intel', 'comms', 'admin'],
+  modules: ['records', 'dispatch', 'evidence', 'lab', 'intel', 'comms', 'admin'],
 };
 
 const groups: PermissionGroup[] = [
@@ -610,9 +610,1251 @@ let fleetRows: FleetEntry[] = [
 
 let nextFleetId = 4;
 
+// ----------------------------------------------------------------- dispatch
+
+/**
+ * Dispatch fixtures (spec 7.16, 7.17).
+ *
+ * The shapes below mirror the columns `server/modules/cad/repo.lua` selects,
+ * and they are declared here rather than imported because the console's types
+ * live in the module script of `modules/cad/Dispatch.svelte`: a `.svelte` file
+ * is not something `tsc --noEmit` can resolve, so importing from one would fail
+ * `pnpm typecheck` while passing `svelte-check`. Anything that drifts between
+ * the two is a fixture that lies about the server, which is the one thing a
+ * fixture must not do.
+ *
+ * The browser session is a dispatcher who is **also signed on as a unit**
+ * (`12-40`, the callsign `session` above already carries). That is a real state
+ * on a real server, and it is the one that leaves every path walkable without a
+ * game server: a session with no `fpd_units` row would answer `no_unit` to
+ * self-assign, to progress, to the status form and to the emergency button, and
+ * four of the console's screens could never be seen working.
+ */
+
+interface CadCall {
+  id: number;
+  agencyId: string;
+  callNumber: string;
+  type: string;
+  priority: number;
+  status: string;
+  x: number | null;
+  y: number | null;
+  z: number | null;
+  locationText: string | null;
+  beatId: number | null;
+  callerName: string | null;
+  callerPhone: string | null;
+  source: string;
+  sourceResource: string | null;
+  receivedAt: string;
+  receivedAtUnix: number;
+  dispatchedAt: string | null;
+  enRouteAt: string | null;
+  onSceneAt: string | null;
+  clearedAt: string | null;
+  disposition: string | null;
+  acknowledgedBy: string | null;
+  acknowledgedAt: string | null;
+}
+
+interface CadAssignment {
+  id: number;
+  callId: number;
+  officerId: number;
+  callsign: string;
+  isLead: number | null;
+  joinedAt: string;
+  leftAt: string | null;
+  active: number | null;
+}
+
+interface CadLogEntry {
+  id: number;
+  callId: number;
+  entryType: string;
+  body: string | null;
+  messageKey: string | null;
+  messageArgs: Record<string, string | number> | null;
+  callsign: string | null;
+  createdAt: string;
+  createdAtUnix: number;
+}
+
+interface CadLink {
+  id: number;
+  callId: number;
+  targetType: string;
+  targetId: number;
+  role: string;
+  label: string;
+  detail: string | null;
+  createdAt: string;
+}
+
+interface CadUnit {
+  officerId: number;
+  agencyId: string;
+  callsign: string;
+  status: string;
+  statusSince: string;
+  statusSinceUnix: number;
+  beatId: number | null;
+  division: string | null;
+  vehiclePlate: string | null;
+  vehicleModel: string | null;
+  x: number | null;
+  y: number | null;
+  z: number | null;
+  heading: number | null;
+  positionAtUnix: number | null;
+  onCallId: number | null;
+  onCallLead: number | null;
+  onCallNumber: string | null;
+  onCallPriority: number | null;
+  onCallStatus: string | null;
+}
+
+interface CadBroadcast {
+  id: number;
+  kind: string;
+  priority: number;
+  title: string;
+  body: string;
+  plate: string | null;
+  callId: number | null;
+  expiresAt: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+}
+
+/** The session's own unit. `call.self_assign` names no officer; this is it. */
+const OWN_OFFICER_ID = 1;
+
+function minutesAgo(minutes: number): { at: string; unix: number } {
+  const date = new Date(Date.now() - minutes * 60_000);
+
+  return { at: date.toISOString(), unix: Math.floor(date.getTime() / 1000) };
+}
+
+function inMinutes(minutes: number): string {
+  return new Date(Date.now() + minutes * 60_000).toISOString();
+}
+
+/** `260917-0042`, as `fpd_counters` allocates one. Never from input. */
+function callNumberFor(sequence: number): string {
+  const now = new Date();
+  const stamp = [now.getFullYear() % 100, now.getMonth() + 1, now.getDate()]
+    .map((part) => String(part).padStart(2, '0'))
+    .join('');
+
+  return `${stamp}-${String(sequence).padStart(4, '0')}`;
+}
+
+let nextCallId = 4;
+let nextLogId = 20;
+let nextAssignmentId = 10;
+let nextBroadcastId = 3;
+let callSequence = 44;
+
+const shotsFired = minutesAgo(4);
+const collision = minutesAgo(26);
+const welfare = minutesAgo(52);
+
+let cadCalls: CadCall[] = [
+  {
+    id: 1,
+    agencyId: 'lspd',
+    callNumber: callNumberFor(41),
+    type: 'shots_fired',
+    priority: 1,
+    status: 'pending',
+    x: 232.4,
+    y: -868.1,
+    z: 30.5,
+    locationText: 'Vespucci Boulevard at Prosperity Street',
+    beatId: 1,
+    callerName: 'L. Nyberg',
+    callerPhone: '555-0142',
+    source: 'phone',
+    sourceResource: null,
+    receivedAt: shotsFired.at,
+    receivedAtUnix: shotsFired.unix,
+    dispatchedAt: null,
+    enRouteAt: null,
+    onSceneAt: null,
+    clearedAt: null,
+    disposition: null,
+    acknowledgedBy: null,
+    acknowledgedAt: null,
+  },
+  {
+    id: 2,
+    agencyId: 'lspd',
+    callNumber: callNumberFor(42),
+    type: 'traffic_collision',
+    priority: 2,
+    status: 'on_scene',
+    x: 128.9,
+    y: -1040.7,
+    z: 29.3,
+    locationText: 'Alta Street at Power Street',
+    beatId: 1,
+    callerName: 'Anonymous',
+    callerPhone: null,
+    source: 'dispatcher',
+    sourceResource: null,
+    receivedAt: collision.at,
+    receivedAtUnix: collision.unix,
+    dispatchedAt: minutesAgo(24).at,
+    enRouteAt: minutesAgo(23).at,
+    onSceneAt: minutesAgo(18).at,
+    clearedAt: null,
+    disposition: null,
+    acknowledgedBy: null,
+    acknowledgedAt: null,
+  },
+  {
+    /**
+     * A call taken over the phone that the caller could only describe. It has
+     * no coordinates, which is why `call.get` answers it with no
+     * recommendation at all — the console draws no panel rather than an empty
+     * one, and this row is what makes that path walkable.
+     */
+    id: 3,
+    agencyId: 'lspd',
+    callNumber: callNumberFor(43),
+    type: 'welfare_check',
+    priority: 3,
+    status: 'pending',
+    x: null,
+    y: null,
+    z: null,
+    locationText: 'Somewhere on Grove Street, the caller was not sure which house',
+    beatId: 2,
+    callerName: 'M. Ek',
+    callerPhone: '555-0198',
+    source: 'phone',
+    sourceResource: null,
+    receivedAt: welfare.at,
+    receivedAtUnix: welfare.unix,
+    dispatchedAt: null,
+    enRouteAt: null,
+    onSceneAt: null,
+    clearedAt: null,
+    disposition: null,
+    acknowledgedBy: null,
+    acknowledgedAt: null,
+  },
+];
+
+let cadAssignments: CadAssignment[] = [
+  {
+    id: 1,
+    callId: 2,
+    officerId: 2,
+    callsign: '3A-12',
+    isLead: 1,
+    joinedAt: minutesAgo(24).at,
+    leftAt: null,
+    active: 1,
+  },
+];
+
+let cadLog: CadLogEntry[] = [
+  {
+    id: 1,
+    callId: 1,
+    entryType: 'created',
+    body: 'Caller heard four or five shots from the car park behind the shop and saw two people run east.',
+    messageKey: 'cad.log.created',
+    messageArgs: null,
+    callsign: null,
+    createdAt: shotsFired.at,
+    createdAtUnix: shotsFired.unix,
+  },
+  {
+    id: 2,
+    callId: 2,
+    entryType: 'created',
+    body: null,
+    messageKey: 'cad.log.created',
+    messageArgs: null,
+    callsign: null,
+    createdAt: collision.at,
+    createdAtUnix: collision.unix,
+  },
+  {
+    id: 3,
+    callId: 2,
+    entryType: 'dispatched',
+    body: null,
+    messageKey: 'cad.log.dispatched',
+    messageArgs: { callsign: '3A-12' },
+    callsign: '12-40',
+    createdAt: minutesAgo(24).at,
+    createdAtUnix: minutesAgo(24).unix,
+  },
+  {
+    id: 4,
+    callId: 2,
+    entryType: 'unit_status',
+    body: null,
+    // The argument names a vocabulary, so it carries the enum member and the
+    // console resolves it through `cad.unitStatus.*` in the reader's language.
+    messageKey: 'cad.log.unit_status',
+    messageArgs: { callsign: '3A-12', status: 'on_scene' },
+    callsign: '3A-12',
+    createdAt: minutesAgo(18).at,
+    createdAtUnix: minutesAgo(18).unix,
+  },
+  {
+    id: 5,
+    callId: 2,
+    entryType: 'note',
+    body: 'Two vehicles, no injuries. Tow requested for the second one.',
+    messageKey: null,
+    messageArgs: null,
+    callsign: '3A-12',
+    createdAt: minutesAgo(16).at,
+    createdAtUnix: minutesAgo(16).unix,
+  },
+  {
+    id: 6,
+    callId: 3,
+    entryType: 'created',
+    body: null,
+    messageKey: 'cad.log.created',
+    messageArgs: null,
+    callsign: null,
+    createdAt: welfare.at,
+    createdAtUnix: welfare.unix,
+  },
+];
+
+/**
+ * The persons and vehicles on the collision call.
+ *
+ * A constant, and that is a finding rather than a shortcut: `call.link` is a
+ * route with a schema, a permission and a grant, and nothing in the interface
+ * calls it — linking a record to a call needs the register's row id, and the
+ * card has no picker to produce one. The milestone report says so; until there
+ * is a caller, nothing can add a link and this list cannot move.
+ */
+const cadLinks: CadLink[] = [
+  {
+    id: 1,
+    callId: 2,
+    targetType: 'person',
+    targetId: 1,
+    role: 'involved',
+    label: 'DOE, John A.',
+    detail: null,
+    createdAt: minutesAgo(17).at,
+  },
+  {
+    id: 2,
+    callId: 2,
+    targetType: 'vehicle',
+    targetId: 1,
+    role: 'involved',
+    label: '45ABC123',
+    detail: null,
+    createdAt: minutesAgo(17).at,
+  },
+];
+
+let cadUnits: CadUnit[] = [
+  {
+    officerId: OWN_OFFICER_ID,
+    agencyId: 'lspd',
+    callsign: '12-40',
+    status: 'available',
+    statusSince: minutesAgo(11).at,
+    statusSinceUnix: minutesAgo(11).unix,
+    beatId: 1,
+    division: 'patrol',
+    vehiclePlate: 'LSPD0412',
+    vehicleModel: 'police3',
+    x: 215.7,
+    y: -810.2,
+    z: 30.7,
+    heading: 120,
+    positionAtUnix: minutesAgo(0.2).unix,
+    onCallId: null,
+    onCallLead: null,
+    onCallNumber: null,
+    onCallPriority: null,
+    onCallStatus: null,
+  },
+  {
+    officerId: 2,
+    agencyId: 'lspd',
+    callsign: '3A-12',
+    status: 'on_scene',
+    statusSince: minutesAgo(18).at,
+    statusSinceUnix: minutesAgo(18).unix,
+    beatId: 1,
+    division: 'patrol',
+    vehiclePlate: 'LSPD0388',
+    vehicleModel: 'police3',
+    x: 131.2,
+    y: -1036.4,
+    z: 29.3,
+    heading: 250,
+    positionAtUnix: minutesAgo(0.3).unix,
+    onCallId: 2,
+    onCallLead: 1,
+    onCallNumber: callNumberFor(42),
+    onCallPriority: 2,
+    onCallStatus: 'on_scene',
+  },
+  {
+    officerId: 3,
+    agencyId: 'lspd',
+    callsign: '2L-30',
+    status: 'busy',
+    statusSince: minutesAgo(6).at,
+    statusSinceUnix: minutesAgo(6).unix,
+    beatId: 2,
+    division: 'traffic',
+    vehiclePlate: 'LSPD0501',
+    vehicleModel: 'police2',
+    x: 402.8,
+    y: -996.1,
+    z: 29.4,
+    heading: 10,
+    positionAtUnix: minutesAgo(1).unix,
+    onCallId: null,
+    onCallLead: null,
+    onCallNumber: null,
+    onCallPriority: null,
+    onCallStatus: null,
+  },
+  {
+    officerId: 4,
+    agencyId: 'lspd',
+    callsign: '5X-11',
+    status: 'out_of_service',
+    statusSince: minutesAgo(74).at,
+    statusSinceUnix: minutesAgo(74).unix,
+    beatId: null,
+    division: 'k9',
+    vehiclePlate: null,
+    vehicleModel: null,
+    x: 461.3,
+    y: -986.2,
+    z: 24.9,
+    heading: 90,
+    positionAtUnix: minutesAgo(12).unix,
+    onCallId: null,
+    onCallLead: null,
+    onCallNumber: null,
+    onCallPriority: null,
+    onCallStatus: null,
+  },
+];
+
+/**
+ * Two districts. `polygon` is `[[x, y], …]` and the bounding box beside it is
+ * computed on the server from that polygon and never sent in — the fixture
+ * carries both because the row does.
+ */
+const cadBeats = [
+  {
+    id: 1,
+    code: 'A1',
+    labelKey: 'beat.downtown',
+    kind: 'beat',
+    polygon: [
+      [60, -1120],
+      [330, -1120],
+      [330, -760],
+      [60, -760],
+    ] as [number, number][],
+    minX: 60,
+    minY: -1120,
+    maxX: 330,
+    maxY: -760,
+  },
+  {
+    id: 2,
+    code: 'B2',
+    labelKey: 'beat.east',
+    kind: 'district',
+    polygon: [
+      [330, -1120],
+      [620, -1120],
+      [620, -760],
+      [330, -760],
+    ] as [number, number][],
+    minX: 330,
+    minY: -1120,
+    maxX: 620,
+    maxY: -760,
+  },
+];
+
+let cadBroadcasts: CadBroadcast[] = [
+  {
+    id: 1,
+    kind: 'bolo',
+    priority: 2,
+    title: 'Silver saloon, no plates, Vespucci',
+    body: 'Two occupants, both in dark clothing. Seen leaving the shots-fired call eastbound. Do not approach alone.',
+    plate: null,
+    callId: 1,
+    expiresAt: inMinutes(180),
+    cancelledAt: null,
+    createdAt: minutesAgo(3).at,
+  },
+  {
+    id: 2,
+    kind: 'information',
+    priority: 4,
+    title: 'Power Street closed between Alta and Sinner',
+    body: 'Road closed for the collision on Alta. Use Sinner Street until further notice.',
+    plate: null,
+    callId: 2,
+    expiresAt: inMinutes(60),
+    cancelledAt: null,
+    createdAt: minutesAgo(15).at,
+  },
+];
+
+/** Who is live on a call right now. */
+function liveOn(callId: number): CadAssignment[] {
+  return cadAssignments.filter(
+    (assignment) => assignment.callId === callId && assignment.active === 1,
+  );
+}
+
+function findCall(id: number): CadCall | undefined {
+  return cadCalls.find((call) => call.id === id);
+}
+
+/** The refusal `openCall` gives for a call that has already been closed. */
+function closedRefusal(call: CadCall | undefined, field: string): FixtureRefusal | null {
+  if (!call) return refuse('not_found');
+  if (call.status === 'cleared') return refuse('conflict', { [field]: 'call_cleared' });
+  if (call.status === 'cancelled') return refuse('conflict', { [field]: 'call_cancelled' });
+
+  return null;
+}
+
+function addLog(
+  callId: number,
+  entry: Omit<CadLogEntry, 'id' | 'callId' | 'createdAt' | 'createdAtUnix'>,
+): CadLogEntry {
+  const now = minutesAgo(0);
+  const line: CadLogEntry = { id: nextLogId++, callId, ...entry, createdAt: now.at, createdAtUnix: now.unix };
+
+  cadLog = [...cadLog, line];
+
+  return line;
+}
+
+/** Keeps the joined columns of the board in step with the assignments. */
+function refreshUnitAssignments(): void {
+  cadUnits = cadUnits.map((unit) => {
+    const assignment = cadAssignments.find(
+      (row) => row.officerId === unit.officerId && row.active === 1,
+    );
+    const call = assignment ? findCall(assignment.callId) : undefined;
+
+    return {
+      ...unit,
+      onCallId: call ? call.id : null,
+      onCallLead: assignment?.isLead ?? null,
+      onCallNumber: call ? call.callNumber : null,
+      onCallPriority: call ? call.priority : null,
+      onCallStatus: call ? call.status : null,
+    };
+  });
+}
+
+/**
+ * The closest units that could be sent (`Cad.recommendUnits`).
+ *
+ * Free units first, then the ones on a lower-priority call that this one
+ * outranks, nearest first — and never more than the configured three.
+ */
+function recommendFor(call: CadCall): unknown[] {
+  if (call.x === null || call.y === null) return [];
+
+  const x = call.x;
+  const y = call.y;
+
+  return cadUnits
+    .filter((unit) => unit.x !== null && unit.y !== null)
+    .filter((unit) => {
+      const free =
+        unit.onCallId === null && ['available', 'at_station'].includes(unit.status);
+      const divertible =
+        unit.onCallId !== null &&
+        unit.onCallPriority !== null &&
+        call.priority < unit.onCallPriority;
+
+      return free || divertible;
+    })
+    .map((unit) => ({
+      officerId: unit.officerId,
+      callsign: unit.callsign,
+      status: unit.status,
+      distance: Math.hypot((unit.x ?? 0) - x, (unit.y ?? 0) - y),
+      stale: (unit.positionAtUnix ?? 0) < Math.floor(Date.now() / 1000) - 60,
+      divertFromCallId: unit.onCallId,
+    }))
+    .sort((left, right) => left.distance - right.distance)
+    .slice(0, 3);
+}
+
 export const fixtures: FixtureSet = {
   ok: {
     'session.get': () => session,
+
+    // ------------------------------------------------------------- dispatch
+
+    'call.list': (input) => {
+      const filter = (input ?? {}) as {
+        status?: string;
+        priority?: number;
+        beatId?: number;
+        mine?: boolean;
+      };
+
+      const calls = cadCalls
+        .filter((call) =>
+          filter.status
+            ? call.status === filter.status
+            : call.status !== 'cleared' && call.status !== 'cancelled',
+        )
+        .filter((call) => (filter.priority ? call.priority === filter.priority : true))
+        .filter((call) => (filter.beatId ? call.beatId === filter.beatId : true))
+        .filter((call) =>
+          filter.mine
+            ? liveOn(call.id).some((unit) => unit.officerId === OWN_OFFICER_ID)
+            : true,
+        )
+        .map((call) => ({ ...call, unitCount: liveOn(call.id).length }))
+        .sort(
+          (left, right) =>
+            left.priority - right.priority || left.receivedAtUnix - right.receivedAtUnix,
+        );
+
+      return { calls };
+    },
+
+    'call.get': (input) => {
+      const { id } = input as { id: number };
+      const call = findCall(id);
+
+      if (!call) return refuse('not_found');
+
+      return {
+        id,
+        call,
+        units: cadAssignments.filter((assignment) => assignment.callId === id),
+        log: cadLog.filter((entry) => entry.callId === id),
+        links: cadLinks.filter((link) => link.callId === id),
+        // Present for a session that may dispatch, and only for a call with
+        // coordinates to measure from — the welfare check above has none, so
+        // opening it draws no recommendation panel at all.
+        ...(call.x === null ? {} : { recommended: recommendFor(call) }),
+      };
+    },
+
+    'call.create': (input) => {
+      const body = input as {
+        placementId?: number;
+        type: string;
+        priority: number;
+        locationText: string;
+        beatId?: number;
+        callerName?: string;
+        callerPhone?: string;
+        details?: string;
+      };
+
+      // Pinned to the console (3.10): the id is a claim the server checks
+      // against where the dispatcher is actually standing.
+      if (!body.placementId) return refuse('context');
+
+      const now = minutesAgo(0);
+      const call: CadCall = {
+        id: nextCallId++,
+        agencyId: 'lspd',
+        callNumber: callNumberFor(++callSequence),
+        type: body.type,
+        priority: body.priority,
+        status: 'pending',
+        x: null,
+        y: null,
+        z: null,
+        locationText: body.locationText,
+        beatId: body.beatId ?? null,
+        callerName: body.callerName ?? null,
+        callerPhone: body.callerPhone ?? null,
+        source: 'dispatcher',
+        sourceResource: null,
+        receivedAt: now.at,
+        receivedAtUnix: now.unix,
+        dispatchedAt: null,
+        enRouteAt: null,
+        onSceneAt: null,
+        clearedAt: null,
+        disposition: null,
+        acknowledgedBy: null,
+        acknowledgedAt: null,
+      };
+
+      cadCalls = [...cadCalls, call];
+
+      addLog(call.id, {
+        entryType: 'created',
+        // What the caller said opens the narrative: it is content, so it goes
+        // in `body` beside the generated line's own key.
+        body: body.details ?? null,
+        messageKey: 'cad.log.created',
+        messageArgs: null,
+        callsign: null,
+      });
+
+      return { id: call.id, call };
+    },
+
+    'call.dispatch': (input) => {
+      const body = input as {
+        placementId?: number;
+        callId: number;
+        officerIds?: string[];
+        removeOfficerIds?: string[];
+        leadOfficerId?: string;
+      };
+
+      if (!body.placementId) return refuse('context');
+
+      const call = findCall(body.callId);
+      const closed = closedRefusal(call, 'callId');
+      if (closed || !call) return closed ?? refuse('not_found');
+
+      const join = (body.officerIds ?? []).map(Number);
+      const leave = (body.removeOfficerIds ?? []).map(Number);
+
+      if (join.length === 0 && leave.length === 0 && !body.leadOfficerId) {
+        return refuse('invalid', { officerIds: 'nothing_to_change' });
+      }
+
+      for (const officerId of join) {
+        const unit = cadUnits.find((row) => row.officerId === officerId);
+        if (!unit) return refuse('invalid', { officerIds: 'unknown' });
+
+        // A unit that is off duty or off the road cannot be sent, and the two
+        // are told apart because the fix differs.
+        if (unit.status === 'off_duty') return refuse('conflict', { officerIds: 'off_duty' });
+        if (unit.status === 'out_of_service') {
+          return refuse('conflict', { officerIds: 'unavailable' });
+        }
+
+        if (liveOn(call.id).some((assignment) => assignment.officerId === officerId)) {
+          return refuse('conflict', { officerIds: 'already_assigned' });
+        }
+
+        cadAssignments = [
+          ...cadAssignments,
+          {
+            id: nextAssignmentId++,
+            callId: call.id,
+            officerId,
+            callsign: unit.callsign,
+            isLead: null,
+            joinedAt: minutesAgo(0).at,
+            leftAt: null,
+            active: 1,
+          },
+        ];
+
+        addLog(call.id, {
+          entryType: 'dispatched',
+          body: null,
+          messageKey: 'cad.log.dispatched',
+          messageArgs: { callsign: unit.callsign },
+          callsign: session.callsign,
+        });
+      }
+
+      for (const officerId of leave) {
+        const assignment = liveOn(call.id).find((row) => row.officerId === officerId);
+        if (!assignment) return refuse('conflict', { removeOfficerIds: 'not_assigned' });
+
+        cadAssignments = cadAssignments.map((row) =>
+          row.id === assignment.id
+            ? { ...row, active: null, isLead: null, leftAt: minutesAgo(0).at }
+            : row,
+        );
+
+        addLog(call.id, {
+          entryType: 'unit_left',
+          body: null,
+          messageKey: 'cad.log.unit_left',
+          messageArgs: { callsign: assignment.callsign },
+          callsign: session.callsign,
+        });
+      }
+
+      if (body.leadOfficerId) {
+        const lead = Number(body.leadOfficerId);
+        const assignment = liveOn(call.id).find((row) => row.officerId === lead);
+
+        // The lead has to be on the call after the dispatch is applied, which
+        // is a rule no schema can state.
+        if (!assignment) return refuse('conflict', { leadOfficerId: 'not_assigned' });
+
+        cadAssignments = cadAssignments.map((row) =>
+          row.callId === call.id && row.active === 1
+            ? { ...row, isLead: row.officerId === lead ? 1 : null }
+            : row,
+        );
+
+        addLog(call.id, {
+          entryType: 'lead_changed',
+          body: null,
+          messageKey: 'cad.log.lead_changed',
+          messageArgs: { callsign: assignment.callsign },
+          callsign: session.callsign,
+        });
+      }
+
+      // The first unit on the call stamps `dispatched_at`, and the stamp never
+      // moves again: a response-time report is arithmetic on it.
+      if (call.status === 'pending' && liveOn(call.id).length > 0) {
+        cadCalls = cadCalls.map((row) =>
+          row.id === call.id
+            ? { ...row, status: 'dispatched', dispatchedAt: row.dispatchedAt ?? minutesAgo(0).at }
+            : row,
+        );
+
+        addLog(call.id, {
+          entryType: 'call_status',
+          body: null,
+          messageKey: 'cad.log.call_status',
+          messageArgs: { status: 'dispatched' },
+          callsign: session.callsign,
+        });
+      }
+
+      refreshUnitAssignments();
+
+      return { id: call.id, joined: join.length, left: leave.length };
+    },
+
+    'call.self_assign': (input) => {
+      const { callId } = input as { callId: number };
+      const call = findCall(callId);
+      const closed = closedRefusal(call, 'callId');
+      if (closed || !call) return closed ?? refuse('not_found');
+
+      if (liveOn(callId).some((row) => row.officerId === OWN_OFFICER_ID)) {
+        return refuse('conflict', { callId: 'already_assigned' });
+      }
+
+      const own = cadUnits.find((unit) => unit.officerId === OWN_OFFICER_ID);
+      if (!own) return refuse('conflict', { callId: 'no_unit' });
+      if (own.status === 'off_duty') return refuse('conflict', { callId: 'off_duty' });
+
+      cadAssignments = [
+        ...cadAssignments,
+        {
+          id: nextAssignmentId++,
+          callId,
+          officerId: OWN_OFFICER_ID,
+          callsign: own.callsign,
+          isLead: liveOn(callId).length === 0 ? 1 : null,
+          joinedAt: minutesAgo(0).at,
+          leftAt: null,
+          active: 1,
+        },
+      ];
+
+      // A unit that took the call and one that was sent to it are different
+      // facts, and the log is read back to tell them apart.
+      addLog(callId, {
+        entryType: 'unit_joined',
+        body: null,
+        messageKey: 'cad.log.self_assigned',
+        messageArgs: { callsign: own.callsign },
+        callsign: own.callsign,
+      });
+
+      if (call.status === 'pending') {
+        cadCalls = cadCalls.map((row) =>
+          row.id === callId
+            ? { ...row, status: 'dispatched', dispatchedAt: row.dispatchedAt ?? minutesAgo(0).at }
+            : row,
+        );
+      }
+
+      refreshUnitAssignments();
+
+      return { id: callId, callNumber: call.callNumber };
+    },
+
+    'call.status': (input) => {
+      const { callId, status } = input as { callId: number; status: string };
+      const call = findCall(callId);
+      const closed = closedRefusal(call, 'callId');
+      if (closed || !call) return closed ?? refuse('not_found');
+
+      const own = cadUnits.find((unit) => unit.officerId === OWN_OFFICER_ID);
+      if (!own) return refuse('conflict', { status: 'no_unit' });
+
+      // Progress is reported by the unit that is on the call; moving somebody
+      // else is `unit.manage`, a different key held by different people.
+      if (!liveOn(callId).some((row) => row.officerId === OWN_OFFICER_ID)) {
+        return refuse('conflict', { callId: 'not_assigned' });
+      }
+
+      const now = minutesAgo(0);
+
+      cadUnits = cadUnits.map((unit) =>
+        unit.officerId === OWN_OFFICER_ID
+          ? { ...unit, status, statusSince: now.at, statusSinceUnix: now.unix }
+          : unit,
+      );
+
+      // The call's stamps are the first unit to get there, not the latest.
+      cadCalls = cadCalls.map((row) =>
+        row.id === callId
+          ? {
+              ...row,
+              status,
+              enRouteAt: status === 'en_route' ? (row.enRouteAt ?? now.at) : row.enRouteAt,
+              onSceneAt: status === 'on_scene' ? (row.onSceneAt ?? now.at) : row.onSceneAt,
+            }
+          : row,
+      );
+
+      addLog(callId, {
+        entryType: 'unit_status',
+        body: null,
+        messageKey: 'cad.log.unit_status',
+        messageArgs: { callsign: own.callsign, status },
+        callsign: own.callsign,
+      });
+
+      refreshUnitAssignments();
+
+      return { id: callId, status };
+    },
+
+    'call.clear': (input) => {
+      const body = input as { callId: number; disposition: string; note?: string };
+      const call = findCall(body.callId);
+      const closed = closedRefusal(call, 'callId');
+      if (closed || !call) return closed ?? refuse('not_found');
+
+      // 7.16: an emergency call cannot be cleared until a supervisor has
+      // acknowledged it, and cancelling is refused on the same terms or it
+      // would be the way around the rule.
+      if (call.source === 'panic' && call.acknowledgedAt === null) {
+        return refuse('conflict', { callId: 'needs_acknowledgement' });
+      }
+
+      const status =
+        body.disposition === 'duplicate' || body.disposition === 'cancelled'
+          ? 'cancelled'
+          : 'cleared';
+
+      cadCalls = cadCalls.map((row) =>
+        row.id === body.callId
+          ? { ...row, status, disposition: body.disposition, clearedAt: minutesAgo(0).at }
+          : row,
+      );
+
+      cadAssignments = cadAssignments.map((row) =>
+        row.callId === body.callId && row.active === 1
+          ? { ...row, active: null, leftAt: minutesAgo(0).at }
+          : row,
+      );
+
+      if (body.note) {
+        addLog(body.callId, {
+          entryType: 'note',
+          body: body.note,
+          messageKey: null,
+          messageArgs: null,
+          callsign: session.callsign,
+        });
+      }
+
+      addLog(body.callId, {
+        entryType: 'cleared',
+        body: null,
+        messageKey: status === 'cancelled' ? 'cad.log.cancelled' : 'cad.log.cleared',
+        messageArgs: { disposition: body.disposition },
+        callsign: session.callsign,
+      });
+
+      refreshUnitAssignments();
+
+      return { id: body.callId, disposition: body.disposition, status };
+    },
+
+    'call.acknowledge': (input) => {
+      const { callId } = input as { callId: number };
+      const call = findCall(callId);
+
+      if (!call) return refuse('not_found');
+
+      // Only an emergency has anything to acknowledge.
+      if (call.source !== 'panic') return refuse('invalid', { callId: 'not_supported' });
+      if (call.acknowledgedAt !== null) {
+        return refuse('conflict', { callId: 'nothing_to_change' });
+      }
+
+      cadCalls = cadCalls.map((row) =>
+        row.id === callId
+          ? { ...row, acknowledgedAt: minutesAgo(0).at, acknowledgedBy: session.callsign }
+          : row,
+      );
+
+      addLog(callId, {
+        entryType: 'unit_status',
+        body: null,
+        messageKey: 'cad.log.acknowledged',
+        messageArgs: { callsign: session.callsign },
+        callsign: session.callsign,
+      });
+
+      return { id: callId };
+    },
+
+    'call.note': (input) => {
+      const { callId, body } = input as { callId: number; body: string };
+      const call = findCall(callId);
+      const closed = closedRefusal(call, 'callId');
+      if (closed || !call) return closed ?? refuse('not_found');
+
+      // The kind is not a field: this route writes a note, and the server
+      // writes every other kind from what it has just done (invariant 11).
+      addLog(callId, {
+        entryType: 'note',
+        body,
+        messageKey: null,
+        messageArgs: null,
+        callsign: session.callsign,
+      });
+
+      return { id: callId };
+    },
+
+    'unit.list': () => ({ units: cadUnits.filter((unit) => unit.status !== 'off_duty') }),
+
+    'unit.status': (input) => {
+      const { status } = input as { status: string };
+      const own = cadUnits.find((unit) => unit.officerId === OWN_OFFICER_ID);
+
+      if (!own) return refuse('conflict', { status: 'no_unit' });
+      // The same status again is not a change, and `status_since` must not be
+      // restamped for it or the welfare timer resets on every press.
+      if (own.status === status) return refuse('conflict', { status: 'nothing_to_change' });
+
+      const now = minutesAgo(0);
+
+      cadUnits = cadUnits.map((unit) =>
+        unit.officerId === OWN_OFFICER_ID
+          ? { ...unit, status, statusSince: now.at, statusSinceUnix: now.unix }
+          : unit,
+      );
+
+      return { id: OWN_OFFICER_ID, status };
+    },
+
+    'unit.manage': (input) => {
+      const body = input as {
+        officerId: number;
+        status?: string;
+        callsign?: string;
+        beatId?: number;
+        reason?: string;
+      };
+
+      const unit = cadUnits.find((row) => row.officerId === body.officerId);
+      if (!unit) return refuse('not_found', { officerId: 'unknown' });
+
+      if (!body.status && !body.callsign && !body.beatId) {
+        return refuse('invalid', { status: 'nothing_to_change' });
+      }
+
+      // The two changes that read as discipline afterwards need a reason, and
+      // a schema cannot say "required unless".
+      if ((body.status === 'out_of_service' || body.status === 'off_duty') && !body.reason) {
+        return refuse('invalid', { reason: 'required' });
+      }
+
+      const now = minutesAgo(0);
+
+      cadUnits = cadUnits.map((row) =>
+        row.officerId === body.officerId
+          ? {
+              ...row,
+              callsign: body.callsign ?? row.callsign,
+              beatId: body.beatId ?? row.beatId,
+              status: body.status ?? row.status,
+              statusSince: body.status ? now.at : row.statusSince,
+              statusSinceUnix: body.status ? now.unix : row.statusSinceUnix,
+            }
+          : row,
+      );
+
+      return { id: body.officerId };
+    },
+
+    /**
+     * The emergency button (7.16). It takes nothing at all: the position, the
+     * type, the priority and the officer are all the server's.
+     */
+    'unit.emergency': () => {
+      const own = cadUnits.find((unit) => unit.officerId === OWN_OFFICER_ID);
+      if (!own) return refuse('conflict', { status: 'no_unit' });
+      if (own.status === 'off_duty') return refuse('conflict', { status: 'off_duty' });
+
+      const now = minutesAgo(0);
+      const call: CadCall = {
+        id: nextCallId++,
+        agencyId: 'lspd',
+        callNumber: callNumberFor(++callSequence),
+        type: 'officer_emergency',
+        priority: 1,
+        status: 'dispatched',
+        x: own.x,
+        y: own.y,
+        z: own.z,
+        locationText: null,
+        beatId: own.beatId,
+        callerName: null,
+        callerPhone: null,
+        source: 'panic',
+        sourceResource: null,
+        receivedAt: now.at,
+        receivedAtUnix: now.unix,
+        dispatchedAt: now.at,
+        enRouteAt: null,
+        onSceneAt: null,
+        clearedAt: null,
+        disposition: null,
+        acknowledgedBy: null,
+        acknowledgedAt: null,
+      };
+
+      cadCalls = [...cadCalls, call];
+      cadAssignments = [
+        ...cadAssignments,
+        {
+          id: nextAssignmentId++,
+          callId: call.id,
+          officerId: OWN_OFFICER_ID,
+          callsign: own.callsign,
+          isLead: 1,
+          joinedAt: now.at,
+          leftAt: null,
+          active: 1,
+        },
+      ];
+
+      cadUnits = cadUnits.map((unit) =>
+        unit.officerId === OWN_OFFICER_ID
+          ? { ...unit, status: 'emergency', statusSince: now.at, statusSinceUnix: now.unix }
+          : unit,
+      );
+
+      addLog(call.id, {
+        entryType: 'created',
+        body: null,
+        messageKey: 'cad.log.created',
+        messageArgs: null,
+        callsign: own.callsign,
+      });
+
+      refreshUnitAssignments();
+
+      return { id: call.id, call };
+    },
+
+    'broadcast.list': (input) => {
+      const filter = (input ?? {}) as { includeExpired?: boolean; kind?: string };
+
+      return {
+        broadcasts: cadBroadcasts
+          .filter((entry) => (filter.includeExpired ? true : entry.cancelledAt === null))
+          .filter((entry) => (filter.kind ? entry.kind === filter.kind : true))
+          .sort((left, right) => left.priority - right.priority),
+      };
+    },
+
+    'broadcast.create': (input) => {
+      const body = input as {
+        kind: string;
+        priority?: number;
+        title: string;
+        body: string;
+        plate?: string;
+        expiresInMinutes?: number;
+      };
+
+      const broadcast: CadBroadcast = {
+        id: nextBroadcastId++,
+        kind: body.kind,
+        priority: body.priority ?? 3,
+        title: body.title,
+        body: body.body,
+        // Upper-cased and trimmed, like every other plate column in the suite.
+        plate: body.plate ? body.plate.trim().toUpperCase() : null,
+        callId: null,
+        // Minutes on the server's clock, never a date from the client. Absent
+        // takes the agency's configured default rather than "no expiry".
+        expiresAt: inMinutes(body.expiresInMinutes ?? 240),
+        cancelledAt: null,
+        createdAt: minutesAgo(0).at,
+      };
+
+      cadBroadcasts = [broadcast, ...cadBroadcasts];
+
+      return { id: broadcast.id, broadcast };
+    },
+
+    'broadcast.cancel': (input) => {
+      const { id } = input as { id: number };
+      const entry = cadBroadcasts.find((row) => row.id === id);
+
+      if (!entry || entry.cancelledAt !== null) return refuse('not_found');
+
+      // Nothing is deleted: the row is stamped and stays, so what was out on
+      // the air at the time survives the shift it was asked about.
+      cadBroadcasts = cadBroadcasts.map((row) =>
+        row.id === id ? { ...row, cancelledAt: minutesAgo(0).at } : row,
+      );
+
+      return { id };
+    },
+
+    'beat.list': () => ({ beats: cadBeats }),
+
+    'map.view': (input) => {
+      const { subscribe } = (input ?? {}) as { subscribe?: boolean };
+
+      // The close half is a field rather than a second route, so there is one
+      // place the subscription is written.
+      if (subscribe === false) return { subscribed: false };
+
+      return {
+        subscribed: true,
+        units: cadUnits.filter((unit) => unit.status !== 'off_duty'),
+        calls: cadCalls.filter(
+          (call) => call.status !== 'cleared' && call.status !== 'cancelled',
+        ),
+      };
+    },
 
     'admin.rolemap.list': () => ({
       mappings,

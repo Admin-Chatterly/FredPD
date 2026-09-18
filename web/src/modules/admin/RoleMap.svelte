@@ -97,7 +97,7 @@
     <!-- How current the underlying Discord data is. A mapping edited against a
          stale snapshot is still correct, but what it grants today may not be. -->
     <p class="text-xs text-[var(--color-ink-muted)]">
-      {#if view.snapshotAgeSeconds === null}
+      {#if view.snapshotAgeSeconds == null}
         {t('admin.roleMap.snapshotMissing')}
       {:else}
         {t('admin.roleMap.snapshotAge', { seconds: view.snapshotAgeSeconds })}

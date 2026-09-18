@@ -108,6 +108,12 @@ server_scripts {
     'server/modules/cad/repo.lua',
     'server/modules/cad/avl.lua',
     'server/modules/cad/routes.lua',
+    -- Sign-on, last of the four: it binds the repo, the service and
+    -- `FredPD.Cad.avl` at load, and it is the only thing that writes an
+    -- `fpd_units` row. Listed after `routes.lua` rather than before it because
+    -- nothing in the routes needs it -- they read the row it writes -- and a
+    -- file that fills a namespace nobody reads at load is free to go last.
+    'server/modules/cad/events.lua',
 
     'server/modules/admin/service.lua',
     'server/modules/admin/routes.lua',
@@ -123,6 +129,12 @@ client_scripts {
     'client/placement-editor.lua',
     'client/chat.lua',
     'client/garage.lua',
+    -- Dispatch: the panic keybind and the relay that carries the server's
+    -- `fredpd:cad:*` pushes into the NUI. After `client/core.lua`, whose
+    -- namespace it binds at load; before `client/main.lua`, which stays last
+    -- because it is the NUI host and registers the terminal placements --
+    -- `dispatch_console` among them -- that this file deliberately leaves alone.
+    'client/cad.lua',
     'client/main.lua',
 }
 

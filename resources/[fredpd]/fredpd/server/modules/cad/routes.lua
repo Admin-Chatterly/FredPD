@@ -1470,7 +1470,10 @@ route.define({
         -- shift it was asked about (0007). Zero rows is one that was already off
         -- the air, or one from another agency -- neither of which this session
         -- takes down, and neither of which it is told apart.
-        if repo.cancelBroadcast(session.agencyId, input.id, session.discordId) == 0 then
+        -- `not`, not `== 0`: this repo function answers a BOOLEAN, and in Lua
+        -- `false == 0` is false, so the refusal below was unreachable and a
+        -- cancel of somebody else's broadcast answered success.
+        if not repo.cancelBroadcast(session.agencyId, input.id, session.discordId) then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
         end
 

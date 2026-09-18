@@ -343,8 +343,11 @@
       phone: person.phone ?? '',
       address: person.address ?? '',
       classification: person.classification,
-      deceased: person.deceasedAt !== null,
-      missing: person.missingSince !== null,
+      // `!= null`, not `!== null`: a person who is alive has no `deceased_at`,
+      // so the key is absent from the row and arrives as `undefined`. Under
+      // the strict comparison this was true for everybody.
+      deceased: person.deceasedAt != null,
+      missing: person.missingSince != null,
     };
 
     personForm = { ...seeded };
