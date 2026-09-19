@@ -135,7 +135,8 @@
     "required_without_target": "Give a description when there is no record to point at.",
     "resolved": "This lookout has been closed.",
     "no_expiry": "This lookout has no expiry and cannot be trusted.",
-    "out_of_range": "Outside the permitted range."
+    "out_of_range": "Outside the permitted range.",
+    "out_of_order": "Not possible from this stage."
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -941,7 +942,8 @@
       "firearms": "Firearms",
       "persons": "Persons",
       "vehicles": "Vehicles",
-      "anmalan": "Reports"
+      "anmalan": "Reports",
+      "frihet": "Custody"
     },
     "vehicle": {
       "column": {
@@ -1664,7 +1666,10 @@
       "framstallan": "Remand application (RB 24:12)",
       "forhandling": "Remand hearing (RB 24:13)",
       "passed": "Overdue by {time}",
-      "remaining": "{time} remaining"
+      "remaining": "{time} remaining",
+      "none": "No deadline is running.",
+      "met": "Met",
+      "overdueRow": "Overdue"
     },
     "grund": {
       "pa_bar_garning": "Caught in the act",
@@ -1690,7 +1695,47 @@
       "annan": "Other"
     },
     "empty": "Nobody is being held.",
-    "attention": "A statutory deadline needs attention."
+    "attention": "A statutory deadline needs attention.",
+    "filter": {
+      "openOnly": "Currently held only"
+    },
+    "emptyList": "No detentions match.",
+    "detail": {
+      "none": "Select a detention to open it."
+    },
+    "section": {
+      "chain": "Decisions",
+      "deadlines": "Statutory deadlines",
+      "brott": "Held for",
+      "log": "Custody log"
+    },
+    "chain": {
+      "pending": "Not taken",
+      "by": "By",
+      "notified": "Notified of suspicion (RB 24:9)",
+      "notNotified": "Not yet notified of suspicion."
+    },
+    "brott": {
+      "empty": "No offences recorded."
+    },
+    "log": {
+      "empty": "Nothing logged yet.",
+      "kind": "Entry",
+      "note": "Note",
+      "at": "Time",
+      "by": "By"
+    },
+    "confirm": {
+      "anhallande": "Anhållande is the prosecutor’s decision. It starts the RB 24:12 clock: the remand application must reach the court by noon on the third day.",
+      "framstallan": "This records that the remand application has been filed with the court.",
+      "haktning": "Häktning is the court’s decision. It ends the RB 24:13 deadline and keeps this person in custody.",
+      "frigiv": "Releasing ends the detention. A later arrest is a new chain with its own statutory clocks, not a reopening of this one."
+    },
+    "duration": {
+      "days": "{count} d",
+      "hours": "{count} h",
+      "minutes": "{count} min"
+    }
   },
   "tvang": {
     "kind": {

@@ -135,7 +135,8 @@
     "required_without_target": "Ange ett signalement när det inte finns någon post att peka på.",
     "resolved": "Spaningsuppdraget är avslutat.",
     "no_expiry": "Spaningsuppdraget saknar sluttid och kan inte användas.",
-    "out_of_range": "Utanför tillåtet intervall."
+    "out_of_range": "Utanför tillåtet intervall.",
+    "out_of_order": "Inte möjligt från det här stadiet."
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -941,7 +942,8 @@
       "firearms": "Vapen",
       "persons": "Personer",
       "vehicles": "Fordon",
-      "anmalan": "Anmälningar"
+      "anmalan": "Anmälningar",
+      "frihet": "Frihetsberövande"
     },
     "vehicle": {
       "column": {
@@ -1664,7 +1666,10 @@
       "framstallan": "Häktningsframställan (RB 24:12)",
       "forhandling": "Häktningsförhandling (RB 24:13)",
       "passed": "Överskriden med {time}",
-      "remaining": "{time} kvar"
+      "remaining": "{time} kvar",
+      "none": "Ingen frist löper.",
+      "met": "Uppfylld",
+      "overdueRow": "Överskriden"
     },
     "grund": {
       "pa_bar_garning": "På bar gärning",
@@ -1690,7 +1695,47 @@
       "annan": "Annat"
     },
     "empty": "Ingen är frihetsberövad.",
-    "attention": "En lagstadgad frist kräver åtgärd."
+    "attention": "En lagstadgad frist kräver åtgärd.",
+    "filter": {
+      "openOnly": "Endast pågående"
+    },
+    "emptyList": "Inga frihetsberövanden matchar.",
+    "detail": {
+      "none": "Välj ett frihetsberövande för att öppna det."
+    },
+    "section": {
+      "chain": "Beslut",
+      "deadlines": "Lagstadgade frister",
+      "brott": "Misstänkt för",
+      "log": "Arrestjournal"
+    },
+    "chain": {
+      "pending": "Ej fattat",
+      "by": "Av",
+      "notified": "Underrättad om misstanke (RB 24:9)",
+      "notNotified": "Ännu inte underrättad om misstanke."
+    },
+    "brott": {
+      "empty": "Inga brott registrerade."
+    },
+    "log": {
+      "empty": "Inget loggat ännu.",
+      "kind": "Händelse",
+      "note": "Anteckning",
+      "at": "Tid",
+      "by": "Av"
+    },
+    "confirm": {
+      "anhallande": "Anhållande är åklagarens beslut. Det startar fristen enligt RB 24:12: häktningsframställan ska vara hos rätten senast klockan tolv tredje dagen.",
+      "framstallan": "Detta registrerar att häktningsframställan har lämnats till rätten.",
+      "haktning": "Häktning är rättens beslut. Det avslutar fristen enligt RB 24:13 och håller personen kvar i häkte.",
+      "frigiv": "Frigivning avslutar frihetsberövandet. Ett senare gripande är en ny kedja med egna frister, inte en återupptagning av den här."
+    },
+    "duration": {
+      "days": "{count} d",
+      "hours": "{count} h",
+      "minutes": "{count} min"
+    }
   },
   "tvang": {
     "kind": {

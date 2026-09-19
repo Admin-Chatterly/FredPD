@@ -164,6 +164,11 @@ const REASONS = new Set([
   'fu_closed',
   'wrong_capacity',
   'already_released',
+  // The move does not exist from the stage the record is at — a häktning
+  // before an anhållande. Distinct from the validator's `not_allowed`, which
+  // means the *value* was not one of the field's permitted ones: the status
+  // here is real, and it is the step from it that is not.
+  'out_of_order',
 
   // Tvångsmedel (7.12). A measure aimed at the wrong kind of target, and the
   // three ways one stops authorising anything.

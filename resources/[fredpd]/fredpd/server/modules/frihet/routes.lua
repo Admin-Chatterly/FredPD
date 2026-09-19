@@ -241,7 +241,7 @@ local function runDecision(session, input, action)
     local ok, why = service.canDecide(row, action, capacityOf(session))
     if not ok then
         return route.refuse(
-            (why == 'already_released' or why == 'not_allowed')
+            (why == 'already_released' or why == 'out_of_order')
                 and FredPD.ErrorCode.CONFLICT
                 or FredPD.ErrorCode.FORBIDDEN,
             { status = why })

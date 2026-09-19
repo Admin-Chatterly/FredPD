@@ -1,6 +1,7 @@
 <script lang="ts">
   import { nui } from '../../lib/nui';
   import Anmalan from './Anmalan.svelte';
+  import Frihet from './Frihet.svelte';
   import { t } from '../../lib/i18n';
   import {
     CLASSIFICATIONS,
@@ -64,7 +65,7 @@
    * drawn as a refusal (invariant 4, spec 6.4).
    */
 
-  type Tab = 'persons' | 'vehicles' | 'firearms' | 'anmalan';
+  type Tab = 'persons' | 'vehicles' | 'firearms' | 'anmalan' | 'frihet';
 
   /** Which form's label a rejected field belongs to (spec 3.5). */
   const FIELD_LABELS: Record<string, string> = {
@@ -1033,7 +1034,7 @@
     selectedFirearmId = id;
   }
 
-  const tabs: Tab[] = ['persons', 'vehicles', 'firearms', 'anmalan'];
+  const tabs: Tab[] = ['persons', 'vehicles', 'firearms', 'anmalan', 'frihet'];
   const messages = $derived(fieldList(failure, FIELD_LABELS));
 
   const openVehicleRecord = $derived(vehicleDetail?.vehicle ?? null);
@@ -2880,5 +2881,13 @@
       from an identifier the interface would have to be sent first.
     -->
     <Anmalan />
+  {:else if tab === 'frihet'}
+    <!--
+      Its own component for the same reason, and one more: it holds a ticking
+      clock. The countdown interval belongs to the screen that draws it and is
+      cleared when that screen goes away, which a branch inside the tab host
+      could not do.
+    -->
+    <Frihet />
   {/if}
 </section>

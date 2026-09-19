@@ -131,7 +131,7 @@ describe('frihet', function()
             -- somebody's missing rank: the first is the real objection.
             local _, why = frihet.canDecide({ status = 'gripen' }, 'hakta', 'polis')
 
-            assert.are.equal('not_allowed', why)
+            assert.are.equal('out_of_order', why)
         end)
     end)
 

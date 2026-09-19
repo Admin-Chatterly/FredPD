@@ -295,7 +295,12 @@ function Frihet.canDecide(row, action, capacity)
 
     if not Frihet.isOpen(row) then return false, 'already_released' end
 
-    if not Frihet.nextStatus(row.status, action) then return false, 'not_allowed' end
+    -- `out_of_order` rather than `not_allowed`, which is the validator's word
+    -- for "not one of this field's permitted values". They are different
+    -- objections and an officer reads the difference: a häktning before an
+    -- anhållande is a detention with no legal basis, not a typo in a dropdown,
+    -- and "Status -- not an allowed value" is the screen failing to say so.
+    if not Frihet.nextStatus(row.status, action) then return false, 'out_of_order' end
 
     local required = Frihet.deciderFor(action)
     if required and capacity ~= required then return false, 'wrong_capacity' end

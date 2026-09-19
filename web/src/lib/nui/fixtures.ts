@@ -1755,9 +1755,382 @@ function moveAnmalan(input: unknown, to: string): unknown {
   return { id: row.id, status: to };
 }
 
+// ------------------------------------------------------- frihetsberövande
+
+interface FixtureFrihet {
+  id: number;
+  number: string;
+  status: string;
+  personId: number;
+  personNumber: string;
+  grund: string;
+  version: number;
+  /** Seconds before "now" each stage happened; absent means it has not. */
+  gripenAgo?: number;
+  anhallenAgo?: number;
+  framstallanAgo?: number;
+  haktadAgo?: number;
+  frigivenAgo?: number;
+  gripenBy?: string;
+  anhallenBy?: string;
+  haktadBy?: string;
+  frigivenBy?: string;
+  underrattadAgo?: number;
+  brott: { id: number; brottId: number; code: string; labelKey: string; citation: string; grad: string; stage: string }[];
+  log: { id: number; kind: string; note: string | null; loggedBy: string; loggedAgo: number }[];
+}
+
+const HOUR = 3600;
+
+/**
+ * Four chains, chosen for the four things the screen draws differently.
+ *
+ * Every timestamp is relative to the moment the fixture is read, because the
+ * whole screen is a countdown: a fixture with fixed dates would be comfortably
+ * in hand on the day it was written and years overdue by the time anybody ran
+ * the test again.
+ */
+const frihetsberovanden: FixtureFrihet[] = [
+  {
+    // Just arrested. RB 24:13 has most of its four dygn left, and there is no
+    // RB 24:12 clock yet because no prosecutor has decided anything.
+    id: 1,
+    number: 'A26-00041',
+    status: 'gripen',
+    personId: 2,
+    personNumber: 'P-000512',
+    grund: 'pa_bar_garning',
+    version: 1,
+    gripenAgo: 3 * HOUR,
+    gripenBy: FIXTURE_VIEWER,
+    brott: [
+      {
+        id: 21,
+        brottId: 12,
+        code: 'BRB-3-5',
+        labelKey: 'brott.rubrik.misshandel',
+        citation: 'BrB 3:5',
+        grad: 'normal',
+        stage: 'fullbordat',
+      },
+    ],
+    log: [
+      {
+        id: 201,
+        kind: 'frihet.logKind.maltid',
+        note: null,
+        loggedBy: FIXTURE_VIEWER,
+        loggedAgo: 1 * HOUR,
+      },
+    ],
+  },
+  {
+    // **Overdue.** Anhållen four days ago with no häktningsframställan, so RB
+    // 24:12's noon is long past. This is the red row, and the one the whole
+    // screen exists to put in front of somebody.
+    id: 2,
+    number: 'A26-00039',
+    status: 'anhallen',
+    personId: 1,
+    personNumber: 'P-000431',
+    grund: 'flyktfara',
+    version: 2,
+    gripenAgo: 100 * HOUR,
+    anhallenAgo: 96 * HOUR,
+    gripenBy: '100000000000000002',
+    anhallenBy: '100000000000000003',
+    underrattadAgo: 99 * HOUR,
+    brott: [
+      {
+        id: 22,
+        brottId: 11,
+        code: 'BRB-8-4',
+        labelKey: 'brott.rubrik.grov_stold',
+        citation: 'BrB 8:4',
+        grad: 'grov',
+        stage: 'fullbordat',
+      },
+    ],
+    log: [],
+  },
+  {
+    // Inside the warning window but not yet past it: the amber case, which is
+    // what `needsAttention` is generous about on purpose.
+    id: 3,
+    number: 'A26-00040',
+    status: 'framstalld',
+    personId: 3,
+    personNumber: 'P-000733',
+    grund: 'kollusionsfara',
+    version: 3,
+    gripenAgo: 92 * HOUR,
+    anhallenAgo: 90 * HOUR,
+    framstallanAgo: 2 * HOUR,
+    gripenBy: FIXTURE_VIEWER,
+    anhallenBy: '100000000000000003',
+    brott: [],
+    log: [],
+  },
+  {
+    // Closed. Only reachable with the "currently held" filter off, and its
+    // `heldFor` must stop growing — a released chain reports what it was.
+    id: 4,
+    number: 'A26-00038',
+    status: 'frigiven',
+    personId: 4,
+    personNumber: 'P-000108',
+    grund: 'identitet_oklar',
+    version: 4,
+    gripenAgo: 200 * HOUR,
+    frigivenAgo: 194 * HOUR,
+    gripenBy: FIXTURE_VIEWER,
+    frigivenBy: FIXTURE_VIEWER,
+    brott: [],
+    log: [],
+  },
+];
+
+/** Two stubs, for the reason `restrictedAnmalningar` gives: one would not collide. */
+const restrictedFrihet = [
+  { restricted: true as const, recordType: 'arrest', contact: 'internal_affairs' },
+  { restricted: true as const, recordType: 'arrest', contact: 'homicide' },
+];
+
+/**
+ * The derived fields `withClocks` adds on the server, computed the same way.
+ *
+ * RB 24:12 is approximated here as noon on the third day in UTC — the fixture
+ * does not need the server's daylight-saving correctness, it needs a deadline
+ * that is plainly in the past for row 2 and plainly ahead for row 3. The real
+ * arithmetic is pinned by `frihet_spec.lua` against fixed instants.
+ */
+function withFixtureClocks(row: FixtureFrihet): Record<string, unknown> {
+  const now = Date.now();
+  const at = (ago?: number) => (ago === undefined ? null : new Date(now - ago * 1000).toISOString());
+  const seconds = (ago?: number) => (ago === undefined ? null : now / 1000 - ago);
+
+  const deadlines: Record<string, { at: number; remaining: number; passed: boolean }> = {};
+
+  const anhallenAt = seconds(row.anhallenAgo);
+  if (anhallenAt !== null && row.framstallanAgo === undefined) {
+    const noon = new Date(anhallenAt * 1000);
+    noon.setUTCDate(noon.getUTCDate() + 3);
+    noon.setUTCHours(12, 0, 0, 0);
+
+    const deadlineAt = noon.getTime() / 1000;
+    const remaining = deadlineAt - now / 1000;
+
+    deadlines.framstallan = { at: deadlineAt, remaining, passed: remaining < 0 };
+  }
+
+  const start = seconds(row.gripenAgo) ?? anhallenAt;
+  if (start !== null && row.haktadAgo === undefined) {
+    const deadlineAt = start + 96 * HOUR;
+    const remaining = deadlineAt - now / 1000;
+
+    deadlines.forhandling = { at: deadlineAt, remaining, passed: remaining < 0 };
+  }
+
+  // The nearer of the two, with a passed one always winning — `nextDeadline`.
+  // Reduced over entries rather than keys so the lookup cannot be undefined.
+  const best = Object.entries(deadlines).reduce<
+    [string, { at: number; remaining: number; passed: boolean }] | null
+  >((winner, entry) => {
+    if (!winner) return entry;
+    if (entry[1].passed !== winner[1].passed) return entry[1].passed ? entry : winner;
+
+    return entry[1].at < winner[1].at ? entry : winner;
+  }, null);
+
+  const nextDeadline = best ? best[0] : null;
+
+  const heldStart = row.gripenAgo ?? row.anhallenAgo;
+  const heldFor =
+    heldStart === undefined
+      ? null
+      : row.frigivenAgo === undefined
+        ? heldStart
+        : heldStart - row.frigivenAgo;
+
+  const next = best ? best[1] : null;
+
+  return {
+    id: row.id,
+    number: row.number,
+    status: row.status,
+    personId: row.personId,
+    personNumber: row.personNumber,
+    grund: row.grund,
+    version: row.version,
+    gripenAt: at(row.gripenAgo),
+    gripenBy: row.gripenBy ?? null,
+    anhallenAt: at(row.anhallenAgo),
+    anhallenBy: row.anhallenBy ?? null,
+    framstallanAt: at(row.framstallanAgo),
+    haktadAt: at(row.haktadAgo),
+    haktadBy: row.haktadBy ?? null,
+    frigivenAt: at(row.frigivenAgo),
+    frigivenBy: row.frigivenBy ?? null,
+    underrattadAt: at(row.underrattadAgo),
+    deadlines,
+    nextDeadline,
+    heldFor,
+    needsAttention: next ? next.passed || next.remaining <= 6 * HOUR : false,
+  };
+}
+
+/**
+ * A decision against the fixture rows.
+ *
+ * Enforces the two rules the screen is tested against: the chain's order, and
+ * the capacity each decision requires. The viewer is an ordinary officer, so
+ * `anhallande` and `haktning` are refused — which is the refusal path the
+ * screen has to draw as "that decision is not yours to take" rather than as a
+ * Discord role problem.
+ */
+const FIXTURE_CAPACITY = 'polis';
+
+const NEXT_STATUS: Record<string, Record<string, string>> = {
+  gripen: { anhallande: 'anhallen', frigiv: 'frigiven' },
+  anhallen: { framstallan: 'framstalld', frigiv: 'frigiven' },
+  framstalld: { haktning: 'haktad', frigiv: 'frigiven' },
+  haktad: { frigiv: 'frigiven' },
+};
+
+const CAPACITY_FOR: Record<string, string> = {
+  anhallande: 'aklagare',
+  framstallan: 'aklagare',
+  haktning: 'domare',
+};
+
+function decideFrihet(input: unknown, action: string): unknown {
+  const { id, grund } = (input ?? {}) as { id?: number; grund?: string };
+  const row = frihetsberovanden.find((entry) => entry.id === id);
+
+  if (!row) return refuse('not_found');
+  if (row.status === 'frigiven') return refuse('conflict', { status: 'already_released' });
+
+  const to = NEXT_STATUS[row.status]?.[action];
+  if (!to) return refuse('conflict', { status: 'out_of_order' });
+
+  const required = CAPACITY_FOR[action];
+  if (required && required !== FIXTURE_CAPACITY) {
+    return refuse('forbidden', { status: 'wrong_capacity' });
+  }
+
+  if ((to === 'anhallen' || to === 'frigiven') && !grund) {
+    return refuse('invalid', { grund: 'required' });
+  }
+
+  row.status = to;
+  row.version += 1;
+
+  if (to === 'anhallen') row.anhallenAgo = 0;
+  if (to === 'framstalld') row.framstallanAgo = 0;
+  if (to === 'haktad') row.haktadAgo = 0;
+  if (to === 'frigiven') row.frigivenAgo = 0;
+
+  return { id: row.id, status: to };
+}
+
 export const fixtures: FixtureSet = {
   ok: {
     'session.get': () => session,
+
+    // ------------------------------------------------- frihetsberövande
+
+    /**
+     * Everybody the agency is holding (spec 7.9). No filter — the route takes
+     * none, because "who is in our cells right now" has one answer.
+     */
+    'frihet.open': () => ({
+      frihetsberovanden: [
+        ...frihetsberovanden
+          .filter((row) => row.status !== 'frigiven')
+          .map((row) => withFixtureClocks(row)),
+        ...restrictedFrihet,
+      ],
+    }),
+
+    'frihet.list': (input) => {
+      const filter = (input ?? {}) as { status?: string };
+
+      return {
+        frihetsberovanden: [
+          ...frihetsberovanden
+            .filter((row) => !filter.status || row.status === filter.status)
+            .map((row) => withFixtureClocks(row)),
+          ...restrictedFrihet,
+        ],
+      };
+    },
+
+    'frihet.get': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const row = frihetsberovanden.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+
+      const now = Date.now();
+
+      return {
+        frihetsberovande: withFixtureClocks(row),
+        brott: row.brott,
+        straffskala: row.brott.length > 0 ? { boter: false, min: 6, max: 72 } : null,
+        log: row.log.map((entry) => ({
+          id: entry.id,
+          kind: entry.kind,
+          note: entry.note,
+          loggedBy: entry.loggedBy,
+          loggedAt: new Date(now - entry.loggedAgo * 1000).toISOString(),
+        })),
+      };
+    },
+
+    'frihet.anhallande': (input) => decideFrihet(input, 'anhallande'),
+    'frihet.framstallan': (input) => decideFrihet(input, 'framstallan'),
+    'frihet.haktning': (input) => decideFrihet(input, 'haktning'),
+    'frihet.frigiv': (input) => decideFrihet(input, 'frigiv'),
+
+    'frihet.underratta': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const row = frihetsberovanden.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+
+      // Written once (RB 24:9). A second press is not an error and does not
+      // move the timestamp: the question asked later is when they were *first*
+      // told.
+      if (row.underrattadAgo !== undefined) return { id: row.id, alreadyRecorded: true };
+
+      row.underrattadAgo = 0;
+
+      return { id: row.id };
+    },
+
+    'frihet.log.add': (input) => {
+      const { id, kind, note } = (input ?? {}) as {
+        id?: number;
+        kind?: string;
+        note?: string;
+      };
+
+      const row = frihetsberovanden.find((entry) => entry.id === id);
+      if (!row) return refuse('not_found');
+
+      row.log = [
+        {
+          id: 900 + row.log.length,
+          kind: kind ?? 'frihet.logKind.annan',
+          note: note ?? null,
+          loggedBy: FIXTURE_VIEWER,
+          loggedAgo: 0,
+        },
+        ...row.log,
+      ];
+
+      return { id: row.id };
+    },
 
     // ------------------------------------------------------------- anmälan
 

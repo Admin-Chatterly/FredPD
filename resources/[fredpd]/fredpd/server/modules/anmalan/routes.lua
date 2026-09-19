@@ -298,7 +298,9 @@ local function runTransition(session, input, action, guard)
 
     local toStatus = service.nextStatus(row.status, action)
     if not toStatus then
-        return route.refuse(FredPD.ErrorCode.CONFLICT, { status = 'not_allowed' })
+        -- `out_of_order`, not the validator's `not_allowed`: the status is a
+        -- real one, it is this move from it that does not exist.
+        return route.refuse(FredPD.ErrorCode.CONFLICT, { status = 'out_of_order' })
     end
 
     local snapshot = snapshotOf(row, repo.charges(row.id), repo.personer(row.id))
@@ -591,7 +593,9 @@ local function runFuDecision(session, input, action)
 
     local toStatus = service.nextFuStatus(row.status, action)
     if not toStatus then
-        return route.refuse(FredPD.ErrorCode.CONFLICT, { status = 'not_allowed' })
+        -- `out_of_order`, not the validator's `not_allowed`: the status is a
+        -- real one, it is this move from it that does not exist.
+        return route.refuse(FredPD.ErrorCode.CONFLICT, { status = 'out_of_order' })
     end
 
     -- A nedläggning without a stated ground is the decision nobody can be asked
