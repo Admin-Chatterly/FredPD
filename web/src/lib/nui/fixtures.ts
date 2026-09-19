@@ -1763,7 +1763,9 @@ interface FixtureFrihet {
   status: string;
   personId: number;
   personNumber: string;
-  grund: string;
+  gripandeGrund: string;
+  anhallandeGrund?: string;
+  frigivenGrund?: string;
   version: number;
   /** Seconds before "now" each stage happened; absent means it has not. */
   gripenAgo?: number;
@@ -1777,7 +1779,14 @@ interface FixtureFrihet {
   frigivenBy?: string;
   underrattadAgo?: number;
   brott: { id: number; brottId: number; code: string; labelKey: string; citation: string; grad: string; stage: string }[];
-  log: { id: number; kind: string; note: string | null; loggedBy: string; loggedAgo: number }[];
+  log: {
+    id: number;
+    kind: string;
+    note: string | null;
+    loggedByCallsign: string | null;
+    loggedByName: string | null;
+    loggedAgo: number;
+  }[];
 }
 
 const HOUR = 3600;
@@ -1799,7 +1808,7 @@ const frihetsberovanden: FixtureFrihet[] = [
     status: 'gripen',
     personId: 2,
     personNumber: 'P-000512',
-    grund: 'pa_bar_garning',
+    gripandeGrund: 'pa_bar_garning',
     version: 1,
     gripenAgo: 3 * HOUR,
     gripenBy: FIXTURE_VIEWER,
@@ -1819,7 +1828,8 @@ const frihetsberovanden: FixtureFrihet[] = [
         id: 201,
         kind: 'frihet.logKind.maltid',
         note: null,
-        loggedBy: FIXTURE_VIEWER,
+        loggedByCallsign: '1-ADAM-12',
+        loggedByName: 'Berg',
         loggedAgo: 1 * HOUR,
       },
     ],
@@ -1833,7 +1843,8 @@ const frihetsberovanden: FixtureFrihet[] = [
     status: 'anhallen',
     personId: 1,
     personNumber: 'P-000431',
-    grund: 'flyktfara',
+    gripandeGrund: 'flyktfara',
+    anhallandeGrund: 'flyktfara',
     version: 2,
     gripenAgo: 100 * HOUR,
     anhallenAgo: 96 * HOUR,
@@ -1861,7 +1872,8 @@ const frihetsberovanden: FixtureFrihet[] = [
     status: 'framstalld',
     personId: 3,
     personNumber: 'P-000733',
-    grund: 'kollusionsfara',
+    gripandeGrund: 'kollusionsfara',
+    anhallandeGrund: 'kollusionsfara',
     version: 3,
     gripenAgo: 92 * HOUR,
     anhallenAgo: 90 * HOUR,
@@ -1879,7 +1891,8 @@ const frihetsberovanden: FixtureFrihet[] = [
     status: 'frigiven',
     personId: 4,
     personNumber: 'P-000108',
-    grund: 'identitet_oklar',
+    gripandeGrund: 'identitet_oklar',
+    frigivenGrund: 'ej_anhallen',
     version: 4,
     gripenAgo: 200 * HOUR,
     frigivenAgo: 194 * HOUR,
@@ -1911,7 +1924,12 @@ function withFixtureClocks(row: FixtureFrihet): Record<string, unknown> {
 
   const deadlines: Record<string, { at: number; remaining: number; passed: boolean }> = {};
 
-  const anhallenAt = seconds(row.anhallenAgo);
+  // A released chain carries no deadline, as `Frihet.deadlines` does not. The
+  // fixture has to agree or the e2e suite asserts a screen the server cannot
+  // produce -- which is exactly how the `grund` drift went unnoticed.
+  const released = row.status === 'frigiven';
+
+  const anhallenAt = released ? null : seconds(row.anhallenAgo);
   if (anhallenAt !== null && row.framstallanAgo === undefined) {
     const noon = new Date(anhallenAt * 1000);
     noon.setUTCDate(noon.getUTCDate() + 3);
@@ -1923,7 +1941,7 @@ function withFixtureClocks(row: FixtureFrihet): Record<string, unknown> {
     deadlines.framstallan = { at: deadlineAt, remaining, passed: remaining < 0 };
   }
 
-  const start = seconds(row.gripenAgo) ?? anhallenAt;
+  const start = released ? null : (seconds(row.gripenAgo) ?? anhallenAt);
   if (start !== null && row.haktadAgo === undefined) {
     const deadlineAt = start + 96 * HOUR;
     const remaining = deadlineAt - now / 1000;
@@ -1960,7 +1978,9 @@ function withFixtureClocks(row: FixtureFrihet): Record<string, unknown> {
     status: row.status,
     personId: row.personId,
     personNumber: row.personNumber,
-    grund: row.grund,
+    gripandeGrund: row.gripandeGrund,
+    anhallandeGrund: row.anhallandeGrund ?? null,
+    frigivenGrund: row.frigivenGrund ?? null,
     version: row.version,
     gripenAt: at(row.gripenAgo),
     gripenBy: row.gripenBy ?? null,
@@ -2025,10 +2045,16 @@ function decideFrihet(input: unknown, action: string): unknown {
   row.status = to;
   row.version += 1;
 
-  if (to === 'anhallen') row.anhallenAgo = 0;
+  if (to === 'anhallen') {
+    row.anhallenAgo = 0;
+    if (grund) row.anhallandeGrund = grund;
+  }
   if (to === 'framstalld') row.framstallanAgo = 0;
   if (to === 'haktad') row.haktadAgo = 0;
-  if (to === 'frigiven') row.frigivenAgo = 0;
+  if (to === 'frigiven') {
+    row.frigivenAgo = 0;
+    if (grund) row.frigivenGrund = grund;
+  }
 
   return { id: row.id, status: to };
 }
@@ -2081,7 +2107,8 @@ export const fixtures: FixtureSet = {
           id: entry.id,
           kind: entry.kind,
           note: entry.note,
-          loggedBy: entry.loggedBy,
+          loggedByCallsign: entry.loggedByCallsign,
+          loggedByName: entry.loggedByName,
           loggedAt: new Date(now - entry.loggedAgo * 1000).toISOString(),
         })),
       };
@@ -2118,12 +2145,20 @@ export const fixtures: FixtureSet = {
       const row = frihetsberovanden.find((entry) => entry.id === id);
       if (!row) return refuse('not_found');
 
+      // Mirrors `Frihet.isLogKind`: a key under the module's prefix, never
+      // prose. `t()` prints an unknown key verbatim, so a free string here
+      // reached a custody record as a label.
+      if (!/^frihet\.logKind\.[a-z][a-z0-9_]*$/.test(kind ?? '')) {
+        return refuse('invalid', { kind: 'not_a_key' });
+      }
+
       row.log = [
         {
           id: 900 + row.log.length,
           kind: kind ?? 'frihet.logKind.annan',
           note: note ?? null,
-          loggedBy: FIXTURE_VIEWER,
+          loggedByCallsign: '1-ADAM-12',
+          loggedByName: 'Berg',
           loggedAgo: 0,
         },
         ...row.log,

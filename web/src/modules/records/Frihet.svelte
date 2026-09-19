@@ -61,18 +61,30 @@
     status: string;
     personId: number;
     personNumber?: string | null;
-    grund?: string | null;
-    plats?: string | null;
+    /**
+     * Each stage's ground, named the way the SELECT aliases it.
+     *
+     * There is **no bare `grund`** — `frihet/repo.lua` sends
+     * `gripande_grund AS gripandeGrund` and two siblings, and a field called
+     * `grund` typed here rendered nothing at all in game while passing every
+     * test, because the fixture invented one. Three fields, spelled as the
+     * server spells them.
+     */
+    gripandeGrund?: string | null;
+    anhallandeGrund?: string | null;
+    frigivenGrund?: string | null;
+    gripandePlats?: string | null;
     gripenAt?: Moment;
     gripenBy?: string | null;
     anhallenAt?: Moment;
     anhallenBy?: string | null;
     framstallanAt?: Moment;
+    framstallanBy?: string | null;
     haktadAt?: Moment;
     haktadBy?: string | null;
+    haktningBeslut?: string | null;
     frigivenAt?: Moment;
     frigivenBy?: string | null;
-    frigivenGrund?: string | null;
     underrattadAt?: Moment;
     version: number;
     /** Added by `withClocks` on the way out of every frihet route. */
@@ -102,7 +114,18 @@
     id: number;
     kind: string;
     note: string | null;
-    loggedBy: string | null;
+    /**
+     * The author as a person, not as an account.
+     *
+     * `logged_by` is a Discord snowflake and the repo joins `fpd_officers` to
+     * turn it into the callsign and the display name command staff set. An
+     * 18-digit identifier in a "By" column told an officer nothing and put an
+     * account id on the face of a record a defence lawyer reads. Both are
+     * nullable: an entry written by somebody since off the roster still has to
+     * appear, because the log is append-only.
+     */
+    loggedByCallsign: string | null;
+    loggedByName: string | null;
     loggedAt: Moment;
   }
 
@@ -166,6 +189,40 @@
   let grund = $state('');
   let logKind = $state(LOG_KINDS[0]);
   let logNote = $state('');
+
+  /**
+   * The confirmation dialog, and the button that opened it.
+   *
+   * Kept so focus can move into the dialog when it opens and back to the
+   * trigger when it closes. Without the first, pressing a decision button left
+   * `document.activeElement` on `<body>` — nothing announced, no visible focus,
+   * and a keyboard user had to tab blindly into a dialog about a detention.
+   */
+  let confirmBox = $state<HTMLDivElement | null>(null);
+  let trigger: HTMLButtonElement | null = null;
+
+  /** The required marker 6.4 asks for. Punctuation, so it is not a locale key. */
+  const REQUIRED_MARK = '*';
+
+  /** True once the server has said this decision needs a ground and none is set. */
+  const grundMissing = $derived(
+    failure?.err === 'invalid' && failure.fields?.grund === 'required' && !grund,
+  );
+
+  /**
+   * Moves focus into the dialog as it opens.
+   *
+   * The dialog is the element that catches Escape, so focus being inside it is
+   * what makes Escape close the dialog rather than the whole NUI.
+   */
+  $effect(() => {
+    if (confirming && confirmBox) confirmBox.focus();
+  });
+
+  function cancelConfirm(): void {
+    confirming = null;
+    trigger?.focus();
+  }
 
   /**
    * How long ago the open response arrived, in seconds, ticking once a second.
@@ -334,6 +391,21 @@
   }
 
   /**
+   * How long this person has been held, as a row should read it.
+   *
+   * `elapsed` is added only while the chain is open. The server already froze
+   * the figure at the release — `Frihet.heldFor` measures to `frigivenAt` or to
+   * now, whichever exists — and adding the tick unconditionally undid that, so
+   * a detention that ended weeks ago grew a second every second while somebody
+   * watched the history list.
+   */
+  function heldText(row: FrihetRow): string {
+    if (!row.heldFor) return '';
+
+    return duration(row.frigivenAt ? row.heldFor : row.heldFor + elapsed);
+  }
+
+  /**
    * A span of seconds as an officer reads it: `2 d 6 h`, `14 min`.
    *
    * Two units at most, and never a unit that is zero — "0 d 6 h 0 min" is three
@@ -389,6 +461,21 @@
     return value.replace('T', ' ').slice(0, 16);
   }
 
+  /**
+   * A log entry's author, as 6.3 writes one: `Berg (1-ADAM-12)`.
+   *
+   * Empty when the roster no longer has them — an entry by somebody since
+   * removed still belongs in an append-only log, and a blank cell says "we no
+   * longer know who" more honestly than an account id does.
+   */
+  function officerText(entry: LogEntry): string {
+    if (entry.loggedByName && entry.loggedByCallsign) {
+      return `${entry.loggedByName} (${entry.loggedByCallsign})`;
+    }
+
+    return entry.loggedByName ?? entry.loggedByCallsign ?? '';
+  }
+
   function stubContact(row: Restricted): string {
     return t('records.restricted.contact', { unit: t(`access.unit.${row.contact}`) });
   }
@@ -429,11 +516,26 @@
   const stages = $derived(
     record
       ? [
-          { key: 'gripen', at: record.gripenAt, by: record.gripenBy },
-          { key: 'anhallen', at: record.anhallenAt, by: record.anhallenBy },
-          { key: 'framstalld', at: record.framstallanAt, by: null },
-          { key: 'haktad', at: record.haktadAt, by: record.haktadBy },
-          { key: 'frigiven', at: record.frigivenAt, by: record.frigivenBy },
+          {
+            key: 'gripen',
+            at: record.gripenAt,
+            grund: record.gripandeGrund,
+            grundList: 'frihet.grund',
+          },
+          {
+            key: 'anhallen',
+            at: record.anhallenAt,
+            grund: record.anhallandeGrund,
+            grundList: 'frihet.grund',
+          },
+          { key: 'framstalld', at: record.framstallanAt, grund: null, grundList: '' },
+          { key: 'haktad', at: record.haktadAt, grund: null, grundList: '' },
+          {
+            key: 'frigiven',
+            at: record.frigivenAt,
+            grund: record.frigivenGrund,
+            grundList: 'frihet.frigivningsgrund',
+          },
         ]
       : [],
   );
@@ -498,71 +600,92 @@
           {openOnly ? t('frihet.empty') : t('frihet.emptyList')}
         </p>
       {:else}
-        <table class="w-full text-xs">
-          <thead class="bg-[var(--color-surface)]">
-            <tr>
-              <th class="px-2 py-1 text-left font-semibold">{t('frihet.column.number')}</th>
-              <th class="px-2 py-1 text-left font-semibold">{t('frihet.column.person')}</th>
-              <th class="px-2 py-1 text-left font-semibold">{t('frihet.column.status')}</th>
-              <th class="px-2 py-1 text-left font-semibold">{t('frihet.column.heldFor')}</th>
-              <th class="px-2 py-1 text-left font-semibold">{t('frihet.column.deadline')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <!--
-              Keyed by index, not by id: a stub carries no id (4.5), so two
-              restricted rows would collide on `undefined` and Svelte would
-              refuse to render the list at all. Every list in this module keys
-              the same way.
-            -->
-            {#each rows as row, index (index)}
-              {#if isStub(row)}
-                <tr class="border-t border-[var(--color-border)]">
-                  <td class="px-2 py-1 text-[var(--color-ink-muted)]" colspan="5">
-                    {t('records.restricted.title')} — {stubContact(row)}
-                  </td>
-                </tr>
-              {:else}
-                {@const deadline = nextOf(row)}
-                <tr class="border-t border-[var(--color-border)]">
-                  <td class="px-2 py-1 font-[family-name:var(--font-mono)]">
-                    <button
-                      type="button"
-                      class="underline-offset-2 hover:underline"
-                      class:font-semibold={openId === row.id}
-                      onclick={() => void open(row.id)}
-                    >
-                      {row.number}
-                    </button>
-                  </td>
-                  <td class="px-2 py-1 font-[family-name:var(--font-mono)]">
-                    {row.personNumber ?? ''}
-                  </td>
-                  <td class="px-2 py-1">{t(`frihet.status.${row.status}`)}</td>
-                  <td class="px-2 py-1">
-                    {row.heldFor ? duration(row.heldFor + elapsed) : ''}
-                  </td>
-                  <td class="px-2 py-1">
-                    {#if deadline}
-                      <!--
-                        The overdue row is marked by colour AND by a word.
-                        Colour alone is not a signal every officer receives, and
-                        this is the one row on the screen where missing it is an
-                        unlawful detention (6.2).
-                      -->
-                      <span class:text-[var(--color-alert)]={isOverdue(deadline)}>
-                        {#if isOverdue(deadline)}
-                          {t('frihet.deadline.overdueRow')} —
-                        {/if}
-                        {countdown(deadline)}
-                      </span>
-                    {/if}
-                  </td>
-                </tr>
-              {/if}
-            {/each}
-          </tbody>
-        </table>
+        <!--
+          Scrolls inside its own panel rather than pushing past it.
+          Five columns of Swedish do not fit 438 px: "Häktningsframställan
+          inlämnad" alone is 29 characters with an unbreakable first word, and
+          the countdown column — the one the screen exists for — was rendering
+          89 px outside the border and over the detail panel behind it. Spec 6
+          allows a table its own horizontal scroll; it does not allow the
+          statutory deadline to be the part that falls off.
+        -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead class="bg-[var(--color-surface)]">
+              <tr>
+                <th class="px-2 py-1 text-left font-semibold">{t('frihet.column.number')}</th>
+                <th class="px-2 py-1 text-left font-semibold">{t('frihet.column.person')}</th>
+                <th class="px-2 py-1 text-left font-semibold">{t('frihet.column.status')}</th>
+                <th class="px-2 py-1 text-left font-semibold">{t('frihet.column.heldFor')}</th>
+                <th class="px-2 py-1 text-left font-semibold">{t('frihet.column.deadline')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!--
+                Keyed by index, not by id: a stub carries no id (4.5), so two
+                restricted rows would collide on `undefined` and Svelte would
+                refuse to render the list at all. Every list in this module keys
+                the same way.
+              -->
+              {#each rows as row, index (index)}
+                {#if isStub(row)}
+                  <tr class="border-t border-[var(--color-border)]">
+                    <td class="px-2 py-1 text-[var(--color-ink-muted)]" colspan="5">
+                      {t('records.restricted.title')} — {stubContact(row)}
+                    </td>
+                  </tr>
+                {:else}
+                  {@const deadline = nextOf(row)}
+                  <tr class="border-t border-[var(--color-border)]">
+                    <td class="px-2 py-1 font-[family-name:var(--font-mono)] whitespace-nowrap">
+                      <button
+                        type="button"
+                        class="underline-offset-2 hover:underline"
+                        class:font-semibold={openId === row.id}
+                        onclick={() => void open(row.id)}
+                      >
+                        {row.number}
+                      </button>
+                    </td>
+                    <td class="px-2 py-1 font-[family-name:var(--font-mono)] whitespace-nowrap">
+                      {row.personNumber ?? ''}
+                    </td>
+                    <td class="px-2 py-1">{t(`frihet.status.${row.status}`)}</td>
+                    <td class="px-2 py-1 whitespace-nowrap">{heldText(row)}</td>
+                    <td class="px-2 py-1 whitespace-nowrap">
+                      {#if deadline}
+                        <!--
+                          Three states, not two. Overdue and comfortable were
+                          distinguished; *about to breach* was not, so a row
+                          four hours from an RB 24:12 breach looked exactly like
+                          one with three days left — on the board a supervisor
+                          watches precisely to catch the first.
+                          `needsAttention` is the server's own judgement and was
+                          already on every row; it was simply not drawn.
+
+                          Each state carries a word as well as a colour, because
+                          colour alone is not a signal every officer receives
+                          and this is the column where missing it is an unlawful
+                          detention (6.2).
+                        -->
+                        <span
+                          class:text-[var(--color-alert)]={isOverdue(deadline)}
+                          class:text-[var(--color-caution)]={!isOverdue(deadline) &&
+                            row.needsAttention}
+                        >
+                          {#if !isOverdue(deadline) && row.needsAttention}
+                            {t('frihet.deadline.soon')} —
+                          {/if}
+                          {countdown(deadline)}
+                        </span>
+                      {/if}
+                    </td>
+                  </tr>
+                {/if}
+              {/each}
+            </tbody>
+          </table>
+        </div>
       {/if}
     </div>
 
@@ -577,18 +700,42 @@
           </h2>
           <p class="text-xs text-[var(--color-ink-muted)]">
             {t(`frihet.status.${record.status}`)}
-            {#if record.grund}
-              · {t(`frihet.grund.${record.grund}`)}
+            {#if record.gripandeGrund}
+              · {t(`frihet.grund.${record.gripandeGrund}`)}
             {/if}
             {#if record.heldFor}
-              · {t('frihet.column.heldFor')}: {duration(record.heldFor + elapsed)}
+              · {t('frihet.column.heldFor')}: {heldText(record)}
             {/if}
           </p>
         </header>
 
         {#if record.needsAttention}
-          <p class="mb-3 border border-[var(--color-alert)] px-2 py-1 text-xs" role="alert">
-            {t('frihet.attention')}
+          <!--
+            `caution` while a deadline is still running, `alert` only once one
+            has passed. 6.2 assigns caution to "pending, expiring, needs
+            attention" and alert to warrants and officer safety — and a banner
+            that reads the same six hours before a breach as it does a day
+            after one is a banner that stops distinguishing them.
+
+            It also names which deadline, because "a statutory deadline needs
+            attention" does not tell an officer whether to ring the prosecutor
+            or the court.
+          -->
+          {@const passed = nextOf(record) ? isOverdue(nextOf(record)!) : false}
+          <p
+            class="mb-3 px-2 py-1 text-xs"
+            class:border={true}
+            class:border-[var(--color-alert)]={passed}
+            class:border-[var(--color-caution)]={!passed}
+            role="alert"
+          >
+            {#if record.nextDeadline}
+              {t(passed ? 'frihet.attentionPassed' : 'frihet.attentionSoon', {
+                deadline: t(`frihet.deadline.${record.nextDeadline}`),
+              })}
+            {:else}
+              {t('frihet.attention')}
+            {/if}
           </p>
         {/if}
 
@@ -623,18 +770,36 @@
           <h3 class="mb-1 text-xs font-semibold">{t('frihet.section.chain')}</h3>
           <ul class="text-xs">
             {#each stages as stage (stage.key)}
-              <li class="flex justify-between border-t border-[var(--color-border)] py-1">
-                <span class:text-[var(--color-ink-muted)]={!stage.at}>
-                  {t(`frihet.status.${stage.key}`)}
-                </span>
-                <span class="font-[family-name:var(--font-mono)]">
-                  {#if stage.at}
-                    {formatMoment(stage.at)}{#if stage.by}
-                      · {t('frihet.chain.by')} {stage.by}{/if}
-                  {:else}
-                    <span class="text-[var(--color-ink-muted)]">{t('frihet.chain.pending')}</span>
-                  {/if}
-                </span>
+              <li class="border-t border-[var(--color-border)] py-1">
+                <div class="flex justify-between gap-2">
+                  <!--
+                    The row names the *decision*, not the person's state: this
+                    is a list of what was decided, and "Gripen / Anhållen /
+                    Häktad" are what somebody is, which reads oddly under a
+                    heading of "Beslut". `frihet.stage.*` carries the act.
+                  -->
+                  <span class:text-[var(--color-ink-muted)]={!stage.at}>
+                    {t(`frihet.stage.${stage.key}`)}
+                  </span>
+                  <span class="font-[family-name:var(--font-mono)] whitespace-nowrap">
+                    {#if stage.at}
+                      {formatMoment(stage.at)}
+                    {:else}
+                      <span class="text-[var(--color-ink-muted)]">{t('frihet.chain.pending')}</span>
+                    {/if}
+                  </span>
+                </div>
+                <!--
+                  The ground each decision rested on, which is the part quoted
+                  afterwards. The release ground in particular was required by
+                  the server, stored, and then rendered nowhere — so the reason
+                  somebody was let go vanished the moment it was recorded.
+                -->
+                {#if stage.grund}
+                  <p class="text-[var(--color-ink-muted)]">
+                    {t('frihet.column.grund')}: {t(`${stage.grundList}.${stage.grund}`)}
+                  </p>
+                {/if}
               </li>
             {/each}
           </ul>
@@ -703,8 +868,31 @@
                 6.4: a dialog with a verb label for a legal action. Each of
                 these either keeps somebody locked up or lets them go, and each
                 is quoted afterwards.
+
+                `onkeydown` is not decoration. `main.ts` listens for Escape on
+                `window` and asks the client to close the whole NUI, so Escape
+                inside this dialog used to discard the open record and the
+                chosen ground mid-release — the opposite of 6.4, which wants
+                Escape to close the dialog. Stopping propagation keeps it local.
+
+                Focused on open so a keyboard user is actually inside it, and
+                focus returns to the button that opened it on cancel.
               -->
-              <div class="border border-[var(--color-border)] px-2 py-2 text-xs">
+              <div
+                bind:this={confirmBox}
+                role="dialog"
+                aria-modal="true"
+                aria-label={t(`frihet.action.${confirming}`)}
+                tabindex="-1"
+                class="border border-[var(--color-border)] px-2 py-2 text-xs"
+                onkeydown={(event) => {
+                  if (event.key !== 'Escape') return;
+
+                  event.stopPropagation();
+                  event.preventDefault();
+                  cancelConfirm();
+                }}
+              >
                 <p>{t(`frihet.confirm.${confirming}`)}</p>
 
                 {#if grundList}
@@ -713,15 +901,34 @@
                     reaches it before the action that consumes it (6.4). It is a
                     locale key and never free text (invariant 6): it is read
                     back in both languages and quoted in a court file.
+
+                    The placeholder is "choose a ground", not `form.any`. The
+                    server requires this field (`grund: required`), and an empty
+                    option labelled "Any" read as a filter default and invited a
+                    refusal the officer had done nothing to deserve.
                   -->
                   <label class="mt-2 flex flex-col gap-1">
-                    {t('frihet.column.grund')}
-                    <select bind:value={grund} class="border border-[var(--color-border)] px-2 py-1">
-                      <option value="">{t('form.any')}</option>
+                    {t('frihet.column.grund')} <span aria-hidden="true">{REQUIRED_MARK}</span>
+                    <select
+                      bind:value={grund}
+                      required
+                      aria-required="true"
+                      class="border border-[var(--color-border)] px-2 py-1"
+                      class:border-[var(--color-alert)]={grundMissing}
+                    >
+                      <option value="">{t('frihet.grund.choose')}</option>
                       {#each GRUND_KEYS[grundList] as key (key)}
                         <option value={key}>{t(`${grundList}.${key}`)}</option>
                       {/each}
                     </select>
+                    {#if grundMissing}
+                      <!--
+                        Beside the field, not only in the panel at the top of
+                        the page: 6.4 wants inline validation, and the officer
+                        is looking here.
+                      -->
+                      <span class="text-[var(--color-alert)]">{t('fieldError.required')}</span>
+                    {/if}
                   </label>
                 {/if}
 
@@ -737,7 +944,7 @@
                   <button
                     type="button"
                     class="border border-[var(--color-border)] px-3 py-1"
-                    onclick={() => (confirming = null)}
+                    onclick={() => cancelConfirm()}
                   >
                     {t('form.cancel')}
                   </button>
@@ -750,7 +957,8 @@
                     type="button"
                     class="border border-[var(--color-border)] px-3 py-1 text-xs"
                     disabled={busy}
-                    onclick={() => {
+                    onclick={(event) => {
+                      trigger = event.currentTarget;
                       confirming = action;
                       grund = '';
                     }}
@@ -787,7 +995,7 @@
                     </td>
                     <td class="px-2 py-1">{t(entry.kind)}</td>
                     <td class="px-2 py-1">{entry.note ?? ''}</td>
-                    <td class="px-2 py-1">{entry.loggedBy ?? ''}</td>
+                    <td class="px-2 py-1">{officerText(entry)}</td>
                   </tr>
                 {/each}
               </tbody>

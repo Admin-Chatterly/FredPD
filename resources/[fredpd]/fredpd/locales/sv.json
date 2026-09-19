@@ -136,7 +136,8 @@
     "resolved": "Spaningsuppdraget är avslutat.",
     "no_expiry": "Spaningsuppdraget saknar sluttid och kan inte användas.",
     "out_of_range": "Utanför tillåtet intervall.",
-    "out_of_order": "Inte möjligt från det här stadiet."
+    "out_of_order": "Inte möjligt från det här stadiet.",
+    "not_a_key": "Okänd händelsetyp."
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -943,7 +944,7 @@
       "persons": "Personer",
       "vehicles": "Fordon",
       "anmalan": "Anmälningar",
-      "frihet": "Frihetsberövande"
+      "frihet": "Frihetsberövanden"
     },
     "vehicle": {
       "column": {
@@ -1658,7 +1659,7 @@
       "person": "Person",
       "status": "Status",
       "gripen": "Gripen",
-      "heldFor": "Frihetsberövad",
+      "heldFor": "Tid frihetsberövad",
       "deadline": "Nästa frist",
       "grund": "Grund"
     },
@@ -1668,8 +1669,7 @@
       "passed": "Överskriden med {time}",
       "remaining": "{time} kvar",
       "none": "Ingen frist löper.",
-      "met": "Uppfylld",
-      "overdueRow": "Överskriden"
+      "soon": "Snart"
     },
     "grund": {
       "pa_bar_garning": "På bar gärning",
@@ -1678,13 +1678,14 @@
       "kollusionsfara": "Kollusionsfara",
       "recidivfara": "Recidivfara",
       "identitet_oklar": "Identiteten ej fastställd",
-      "annan": "Annat, anges i journalen"
+      "annan": "Annan, anges i journalen",
+      "choose": "Välj grund"
     },
     "frigivningsgrund": {
       "ej_anhallen": "Ej anhållen av åklagare",
       "beslut_upphavt": "Beslutet upphävt",
       "tiden_ute": "Fristen har löpt ut",
-      "annan": "Annat, anges i journalen"
+      "annan": "Annan, anges i journalen"
     },
     "logKind": {
       "forhor": "Förhör",
@@ -1706,7 +1707,7 @@
     "section": {
       "chain": "Beslut",
       "deadlines": "Lagstadgade frister",
-      "brott": "Misstänkt för",
+      "brott": "Frihetsberövad för",
       "log": "Arrestjournal"
     },
     "chain": {
@@ -1720,21 +1721,30 @@
     },
     "log": {
       "empty": "Inget loggat ännu.",
-      "kind": "Händelse",
+      "kind": "Åtgärd",
       "note": "Anteckning",
       "at": "Tid",
-      "by": "Av"
+      "by": "Noterat av"
     },
     "confirm": {
-      "anhallande": "Anhållande är åklagarens beslut. Det startar fristen enligt RB 24:12: häktningsframställan ska vara hos rätten senast klockan tolv tredje dagen.",
-      "framstallan": "Detta registrerar att häktningsframställan har lämnats till rätten.",
-      "haktning": "Häktning är rättens beslut. Det avslutar fristen enligt RB 24:13 och håller personen kvar i häkte.",
+      "anhallande": "Anhållande är åklagarens beslut. Det startar fristen enligt RB 24:12: häktningsframställan ska ha getts in till rätten senast klockan tolv tredje dagen efter anhållningsbeslutet — en lokal klockan tolv, inte sjuttiotvå timmar.",
+      "framstallan": "Detta registrerar att häktningsframställan har getts in till rätten. Fristen enligt RB 24:12 upphör att löpa. Häktningsförhandling ska hållas senast fyra dygn efter gripandet (RB 24:13).",
+      "haktning": "Häktning är rättens beslut. Det avslutar fristen enligt RB 24:13 och personen tas in i häkte.",
       "frigiv": "Frigivning avslutar frihetsberövandet. Ett senare gripande är en ny kedja med egna frister, inte en återupptagning av den här."
     },
     "duration": {
-      "days": "{count} d",
-      "hours": "{count} h",
+      "days": "{count} dygn",
+      "hours": "{count} tim",
       "minutes": "{count} min"
+    },
+    "attentionSoon": "{deadline} löper snart ut.",
+    "attentionPassed": "{deadline} har överskridits.",
+    "stage": {
+      "gripen": "Gripande",
+      "anhallen": "Anhållande",
+      "framstalld": "Häktningsframställan",
+      "haktad": "Häktning",
+      "frigiven": "Frigivande"
     }
   },
   "tvang": {

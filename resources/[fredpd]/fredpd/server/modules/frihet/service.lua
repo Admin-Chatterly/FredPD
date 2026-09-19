@@ -119,6 +119,28 @@ function Frihet.isOpen(row)
     return type(row) == 'table' and row.status ~= 'frigiven'
 end
 
+--- Is this a locale key the custody log may carry?
+---
+--- `FrihetLog.kind` is a *key* and not an enum on purpose: what a department
+--- logs is a matter of its own standing orders rather than of what the law
+--- names, and an enum would need a migration before a server could record
+--- something its own routines require.
+---
+--- What that argument does not license is a free string. The NUI renders the
+--- kind with `t()`, and `t()` falls back to printing an unknown key verbatim --
+--- so a 64-character field with no shape let an officer write an arbitrary
+--- sentence into a custody record and have it drawn as a label, in English, in
+--- both locales. That is invariant 6 gone round the back.
+---
+--- The prefix is the whole check, and it keeps the freedom the comment wanted:
+--- a department adds `frihet.logKind.visitation` to its locale overlay and the
+--- server accepts it without a schema change. What it cannot do is send prose.
+local LOG_KIND_PATTERN <const> = '^frihet%.logKind%.[a-z][a-z0-9_]*$'
+
+function Frihet.isLogKind(value)
+    return type(value) == 'string' and value:match(LOG_KIND_PATTERN) ~= nil
+end
+
 -- -----------------------------------------------------------------------------
 -- The clocks
 -- -----------------------------------------------------------------------------
@@ -196,6 +218,17 @@ function Frihet.deadlines(row, now, offset)
     local out = {}
 
     if type(row) ~= 'table' then return out end
+
+    -- A released chain has no deadlines. Neither statutory clock is about the
+    -- passage of time on its own: RB 24:12 bounds how long somebody may be held
+    -- before the court is asked, and RB 24:13 bounds how long before it hears
+    -- them. Once they are out, both questions are answered.
+    --
+    -- Without this the history list drew "Överskriden med 4 d 8 h" and the red
+    -- attention banner against somebody released days ago -- a breach warning
+    -- for a detention that ended, on the screen whose whole job is to be
+    -- believed about breaches.
+    if not Frihet.isOpen(row) then return out end
 
     -- RB 24:12, from the anhållande. Only while it is still the live question:
     -- once the framställan has been made the deadline has been met and a

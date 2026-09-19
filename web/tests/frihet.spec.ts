@@ -64,17 +64,119 @@ test('marks an overdue RB 24:12 deadline as overdue, in words', async ({ page })
   await expect(row).toContainText('Overdue by');
 });
 
-test('draws the chain in order, with who decided and when', async ({ page }) => {
+test('draws the chain as decisions, in order, with the ground each rested on', async ({
+  page,
+}) => {
   await openCustody(page);
 
   await page.getByRole('button', { name: 'A26-00039' }).click();
 
   await expect(page.getByRole('heading', { name: 'Decisions' })).toBeVisible();
 
-  // Arrested and detained by the prosecutor; the two later stages have not
-  // happened and say so rather than rendering an empty row.
-  const chain = page.getByRole('listitem').filter({ hasText: 'Remanded in custody' });
-  await expect(chain).toContainText('Not taken');
+  // The rows name the *act*, not the person's state: "Gripen / Anhållen" under
+  // a heading of "Decisions" reads as a list of conditions, not of decisions.
+  // Exact: "Häktning" is a prefix of "Häktningsframställan", and both are rows.
+  const remand = page
+    .getByRole('listitem')
+    .filter({ has: page.getByText('Häktning (remand by the court)') });
+  await expect(remand).toContainText('Not taken');
+
+  // The ground is the part quoted afterwards, and it comes from the server as
+  // `gripandeGrund` — a field this screen once read as a bare `grund`, which
+  // meant it rendered nothing at all in game while every test passed.
+  const arrest = page.getByRole('listitem').filter({ hasText: 'Gripande' });
+  await expect(arrest).toContainText('Risk of flight');
+});
+
+test('shows the release ground, which was stored and never drawn', async ({ page }) => {
+  await openCustody(page);
+
+  await page.getByLabel('Currently held only').uncheck();
+  await page.getByRole('button', { name: 'Search' }).click();
+  await page.getByRole('button', { name: 'A26-00038' }).click();
+
+  const release = page.getByRole('listitem').filter({ hasText: 'Frigivande' });
+  await expect(release).toContainText('Not detained by the prosecutor');
+});
+
+test('stops the clocks when somebody is released', async ({ page }) => {
+  await openCustody(page);
+
+  await page.getByLabel('Currently held only').uncheck();
+  await page.getByRole('button', { name: 'Search' }).click();
+
+  // A26-00038 was arrested 200 hours ago and released 194 hours ago. Both RB
+  // clocks would otherwise still be running and long past, so the history list
+  // drew a breach warning — and the red banner — against somebody already out.
+  const row = page.getByRole('row').filter({ hasText: 'A26-00038' });
+  await expect(row).not.toContainText('Overdue');
+
+  await page.getByRole('button', { name: 'A26-00038' }).click();
+  await expect(page.getByText('No deadline is running.')).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
+test('marks a deadline that is close but not yet breached', async ({ page }) => {
+  await openCustody(page);
+
+  // A26-00040 is inside the warning window. Before this it rendered in plain
+  // ink, identical to a row with three days left — on the board a supervisor
+  // watches precisely to catch the row that is about to breach.
+  const row = page.getByRole('row').filter({ hasText: 'A26-00040' });
+  await expect(row).toContainText('Due soon');
+});
+
+test('says which deadline needs attention, not merely that one does', async ({ page }) => {
+  await openCustody(page);
+
+  await page.getByRole('button', { name: 'A26-00039' }).click();
+
+  // "A statutory deadline needs attention" does not tell an officer whether to
+  // ring the prosecutor or the court.
+  await expect(page.getByRole('alert')).toContainText('Remand application (RB 24:12)');
+  await expect(page.getByRole('alert')).toContainText('has passed');
+});
+
+test('names the officer who wrote a custody log entry, not their account id', async ({ page }) => {
+  await openCustody(page);
+
+  await page.getByRole('button', { name: 'A26-00041' }).click();
+
+  // An 18-digit Discord snowflake told an officer nothing and put an account
+  // identifier on the face of a record a defence lawyer reads.
+  await expect(page.getByRole('cell', { name: 'Berg (1-ADAM-12)' })).toBeVisible();
+});
+
+test('Escape closes the confirmation, not the whole interface', async ({ page }) => {
+  await openCustody(page);
+
+  await page.getByRole('button', { name: 'A26-00041' }).click();
+  await page.getByRole('button', { name: 'Detain (prosecutor)' }).click();
+
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+
+  // `main.ts` listens for Escape on `window` and asks the client to close the
+  // NUI. Inside a dialog about a detention that discarded the open record and
+  // the chosen ground; 6.4 wants Escape to close the dialog.
+  await page.keyboard.press('Escape');
+
+  await expect(dialog).toHaveCount(0);
+  // The record is still open behind it, and the shell is still there.
+  await expect(page.getByRole('heading', { name: 'Decisions' })).toBeVisible();
+});
+
+test('asks for a ground rather than offering "Any"', async ({ page }) => {
+  await openCustody(page);
+
+  await page.getByRole('button', { name: 'A26-00041' }).click();
+  await page.getByRole('button', { name: 'Release', exact: true }).click();
+
+  // The server requires this field. An empty option labelled "Any" read as a
+  // filter default and invited a refusal the officer had done nothing to earn.
+  // Scoped to the dialog: the status filter and the log-kind picker are
+  // comboboxes too.
+  await expect(page.getByRole('dialog').getByRole('combobox')).toContainText('Choose a ground');
 });
 
 test('counts down, rather than printing a number the server sent once', async ({ page }) => {
@@ -175,7 +277,7 @@ test('renders the custody tab in Swedish', async ({ page }) => {
   await page.goto('/?locale=sv');
 
   await page.locator('nav').first().getByRole('button', { name: 'Register' }).click();
-  await page.getByRole('button', { name: 'Frihetsberövande', exact: true }).click();
+  await page.getByRole('button', { name: 'Frihetsberövanden', exact: true }).click();
 
   await expect(page.getByRole('button', { name: 'A26-00041' })).toBeVisible();
 

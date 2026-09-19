@@ -154,7 +154,7 @@ route.define({
             frihetsberovande = withClocks(row, os.time(), timezoneOffset()),
             brott = charges,
             straffskala = #skalor > 0 and brott.gemensamStraffskala(skalor) or nil,
-            log = repo.log(row.id),
+            log = repo.log(row.id, session.agencyId),
         }
     end,
 })
@@ -393,6 +393,14 @@ route.define({
     handler = function(session, input)
         local row, refusal = readable(session, input.id)
         if not row then return refusal end
+
+        -- The kind is a locale key, and the schema can only say "a string".
+        -- Checked here because the NUI draws it with `t()`, which prints an
+        -- unknown key as itself: without this the field was a way to put an
+        -- arbitrary sentence on the face of a custody record (invariant 6).
+        if not service.isLogKind(input.kind) then
+            return route.refuse(FredPD.ErrorCode.INVALID, { kind = 'not_a_key' })
+        end
 
         repo.addLog(row.id, input.kind, input.note, session.discordId)
 

@@ -169,6 +169,10 @@ const REASONS = new Set([
   // means the *value* was not one of the field's permitted ones: the status
   // here is real, and it is the step from it that is not.
   'out_of_order',
+  // A custody-log kind that is not a locale key. The NUI draws the kind with
+  // `t()`, which prints an unknown key verbatim, so a free string here put
+  // arbitrary prose on the face of a record (invariant 6).
+  'not_a_key',
 
   // Tvångsmedel (7.12). A measure aimed at the wrong kind of target, and the
   // three ways one stops authorising anything.

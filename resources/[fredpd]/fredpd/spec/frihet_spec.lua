@@ -136,6 +136,59 @@ describe('frihet', function()
     end)
 
     -- -------------------------------------------------------------------------
+    describe('a released chain', function()
+        it('carries no statutory deadline', function()
+            -- Gripen five days ago and released: the RB 24:13 clock would
+            -- otherwise still be running and long past, so the history list
+            -- drew a breach warning against somebody already out.
+            local gripen = utc(2026, 3, 9, 8, 0)
+            local now = utc(2026, 3, 14, 8, 0)
+
+            local open = frihet.deadlines(
+                { status = 'gripen', gripenAt = gripen }, now, UTC)
+
+            -- The deadline is real while the chain is open ...
+            assert.is_not_nil(open.forhandling)
+            assert.is_true(open.forhandling.passed)
+
+            -- ... and gone once they are released.
+            local closed = frihet.deadlines(
+                { status = 'frigiven', gripenAt = gripen, frigivenAt = now }, now, UTC)
+
+            assert.is_nil(closed.forhandling)
+            assert.is_nil(closed.framstallan)
+        end)
+
+        it('needs no attention', function()
+            local gripen = utc(2026, 3, 9, 8, 0)
+            local now = utc(2026, 3, 14, 8, 0)
+
+            assert.is_false(frihet.needsAttention(
+                { status = 'frigiven', gripenAt = gripen, frigivenAt = now }, now, UTC))
+        end)
+    end)
+
+    -- -------------------------------------------------------------------------
+    describe('the custody log kind', function()
+        it('accepts a locale key under the module prefix', function()
+            assert.is_true(frihet.isLogKind('frihet.logKind.forhor'))
+            -- A department's own routine, added to its locale overlay without a
+            -- schema change. That freedom is why the field is a key at all.
+            assert.is_true(frihet.isLogKind('frihet.logKind.visitation'))
+        end)
+
+        it('refuses anything that is not one', function()
+            -- The NUI renders the kind with `t()`, which prints an unknown key
+            -- verbatim -- so prose here reached a custody record as a label.
+            assert.is_false(frihet.isLogKind('Advokaten fick inte komma in'))
+            assert.is_false(frihet.isLogKind('anmalan.status.godkand'))
+            assert.is_false(frihet.isLogKind('frihet.logKind.'))
+            assert.is_false(frihet.isLogKind('frihet.logKind.Förhör'))
+            assert.is_false(frihet.isLogKind(nil))
+        end)
+    end)
+
+    -- -------------------------------------------------------------------------
     describe('RB 24:12 — noon on the third day', function()
         it('is noon three days later, not seventy-two hours', function()
             -- Anhållande Monday 9 March 2026 at 14:00. The third day after is

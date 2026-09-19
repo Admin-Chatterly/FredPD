@@ -101,13 +101,35 @@ function Repo.charges(frihetId)
          ORDER BY fb.id]], { frihetId })
 end
 
-function Repo.log(frihetId)
+--- The custody log, with each entry's author named rather than numbered.
+---
+--- The join is the point. `logged_by` is a Discord snowflake, and a snowflake
+--- drawn in a "By" column tells an officer nothing and puts an account
+--- identifier on the face of a custody record -- a document a defence lawyer
+--- reads. `fpd_officers` already holds the callsign and the display name
+--- command staff set.
+---
+--- LEFT, not INNER: an entry written by somebody since removed from the roster
+--- must still appear. The log is append-only (7.9) and a row that vanished
+--- because its author left is the one gap that matters in it. The NUI falls
+--- back to the callsign, then to nothing.
+---
+--- **Scoped by agency**, which is not optional here. `fpd_officers` is unique
+--- on `(discord_id, agency_id)`, so an officer on two agencies' rosters --
+--- ordinary on a server running a police department and a sheriff's office --
+--- matches twice, and an unscoped join would silently duplicate every entry
+--- they wrote. A custody log that shows the same meal twice is a custody log
+--- nobody can testify from.
+function Repo.log(frihetId, agencyId)
     return FredPD.Core.db.query([[
-        SELECT id, kind, note, logged_by AS loggedBy,
-               UNIX_TIMESTAMP(logged_at) AS loggedAt
-          FROM fpd_frihet_log
-         WHERE frihet_id = ?
-         ORDER BY logged_at, id]], { frihetId })
+        SELECT l.id, l.kind, l.note,
+               o.callsign AS loggedByCallsign, o.name AS loggedByName,
+               UNIX_TIMESTAMP(l.logged_at) AS loggedAt
+          FROM fpd_frihet_log l
+          LEFT JOIN fpd_officers o
+                 ON o.discord_id = l.logged_by AND o.agency_id = ?
+         WHERE l.frihet_id = ?
+         ORDER BY l.logged_at, l.id]], { agencyId, frihetId })
 end
 
 --- Records a gripande, and allocates the number under the counter lock.

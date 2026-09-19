@@ -136,7 +136,8 @@
     "resolved": "This lookout has been closed.",
     "no_expiry": "This lookout has no expiry and cannot be trusted.",
     "out_of_range": "Outside the permitted range.",
-    "out_of_order": "Not possible from this stage."
+    "out_of_order": "Not possible from this stage.",
+    "not_a_key": "Not a recognised entry type."
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -1658,7 +1659,7 @@
       "person": "Person",
       "status": "Status",
       "gripen": "Arrested",
-      "heldFor": "Held for",
+      "heldFor": "Time held",
       "deadline": "Next deadline",
       "grund": "Ground"
     },
@@ -1668,8 +1669,7 @@
       "passed": "Overdue by {time}",
       "remaining": "{time} remaining",
       "none": "No deadline is running.",
-      "met": "Met",
-      "overdueRow": "Overdue"
+      "soon": "Due soon"
     },
     "grund": {
       "pa_bar_garning": "Caught in the act",
@@ -1678,7 +1678,8 @@
       "kollusionsfara": "Risk of interference with the investigation",
       "recidivfara": "Risk of reoffending",
       "identitet_oklar": "Identity not established",
-      "annan": "Other, stated in the log"
+      "annan": "Other, stated in the log",
+      "choose": "Choose a ground"
     },
     "frigivningsgrund": {
       "ej_anhallen": "Not detained by the prosecutor",
@@ -1726,15 +1727,24 @@
       "by": "By"
     },
     "confirm": {
-      "anhallande": "Anhållande is the prosecutor’s decision. It starts the RB 24:12 clock: the remand application must reach the court by noon on the third day.",
-      "framstallan": "This records that the remand application has been filed with the court.",
-      "haktning": "Häktning is the court’s decision. It ends the RB 24:13 deadline and keeps this person in custody.",
+      "anhallande": "Anhållande is the prosecutor’s decision. It starts the RB 24:12 clock: the remand application must reach the court by noon on the third day after this decision — a local noon, not seventy-two hours.",
+      "framstallan": "This records that the remand application has been filed with the court. The RB 24:12 clock stops. The hearing must be held within four dygn of the arrest (RB 24:13).",
+      "haktning": "Häktning is the court’s decision. It ends the RB 24:13 deadline and the person stays in custody.",
       "frigiv": "Releasing ends the detention. A later arrest is a new chain with its own statutory clocks, not a reopening of this one."
     },
     "duration": {
       "days": "{count} d",
       "hours": "{count} h",
       "minutes": "{count} min"
+    },
+    "attentionSoon": "{deadline} is due soon.",
+    "attentionPassed": "{deadline} has passed.",
+    "stage": {
+      "gripen": "Gripande (police arrest)",
+      "anhallen": "Anhållande (prosecutor’s detention order)",
+      "framstalld": "Häktningsframställan (remand application)",
+      "haktad": "Häktning (remand by the court)",
+      "frigiven": "Frigivande (release)"
     }
   },
   "tvang": {
