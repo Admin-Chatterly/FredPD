@@ -1,0 +1,1873 @@
+{
+  "app": {
+    "name": "FredPD",
+    "loading": "Laddar…",
+    "offline": "Ingen kontakt med servern."
+  },
+  "shell": {
+    "close": "Stäng",
+    "back": "Tillbaka",
+    "commandPlaceholder": "Kommando eller sökning",
+    "module": {
+      "records": "Register",
+      "dispatch": "Ledningscentral",
+      "evidence": "Bevis",
+      "lab": "Laboratorium",
+      "intel": "Underrättelser",
+      "court": "Domstol",
+      "personnel": "Personal",
+      "comms": "Kommunikation",
+      "admin": "Administration"
+    },
+    "status": {
+      "unit": "Enhet {callsign}",
+      "onDuty": "I tjänst",
+      "offDuty": "Ur tjänst",
+      "signedInAs": "Inloggad som {name}",
+      "permissionsStale": "Behörigheterna är inaktuella"
+    },
+    "unbuilt": {
+      "title": "Inte byggd ännu",
+      "body": "Din behörighet öppnar modulen, men den är ännu inte byggd i den här versionen av FredPD. Det saknas ingenting i din behörighet — det finns bara ingenting här än."
+    }
+  },
+  "error": {
+    "no_session": "Du är inte inloggad. Öppna FredPD från en terminal eller ett tjänstefordon.",
+    "forbidden": "Dina Discord-roller ger inte behörighet till det här.",
+    "context": "Det här går bara att göra på rätt plats, i tjänst eller i rätt enhet.",
+    "rate_limited": "För många anrop. Vänta en stund och försök igen.",
+    "invalid": "Formuläret innehåller fel.",
+    "not_found": "Posten hittades inte.",
+    "conflict": "Någon annan ändrade posten medan du redigerade. Ladda om och försök igen.",
+    "restricted": "Posten är skyddad. Begär behörighet eller använd nödöppning.",
+    "stale_permissions": "Dina behörigheter är inaktuella. Logga in igen.",
+    "internal": "Något gick fel på servern. Felet har loggats."
+  },
+  "setup": {
+    "done": "FredPD är klart. {agency} skapad; Discord-rollen {role} ger nu administration.",
+    "alreadyDone": "FredPD är redan uppsatt. Hantera behörigheter under Administration i MDT:n.",
+    "busy": "Uppstarten pågår redan. Vänta ett ögonblick och försök igen.",
+    "badCode": "Fel uppstartskod. Den skrivs ut i serverkonsolen när resursen startar.",
+    "noRole": "Ange vilken Discord-roll som ska ge administration: /fredpd setup <kod> <roll-id>. Serverkonsolen listar dina roller.",
+    "roleNotHeld": "Du har inte den Discord-rollen. Serverkonsolen listar dem du har.",
+    "noSeed": "Behörighetsgrupperna saknas. Kör database/seeds/0001_permissions.sql och försök igen.",
+    "noDiscord": "Ingen Discord-identitet. Starta Discord och anslut igen — FredPD identifierar poliser via Discord-konto.",
+    "noToken": "Ingen Discord-bottoken i config/server.lua. Lägg in en, starta om resursen och försök igen.",
+    "discordFailed": "Discord gick inte att nå. Kontrollera token och guild-id i config/server.lua.",
+    "noRoles": "Du har inga roller i den Discord-servern. Ge dig själv en och kör uppstarten igen.",
+    "failed": "Uppstarten kunde inte sparas i databasen. Anledningen finns i serverkonsolen."
+  },
+  "form": {
+    "cancel": "Avbryt",
+    "any": "Alla",
+    "search": "Sök"
+  },
+  "fieldError": {
+    "type": "fel typ av värde",
+    "too_short": "för kort",
+    "too_long": "för långt",
+    "too_small": "för litet",
+    "too_large": "för stort",
+    "required": "obligatoriskt",
+    "exists": "används redan",
+    "unknown": "okänt",
+    "cycle": "skulle ärva i en cirkel",
+    "not_group_key": "inte en giltig gruppnyckel",
+    "not_permission_key": "inte en giltig behörighetsnyckel",
+    "not_model": "ingen fordonsmodell på den här servern",
+    "not_locale_key": "inte en namnnyckel",
+    "not_certification": "inte ett behörighetsbevis",
+    "not_snowflake": "inte ett Discord-ID",
+    "not_integer": "måste vara ett heltal",
+    "not_allowed": "inte ett tillåtet värde",
+    "not_supported": "stöds inte",
+    "not_elapsed": "handläggningstiden har inte löpt ut",
+    "nothing_to_change": "inget att ändra",
+    "protected": "skyddat och går inte att ändra",
+    "would_lock_out": "skulle lämna ingen kvar som kan administrera FredPD",
+    "inherited_by_groups": "ärvs av en annan grupp",
+    "mapped_to_roles": "kopplad till en Discord-roll",
+    "too_many": "för många",
+    "stale": "ändrat sedan sidan lästes in",
+    "model_changed": "behörigheterna ändrades medan sidan var öppen",
+    "scene_released": "brottsplatsen är hävd",
+    "unattributed": "ingen ägare registrerad för spåret",
+    "format": "inte ett datum i formatet ÅÅÅÅ-MM-DD",
+    "field_forbidden": "du saknar behörighet för den här uppgiften",
+    "clearance": "över din behörighetsnivå",
+    "destroyed": "registrerat som förstört",
+    "lost": "anmält förkommet",
+    "seized": "i polisens förvar",
+    "stolen": "anmält stulet",
+    "call_cleared": "händelsen är redan avslutad",
+    "call_cancelled": "händelsen är återkallad",
+    "already_assigned": "redan knuten till händelsen",
+    "not_assigned": "inte knuten till händelsen",
+    "off_duty": "inte i tjänst",
+    "unavailable": "inte disponibel för utlarmning",
+    "no_unit": "inte inloggad på någon enhet",
+    "needs_acknowledgement": "kräver kvittens från befäl",
+    "disabled": "avstängd",
+    "straffskala": "Ingen giltig straffskala.",
+    "incomplete_citation": "Ett lagrum kräver balk, kapitel och paragraf — eller inget alls.",
+    "over_max": "Tidsbestämt fängelse kan inte överstiga arton år.",
+    "under_review": "Anmälan är hos befäl och kan inte ändras.",
+    "not_author": "Du har inte upprättat den här anmälan.",
+    "own_report": "Du kan inte godkänna en anmälan du själv har upprättat.",
+    "not_submitted": "Anmälan är inte inlämnad.",
+    "not_submittable": "Anmälan kan inte lämnas in i nuvarande status.",
+    "locked": "Godkänd och låst.",
+    "not_ledare": "Du är inte förundersökningsledare i ärendet.",
+    "fu_closed": "Förundersökningen är avslutad.",
+    "self_parent": "En tilläggsuppgift kan inte vara sin egen huvudanmälan.",
+    "too_deep": "Kedjan av tilläggsuppgifter är för lång.",
+    "length_mismatch": "Listorna stämmer inte överens.",
+    "stage_unavailable": "Lagen gör inte det stadiet straffbart för det här brottet.",
+    "over_clearance": "Över din behörighet.",
+    "wrong_capacity": "Det beslutet är inte ditt att fatta.",
+    "already_released": "Personen är redan frigiven.",
+    "not_a_place": "Tvångsmedlet riktas mot en plats, inte mot en person.",
+    "not_a_person": "Tvångsmedlet riktas mot en person, inte mot en plats.",
+    "upphavd": "Beslutet är hävt.",
+    "not_yet": "Beslutet har inte trätt i kraft.",
+    "expired": "Beslutet har upphört att gälla.",
+    "cancelled": "Avlyst.",
+    "required_without_target": "Ange ett signalement när det inte finns någon post att peka på.",
+    "resolved": "Spaningsuppdraget är avslutat.",
+    "no_expiry": "Spaningsuppdraget saknar sluttid och kan inte användas.",
+    "out_of_range": "Utanför tillåtet intervall.",
+    "out_of_order": "Inte möjligt från det här stadiet.",
+    "not_a_key": "Okänd händelsetyp."
+  },
+  "placement": {
+    "station_terminal": "Stationsterminal",
+    "property_terminal": "Terminal i beslagsrummet",
+    "lab_terminal": "Laboratorieterminal",
+    "booking_terminal": "Terminal för inskrivning",
+    "dispatch_console": "Ledningsplats",
+    "courthouse_terminal": "Terminal i domstolen",
+    "motorpool": "Fordonsdepå",
+    "evidence_bench": "Bevisbänk",
+    "interaction": {
+      "prop": "Koppla till ett föremål",
+      "ped": "Placera en person",
+      "zone": "Markera ett område"
+    },
+    "editor": {
+      "title": "Placeringar",
+      "newZone": "Ny här — område",
+      "newProp": "Ny här — koppla till föremålet jag tittar på",
+      "newPed": "Ny här — placera en person",
+      "move": "Flytta den närmaste hit",
+      "disable": "Stäng av den närmaste",
+      "delete": "Ta bort den närmaste",
+      "pickKind": "Vad ska den här öppna?",
+      "pedModelTitle": "Person",
+      "pedModelLabel": "Modellnamn",
+      "noProp": "Inget föremål i sikte. Titta rakt på ett och försök igen.",
+      "noneNearby": "Ingen placering i närheten.",
+      "created": "Placeringen är skapad.",
+      "moved": "Placeringen är flyttad.",
+      "disabled": "Placeringen är avstängd.",
+      "deleted": "Placeringen är borttagen.",
+      "deleteTitle": "Ta bort placeringen?",
+      "deleteBody": "{kind}, {distance} m härifrån. Det går inte att ångra."
+    }
+  },
+  "chat": {
+    "usage": "Skriv ett meddelande efter kommandot.",
+    "suggestion": "Skicka till polisens interna kanal",
+    "suggestionArg": "Vad du vill skicka"
+  },
+  "garage": {
+    "title": "Fordonsdepå",
+    "returnVehicle": "Lämna tillbaka ett fordon",
+    "drawn": "Fordon {plate} utkvitterat.",
+    "returned": "Fordon {plate} återlämnat.",
+    "noVehicle": "Det finns inget fordon här att lämna tillbaka.",
+    "unknownModel": "Fordonsmodellen finns inte på den här servern."
+  },
+  "fleet": {
+    "patrol_sedan": "Patrullbil",
+    "riot": "Piketbuss",
+    "helicopter": "Helikopter"
+  },
+  "evidence": {
+    "empty": "Inget bevismaterial matchar.",
+    "detail": {
+      "none": "Välj ett bevismaterialnummer för att öppna posten."
+    },
+    "tab": {
+      "items": "Bevismaterial",
+      "scenes": "Brottsplatser"
+    },
+    "column": {
+      "number": "Bevismaterialnummer",
+      "type": "Typ",
+      "packaging": "Förpackning",
+      "seal": "Försegling",
+      "status": "Status",
+      "storage": "Förvaring",
+      "case": "Ärende",
+      "collected": "Säkrat",
+      "marker": "Markör",
+      "ref": "Referens",
+      "description": "Beskrivning"
+    },
+    "filter": {
+      "status": "Status",
+      "type": "Typ",
+      "search": "Sök",
+      "searchPlaceholder": "Bevismaterialnummer, ärende eller beskrivning",
+      "any": "Alla",
+      "apply": "Filtrera"
+    },
+    "type": {
+      "print": "Latent fingeravtryck",
+      "blood": "Blod",
+      "dna_touch": "Saliv eller kontakt-DNA",
+      "casing": "Patronhylsa",
+      "bullet": "Projektil",
+      "magazine": "Magasin",
+      "gsr": "Skottrester",
+      "footwear": "Skoavtryck",
+      "glove_mark": "Handskavtryck eller fibrer",
+      "drug_residue": "Narkotikarester",
+      "tool_mark": "Verktygsspår eller glassplitter",
+      "digital": "Digital enhet"
+    },
+    "packaging": {
+      "evidence_bag": "Beslagspåse",
+      "envelope": "Kuvert",
+      "swab_box": "Provtagningsask",
+      "lift_card": "Lyftfolie",
+      "firearm_box": "Vapenlåda",
+      "drug_bag": "Narkotikapåse",
+      "phone_bag": "Telefonpåse",
+      "item_tag": "Godsetikett"
+    },
+    "seal": {
+      "sealed": "Obruten",
+      "broken": "Bruten",
+      "resealed": "Omförseglad"
+    },
+    "status": {
+      "collected": "Säkrat",
+      "in_locker": "I beslagsskåp",
+      "in_property": "I beslagsrum",
+      "checked_out": "Utkvitterat",
+      "at_lab": "På laboratorium",
+      "released": "Utlämnat",
+      "destroyed": "Förstört"
+    },
+    "destination": {
+      "locker": "Beslagsskåp",
+      "lab": "Forensiskt laboratorium",
+      "court": "Domstol",
+      "investigator": "Utredare"
+    },
+    "collect": {
+      "title": "Säkra spår",
+      "trace": "Spår",
+      "packaging": "Förpackning",
+      "marker": "Markörnummer",
+      "submit": "Säkra"
+    },
+    "intake": {
+      "title": "Mottagning i beslagsrum",
+      "storage": "Förvaringsplats",
+      "storagePlaceholder": "Vapenvalv, hylla B-04",
+      "reason": "Skäl",
+      "accept": "Ta emot",
+      "reject": "Avvisa"
+    },
+    "transfer": {
+      "title": "Överlämning",
+      "destination": "Överlämnas till",
+      "toParty": "Mottagen av",
+      "reason": "Skäl",
+      "submit": "Överlämna"
+    },
+    "custody": {
+      "title": "Beslagskedja",
+      "time": "Tid",
+      "action": "Åtgärd",
+      "from": "Från",
+      "to": "Till",
+      "reason": "Skäl",
+      "signedBy": "Signerad av",
+      "empty": "Inga poster i beslagskedjan än."
+    },
+    "custodyAction": {
+      "collect": "Säkring",
+      "deposit": "Deponering",
+      "intake": "Mottagning",
+      "transfer": "Överlämning",
+      "checkout": "Utkvittering",
+      "checkin": "Återlämning",
+      "release": "Utlämning",
+      "destroy": "Förstöring"
+    },
+    "labRequest": {
+      "title": "Begär analys",
+      "analyses": "Analyser",
+      "items": "Bevismaterial",
+      "priority": "Prioritet",
+      "justification": "Motivering",
+      "submit": "Skicka analysbegäran"
+    },
+    "analyses": {
+      "title": "Analyser",
+      "empty": "Inga analyser på det här bevismaterialet."
+    },
+    "scene": {
+      "number": "Brottsplatsnummer",
+      "items": "Bevismaterial",
+      "entries": "Inpasseringar",
+      "opened": "Öppnad",
+      "empty": "Inga brottsplatser än.",
+      "create": "Öppna brottsplats",
+      "createIntro": "Brottsplatsen öppnas vid din position. Radien anger avspärrningen.",
+      "radius": "Radie (m)",
+      "release": "Häv avspärrning",
+      "releaseConfirm": "Hävd avspärrning avslutar spårsäkringen på brottsplatsen.",
+      "status": {
+        "open": "Öppen",
+        "released": "Hävd"
+      }
+    }
+  },
+  "lab": {
+    "title": "Forensiskt laboratorium",
+    "intro": "Analyser som väntar på handläggning vid laboratoriet. Ta en analys, dokumentera metoden och slutför den när handläggningstiden har löpt ut.",
+    "empty": "Inga analyser i kön. En analysbegäran skapas från ett ärende under Bevis.",
+    "start": "Påbörja",
+    "complete": "Slutför analys",
+    "completeNote": "Resultatet beräknas av laboratoriet när handläggningstiden har löpt ut och anges inte här.",
+    "notStarted": "Inte påbörjad. Handläggningstiden börjar när analysen tas.",
+    "observations": "Iakttagelser",
+    "observationsPlaceholder": "Topsprov extraherat och kvantifierat. Provet delvis nedbrutet av regn.",
+    "column": {
+      "analysis": "Analys",
+      "assigned": "Handläggare",
+      "case": "Ärende",
+      "completed": "Slutförd",
+      "due": "Beräknat klar",
+      "evidence": "Bevismaterial",
+      "priority": "Prioritet",
+      "result": "Resultat",
+      "started": "Påbörjad",
+      "status": "Status"
+    },
+    "filter": {
+      "analysis": "Analys",
+      "any": "Alla",
+      "mine": "Tilldelade mig",
+      "status": "Status"
+    },
+    "analysis": {
+      "dna": "DNA-analys",
+      "print_comparison": "Fingeravtrycksjämförelse",
+      "print_search": "Sökning i fingeravtrycksregistret",
+      "ballistics": "Ballistik",
+      "gsr": "Skottrester",
+      "drug_id": "Narkotikaanalys"
+    },
+    "status": {
+      "queued": "I kö",
+      "in_progress": "Pågår",
+      "complete": "Klar",
+      "reviewed": "Granskad",
+      "released": "Utlämnad",
+      "cancelled": "Makulerad"
+    },
+    "priority": {
+      "routine": "Normal",
+      "expedited": "Förtur",
+      "urgent": "Akut"
+    },
+    "result": {
+      "profile_obtained": "DNA-profil framställd",
+      "partial_profile": "Ofullständig DNA-profil",
+      "mixture": "DNA-blandbild",
+      "no_profile": "Ingen DNA-profil",
+      "identification": "Identifiering",
+      "exclusion": "Uteslutning",
+      "inconclusive": "Inkonklusivt",
+      "insufficient": "Otillräckligt för jämförelse",
+      "candidate_match": "Träff i register, kräver bekräftelse",
+      "no_match": "Ingen träff"
+    }
+  },
+  "intel": {
+    "tab": {
+      "log": "Underrättelselogg",
+      "people": "Personer",
+      "orgs": "Organisationer",
+      "cases": "Ärenden"
+    },
+    "search": {
+      "placeholder": "Sök i registret",
+      "empty": "Ingen träff.",
+      "results": "{count} träffar"
+    },
+    "log": {
+      "empty": "Inga underrättelser inlagda än.",
+      "compose": "Lägg in underrättelse",
+      "body": "Vad som iakttagits",
+      "bodyPlaceholder": "Svart skåpbil utan registreringsskyltar, parkerad på Alta Street två gånger denna vecka.",
+      "tags": "Taggar",
+      "tagsPlaceholder": "narkotika, vapen",
+      "source": "Källa",
+      "confidence": "Tillförlitlighet",
+      "post": "Lägg in",
+      "posted": "Inlagd.",
+      "allTags": "Alla",
+      "filtered": "Filtrerat på {tag}",
+      "attachedTo": "Gäller"
+    },
+    "source": {
+      "informant": "Informatör",
+      "wiretap": "Telefonavlyssning",
+      "surveillance": "Spaning",
+      "patrol": "Patrull",
+      "tip": "Tips",
+      "other": "Övrigt",
+      "protected": "Skyddad källa",
+      "none": "Ingen källa angiven"
+    },
+    "confidence": {
+      "low": "Låg",
+      "medium": "Medel",
+      "high": "Hög"
+    },
+    "person": {
+      "unknown": "Okänd person",
+      "new": "Ny person",
+      "name": "Namn",
+      "alias": "Alias",
+      "description": "Signalement",
+      "status": "Status",
+      "empty": "Ingen i registret än.",
+      "notes": "Underrättelser",
+      "vehicles": "Fordon",
+      "orgs": "Organisationer",
+      "associates": "Kontakter",
+      "cases": "Ärenden",
+      "noteCount": "{count} poster",
+      "plates": "Registreringsnummer",
+      "confirmed": "Bekräftad",
+      "suspected": "Misstänkt"
+    },
+    "personStatus": {
+      "unknown": "Okänd",
+      "poi": "Person av intresse",
+      "active_investigation": "Under utredning",
+      "warrant": "Efterlyst",
+      "cleared": "Avskriven",
+      "incarcerated": "Frihetsberövad",
+      "deceased": "Avliden"
+    },
+    "org": {
+      "new": "Ny organisation",
+      "name": "Namn",
+      "territory": "Område",
+      "members": "{count} medlemmar",
+      "empty": "Inga organisationer i registret än.",
+      "roster": "Medlemmar"
+    },
+    "orgType": {
+      "gang": "Gäng",
+      "cartel": "Kartell",
+      "business": "Företag",
+      "crew": "Liga",
+      "other": "Övrigt"
+    },
+    "orgStatus": {
+      "active": "Aktiv",
+      "disbanded": "Upplöst",
+      "dormant": "Vilande"
+    },
+    "case": {
+      "new": "Nytt ärende",
+      "title": "Rubrik",
+      "description": "Beskrivning",
+      "empty": "Inga ärenden än.",
+      "linked": "{people} personer, {orgs} organisationer",
+      "links": "Kopplat till ärendet"
+    },
+    "caseStatus": {
+      "open": "Öppet",
+      "closed": "Avslutat",
+      "cold": "Kallt"
+    },
+    "action": {
+      "save": "Spara",
+      "cancel": "Avbryt",
+      "create": "Skapa",
+      "back": "Tillbaka"
+    }
+  },
+  "admin": {
+    "roleMap": {
+      "title": "Discord-roller",
+      "intro": "Koppla en Discord-roll till en behörighetsgrupp. Rollerna är den enda källan till behörighet; här avgörs vad var och en ger.",
+      "roleId": "Roll-ID i Discord",
+      "roleName": "Namn (för visning)",
+      "group": "Behörighetsgrupp",
+      "add": "Lägg till koppling",
+      "remove": "Ta bort",
+      "empty": "Inga roller är kopplade än. Innan någon är det har ingen behörighet.",
+      "snapshotAge": "Discord synkades senast för {seconds} s sedan",
+      "snapshotMissing": "Discord har aldrig synkats. Kontrollera tjänsten.",
+      "added": "Kopplingen är tillagd.",
+      "removed": "Kopplingen är borttagen.",
+      "confirmRemove": "Ta bort kopplingen? Den som bara hade behörighet genom den förlorar den omedelbart."
+    },
+    "fleet": {
+      "title": "Fordonspark",
+      "intro": "Vad fordonsparken erbjuder och vem som får ta ut det. Ett fordon utan spärr kan tas ut av alla som får ta ut fordon.",
+      "empty": "Inga fordon i fordonsparken.",
+      "new": "Lägg till fordon",
+      "add": "Lägg till",
+      "edit": "Ändra fordon",
+      "save": "Spara",
+      "remove": "Ta bort",
+      "removeConfirm": "Fordonet tas bort ur fordonsparkens meny. Redan uttagna fordon påverkas inte.",
+      "vehicle": "Fordon",
+      "model": "Modell",
+      "modelPlaceholder": "police3",
+      "labelKey": "Namnnyckel",
+      "labelKeyPlaceholder": "fleet.patrol_sedan",
+      "permission": "Behörighet",
+      "certification": "Behörighetsbevis",
+      "livery": "Dekor",
+      "sortOrder": "Ordning",
+      "enabled": "Tillgängligt",
+      "on": "Ja",
+      "off": "Nej",
+      "gating": "Vem får ta ut det",
+      "noGate": "Alla som får ta ut fordon",
+      "requiredGroup": "Behörighetsgrupp",
+      "requiredDiscordRole": "Discord-roll"
+    },
+    "groups": {
+      "title": "Behörighetsgrupper",
+      "intro": "En behörighetsgrupp är en samling behörighetsnycklar. En Discord-roll ger en grupp; här avgörs vad varje grupp innehåller.",
+      "empty": "Inga behörighetsgrupper än. Skapa en nedan och koppla sedan en Discord-roll till den.",
+      "new": "Ny grupp",
+      "create": "Skapa grupp",
+      "save": "Spara grupp",
+      "delete": "Ta bort",
+      "deleteConfirm": "Ta bort gruppen? Den går inte att ta bort så länge en roll eller en annan grupp använder den.",
+      "key": "Nyckel",
+      "keyPlaceholder": "patrol_supervisor",
+      "name": "Namn",
+      "description": "Beskrivning",
+      "inherits": "Ärver",
+      "inheritsNone": "Inget",
+      "permissions": "Behörigheter",
+      "permissionsIntro": "Kryssa i de nycklar gruppen ger själv. En nyckel du inte själv har går inte att ge vidare.",
+      "effective": "Sammanlagd behörighet",
+      "locked": "Skyddad",
+      "notEditable": "Gruppen ger mer än du själv har, så du kan inte ändra den.",
+      "column": {
+        "own": "Egna",
+        "effective": "Sammanlagda",
+        "roles": "Roller"
+      },
+      "version": "Version"
+    },
+    "health": {
+      "title": "Systemhälsa",
+      "intro": "Räknare som servern redan har i minnet. Tjänstens status, databasens svarstid, ruttider och ködjup mäts inte ännu och visas därför inte.",
+      "refresh": "Uppdatera",
+      "server": "Server",
+      "version": "Version",
+      "env": "Miljö",
+      "routes": "Registrerade rutter",
+      "sessions": "Sessioner",
+      "open": "Öppna",
+      "stale": "Föråldrad ögonblicksbild",
+      "readOnly": "Endast läsning",
+      "discord": "Discord",
+      "sync": "Synkronisering konfigurerad",
+      "on": "Ja",
+      "off": "Nej",
+      "snapshot": "Senast synkad",
+      "seconds": "för {seconds} s sedan",
+      "never": "Aldrig",
+      "gridTitle": "Osäkrade spår",
+      "gridNote": "Totaler för hela servern, sedan resursen senast startade: aldrig ett enskilt spår, en spelare eller en ägare. Förstörda räknar spår som torkats bort eller plockats upp ur världen; att städa undan blod räknas inte, eftersom en undanstädad pöl ligger kvar och luminol fortfarande hittar den. Förstörelse utförd av en spelare kräver ingen polisbehörighet och ger ingen loggpost, så för dem är räknaren den enda notering som finns; en polis som förstör bevis loggas dessutom som forensics.destroyed i loggen.",
+      "grid": {
+        "items": "Spår i världen",
+        "cells": "Rutor i bruk",
+        "subscribers": "Spelare som strömmas",
+        "placed": "Lagda",
+        "merged": "Sammanslagna med befintligt spår",
+        "collected": "Säkrade som bevis",
+        "destroyed": "Förstörda",
+        "evicted": "Nedbrutna eller utrensade",
+        "refused": "Nekad placering"
+      }
+    },
+    "tab": {
+      "rolemap": "Rollkoppling",
+      "groups": "Grupper",
+      "fleet": "Fordonspark",
+      "health": "Systemhälsa"
+    }
+  },
+  "registry": {
+    "flag": {
+      "stolen": "Stulet",
+      "wanted": "Efterlyst",
+      "bolo": "Spaningsmeddelande",
+      "impounded": "Omhändertaget",
+      "evidence_hold": "Beslagtaget",
+      "uninsured": "Oförsäkrat"
+    },
+    "registration": {
+      "valid": "Giltig",
+      "expired": "Utgången",
+      "suspended": "Indragen",
+      "revoked": "Återkallad",
+      "unregistered": "Oregistrerad"
+    },
+    "insurance": {
+      "valid": "Giltig",
+      "expired": "Utgången",
+      "none": "Saknas"
+    },
+    "firearm": {
+      "status": {
+        "registered": "Registrerat",
+        "lost": "Förkommet",
+        "stolen": "Stulet",
+        "seized": "I beslag",
+        "destroyed": "Förstört",
+        "agency_issued": "Tjänstevapen"
+      },
+      "type": {
+        "pistol": "Pistol",
+        "revolver": "Revolver",
+        "rifle": "Gevär",
+        "shotgun": "Hagelgevär",
+        "smg": "Kulsprutepistol",
+        "other": "Övrigt"
+      },
+      "event": {
+        "register": "Registrering",
+        "transfer": "Överlåtelse",
+        "lost": "Förlustanmälan",
+        "stolen": "Stöldanmälan",
+        "recovered": "Återfunnet",
+        "seized": "Beslag",
+        "destroyed": "Förstöring",
+        "issued": "Utkvitterat",
+        "returned": "Återlämnat"
+      }
+    }
+  },
+  "query": {
+    "type": {
+      "person": "Person",
+      "plate": "Registreringsnummer",
+      "vin": "VIN",
+      "firearm": "Vapennummer",
+      "phone": "Telefonnummer",
+      "address": "Adress"
+    },
+    "source": {
+      "person": "Personregister",
+      "vehicle": "Fordonsregister",
+      "firearm": "Vapenregister"
+    },
+    "hit": {
+      "vehicle_flag": "Fordonsmarkering",
+      "firearm": "Vapen",
+      "person_caution": "Personvarning",
+      "anhallen_i_franvaro": "EFTERLYST — anhållen i sin frånvaro. Bekräfta före åtgärd.",
+      "haktad_i_franvaro": "EFTERLYST — häktad i sin frånvaro. Bekräfta före åtgärd."
+    },
+    "caution": {
+      "armed": "Beväpnad",
+      "violent": "Våldsam",
+      "officer_safety": "Personalsäkerhet"
+    },
+    "status": {
+      "unconfirmed": "Obekräftad träff",
+      "confirmed": "Bekräftad träff"
+    },
+    "confirm": {
+      "confirmed": "Bekräftad",
+      "not_confirmed": "Ej bekräftad",
+      "unable": "Inget svar från registerhållande myndighet"
+    }
+  },
+  "access": {
+    "unit": {
+      "homicide": "Mordroteln",
+      "internal_affairs": "Internutredningen",
+      "narcotics": "Narkotikaroteln",
+      "records": "Registerenheten"
+    }
+  },
+  "records": {
+    "aliasKind": {
+      "alias": "Alias",
+      "former": "Tidigare namn",
+      "maiden": "Flicknamn",
+      "moniker": "Öknamn"
+    },
+    "authority": {
+      "caseNumber": "Ärendenummer",
+      "intro": "En sökning som når skyddade poster kräver ett skäl eller ett ärendenummer. Båda skrivs till sökloggen.",
+      "reason": "Skäl",
+      "reasonPlaceholder": "Varför sökningen görs",
+      "title": "Sökbefogenhet"
+    },
+    "biometric": {
+      "dna": "DNA",
+      "fingerprint": "Fingeravtryck",
+      "notOnFile": "Saknas i register",
+      "onFile": "Finns i register"
+    },
+    "cautionKind": {
+      "armed": "Beväpnad",
+      "gang": "Gängkoppling",
+      "mental_health": "Psykisk ohälsa",
+      "officer_safety": "Egen säkerhet",
+      "violent": "Våldsam"
+    },
+    "classification": {
+      "confidential": "Konfidentiell",
+      "internal": "Intern",
+      "open": "Öppen",
+      "restricted": "Begränsad",
+      "secret": "Hemlig"
+    },
+    "descriptor": {
+      "build": "Kroppsbyggnad",
+      "complexion": "Hy",
+      "eyes": "Ögon",
+      "glasses": "Glasögon",
+      "hair": "Hår",
+      "hairStyle": "Frisyr",
+      "height": "Längd (cm)",
+      "notes": "Anteckningar",
+      "weight": "Vikt (kg)"
+    },
+    "field": {
+      "ownerIdentifier": "Registrerad ägare",
+      "restricted": "Undanhållen — du saknar behörighet för uppgiften"
+    },
+    "firearm": {
+      "assign": {
+        "intro": "Lämna tjänstemannen tom för att återlämna vapnet till förrådet.",
+        "submit": "Registrera tilldelning",
+        "title": "Tilldela eller återlämna"
+      },
+      "detail": {
+        "none": "Välj ett serienummer för att öppna posten."
+      },
+      "edit": {
+        "intro": "Serienummer, ägare, status och tilldelning har egna åtgärder, så att ägarhistoriken aldrig kan avvika från posten.",
+        "submit": "Spara vapen",
+        "title": "Redigera vapen"
+      },
+      "empty": "Inget vapen matchar.",
+      "event": {
+        "empty": "Inga händelser registrerade.",
+        "event": "Händelse",
+        "from": "Från",
+        "occurred": "Inträffade",
+        "recordedBy": "Registrerad av",
+        "to": "Till"
+      },
+      "events": "Ägarhistorik",
+      "field": {
+        "assignedOfficer": "Tilldelad",
+        "calibre": "Kaliber",
+        "make": "Fabrikat",
+        "model": "Modell",
+        "ownerParty": "Innehavare (ej i register)",
+        "serial": "Serienummer",
+        "status": "Status",
+        "type": "Typ"
+      },
+      "register": {
+        "submit": "Registrera vapen",
+        "title": "Registrera ett vapen"
+      },
+      "search": {
+        "term": "Serienummer",
+        "termPlaceholder": "Ett serienummer eller början av ett"
+      },
+      "status": {
+        "submit": "Registrera status",
+        "title": "Ändra status"
+      },
+      "trace": {
+        "intro": "En spårning följer vapnet tillbaka till den första posten i registret. Den kräver egen behörighet.",
+        "links": "{count} händelser i kedjan.",
+        "noOrigin": "Registret saknar öppningshändelse för vapnet.",
+        "origin": "Fördes in i registret som {event} den {moment}, till {party}.",
+        "run": "Kör spårning",
+        "title": "Spårningsrapport"
+      },
+      "transfer": {
+        "fromParty": "Från",
+        "intro": "En överlåtelse kräver en mottagare: en person i registret eller en namngiven part utanför det.",
+        "submit": "Registrera överlåtelse",
+        "title": "Överlåtelse",
+        "toIdentifier": "Till identifierare",
+        "toParty": "Till (ej i register)",
+        "toPersonId": "Till person (post-id)"
+      }
+    },
+    "form": {
+      "any": "Alla",
+      "notStated": "Ej angivet",
+      "serverDefault": "Låt servern avgöra",
+      "unchanged": "Lämna oförändrad"
+    },
+    "hit": {
+      "body": "Bekräfta träffen innan du agerar på den.",
+      "column": "Efterlysning",
+      "confirm": "Bekräfta träff",
+      "confirmed": "Bekräftad på den här skärmen. Bekräftelsen registreras inte.",
+      "inResults": "{count} av posterna har en träff i efterlysningsregistret.",
+      "title": "Träff i efterlysningsregistret"
+    },
+    "no": "Nej",
+    "person": {
+      "alias": {
+        "empty": "Inga alias registrerade."
+      },
+      "aliases": "Alias",
+      "biometric": {
+        "empty": "Inget i register."
+      },
+      "biometrics": "Biometri",
+      "caution": {
+        "add": "Lägg till varning",
+        "cancel": "Återta",
+        "detail": "Detalj",
+        "expires": "Upphör om (dagar)",
+        "expiresAt": "Upphör {moment}",
+        "expiresPlaceholder": "0 = aldrig",
+        "kind": "Typ",
+        "noExpiry": "Upphör inte",
+        "sourceCase": "Källärende",
+        "title": "Varningar och markeringar"
+      },
+      "cautions": "Varningar",
+      "column": {
+        "alias": "Matchat alias",
+        "cautions": "Varningar",
+        "name": "Namn",
+        "number": "Registernummer"
+      },
+      "descriptor": {
+        "empty": "Inget signalement registrerat."
+      },
+      "descriptors": "Signalement",
+      "detail": {
+        "none": "Välj ett registernummer för att öppna personen."
+      },
+      "edit": {
+        "submit": "Spara post",
+        "title": "Redigera post"
+      },
+      "empty": "Ingen person matchar.",
+      "field": {
+        "address": "Adress",
+        "classification": "Sekretessnivå",
+        "dateOfBirth": "Födelsedatum",
+        "deceased": "Avliden",
+        "firstName": "Förnamn",
+        "lastName": "Efternamn",
+        "middleName": "Mellannamn",
+        "missing": "Saknad",
+        "phone": "Telefon",
+        "sex": "Kön"
+      },
+      "firearm": {
+        "empty": "Inga vapen registrerade."
+      },
+      "firearms": "Registrerade vapen",
+      "photo": {
+        "case": "Källärende",
+        "description": "Beskrivning",
+        "empty": "Inga fotografier registrerade.",
+        "kind": "Typ",
+        "location": "Placering på kroppen",
+        "note": "Fotografier levereras via mediegatewayen och visas inte på den här skärmen.",
+        "taken": "Tagen"
+      },
+      "photos": "Fotografier",
+      "search": {
+        "term": "Namn, alias eller registernummer",
+        "termPlaceholder": "Minst två tecken"
+      },
+      "unnamed": "Inget namn registrerat",
+      "vehicle": {
+        "empty": "Inga fordon registrerade."
+      },
+      "vehicles": "Registrerade fordon"
+    },
+    "photoKind": {
+      "field": "Fältfoto",
+      "mark": "Märke",
+      "mugshot": "Anhållningsfoto",
+      "scar": "Ärr",
+      "tattoo": "Tatuering"
+    },
+    "restricted": {
+      "body": "Du får veta att posten finns, inte mer. Enheten ovan avgör om du ska få tillgång.",
+      "contact": "Kontakta {unit}",
+      "title": "Skyddad post"
+    },
+    "search": {
+      "run": "Sök",
+      "term": "Sökterm"
+    },
+    "sex": {
+      "female": "Kvinna",
+      "male": "Man",
+      "other": "Annat",
+      "unknown": "Okänt"
+    },
+    "tab": {
+      "firearms": "Vapen",
+      "persons": "Personer",
+      "vehicles": "Fordon",
+      "anmalan": "Anmälningar",
+      "frihet": "Frihetsberövanden"
+    },
+    "vehicle": {
+      "column": {
+        "plate": "Registreringsnummer"
+      },
+      "detail": {
+        "none": "Välj ett registreringsnummer för att öppna posten."
+      },
+      "edit": {
+        "submit": "Spara fordon",
+        "title": "Redigera fordon"
+      },
+      "empty": "Inget fordon matchar.",
+      "field": {
+        "colour": "Färg",
+        "colourSecondary": "Andra färg",
+        "insurance": "Försäkring",
+        "insuranceExpires": "Försäkring upphör",
+        "model": "Modell",
+        "plate": "Registreringsnummer",
+        "registration": "Registrering",
+        "registrationExpires": "Registrering upphör",
+        "vin": "Chassinummer"
+      },
+      "flag": {
+        "add": "Lägg till markering",
+        "clear": "Ta bort markering",
+        "detail": "Detalj",
+        "empty": "Inga markeringar gäller.",
+        "expires": "Upphör",
+        "expiresIn": "Upphör om (sekunder)",
+        "expiresInPlaceholder": "0 = aldrig",
+        "kind": "Typ",
+        "submit": "Lägg till markering"
+      },
+      "flags": "Gällande markeringar",
+      "plate": {
+        "change": "Byt registreringsnummer",
+        "empty": "Ingen registreringshistorik.",
+        "from": "Innehavd från",
+        "new": "Nytt registreringsnummer",
+        "reason": "Skäl",
+        "submit": "Byt registreringsnummer",
+        "until": "Innehavd till"
+      },
+      "plates": "Registreringshistorik",
+      "register": {
+        "intro": "Chassinumret genereras av registret och kan inte anges här.",
+        "reason": "Skäl",
+        "submit": "Registrera fordon",
+        "title": "Registrera ett fordon"
+      },
+      "search": {
+        "term": "Registreringsnummer eller chassinummer",
+        "termPlaceholder": "Ett registreringsnummer eller början av ett"
+      }
+    },
+    "withheld": {
+      "action": "Ange ett skäl",
+      "body": "Sökningen träffade poster du är behörig att läsa men öppnade dem inte, eftersom den nådde skyddade uppgifter utan angivet skäl. Ange ett skäl eller ett ärendenummer ovan och sök igen.",
+      "title": "Poster undanhållna"
+    },
+    "yes": "Ja"
+  },
+  "forensics": {
+    "busy": "Du håller redan på med något",
+    "collect": {
+      "option": "Säkra spår",
+      "description": "Förpacka och för in i beslagskedjan",
+      "progress": "Säkrar",
+      "done": "Säkrat som {number}",
+      "cancelled": "Avbrutet innan spåret säkrades"
+    },
+    "destroy": {
+      "wipe": {
+        "option": "Torka av",
+        "progress": "Torkar av"
+      },
+      "clean": {
+        "option": "Rengör",
+        "progress": "Rengör"
+      },
+      "wash": {
+        "option": "Tvätta händerna",
+        "progress": "Tvättar"
+      },
+      "pickup": {
+        "option": "Plocka upp",
+        "progress": "Plockar upp"
+      },
+      "weapon": {
+        "option": "Rengör vapnet",
+        "progress": "Rengör vapnet"
+      },
+      "done": "Klart",
+      "cancelled": "Avbrutet",
+      "noItem": "Du har inte det som krävs",
+      "failed": "Det gick inte"
+    },
+    "marker": {
+      "option": "Placera markör",
+      "title": "Bevismarkör",
+      "number": "Markör {number}",
+      "placed": "Markör {number} placerad",
+      "cleared": "{count} markörer borttagna"
+    },
+    "swab": {
+      "option": "Ta prov på skottrester",
+      "progress": "Tar prov",
+      "done": "Prov taget",
+      "cancelled": "Avbrutet innan provet togs",
+      "failed": "Provet kunde inte tas"
+    },
+    "tool": {
+      "powder": "Fingeravtryckspulver",
+      "powderHint": "Framkallar latenta fingeravtryck på en yta",
+      "luminol": "Luminol",
+      "luminolHint": "Framkallar blod, även blod som rengjorts",
+      "forensic_light": "Kriminalteknisk lampa",
+      "forensicLightHint": "Framkallar spår i mörker",
+      "progress": "Bearbetar ytan",
+      "found": "{count} framkallade",
+      "nothing": "Inget framkallades här",
+      "cancelled": "Avbrutet"
+    },
+    "tools": {
+      "title": "Brottsplatsverktyg",
+      "keybind": "Brottsplatsverktyg",
+      "clearMarkers": "Ta bort markörer",
+      "clearMarkersHint": "Tar bort alla markörer du placerat på brottsplatsen"
+    }
+  },
+  "cad": {
+    "title": "Ledningscentral",
+    "intro": "Händelser i kö, enheterna på tavlan och kartan. En händelse arbetas från operatörsplatsen eller från bilen.",
+    "empty": "Inga händelser.",
+    "tab": {
+      "queue": "Kö",
+      "board": "Enheter",
+      "map": "Karta",
+      "broadcasts": "Utskick",
+      "alpr": "Skyltavläsningar"
+    },
+    "console": {
+      "title": "Operatörsplats",
+      "away": "Att upprätta och larma ut händelser görs vid operatörsplatsen. Allt annat på den här skärmen fungerar varifrån som helst."
+    },
+    "queue": {
+      "title": "Väntande händelser",
+      "empty": "Inget väntar.",
+      "waiting": "Väntat {duration}",
+      "stacked": "{count} väntar",
+      "unassigned": "Ingen enhet"
+    },
+    "board": {
+      "title": "Enheter",
+      "empty": "Ingen enhet inloggad.",
+      "inStatus": "{duration} i status",
+      "noAssignment": "Ingen tilldelning"
+    },
+    "column": {
+      "number": "Händelsenummer",
+      "type": "Typ",
+      "priority": "Prioritet",
+      "status": "Status",
+      "location": "Plats",
+      "beat": "Område",
+      "units": "Enheter",
+      "received": "Inkom",
+      "age": "Väntat",
+      "caller": "Anmälare",
+      "callerPhone": "Anmälarens nummer",
+      "disposition": "Avslutskod",
+      "callsign": "Anropssignal",
+      "officer": "Polis",
+      "unitStatus": "Status",
+      "timeInStatus": "Tid i status",
+      "assignment": "Tilldelning",
+      "vehicle": "Fordon",
+      "details": "Uppgifter",
+      "lead": "Ledande enhet",
+      "source": "Ursprung"
+    },
+    "filter": {
+      "status": "Status",
+      "priority": "Prioritet",
+      "beat": "Område",
+      "type": "Typ",
+      "mine": "Mina händelser",
+      "any": "Alla",
+      "apply": "Filtrera",
+      "search": "Sök",
+      "searchPlaceholder": "Händelsenummer, plats eller anmälare"
+    },
+    "priority": {
+      "p1": "Prio 1 — livshotande eller pågående",
+      "p2": "Prio 2 — brådskande",
+      "p3": "Prio 3 — rutin",
+      "p4": "Prio 4 — endast anmälan eller inbokat"
+    },
+    "priorityShort": {
+      "p1": "Prio 1",
+      "p2": "Prio 2",
+      "p3": "Prio 3",
+      "p4": "Prio 4"
+    },
+    "callStatus": {
+      "pending": "Väntar",
+      "dispatched": "Utlarmad",
+      "en_route": "På väg",
+      "on_scene": "På plats",
+      "cleared": "Avslutad",
+      "cancelled": "Återkallad"
+    },
+    "callType": {
+      "alarm": "Larm",
+      "assault": "Misshandel",
+      "backup": "Begäran om förstärkning",
+      "burglary": "Inbrott",
+      "disturbance": "Ordningsstörning",
+      "domestic": "Våld i nära relation",
+      "drugs": "Narkotika",
+      "missing_person": "Försvunnen person",
+      "officer_emergency": "Polis i nöd",
+      "pursuit": "Förföljande",
+      "robbery": "Rån",
+      "shots_fired": "Skottlossning",
+      "stolen_vehicle": "Stulet fordon",
+      "suspicious": "Misstänkt iakttagelse",
+      "theft": "Stöld",
+      "traffic_collision": "Trafikolycka",
+      "traffic_stop": "Fordonskontroll",
+      "warrant_service": "Verkställighet av efterlysning",
+      "weapons": "Vapen",
+      "welfare_check": "Kontroll av person",
+      "other": "Övrigt"
+    },
+    "disposition": {
+      "report_taken": "Anmälan upprättad",
+      "arrest_made": "Gripande",
+      "citation_issued": "Ordningsbot utfärdad",
+      "warning_given": "Tillsägelse",
+      "handled_on_scene": "Åtgärdat på plats",
+      "assistance_rendered": "Bistånd lämnat",
+      "gone_on_arrival": "Avviken vid framkomst",
+      "unable_to_locate": "Kunde inte påträffas",
+      "unfounded": "Obefogat",
+      "referred": "Överlämnat",
+      "duplicate": "Dubblett",
+      "cancelled": "Återkallad"
+    },
+    "unitStatus": {
+      "off_duty": "Ur tjänst",
+      "available": "Tillgänglig",
+      "en_route": "På väg",
+      "on_scene": "På plats",
+      "busy": "Upptagen",
+      "transporting": "Transport",
+      "at_station": "På station",
+      "out_of_service": "Ej disponibel",
+      "emergency": "Nödlarm"
+    },
+    "linkKind": {
+      "person": "Person",
+      "vehicle": "Fordon"
+    },
+    "linkRole": {
+      "caller": "Anmälare",
+      "victim": "Målsägande",
+      "suspect": "Misstänkt",
+      "witness": "Vittne",
+      "involved": "Inblandad"
+    },
+    "link": {
+      "add": "Koppla till händelsen",
+      "remove": "Ta bort koppling",
+      "withheld": "{count} skyddade — kan inte kopplas"
+    },
+    "logKind": {
+      "created": "Upprättad",
+      "note": "Anteckning",
+      "dispatched": "Utlarmad",
+      "unit_joined": "Enhet tillagd",
+      "unit_left": "Enhet borttagen",
+      "lead_changed": "Ledande enhet ändrad",
+      "unit_status": "Enhetsstatus",
+      "call_status": "Händelsestatus",
+      "linked": "Kopplad",
+      "unlinked": "Koppling borttagen",
+      "cleared": "Avslutad"
+    },
+    "log": {
+      "created": "Händelsen upprättad.",
+      "created_external": "Händelsen upprättad av {resource}.",
+      "dispatched": "{callsign} utlarmad.",
+      "self_assigned": "{callsign} knöt sig till händelsen.",
+      "unit_joined": "{callsign} tillagd på händelsen.",
+      "unit_left": "{callsign} borttagen från händelsen.",
+      "lead_changed": "{callsign} är nu ledande enhet.",
+      "unit_status": "{callsign}: {status}.",
+      "call_status": "Händelsen är {status}.",
+      "priority_changed": "Prioriteten ändrad från {from} till {to}.",
+      "linked": "{label} kopplad som {role}.",
+      "unlinked": "{label} frikopplad.",
+      "cleared": "Händelsen avslutad: {disposition}.",
+      "cancelled": "Händelsen återkallad: {disposition}.",
+      "acknowledged": "Nödlarmet kvitterat av {callsign}.",
+      "welfare_check": "Ingen statusändring från {callsign} på {minutes} minuter.",
+      "report_created": "Anmälan {number} upprättad från händelsen."
+    },
+    "card": {
+      "title": "Händelse {number}",
+      "none": "Välj en händelse för att öppna den.",
+      "narrative": "Händelseförlopp",
+      "units": "Enheter",
+      "links": "Personer och fordon",
+      "hazards": "Riskuppgifter för platsen",
+      "noHazards": "Inga riskuppgifter för platsen.",
+      "noLinks": "Inget kopplat till händelsen.",
+      "noUnits": "Ingen enhet på händelsen."
+    },
+    "time": {
+      "received": "Inkom",
+      "dispatched": "Utlarmad",
+      "enRoute": "På väg",
+      "onScene": "På plats",
+      "cleared": "Avslutad",
+      "none": "Inte ännu"
+    },
+    "note": {
+      "title": "Lägg till i händelseförloppet",
+      "placeholder": "Vad som sades över radion, med anmälarens egna ord där de spelar roll.",
+      "submit": "Lägg till rad",
+      "empty": "Inget loggat än."
+    },
+    "create": {
+      "title": "Ny händelse",
+      "intro": "En händelse som kommer per telefon inträffar där anmälaren säger. Händelsenummer, tid och område sätts av servern.",
+      "type": "Typ",
+      "priority": "Prioritet",
+      "location": "Plats",
+      "locationPlaceholder": "Gata, adress eller korsning",
+      "beat": "Område",
+      "callerName": "Anmälare",
+      "callerPhone": "Anmälarens nummer",
+      "details": "Vad anmälaren uppger",
+      "submit": "Upprätta händelse"
+    },
+    "dispatch": {
+      "title": "Larma ut enheter",
+      "intro": "De föreslagna enheterna är de närmaste tillgängliga. Den ledande enheten är den som svarar för händelsen.",
+      "units": "Enheter",
+      "lead": "Ledande enhet",
+      "recommended": "Närmaste tillgängliga",
+      "noRecommendation": "Ingen tillgänglig enhet att föreslå.",
+      "distance": "{distance} bort",
+      "add": "Larma ut",
+      "remove": "Ta av händelsen",
+      "makeLead": "Gör till ledande enhet",
+      "submit": "Larma ut"
+    },
+    "selfAssign": {
+      "action": "Knyt till händelsen",
+      "confirm": "Knyta din enhet till händelse {number}?",
+      "done": "Knuten till {number}."
+    },
+    "status": {
+      "title": "Min status",
+      "submit": "Sätt status",
+      "changed": "Status satt till {status}.",
+      "callProgress": "Rapportera på händelsen"
+    },
+    "manage": {
+      "title": "Hantera enhet",
+      "intro": "Att ändra en annan enhets status, anropssignal eller område loggas på ditt namn och på enhetens.",
+      "unit": "Enhet",
+      "status": "Status",
+      "callsign": "Anropssignal",
+      "beat": "Område",
+      "reason": "Skäl",
+      "submit": "Spara enhet"
+    },
+    "clear": {
+      "title": "Avsluta händelsen",
+      "intro": "Avslutskoden säger vad händelsen ledde till och läses tillbaka månader senare. Händelsen stängs för alla enheter på den.",
+      "disposition": "Avslutskod",
+      "note": "Avslutande rad",
+      "submit": "Avsluta händelsen",
+      "needsAcknowledgement": "Ett nödlarm kan inte avslutas förrän ett befäl har kvitterat det."
+    },
+    "emergency": {
+      "button": "Nödlarm",
+      "title": "Nödlarm",
+      "confirm": "Utlösa nödlarm på din position? Alla enheter i närheten larmas.",
+      "sent": "Nödlarm utlöst. Enheter är på väg.",
+      "banner": "{callsign} — nödlarm vid {location}",
+      "bannerNoLocation": "{callsign} — nödlarm",
+      "acknowledge": "Kvittera",
+      "acknowledged": "Kvitterat av {callsign}",
+      "notAcknowledged": "Inte kvitterat",
+      "respond": "Rycker ut"
+    },
+    "welfare": {
+      "title": "Kontroll av enhet",
+      "body": "{callsign} har varit på plats på {number} i {minutes} minuter utan statusändring.",
+      "prompt": "Kontrollera enheten",
+      "dismiss": "Sett"
+    },
+    "broadcast": {
+      "title": "Utskick",
+      "empty": "Inget ute.",
+      "create": "Nytt utskick",
+      "kind": "Typ",
+      "headline": "Rubrik",
+      "body": "Meddelande",
+      "plate": "Registreringsnummer",
+      "expiresIn": "Gäller i",
+      "expiresInHint": "Minuter. Lämnas fältet tomt gäller myndighetens standardtid.",
+      "expires": "Upphör",
+      "cancel": "Ta ur luften",
+      "cancelled": "Ur luften",
+      "submit": "Skicka utskick",
+      "fromCall": "Från händelse {number}"
+    },
+    "broadcastKind": {
+      "bolo": "Spaningsuppdrag",
+      "attempt_to_locate": "Eftersök",
+      "all_units": "Till alla enheter",
+      "information": "Information"
+    },
+    "map": {
+      "title": "Karta",
+      "units": "Enheter",
+      "calls": "Händelser",
+      "beats": "Områden",
+      "legend": "Teckenförklaring",
+      "follow": "Följ enhet",
+      "center": "Centrera på händelsen",
+      "positionAge": "Positionen {duration} gammal",
+      "noPosition": "Ingen position",
+      "empty": "Inget att visa på kartan än.",
+      "closed": "Kartan är stängd. Positioner skickas bara medan den är öppen."
+    },
+    "beat": {
+      "title": "Områden",
+      "none": "Inget område",
+      "unassigned": "Ingen tilldelning",
+      "kind": {
+        "beat": "Område",
+        "district": "Distrikt"
+      }
+    },
+    "report": {
+      "create": "Upprätta anmälan från händelsen",
+      "intro": "Anmälan öppnas förifylld från händelsen: plats, tid, enheter och de personer och fordon som är kopplade till den.",
+      "created": "Anmälan {number} upprättad från händelsen."
+    },
+    "source": {
+      "dispatcher": "Upprättad av ledningscentralen",
+      "phone": "Inringd",
+      "export": "Upprättad av {resource}",
+      "panic": "Nödlarm",
+      "alpr": "Skyltavläsning"
+    }
+  },
+  "alpr": {
+    "title": "Skyltavläsningar",
+    "intro": "Varje registreringsskylt en patrull passerat, med tid, plats och enhet. Avläsningar sparas i trettio dagar och raderas sedan.",
+    "empty": "Ingen avläsning matchar.",
+    "column": {
+      "plate": "Registreringsnummer",
+      "time": "Avläst",
+      "unit": "Enhet",
+      "callsign": "Anropssignal",
+      "location": "Plats",
+      "camera": "Kamera",
+      "reason": "Grund",
+      "note": "Uppgift",
+      "case": "Ärende",
+      "hit": "Träff",
+      "expires": "Upphör",
+      "added": "Registrerad",
+      "addedBy": "Registrerad av"
+    },
+    "filter": {
+      "plate": "Registreringsnummer",
+      "unit": "Enhet",
+      "since": "Sedan",
+      "sinceHours": "{hours} tim",
+      "hitsOnly": "Endast träffar",
+      "any": "Alla",
+      "apply": "Filtrera"
+    },
+    "camera": {
+      "front": "Fram",
+      "rear": "Bak",
+      "fixed": "Fast kamera"
+    },
+    "hit": {
+      "title": "Träff på bevakningslista",
+      "banner": "{plate} — {reason}",
+      "advice": "Bekräfta uppgiften innan du agerar på den.",
+      "dismiss": "Stäng",
+      "none": "Inga träffar."
+    },
+    "hotlist": {
+      "title": "Bevakningslista",
+      "intro": "En skylt på listan sätter en varning framför en polis som är på väg att stoppa ett fordon. Varje post säger vem som lagt in den och varför, och upphör att gälla.",
+      "empty": "Inga skyltar bevakas.",
+      "add": "Lägg till skylt",
+      "remove": "Ta bort skylt",
+      "removeConfirm": "Ta bort {plate} från bevakningslistan?",
+      "plate": "Registreringsnummer",
+      "reason": "Grund",
+      "note": "Uppgift",
+      "case": "Ärendenummer",
+      "expiresIn": "Gäller i",
+      "expiresInHint": "Minuter. Lämnas fältet tomt gäller den tills någon tar bort den.",
+      "silent": "Tyst",
+      "silentHint": "Träffen loggas och enheten får ingen varning.",
+      "submit": "Lägg till i bevakningslistan"
+    },
+    "reason": {
+      "stolen_vehicle": "Stulet fordon",
+      "wanted_person": "Efterlyst person",
+      "warrant": "Efterlysning",
+      "bolo": "Spaningsuppdrag",
+      "investigation": "Utredning",
+      "other": "Övrigt"
+    }
+  },
+  "brott": {
+    "grad": {
+      "ringa": "Ringa",
+      "normal": "Normalgraden",
+      "grov": "Grovt",
+      "synnerligen_grov": "Synnerligen grovt"
+    },
+    "column": {
+      "code": "Kod",
+      "citation": "Lagrum",
+      "rubrik": "Brottsrubricering",
+      "grad": "Grad",
+      "straffskala": "Straffskala",
+      "version": "Version"
+    },
+    "straffskala": {
+      "boter": "Böter",
+      "livstid": "Fängelse på livstid",
+      "months": "{count} månader",
+      "month": "{count} månad",
+      "years": "{count} år",
+      "year": "{count} år",
+      "upTo": "högst {max}",
+      "atLeast": "lägst {min} och högst {max}",
+      "gemensam": "Gemensam straffskala ({counts} brott)"
+    },
+    "empty": "Inga brott i katalogen.",
+    "superseded": "Ersatt {date}",
+    "rubrik": {
+      "mord": "Mord",
+      "drap": "Dråp",
+      "misshandel": "Misshandel",
+      "ringa_misshandel": "Ringa misshandel",
+      "grov_misshandel": "Grov misshandel",
+      "olaga_tvang": "Olaga tvång",
+      "olaga_hot": "Olaga hot",
+      "stold": "Stöld",
+      "ringa_stold": "Ringa stöld",
+      "grov_stold": "Grov stöld",
+      "ran": "Rån",
+      "grovt_ran": "Grovt rån",
+      "bedrageri": "Bedrägeri",
+      "skadegorelse": "Skadegörelse",
+      "vald_mot_tjansteman": "Våld eller hot mot tjänsteman",
+      "ringa_vald_mot_tjansteman": "Ringa våld eller hot mot tjänsteman",
+      "valdsamt_motstand": "Våldsamt motstånd",
+      "narkotikabrott": "Narkotikabrott",
+      "ringa_narkotikabrott": "Ringa narkotikabrott",
+      "grovt_narkotikabrott": "Grovt narkotikabrott",
+      "olovlig_korning": "Olovlig körning",
+      "rattfylleri": "Rattfylleri",
+      "grovt_rattfylleri": "Grovt rattfylleri",
+      "vapenbrott": "Vapenbrott",
+      "grovt_vapenbrott": "Grovt vapenbrott"
+    }
+  },
+  "anmalan": {
+    "status": {
+      "utkast": "Utkast",
+      "inlamnad": "Inlämnad",
+      "atersand": "Återsänd",
+      "godkand": "Godkänd"
+    },
+    "roll": {
+      "misstankt": "Misstänkt",
+      "malsagande": "Målsägande",
+      "vittne": "Vittne",
+      "anmalare": "Anmälare",
+      "annan": "Annan"
+    },
+    "stage": {
+      "fullbordat": "Fullbordat",
+      "forsok": "Försök",
+      "forberedelse": "Förberedelse",
+      "stampling": "Stämpling"
+    },
+    "column": {
+      "number": "K-nummer",
+      "title": "Rubrik",
+      "status": "Status",
+      "created": "Upprättad",
+      "author": "Upprättad av",
+      "occurred": "Inträffade",
+      "place": "Brottsplats",
+      "fu": "Förundersökning",
+      "version": "Version"
+    },
+    "action": {
+      "create": "Ny anmälan",
+      "submit": "Lämna in för granskning",
+      "approve": "Godkänn",
+      "atersand": "Återsänd med kommentar",
+      "supplement": "Lägg till tilläggsuppgift",
+      "atersandNote": "Kommentar till upprättaren"
+    },
+    "section": {
+      "brott": "Brott",
+      "personer": "Personer",
+      "handelseforlopp": "Händelseförlopp",
+      "versions": "Versioner",
+      "supplements": "Tilläggsuppgifter"
+    },
+    "empty": "Inga anmälningar matchar.",
+    "locked": "Godkänd och låst. Lägg till en tilläggsuppgift för att komplettera.",
+    "ownReport": "Du kan inte godkänna en anmälan du själv har upprättat.",
+    "returnedNote": "Återsänd av befäl: {note}",
+    "aklagareIndicated": "Brotten som anges gör normalt åklagare till förundersökningsledare.",
+    "filter": {
+      "mine": "Endast mina"
+    },
+    "detail": {
+      "none": "Välj en anmälan för att öppna den."
+    },
+    "brott": {
+      "empty": "Inga brott angivna."
+    },
+    "personer": {
+      "empty": "Inga personer är angivna i anmälan."
+    },
+    "returnedHeading": "Återsänd av befäl",
+    "returnedNoReason": "Ingen motivering angavs.",
+    "confirm": {
+      "approve": "Att godkänna innebär att du signerar anmälan och låser den. Därefter kan den endast kompletteras med en tilläggsuppgift.",
+      "atersand": "Anmälan återsänds till den som upprättat den, tillsammans med din kommentar."
+    }
+  },
+  "fu": {
+    "status": {
+      "inledd": "Inledd",
+      "slutdelgiven": "Slutdelgiven",
+      "redovisad": "Redovisad till åklagare",
+      "nedlagd": "Nedlagd"
+    },
+    "ledareKind": {
+      "polis": "Polisiär förundersökningsledare",
+      "aklagare": "Åklagare"
+    },
+    "column": {
+      "number": "Ärendenummer",
+      "title": "Rubrik",
+      "status": "Status",
+      "ledare": "Förundersökningsledare",
+      "opened": "Inledd",
+      "closed": "Avslutad"
+    },
+    "action": {
+      "create": "Inled förundersökning",
+      "slutdelge": "Slutdelge materialet",
+      "redovisa": "Redovisa till åklagare",
+      "lagg_ned": "Lägg ned",
+      "assign": "Byt förundersökningsledare"
+    },
+    "reason": {
+      "brott_kan_ej_styrkas": "Brott kan ej styrkas",
+      "spaningsuppslag_saknas": "Spaningsuppslag saknas",
+      "ej_brott": "Gärningen är ej brott",
+      "atalsunderlatelse": "Åtalsunderlåtelse",
+      "annan": "Annat skäl, anges nedan"
+    },
+    "empty": "Inga förundersökningar matchar."
+  },
+  "frihet": {
+    "status": {
+      "gripen": "Gripen",
+      "anhallen": "Anhållen",
+      "framstalld": "Häktningsframställan inlämnad",
+      "haktad": "Häktad",
+      "frigiven": "Frigiven"
+    },
+    "action": {
+      "gripande": "Registrera gripande",
+      "anhallande": "Anhåll",
+      "framstallan": "Lämna häktningsframställan",
+      "haktning": "Häkta",
+      "frigiv": "Frige",
+      "underratta": "Registrera underrättelse om misstanke",
+      "log": "Lägg till i arrestjournalen"
+    },
+    "column": {
+      "number": "Diarienummer",
+      "person": "Person",
+      "status": "Status",
+      "gripen": "Gripen",
+      "heldFor": "Tid frihetsberövad",
+      "deadline": "Nästa frist",
+      "grund": "Grund"
+    },
+    "deadline": {
+      "framstallan": "Häktningsframställan (RB 24:12)",
+      "forhandling": "Häktningsförhandling (RB 24:13)",
+      "passed": "Överskriden med {time}",
+      "remaining": "{time} kvar",
+      "none": "Ingen frist löper.",
+      "soon": "Snart"
+    },
+    "grund": {
+      "pa_bar_garning": "På bar gärning",
+      "efterlyst": "Efterlyst",
+      "flyktfara": "Flyktfara",
+      "kollusionsfara": "Kollusionsfara",
+      "recidivfara": "Recidivfara",
+      "identitet_oklar": "Identiteten ej fastställd",
+      "annan": "Annan, anges i journalen",
+      "choose": "Välj grund"
+    },
+    "frigivningsgrund": {
+      "ej_anhallen": "Ej anhållen av åklagare",
+      "beslut_upphavt": "Beslutet upphävt",
+      "tiden_ute": "Fristen har löpt ut",
+      "annan": "Annan, anges i journalen"
+    },
+    "logKind": {
+      "forhor": "Förhör",
+      "forsvarare": "Försvarare",
+      "maltid": "Måltid",
+      "samtal": "Telefonsamtal",
+      "lakare": "Läkarvård",
+      "annan": "Annat"
+    },
+    "empty": "Ingen är frihetsberövad.",
+    "attention": "En lagstadgad frist kräver åtgärd.",
+    "filter": {
+      "openOnly": "Endast pågående"
+    },
+    "emptyList": "Inga frihetsberövanden matchar.",
+    "detail": {
+      "none": "Välj ett frihetsberövande för att öppna det."
+    },
+    "section": {
+      "chain": "Beslut",
+      "deadlines": "Lagstadgade frister",
+      "brott": "Frihetsberövad för",
+      "log": "Arrestjournal"
+    },
+    "chain": {
+      "pending": "Ej fattat",
+      "by": "Av",
+      "notified": "Underrättad om misstanke (RB 24:9)",
+      "notNotified": "Ännu inte underrättad om misstanke."
+    },
+    "brott": {
+      "empty": "Inga brott registrerade."
+    },
+    "log": {
+      "empty": "Inget loggat ännu.",
+      "kind": "Åtgärd",
+      "note": "Anteckning",
+      "at": "Tid",
+      "by": "Noterat av"
+    },
+    "confirm": {
+      "anhallande": "Anhållande är åklagarens beslut. Det startar fristen enligt RB 24:12: häktningsframställan ska ha getts in till rätten senast klockan tolv tredje dagen efter anhållningsbeslutet — en lokal klockan tolv, inte sjuttiotvå timmar.",
+      "framstallan": "Detta registrerar att häktningsframställan har getts in till rätten. Fristen enligt RB 24:12 upphör att löpa. Häktningsförhandling ska hållas senast fyra dygn efter gripandet (RB 24:13).",
+      "haktning": "Häktning är rättens beslut. Det avslutar fristen enligt RB 24:13 och personen tas in i häkte.",
+      "frigiv": "Frigivning avslutar frihetsberövandet. Ett senare gripande är en ny kedja med egna frister, inte en återupptagning av den här."
+    },
+    "duration": {
+      "days": "{count} dygn",
+      "hours": "{count} tim",
+      "minutes": "{count} min"
+    },
+    "attentionSoon": "{deadline} löper snart ut.",
+    "attentionPassed": "{deadline} har överskridits.",
+    "stage": {
+      "gripen": "Gripande",
+      "anhallen": "Anhållande",
+      "framstalld": "Häktningsframställan",
+      "haktad": "Häktning",
+      "frigiven": "Frigivande"
+    }
+  },
+  "tvang": {
+    "kind": {
+      "husrannsakan_reell": "Reell husrannsakan",
+      "husrannsakan_personell": "Personell husrannsakan",
+      "kroppsvisitation": "Kroppsvisitation",
+      "kroppsbesiktning": "Kroppsbesiktning",
+      "beslag": "Beslag"
+    },
+    "target": {
+      "person": "Person",
+      "vehicle": "Fordon",
+      "address": "Adress"
+    },
+    "decider": {
+      "fu_ledare": "Förundersökningsledare",
+      "aklagare": "Åklagare",
+      "domare": "Domare"
+    },
+    "column": {
+      "number": "Diarienummer",
+      "kind": "Tvångsmedel",
+      "target": "Riktat mot",
+      "decided": "Beslutat av",
+      "valid": "Giltigt till",
+      "scope": "Omfattning",
+      "status": "Status"
+    },
+    "action": {
+      "decide": "Fatta beslut",
+      "verkstall": "Registrera verkställighet",
+      "upphav": "Upphäv beslutet"
+    },
+    "grund": {
+      "skalig_misstanke": "Skälig misstanke",
+      "sannolika_skal": "Sannolika skäl",
+      "eftersokande_person": "Eftersökande av person som ska gripas",
+      "sakra_bevis": "Säkra bevisning",
+      "fara_i_drojsmal": "Fara i dröjsmål",
+      "annan": "Annat, anges i omfattningen"
+    },
+    "status": {
+      "live": "Gällande",
+      "expired": "Utgånget",
+      "upphavd": "Upphävt",
+      "not_yet": "Ej i kraft ännu",
+      "verkstalld": "Verkställt"
+    },
+    "empty": "Inga tvångsmedel matchar."
+  },
+  "efterlysning": {
+    "grund": {
+      "anhallen_i_franvaro": "Anhållen i sin frånvaro",
+      "haktad_i_franvaro": "Häktad i sin frånvaro",
+      "delgivning": "Delgivning",
+      "forsvunnen": "Försvunnen person",
+      "oidentifierad": "Oidentifierad",
+      "annan": "Annat"
+    },
+    "avlysningsgrund": {
+      "gripen": "Gripen",
+      "aterkallad": "Återkallad",
+      "preskriberad": "Preskriberad",
+      "annan": "Annat"
+    },
+    "column": {
+      "number": "Diarienummer",
+      "person": "Person",
+      "grund": "Grund",
+      "priority": "Prioritet",
+      "issued": "Utfärdad",
+      "expires": "Upphör"
+    },
+    "action": {
+      "create": "Efterlys",
+      "cancel": "Avlys"
+    },
+    "detainOnSight": "Ska gripas",
+    "notAnArrest": "Efterlyst, men inte för gripande.",
+    "empty": "Ingen är efterlyst."
+  },
+  "spaning": {
+    "target": {
+      "person": "Person",
+      "vehicle": "Fordon",
+      "other": "Endast beskrivning"
+    },
+    "banner": {
+      "alert": "Larm",
+      "notice": "Notering",
+      "quiet": "Endast i akten"
+    },
+    "column": {
+      "number": "Diarienummer",
+      "target": "Söks",
+      "grund": "Grund",
+      "priority": "Prioritet",
+      "area": "Område",
+      "issued": "Utfärdat",
+      "expires": "Upphör",
+      "description": "Beskrivning"
+    },
+    "action": {
+      "create": "Lägg ut spaningsuppdrag",
+      "resolve": "Avsluta spaningsuppdraget"
+    },
+    "grund": {
+      "iakttagelse": "Iakttagelse att följa upp",
+      "efterlyst_fordon": "Eftersökt fordon",
+      "stulet_fordon": "Stulet fordon",
+      "misstankt_fordon": "Fordon kopplat till brott",
+      "eftersokt_person": "Person som söks för förhör",
+      "annan": "Annat"
+    },
+    "avslutsgrund": {
+      "gripen": "Gripen",
+      "omhandertaget": "Fordonet omhändertaget",
+      "aterkallad": "Återkallat",
+      "tiden_ute": "Tiden har löpt ut",
+      "annan": "Annat"
+    },
+    "empty": "Inga spaningsuppdrag pågår.",
+    "notAnArrest": "Spaningsuppdrag, inte efterlysning. Rapportera iakttagelsen."
+  }
+}

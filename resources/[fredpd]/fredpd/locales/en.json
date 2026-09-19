@@ -1,0 +1,1873 @@
+{
+  "app": {
+    "name": "FredPD",
+    "loading": "Loading…",
+    "offline": "No connection to the server."
+  },
+  "shell": {
+    "close": "Close",
+    "back": "Back",
+    "commandPlaceholder": "Command or search",
+    "module": {
+      "records": "Records",
+      "dispatch": "Dispatch",
+      "evidence": "Evidence",
+      "lab": "Lab",
+      "intel": "Intelligence",
+      "court": "Court",
+      "personnel": "Personnel",
+      "comms": "Communications",
+      "admin": "Administration"
+    },
+    "status": {
+      "unit": "Unit {callsign}",
+      "onDuty": "On duty",
+      "offDuty": "Off duty",
+      "signedInAs": "Signed in as {name}",
+      "permissionsStale": "Permissions out of date"
+    },
+    "unbuilt": {
+      "title": "Not built yet",
+      "body": "Your permissions open this module, but it has not been built into this version of FredPD. Nothing is missing from your access — there is nothing here yet."
+    }
+  },
+  "error": {
+    "no_session": "You are not signed on. Open FredPD from a terminal or an agency vehicle.",
+    "forbidden": "Your Discord roles do not grant access to this.",
+    "context": "This is only available at the right place, on duty, or in the right unit.",
+    "rate_limited": "Too many requests. Wait a moment and try again.",
+    "invalid": "The form contains errors.",
+    "not_found": "The record could not be found.",
+    "conflict": "Someone else changed this record while you were editing. Reload and try again.",
+    "restricted": "This record is restricted. Request access or use break-glass.",
+    "stale_permissions": "Your permissions are out of date. Sign on again.",
+    "internal": "Something went wrong on the server. The error has been logged."
+  },
+  "setup": {
+    "done": "FredPD is set up. {agency} created; the Discord role {role} now grants administration.",
+    "alreadyDone": "FredPD is already set up. Manage permissions from Administration in the MDT.",
+    "busy": "Setup is already running. Wait a moment and try again.",
+    "badCode": "Wrong setup code. It is printed in the server console when the resource starts.",
+    "noRole": "Name the Discord role that should grant administration: /fredpd setup <code> <role id>. The server console lists your roles.",
+    "roleNotHeld": "You do not hold that Discord role. The server console lists the ones you do.",
+    "noSeed": "The permission groups are missing. Apply database/seeds/0001_permissions.sql, then try again.",
+    "noDiscord": "No Discord identity. Start Discord and reconnect — FredPD identifies officers by Discord account.",
+    "noToken": "No Discord bot token in config/server.lua. Add one, restart the resource and try again.",
+    "discordFailed": "Discord could not be reached. Check the token and the guild id in config/server.lua.",
+    "noRoles": "You hold no roles in that Discord server. Give yourself one, then run setup again.",
+    "failed": "Setup could not be written to the database. The server console has the reason."
+  },
+  "form": {
+    "cancel": "Cancel",
+    "any": "Any",
+    "search": "Search"
+  },
+  "fieldError": {
+    "type": "the wrong kind of value",
+    "too_short": "too short",
+    "too_long": "too long",
+    "too_small": "too small",
+    "too_large": "too large",
+    "required": "required",
+    "exists": "already in use",
+    "unknown": "unknown",
+    "cycle": "would inherit in a circle",
+    "not_group_key": "not a valid group key",
+    "not_permission_key": "not a valid permission key",
+    "not_model": "not a vehicle model on this server",
+    "not_locale_key": "not a name key",
+    "not_certification": "not a certification",
+    "not_snowflake": "not a Discord ID",
+    "not_integer": "must be a whole number",
+    "not_allowed": "not an allowed value",
+    "not_supported": "not supported",
+    "not_elapsed": "the turnaround has not elapsed",
+    "nothing_to_change": "nothing to change",
+    "protected": "protected and cannot be changed",
+    "would_lock_out": "would leave nobody able to administer FredPD",
+    "inherited_by_groups": "inherited by another group",
+    "mapped_to_roles": "mapped to a Discord role",
+    "too_many": "too many",
+    "stale": "changed since this screen was loaded",
+    "model_changed": "the permissions changed while this was open",
+    "scene_released": "the scene has been released",
+    "unattributed": "no owner on record for this trace",
+    "format": "not a date in YYYY-MM-DD form",
+    "field_forbidden": "you are not cleared for this field",
+    "clearance": "above your clearance",
+    "destroyed": "recorded as destroyed",
+    "lost": "reported lost",
+    "seized": "in police custody",
+    "stolen": "reported stolen",
+    "call_cleared": "the call is already closed",
+    "call_cancelled": "the call was cancelled",
+    "already_assigned": "already on this call",
+    "not_assigned": "not on this call",
+    "off_duty": "not on duty",
+    "unavailable": "not available for dispatch",
+    "no_unit": "not signed on to a unit",
+    "needs_acknowledgement": "needs a supervisor's acknowledgement",
+    "disabled": "switched off",
+    "straffskala": "Not a valid sentencing range.",
+    "incomplete_citation": "A citation needs the statute, chapter and section, or none of them.",
+    "over_max": "A fixed term cannot exceed eighteen years.",
+    "under_review": "This report is with a supervisor and cannot be edited.",
+    "not_author": "You did not write this report.",
+    "own_report": "You cannot approve a report you wrote.",
+    "not_submitted": "This report has not been submitted.",
+    "not_submittable": "This report cannot be submitted from its current state.",
+    "locked": "Approved and locked.",
+    "not_ledare": "You are not leading this investigation.",
+    "fu_closed": "This investigation is closed.",
+    "self_parent": "A supplemental cannot be its own parent.",
+    "too_deep": "The supplemental chain is too long.",
+    "length_mismatch": "The lists do not line up.",
+    "stage_unavailable": "The statute does not make that stage punishable for this offence.",
+    "over_clearance": "Above your clearance.",
+    "wrong_capacity": "That decision is not yours to take.",
+    "already_released": "This person has already been released.",
+    "not_a_place": "This measure is directed at a place, not a person.",
+    "not_a_person": "This measure is directed at a person, not a place.",
+    "upphavd": "This decision has been revoked.",
+    "not_yet": "This decision is not yet in force.",
+    "expired": "This decision has expired.",
+    "cancelled": "Cancelled.",
+    "required_without_target": "Give a description when there is no record to point at.",
+    "resolved": "This lookout has been closed.",
+    "no_expiry": "This lookout has no expiry and cannot be trusted.",
+    "out_of_range": "Outside the permitted range.",
+    "out_of_order": "Not possible from this stage.",
+    "not_a_key": "Not a recognised entry type."
+  },
+  "placement": {
+    "station_terminal": "Station terminal",
+    "property_terminal": "Property room terminal",
+    "lab_terminal": "Lab terminal",
+    "booking_terminal": "Booking terminal",
+    "dispatch_console": "Dispatch console",
+    "courthouse_terminal": "Courthouse terminal",
+    "motorpool": "Motor pool",
+    "evidence_bench": "Evidence bench",
+    "interaction": {
+      "prop": "Bind to a prop",
+      "ped": "Place a person",
+      "zone": "Mark an area"
+    },
+    "editor": {
+      "title": "Placements",
+      "newZone": "New here — area",
+      "newProp": "New here — bind to the prop I am looking at",
+      "newPed": "New here — place a person",
+      "move": "Move the nearest one to me",
+      "disable": "Switch off the nearest one",
+      "delete": "Delete the nearest one",
+      "pickKind": "What should this open?",
+      "pedModelTitle": "Person",
+      "pedModelLabel": "Model name",
+      "noProp": "No prop in view. Look directly at one and try again.",
+      "noneNearby": "No placement nearby.",
+      "created": "Placement created.",
+      "moved": "Placement moved.",
+      "disabled": "Placement switched off.",
+      "deleted": "Placement deleted.",
+      "deleteTitle": "Delete this placement?",
+      "deleteBody": "{kind}, {distance} m away. This cannot be undone."
+    }
+  },
+  "chat": {
+    "usage": "Write a message after the command.",
+    "suggestion": "Message the internal police channel",
+    "suggestionArg": "What to send"
+  },
+  "garage": {
+    "title": "Motor pool",
+    "returnVehicle": "Return a vehicle",
+    "drawn": "Vehicle {plate} signed out.",
+    "returned": "Vehicle {plate} returned.",
+    "noVehicle": "No vehicle here to return.",
+    "unknownModel": "That vehicle model is not available on this server."
+  },
+  "fleet": {
+    "patrol_sedan": "Patrol sedan",
+    "riot": "Riot van",
+    "helicopter": "Helicopter"
+  },
+  "evidence": {
+    "empty": "No evidence items match.",
+    "detail": {
+      "none": "Select an evidence number to open the item."
+    },
+    "tab": {
+      "items": "Items",
+      "scenes": "Scenes"
+    },
+    "column": {
+      "number": "Evidence number",
+      "type": "Type",
+      "packaging": "Packaging",
+      "seal": "Seal",
+      "status": "Status",
+      "storage": "Storage",
+      "case": "Case",
+      "collected": "Collected",
+      "marker": "Marker",
+      "ref": "Reference",
+      "description": "Description"
+    },
+    "filter": {
+      "status": "Status",
+      "type": "Type",
+      "search": "Search",
+      "searchPlaceholder": "Evidence number, case or description",
+      "any": "Any",
+      "apply": "Apply"
+    },
+    "type": {
+      "print": "Latent fingerprint",
+      "blood": "Blood",
+      "dna_touch": "Saliva or touch DNA",
+      "casing": "Casing",
+      "bullet": "Bullet",
+      "magazine": "Magazine",
+      "gsr": "Gunshot residue",
+      "footwear": "Footwear impression",
+      "glove_mark": "Glove mark or fiber",
+      "drug_residue": "Drug residue",
+      "tool_mark": "Tool mark or broken glass",
+      "digital": "Digital device"
+    },
+    "packaging": {
+      "evidence_bag": "Evidence bag",
+      "envelope": "Envelope",
+      "swab_box": "Swab box",
+      "lift_card": "Lift card",
+      "firearm_box": "Firearm box",
+      "drug_bag": "Drug bag",
+      "phone_bag": "Phone bag",
+      "item_tag": "Large-item tag"
+    },
+    "seal": {
+      "sealed": "Intact",
+      "broken": "Broken",
+      "resealed": "Resealed"
+    },
+    "status": {
+      "collected": "Collected",
+      "in_locker": "In locker",
+      "in_property": "In property room",
+      "checked_out": "Checked out",
+      "at_lab": "At lab",
+      "released": "Released",
+      "destroyed": "Destroyed"
+    },
+    "destination": {
+      "locker": "Temporary locker",
+      "lab": "Forensic lab",
+      "court": "Court",
+      "investigator": "Investigator"
+    },
+    "collect": {
+      "title": "Collect trace",
+      "trace": "Trace",
+      "packaging": "Packaging",
+      "marker": "Marker number",
+      "submit": "Collect"
+    },
+    "intake": {
+      "title": "Property room intake",
+      "storage": "Storage location",
+      "storagePlaceholder": "Firearms vault, shelf B-04",
+      "reason": "Reason",
+      "accept": "Accept",
+      "reject": "Reject"
+    },
+    "transfer": {
+      "title": "Transfer custody",
+      "destination": "Destination",
+      "toParty": "Received by",
+      "reason": "Reason",
+      "submit": "Transfer"
+    },
+    "custody": {
+      "title": "Chain of custody",
+      "time": "Time",
+      "action": "Action",
+      "from": "From",
+      "to": "To",
+      "reason": "Reason",
+      "signedBy": "Signed by",
+      "empty": "No custody entries yet."
+    },
+    "custodyAction": {
+      "collect": "Collected",
+      "deposit": "Deposited",
+      "intake": "Received",
+      "transfer": "Transferred",
+      "checkout": "Checked out",
+      "checkin": "Checked in",
+      "release": "Released",
+      "destroy": "Destroyed"
+    },
+    "labRequest": {
+      "title": "Request lab analysis",
+      "analyses": "Analyses",
+      "items": "Evidence items",
+      "priority": "Priority",
+      "justification": "Justification",
+      "submit": "Send request"
+    },
+    "analyses": {
+      "title": "Analyses",
+      "empty": "No analyses on this item."
+    },
+    "scene": {
+      "number": "Scene number",
+      "items": "Items",
+      "entries": "Entries",
+      "opened": "Opened",
+      "empty": "No scenes yet.",
+      "create": "Open scene",
+      "createIntro": "The scene opens at your position. The radius sets the perimeter.",
+      "radius": "Radius (m)",
+      "release": "Release scene",
+      "releaseConfirm": "Releasing the perimeter ends collection at this scene.",
+      "status": {
+        "open": "Open",
+        "released": "Released"
+      }
+    }
+  },
+  "lab": {
+    "title": "Forensic lab",
+    "intro": "Analyses waiting at the lab. Take one, record the method used, and complete it when the turnaround has elapsed.",
+    "empty": "No analyses in the queue. Lab requests are created from a case in Evidence.",
+    "start": "Start",
+    "complete": "Complete analysis",
+    "completeNote": "The result is computed by the lab when the turnaround has elapsed and is not entered here.",
+    "notStarted": "Not started. The turnaround begins when the analysis is taken.",
+    "observations": "Observations",
+    "observationsPlaceholder": "Swab extracted and quantified. Sample partly degraded by rain.",
+    "column": {
+      "analysis": "Analysis",
+      "assigned": "Assigned to",
+      "case": "Case",
+      "completed": "Completed",
+      "due": "Due",
+      "evidence": "Evidence",
+      "priority": "Priority",
+      "result": "Result",
+      "started": "Started",
+      "status": "Status"
+    },
+    "filter": {
+      "analysis": "Analysis",
+      "any": "Any",
+      "mine": "Assigned to me",
+      "status": "Status"
+    },
+    "analysis": {
+      "dna": "DNA analysis",
+      "print_comparison": "Fingerprint comparison",
+      "print_search": "Fingerprint index search",
+      "ballistics": "Ballistics",
+      "gsr": "Gunshot residue",
+      "drug_id": "Drug identification"
+    },
+    "status": {
+      "queued": "Queued",
+      "in_progress": "In progress",
+      "complete": "Complete",
+      "reviewed": "Reviewed",
+      "released": "Released",
+      "cancelled": "Cancelled"
+    },
+    "priority": {
+      "routine": "Routine",
+      "expedited": "Expedited",
+      "urgent": "Urgent"
+    },
+    "result": {
+      "profile_obtained": "Profile obtained",
+      "partial_profile": "Partial profile",
+      "mixture": "Mixture",
+      "no_profile": "No profile",
+      "identification": "Identification",
+      "exclusion": "Exclusion",
+      "inconclusive": "Inconclusive",
+      "insufficient": "Insufficient for comparison",
+      "candidate_match": "Candidate match, confirmation required",
+      "no_match": "No match"
+    }
+  },
+  "intel": {
+    "tab": {
+      "log": "Intelligence log",
+      "people": "People",
+      "orgs": "Organizations",
+      "cases": "Cases"
+    },
+    "search": {
+      "placeholder": "Search the register",
+      "empty": "Nothing matched.",
+      "results": "{count} results"
+    },
+    "log": {
+      "empty": "No intelligence logged yet.",
+      "compose": "Log intelligence",
+      "body": "What was observed",
+      "bodyPlaceholder": "Black van, no plates, parked on Alta Street twice this week.",
+      "tags": "Tags",
+      "tagsPlaceholder": "narcotics, weapons",
+      "source": "Source",
+      "confidence": "Confidence",
+      "post": "Log it",
+      "posted": "Logged.",
+      "allTags": "All",
+      "filtered": "Filtered by {tag}",
+      "attachedTo": "About"
+    },
+    "source": {
+      "informant": "Informant",
+      "wiretap": "Wiretap",
+      "surveillance": "Surveillance",
+      "patrol": "Patrol",
+      "tip": "Tip",
+      "other": "Other",
+      "protected": "Protected source",
+      "none": "No source given"
+    },
+    "confidence": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
+    "person": {
+      "unknown": "Unknown person",
+      "new": "New person",
+      "name": "Name",
+      "alias": "Alias",
+      "description": "Description",
+      "status": "Status",
+      "empty": "Nobody in the register yet.",
+      "notes": "Intelligence",
+      "vehicles": "Vehicles",
+      "orgs": "Organizations",
+      "associates": "Associates",
+      "cases": "Cases",
+      "noteCount": "{count} entries",
+      "plates": "Plates",
+      "confirmed": "Confirmed",
+      "suspected": "Suspected"
+    },
+    "personStatus": {
+      "unknown": "Unknown",
+      "poi": "Person of interest",
+      "active_investigation": "Under investigation",
+      "warrant": "Wanted",
+      "cleared": "Cleared",
+      "incarcerated": "In custody",
+      "deceased": "Deceased"
+    },
+    "org": {
+      "new": "New organization",
+      "name": "Name",
+      "territory": "Territory",
+      "members": "{count} members",
+      "empty": "No organizations in the register yet.",
+      "roster": "Members"
+    },
+    "orgType": {
+      "gang": "Gang",
+      "cartel": "Cartel",
+      "business": "Business",
+      "crew": "Crew",
+      "other": "Other"
+    },
+    "orgStatus": {
+      "active": "Active",
+      "disbanded": "Disbanded",
+      "dormant": "Dormant"
+    },
+    "case": {
+      "new": "New case",
+      "title": "Title",
+      "description": "Description",
+      "empty": "No cases yet.",
+      "linked": "{people} people, {orgs} organizations",
+      "links": "Linked to this case"
+    },
+    "caseStatus": {
+      "open": "Open",
+      "closed": "Closed",
+      "cold": "Cold"
+    },
+    "action": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "create": "Create",
+      "back": "Back"
+    }
+  },
+  "admin": {
+    "roleMap": {
+      "title": "Discord roles",
+      "intro": "Map a Discord role to a permission group. Roles are the only source of access; this decides what each one grants.",
+      "roleId": "Discord role ID",
+      "roleName": "Name (for display)",
+      "group": "Permission group",
+      "add": "Add mapping",
+      "remove": "Remove",
+      "empty": "No roles mapped yet. Until one is, nobody has access.",
+      "snapshotAge": "Discord last synced {seconds} s ago",
+      "snapshotMissing": "Discord has never synced. Check the gateway.",
+      "added": "Mapping added.",
+      "removed": "Mapping removed.",
+      "confirmRemove": "Remove this mapping? Anyone who had access only through it loses it immediately."
+    },
+    "fleet": {
+      "title": "Motor pool fleet",
+      "intro": "What the motor pool offers, and who may draw it. A vehicle with no gate is drawable by anyone who may draw at all.",
+      "empty": "No vehicles in the fleet.",
+      "new": "Add vehicle",
+      "add": "Add",
+      "edit": "Edit vehicle",
+      "save": "Save",
+      "remove": "Remove",
+      "removeConfirm": "Removing the vehicle takes it out of the motor pool menu. Vehicles already drawn are unaffected.",
+      "vehicle": "Vehicle",
+      "model": "Model",
+      "modelPlaceholder": "police3",
+      "labelKey": "Name key",
+      "labelKeyPlaceholder": "fleet.patrol_sedan",
+      "permission": "Permission",
+      "certification": "Certification",
+      "livery": "Livery",
+      "sortOrder": "Order",
+      "enabled": "Available",
+      "on": "Yes",
+      "off": "No",
+      "gating": "Who may draw it",
+      "noGate": "Anyone who may draw",
+      "requiredGroup": "Permission group",
+      "requiredDiscordRole": "Discord role"
+    },
+    "groups": {
+      "title": "Permission groups",
+      "intro": "A permission group is a bundle of permission keys. A Discord role grants a group; this page decides what each group contains.",
+      "empty": "No permission groups yet. Create one below, then map a Discord role to it.",
+      "new": "New group",
+      "create": "Create group",
+      "save": "Save group",
+      "delete": "Delete",
+      "deleteConfirm": "Delete this group? It cannot be deleted while a role or another group still uses it.",
+      "key": "Key",
+      "keyPlaceholder": "patrol_supervisor",
+      "name": "Name",
+      "description": "Description",
+      "inherits": "Inherits",
+      "inheritsNone": "None",
+      "permissions": "Permissions",
+      "permissionsIntro": "Tick the keys this group grants on its own. A key you do not hold yourself cannot be granted.",
+      "effective": "Effective permissions",
+      "locked": "Protected",
+      "notEditable": "This group grants more than you hold, so you cannot edit it.",
+      "column": {
+        "own": "Own",
+        "effective": "Effective",
+        "roles": "Roles"
+      },
+      "version": "Version"
+    },
+    "health": {
+      "title": "System health",
+      "intro": "Counters the server already holds. Gateway status, database latency, route timings and queue depths are not measured yet, so they are not shown.",
+      "refresh": "Refresh",
+      "server": "Server",
+      "version": "Version",
+      "env": "Environment",
+      "routes": "Routes registered",
+      "sessions": "Sessions",
+      "open": "Open",
+      "stale": "Stale snapshot",
+      "readOnly": "Read-only",
+      "discord": "Discord",
+      "sync": "Sync configured",
+      "on": "Yes",
+      "off": "No",
+      "snapshot": "Last synced",
+      "seconds": "{seconds} s ago",
+      "never": "Never",
+      "gridTitle": "Uncollected traces",
+      "gridNote": "Totals for the whole server, since the resource last started: never a trace, a player or an owner. Destroyed counts traces wiped away or picked up out of the world; cleaning blood is not counted, because a cleaned pool stays where it is and luminol still finds it. Destruction by a player takes no police clearance and leaves no audit entry, so for them this counter is the only record there is; an officer who destroys evidence is also logged as forensics.destroyed in the audit log.",
+      "grid": {
+        "items": "Traces in the world",
+        "cells": "Grid cells in use",
+        "subscribers": "Players being streamed",
+        "placed": "Placed",
+        "merged": "Merged into an existing trace",
+        "collected": "Collected as evidence",
+        "destroyed": "Destroyed",
+        "evicted": "Decayed or evicted",
+        "refused": "Placement refused"
+      }
+    },
+    "tab": {
+      "rolemap": "Role map",
+      "groups": "Groups",
+      "fleet": "Fleet",
+      "health": "Health"
+    }
+  },
+  "registry": {
+    "flag": {
+      "stolen": "Stolen",
+      "wanted": "Wanted",
+      "bolo": "BOLO",
+      "impounded": "Impounded",
+      "evidence_hold": "Evidence hold",
+      "uninsured": "Uninsured"
+    },
+    "registration": {
+      "valid": "Valid",
+      "expired": "Expired",
+      "suspended": "Suspended",
+      "revoked": "Revoked",
+      "unregistered": "Unregistered"
+    },
+    "insurance": {
+      "valid": "Valid",
+      "expired": "Expired",
+      "none": "None on file"
+    },
+    "firearm": {
+      "status": {
+        "registered": "Registered",
+        "lost": "Reported lost",
+        "stolen": "Reported stolen",
+        "seized": "Seized",
+        "destroyed": "Destroyed",
+        "agency_issued": "Agency issued"
+      },
+      "type": {
+        "pistol": "Pistol",
+        "revolver": "Revolver",
+        "rifle": "Rifle",
+        "shotgun": "Shotgun",
+        "smg": "Submachine gun",
+        "other": "Other"
+      },
+      "event": {
+        "register": "Registered",
+        "transfer": "Transferred",
+        "lost": "Reported lost",
+        "stolen": "Reported stolen",
+        "recovered": "Recovered",
+        "seized": "Seized",
+        "destroyed": "Destroyed",
+        "issued": "Issued",
+        "returned": "Returned"
+      }
+    }
+  },
+  "query": {
+    "type": {
+      "person": "Person",
+      "plate": "Plate",
+      "vin": "VIN",
+      "firearm": "Firearm serial",
+      "phone": "Phone number",
+      "address": "Address"
+    },
+    "source": {
+      "person": "Name index",
+      "vehicle": "Vehicle register",
+      "firearm": "Firearm register"
+    },
+    "hit": {
+      "vehicle_flag": "Vehicle flag",
+      "firearm": "Firearm",
+      "person_caution": "Person caution",
+      "anhallen_i_franvaro": "WANTED — detained in absentia. Confirm before acting.",
+      "haktad_i_franvaro": "WANTED — remanded in absentia. Confirm before acting."
+    },
+    "caution": {
+      "armed": "Armed",
+      "violent": "Violent",
+      "officer_safety": "Officer safety"
+    },
+    "status": {
+      "unconfirmed": "Unconfirmed hit",
+      "confirmed": "Confirmed hit"
+    },
+    "confirm": {
+      "confirmed": "Confirmed",
+      "not_confirmed": "Not confirmed",
+      "unable": "No answer from the holding agency"
+    }
+  },
+  "access": {
+    "unit": {
+      "homicide": "Homicide",
+      "internal_affairs": "Internal Affairs",
+      "narcotics": "Narcotics",
+      "records": "Records"
+    }
+  },
+  "records": {
+    "aliasKind": {
+      "alias": "Alias",
+      "former": "Former name",
+      "maiden": "Maiden name",
+      "moniker": "Moniker"
+    },
+    "authority": {
+      "caseNumber": "Case number",
+      "intro": "A query that reaches restricted records needs a reason or a case number. Both are written to the query log.",
+      "reason": "Reason",
+      "reasonPlaceholder": "Why this query is being run",
+      "title": "Query authority"
+    },
+    "biometric": {
+      "dna": "DNA",
+      "fingerprint": "Fingerprints",
+      "notOnFile": "Not on file",
+      "onFile": "On file"
+    },
+    "cautionKind": {
+      "armed": "Armed",
+      "gang": "Gang affiliation",
+      "mental_health": "Mental health",
+      "officer_safety": "Officer safety",
+      "violent": "Violent"
+    },
+    "classification": {
+      "confidential": "Confidential",
+      "internal": "Internal",
+      "open": "Open",
+      "restricted": "Restricted",
+      "secret": "Secret"
+    },
+    "descriptor": {
+      "build": "Build",
+      "complexion": "Complexion",
+      "eyes": "Eyes",
+      "glasses": "Glasses",
+      "hair": "Hair",
+      "hairStyle": "Hairstyle",
+      "height": "Height (cm)",
+      "notes": "Notes",
+      "weight": "Weight (kg)"
+    },
+    "field": {
+      "ownerIdentifier": "Registered keeper",
+      "restricted": "Withheld — you are not cleared for this field"
+    },
+    "firearm": {
+      "assign": {
+        "intro": "Leave the officer blank to return the weapon to the armoury.",
+        "submit": "Record assignment",
+        "title": "Issue or return"
+      },
+      "detail": {
+        "none": "Select a serial number to open the record."
+      },
+      "edit": {
+        "intro": "The serial, the owner, the status and the assignment each have their own action, so the ownership history can never disagree with the record.",
+        "submit": "Save firearm",
+        "title": "Edit firearm"
+      },
+      "empty": "No firearm matches.",
+      "event": {
+        "empty": "No events on record.",
+        "event": "Event",
+        "from": "From",
+        "occurred": "Occurred",
+        "recordedBy": "Recorded by",
+        "to": "To"
+      },
+      "events": "Ownership history",
+      "field": {
+        "assignedOfficer": "Issued to",
+        "calibre": "Calibre",
+        "make": "Make",
+        "model": "Model",
+        "ownerParty": "Keeper (not on file)",
+        "serial": "Serial number",
+        "status": "Status",
+        "type": "Type"
+      },
+      "register": {
+        "submit": "Register firearm",
+        "title": "Register a firearm"
+      },
+      "search": {
+        "term": "Serial number",
+        "termPlaceholder": "A serial number, or the start of one"
+      },
+      "status": {
+        "submit": "Record status",
+        "title": "Change status"
+      },
+      "trace": {
+        "intro": "A trace follows the weapon back to the first entry in the register. It needs its own permission.",
+        "links": "{count} events in the chain.",
+        "noOrigin": "The register holds no opening event for this weapon.",
+        "origin": "Entered the register as {event} on {moment}, to {party}.",
+        "run": "Run trace",
+        "title": "Trace report"
+      },
+      "transfer": {
+        "fromParty": "From",
+        "intro": "A transfer needs somewhere for the weapon to go: a person on file, or a named party outside it.",
+        "submit": "Record transfer",
+        "title": "Transfer",
+        "toIdentifier": "To identifier",
+        "toParty": "To (not on file)",
+        "toPersonId": "To person (record id)"
+      }
+    },
+    "form": {
+      "any": "Any",
+      "notStated": "Not stated",
+      "serverDefault": "Leave to the server",
+      "unchanged": "Leave unchanged"
+    },
+    "hit": {
+      "body": "Confirm this hit before acting on it.",
+      "column": "Hot file",
+      "confirm": "Confirm hit",
+      "confirmed": "Confirmed on this screen. The confirmation is not recorded.",
+      "inResults": "{count} of these records carry a hot-file hit.",
+      "title": "Hot-file hit"
+    },
+    "no": "No",
+    "person": {
+      "alias": {
+        "empty": "No aliases on record."
+      },
+      "aliases": "Aliases",
+      "biometric": {
+        "empty": "Nothing on file."
+      },
+      "biometrics": "Biometrics",
+      "caution": {
+        "add": "Add caution",
+        "cancel": "Withdraw",
+        "detail": "Detail",
+        "expires": "Expires in (days)",
+        "expiresAt": "Expires {moment}",
+        "expiresPlaceholder": "0 = never",
+        "kind": "Kind",
+        "noExpiry": "Does not expire",
+        "sourceCase": "Source case",
+        "title": "Cautions and flags"
+      },
+      "cautions": "Cautions",
+      "column": {
+        "alias": "Matched alias",
+        "cautions": "Cautions",
+        "name": "Name",
+        "number": "Record number"
+      },
+      "descriptor": {
+        "empty": "No description on record."
+      },
+      "descriptors": "Description",
+      "detail": {
+        "none": "Select a record number to open the person."
+      },
+      "edit": {
+        "submit": "Save record",
+        "title": "Edit record"
+      },
+      "empty": "No person matches.",
+      "field": {
+        "address": "Address",
+        "classification": "Classification",
+        "dateOfBirth": "Date of birth",
+        "deceased": "Deceased",
+        "firstName": "First name",
+        "lastName": "Last name",
+        "middleName": "Middle name",
+        "missing": "Missing",
+        "phone": "Phone",
+        "sex": "Sex"
+      },
+      "firearm": {
+        "empty": "No firearms registered."
+      },
+      "firearms": "Registered firearms",
+      "photo": {
+        "case": "Source case",
+        "description": "Description",
+        "empty": "No photographs on record.",
+        "kind": "Kind",
+        "location": "Body location",
+        "note": "Photographs are served through the media gateway and are not shown on this screen.",
+        "taken": "Taken"
+      },
+      "photos": "Photographs",
+      "search": {
+        "term": "Name, alias or record number",
+        "termPlaceholder": "At least two characters"
+      },
+      "unnamed": "No name on record",
+      "vehicle": {
+        "empty": "No vehicles registered."
+      },
+      "vehicles": "Registered vehicles"
+    },
+    "photoKind": {
+      "field": "Field photo",
+      "mark": "Mark",
+      "mugshot": "Mugshot",
+      "scar": "Scar",
+      "tattoo": "Tattoo"
+    },
+    "restricted": {
+      "body": "You may be told this record exists, and nothing more. The unit above decides whether you are given access.",
+      "contact": "Contact {unit}",
+      "title": "Restricted record"
+    },
+    "search": {
+      "run": "Search",
+      "term": "Search term"
+    },
+    "sex": {
+      "female": "Female",
+      "male": "Male",
+      "other": "Other",
+      "unknown": "Unknown"
+    },
+    "tab": {
+      "firearms": "Firearms",
+      "persons": "Persons",
+      "vehicles": "Vehicles",
+      "anmalan": "Reports",
+      "frihet": "Custody"
+    },
+    "vehicle": {
+      "column": {
+        "plate": "Plate"
+      },
+      "detail": {
+        "none": "Select a plate to open the record."
+      },
+      "edit": {
+        "submit": "Save vehicle",
+        "title": "Edit vehicle"
+      },
+      "empty": "No vehicle matches.",
+      "field": {
+        "colour": "Colour",
+        "colourSecondary": "Second colour",
+        "insurance": "Insurance",
+        "insuranceExpires": "Insurance expires",
+        "model": "Model",
+        "plate": "Plate",
+        "registration": "Registration",
+        "registrationExpires": "Registration expires",
+        "vin": "VIN"
+      },
+      "flag": {
+        "add": "Add flag",
+        "clear": "Clear flag",
+        "detail": "Detail",
+        "empty": "No flags in force.",
+        "expires": "Expires",
+        "expiresIn": "Expires in (seconds)",
+        "expiresInPlaceholder": "0 = never",
+        "kind": "Kind",
+        "submit": "Add flag"
+      },
+      "flags": "Flags in force",
+      "plate": {
+        "change": "Change plate",
+        "empty": "No plate history.",
+        "from": "Held from",
+        "new": "New plate",
+        "reason": "Reason",
+        "submit": "Change plate",
+        "until": "Held until"
+      },
+      "plates": "Plate history",
+      "register": {
+        "intro": "The VIN is generated by the register and cannot be given here.",
+        "reason": "Reason",
+        "submit": "Register vehicle",
+        "title": "Register a vehicle"
+      },
+      "search": {
+        "term": "Plate or VIN",
+        "termPlaceholder": "A plate, or the start of one"
+      }
+    },
+    "withheld": {
+      "action": "Give a reason",
+      "body": "This search matched records you are cleared to read but did not open them, because it reached restricted data without a reason. Give a reason or a case number above and run the search again.",
+      "title": "Records withheld"
+    },
+    "yes": "Yes"
+  },
+  "forensics": {
+    "busy": "Already doing something",
+    "collect": {
+      "option": "Secure trace",
+      "description": "Package it and enter it in the chain of custody",
+      "progress": "Securing",
+      "done": "Secured as {number}",
+      "cancelled": "Interrupted before it was secured"
+    },
+    "destroy": {
+      "wipe": {
+        "option": "Wipe down",
+        "progress": "Wiping"
+      },
+      "clean": {
+        "option": "Clean",
+        "progress": "Cleaning"
+      },
+      "wash": {
+        "option": "Wash hands",
+        "progress": "Washing"
+      },
+      "pickup": {
+        "option": "Pick up",
+        "progress": "Picking up"
+      },
+      "weapon": {
+        "option": "Clean the weapon",
+        "progress": "Cleaning the weapon"
+      },
+      "done": "Done",
+      "cancelled": "Interrupted",
+      "noItem": "You do not have what that takes",
+      "failed": "That did not work"
+    },
+    "marker": {
+      "option": "Place marker",
+      "title": "Evidence marker",
+      "number": "Marker {number}",
+      "placed": "Marker {number} placed",
+      "cleared": "{count} markers cleared"
+    },
+    "swab": {
+      "option": "Swab for gunshot residue",
+      "progress": "Taking the swab",
+      "done": "Swab taken",
+      "cancelled": "Interrupted before the swab was taken",
+      "failed": "The swab could not be taken"
+    },
+    "tool": {
+      "powder": "Fingerprint powder",
+      "powderHint": "Reveals latent prints on a surface",
+      "luminol": "Luminol",
+      "luminolHint": "Reveals blood, including blood that has been cleaned",
+      "forensic_light": "Forensic light",
+      "forensicLightHint": "Reveals trace evidence in the dark",
+      "progress": "Working the surface",
+      "found": "{count} revealed",
+      "nothing": "Nothing revealed here",
+      "cancelled": "Interrupted"
+    },
+    "tools": {
+      "title": "Scene tools",
+      "keybind": "Scene tools",
+      "clearMarkers": "Clear markers",
+      "clearMarkersHint": "Removes every marker you have placed at this scene"
+    }
+  },
+  "cad": {
+    "title": "Dispatch",
+    "intro": "Calls waiting, the units on the board, and the map. A call is worked from the console or from the car.",
+    "empty": "No calls.",
+    "tab": {
+      "queue": "Queue",
+      "board": "Units",
+      "map": "Map",
+      "broadcasts": "Broadcasts",
+      "alpr": "Plate reads"
+    },
+    "console": {
+      "title": "Dispatch console",
+      "away": "Raising and assigning calls is done standing at the dispatch console. Everything else on this screen works from anywhere."
+    },
+    "queue": {
+      "title": "Pending calls",
+      "empty": "Nothing pending.",
+      "waiting": "Waiting {duration}",
+      "stacked": "{count} waiting",
+      "unassigned": "No unit"
+    },
+    "board": {
+      "title": "Units",
+      "empty": "No unit signed on.",
+      "inStatus": "{duration} in status",
+      "noAssignment": "Unassigned"
+    },
+    "column": {
+      "number": "Call number",
+      "type": "Type",
+      "priority": "Priority",
+      "status": "Status",
+      "location": "Location",
+      "beat": "Beat",
+      "units": "Units",
+      "received": "Received",
+      "age": "Waiting",
+      "caller": "Caller",
+      "callerPhone": "Caller number",
+      "disposition": "Disposition",
+      "callsign": "Callsign",
+      "officer": "Officer",
+      "unitStatus": "Status",
+      "timeInStatus": "Time in status",
+      "assignment": "Assignment",
+      "vehicle": "Vehicle",
+      "details": "Details",
+      "lead": "Lead unit",
+      "source": "Source"
+    },
+    "filter": {
+      "status": "Status",
+      "priority": "Priority",
+      "beat": "Beat",
+      "type": "Type",
+      "mine": "My calls",
+      "any": "Any",
+      "apply": "Apply",
+      "search": "Search",
+      "searchPlaceholder": "Call number, location or caller"
+    },
+    "priority": {
+      "p1": "Priority 1 — life-threatening or in progress",
+      "p2": "Priority 2 — urgent",
+      "p3": "Priority 3 — routine",
+      "p4": "Priority 4 — report only or scheduled"
+    },
+    "priorityShort": {
+      "p1": "P1",
+      "p2": "P2",
+      "p3": "P3",
+      "p4": "P4"
+    },
+    "callStatus": {
+      "pending": "Pending",
+      "dispatched": "Dispatched",
+      "en_route": "En route",
+      "on_scene": "On scene",
+      "cleared": "Cleared",
+      "cancelled": "Cancelled"
+    },
+    "callType": {
+      "alarm": "Alarm",
+      "assault": "Assault",
+      "backup": "Backup requested",
+      "burglary": "Burglary",
+      "disturbance": "Disturbance",
+      "domestic": "Domestic violence",
+      "drugs": "Drugs",
+      "missing_person": "Missing person",
+      "officer_emergency": "Officer in distress",
+      "pursuit": "Pursuit",
+      "robbery": "Robbery",
+      "shots_fired": "Shots fired",
+      "stolen_vehicle": "Stolen vehicle",
+      "suspicious": "Suspicious observation",
+      "theft": "Theft",
+      "traffic_collision": "Traffic collision",
+      "traffic_stop": "Traffic stop",
+      "warrant_service": "Warrant service",
+      "weapons": "Weapons",
+      "welfare_check": "Welfare check",
+      "other": "Other"
+    },
+    "disposition": {
+      "report_taken": "Report taken",
+      "arrest_made": "Arrest made",
+      "citation_issued": "Citation issued",
+      "warning_given": "Warning given",
+      "handled_on_scene": "Handled on scene",
+      "assistance_rendered": "Assistance rendered",
+      "gone_on_arrival": "Gone on arrival",
+      "unable_to_locate": "Unable to locate",
+      "unfounded": "Unfounded",
+      "referred": "Referred on",
+      "duplicate": "Duplicate call",
+      "cancelled": "Cancelled"
+    },
+    "unitStatus": {
+      "off_duty": "Off duty",
+      "available": "Available",
+      "en_route": "En route",
+      "on_scene": "On scene",
+      "busy": "Busy",
+      "transporting": "Transporting",
+      "at_station": "At station",
+      "out_of_service": "Out of service",
+      "emergency": "Emergency"
+    },
+    "linkKind": {
+      "person": "Person",
+      "vehicle": "Vehicle"
+    },
+    "linkRole": {
+      "caller": "Reporting party",
+      "victim": "Victim",
+      "suspect": "Suspect",
+      "witness": "Witness",
+      "involved": "Involved"
+    },
+    "link": {
+      "add": "Link to call",
+      "remove": "Unlink",
+      "withheld": "{count} restricted — cannot be linked"
+    },
+    "logKind": {
+      "created": "Created",
+      "note": "Note",
+      "dispatched": "Dispatched",
+      "unit_joined": "Unit added",
+      "unit_left": "Unit removed",
+      "lead_changed": "Lead unit changed",
+      "unit_status": "Unit status",
+      "call_status": "Call status",
+      "linked": "Linked",
+      "unlinked": "Unlinked",
+      "cleared": "Cleared"
+    },
+    "log": {
+      "created": "Call created.",
+      "created_external": "Call raised by {resource}.",
+      "dispatched": "{callsign} dispatched.",
+      "self_assigned": "{callsign} attached themselves to the call.",
+      "unit_joined": "{callsign} added to the call.",
+      "unit_left": "{callsign} taken off the call.",
+      "lead_changed": "{callsign} is now the lead unit.",
+      "unit_status": "{callsign}: {status}.",
+      "call_status": "Call is {status}.",
+      "priority_changed": "Priority changed from {from} to {to}.",
+      "linked": "{label} linked as {role}.",
+      "unlinked": "{label} unlinked.",
+      "cleared": "Call cleared: {disposition}.",
+      "cancelled": "Call cancelled: {disposition}.",
+      "acknowledged": "Emergency acknowledged by {callsign}.",
+      "welfare_check": "No change of status from {callsign} for {minutes} minutes.",
+      "report_created": "Report {number} created from this call."
+    },
+    "card": {
+      "title": "Call {number}",
+      "none": "Select a call to open it.",
+      "narrative": "Narrative",
+      "units": "Units",
+      "links": "Persons and vehicles",
+      "hazards": "Premise hazards",
+      "noHazards": "No hazards recorded for this location.",
+      "noLinks": "Nothing linked to this call.",
+      "noUnits": "No unit on this call."
+    },
+    "time": {
+      "received": "Received",
+      "dispatched": "Dispatched",
+      "enRoute": "En route",
+      "onScene": "On scene",
+      "cleared": "Cleared",
+      "none": "Not yet"
+    },
+    "note": {
+      "title": "Add to the narrative",
+      "placeholder": "What was said on the radio, in the caller's words where they matter.",
+      "submit": "Add line",
+      "empty": "Nothing logged yet."
+    },
+    "create": {
+      "title": "New call",
+      "intro": "A call taken by phone happens where the caller says it does. The call number, the time and the beat are set by the server.",
+      "type": "Type",
+      "priority": "Priority",
+      "location": "Location",
+      "locationPlaceholder": "Street, premise or cross street",
+      "beat": "Beat",
+      "callerName": "Caller",
+      "callerPhone": "Caller number",
+      "details": "What the caller said",
+      "submit": "Create call"
+    },
+    "dispatch": {
+      "title": "Dispatch units",
+      "intro": "The recommended units are the closest available ones. The lead unit is the one that answers for the call.",
+      "units": "Units",
+      "lead": "Lead unit",
+      "recommended": "Closest available",
+      "noRecommendation": "No unit available to recommend.",
+      "distance": "{distance} away",
+      "add": "Dispatch",
+      "remove": "Take off call",
+      "makeLead": "Make lead unit",
+      "submit": "Dispatch"
+    },
+    "selfAssign": {
+      "action": "Attach to call",
+      "confirm": "Attach your unit to call {number}?",
+      "done": "Attached to {number}."
+    },
+    "status": {
+      "title": "My status",
+      "submit": "Set status",
+      "changed": "Status set to {status}.",
+      "callProgress": "Report on call"
+    },
+    "manage": {
+      "title": "Manage unit",
+      "intro": "Changing another unit's status, callsign or beat is logged against your name and the unit's.",
+      "unit": "Unit",
+      "status": "Status",
+      "callsign": "Callsign",
+      "beat": "Beat",
+      "reason": "Reason",
+      "submit": "Save unit"
+    },
+    "clear": {
+      "title": "Clear call",
+      "intro": "A disposition says what came of the call and is read back months later. The call closes for every unit on it.",
+      "disposition": "Disposition",
+      "note": "Closing line",
+      "submit": "Clear call",
+      "needsAcknowledgement": "An emergency call cannot be cleared until a supervisor has acknowledged it."
+    },
+    "emergency": {
+      "button": "Emergency",
+      "title": "Emergency",
+      "confirm": "Raise an emergency call at your position? Every unit in range is alerted.",
+      "sent": "Emergency call raised. Units are on the way.",
+      "banner": "{callsign} — emergency at {location}",
+      "bannerNoLocation": "{callsign} — emergency",
+      "acknowledge": "Acknowledge",
+      "acknowledged": "Acknowledged by {callsign}",
+      "notAcknowledged": "Not acknowledged",
+      "respond": "Respond"
+    },
+    "welfare": {
+      "title": "Welfare check",
+      "body": "{callsign} has been on scene at {number} for {minutes} minutes with no change of status.",
+      "prompt": "Check on the unit",
+      "dismiss": "Seen"
+    },
+    "broadcast": {
+      "title": "Broadcasts",
+      "empty": "Nothing on the air.",
+      "create": "New broadcast",
+      "kind": "Kind",
+      "headline": "Title",
+      "body": "Message",
+      "plate": "Plate",
+      "expiresIn": "Stands for",
+      "expiresInHint": "Minutes. Left empty it takes the agency default.",
+      "expires": "Expires",
+      "cancel": "Take off the air",
+      "cancelled": "Off the air",
+      "submit": "Send broadcast",
+      "fromCall": "From call {number}"
+    },
+    "broadcastKind": {
+      "bolo": "BOLO",
+      "attempt_to_locate": "Attempt to locate",
+      "all_units": "All units",
+      "information": "Information"
+    },
+    "map": {
+      "title": "Map",
+      "units": "Units",
+      "calls": "Calls",
+      "beats": "Beats",
+      "legend": "Legend",
+      "follow": "Follow unit",
+      "center": "Centre on call",
+      "positionAge": "Position {duration} old",
+      "noPosition": "No position",
+      "empty": "Nothing to show on the map yet.",
+      "closed": "The map is closed. Positions are only sent while it is open."
+    },
+    "beat": {
+      "title": "Beats",
+      "none": "No beat",
+      "unassigned": "Unassigned",
+      "kind": {
+        "beat": "Beat",
+        "district": "District"
+      }
+    },
+    "report": {
+      "create": "Create report from call",
+      "intro": "The report opens pre-filled from the call: location, time, units, and the persons and vehicles linked to it.",
+      "created": "Report {number} created from this call."
+    },
+    "source": {
+      "dispatcher": "Taken by dispatch",
+      "phone": "Phone call",
+      "export": "Raised by {resource}",
+      "panic": "Emergency button",
+      "alpr": "Plate read"
+    }
+  },
+  "alpr": {
+    "title": "Plate reads",
+    "intro": "Every plate a patrol car drove past, with the time, the place and the unit. Reads are kept for thirty days and then deleted.",
+    "empty": "No plate reads match.",
+    "column": {
+      "plate": "Plate",
+      "time": "Read",
+      "unit": "Unit",
+      "callsign": "Callsign",
+      "location": "Location",
+      "camera": "Camera",
+      "reason": "Reason",
+      "note": "Detail",
+      "case": "Case",
+      "hit": "Hit",
+      "expires": "Expires",
+      "added": "Added",
+      "addedBy": "Added by"
+    },
+    "filter": {
+      "plate": "Plate",
+      "unit": "Unit",
+      "since": "Since",
+      "sinceHours": "{hours} h",
+      "hitsOnly": "Hits only",
+      "any": "Any",
+      "apply": "Apply"
+    },
+    "camera": {
+      "front": "Front",
+      "rear": "Rear",
+      "fixed": "Fixed camera"
+    },
+    "hit": {
+      "title": "Hotlist hit",
+      "banner": "{plate} — {reason}",
+      "advice": "Confirm the entry before acting on it.",
+      "dismiss": "Dismiss",
+      "none": "No hits."
+    },
+    "hotlist": {
+      "title": "Hotlist",
+      "intro": "A plate on this list puts a banner in front of an officer about to stop a car. Every entry says who added it and why, and expires.",
+      "empty": "No plates listed.",
+      "add": "Add plate",
+      "remove": "Remove plate",
+      "removeConfirm": "Remove {plate} from the hotlist?",
+      "plate": "Plate",
+      "reason": "Reason",
+      "note": "Detail",
+      "case": "Case number",
+      "expiresIn": "Stands for",
+      "expiresInHint": "Minutes. Left empty it stands until somebody removes it.",
+      "silent": "Silent",
+      "silentHint": "The hit is logged and the unit is told nothing.",
+      "submit": "Add to hotlist"
+    },
+    "reason": {
+      "stolen_vehicle": "Stolen vehicle",
+      "wanted_person": "Wanted person",
+      "warrant": "Warrant",
+      "bolo": "BOLO",
+      "investigation": "Investigation",
+      "other": "Other"
+    }
+  },
+  "brott": {
+    "grad": {
+      "ringa": "Petty",
+      "normal": "Standard",
+      "grov": "Aggravated",
+      "synnerligen_grov": "Exceptionally aggravated"
+    },
+    "column": {
+      "code": "Code",
+      "citation": "Citation",
+      "rubrik": "Offence",
+      "grad": "Degree",
+      "straffskala": "Sentencing range",
+      "version": "Version"
+    },
+    "straffskala": {
+      "boter": "Fines",
+      "livstid": "Life imprisonment",
+      "months": "{count} months",
+      "month": "{count} month",
+      "years": "{count} years",
+      "year": "{count} year",
+      "upTo": "up to {max}",
+      "atLeast": "at least {min}, up to {max}",
+      "gemensam": "Combined range ({counts} counts)"
+    },
+    "empty": "No offences in the catalogue.",
+    "superseded": "Superseded {date}",
+    "rubrik": {
+      "mord": "Murder",
+      "drap": "Manslaughter",
+      "misshandel": "Assault",
+      "ringa_misshandel": "Petty assault",
+      "grov_misshandel": "Aggravated assault",
+      "olaga_tvang": "Unlawful coercion",
+      "olaga_hot": "Unlawful threat",
+      "stold": "Theft",
+      "ringa_stold": "Petty theft",
+      "grov_stold": "Aggravated theft",
+      "ran": "Robbery",
+      "grovt_ran": "Aggravated robbery",
+      "bedrageri": "Fraud",
+      "skadegorelse": "Criminal damage",
+      "vald_mot_tjansteman": "Violence or threat against a public servant",
+      "ringa_vald_mot_tjansteman": "Petty violence or threat against a public servant",
+      "valdsamt_motstand": "Violent resistance",
+      "narkotikabrott": "Narcotics offence",
+      "ringa_narkotikabrott": "Petty narcotics offence",
+      "grovt_narkotikabrott": "Aggravated narcotics offence",
+      "olovlig_korning": "Driving without a licence",
+      "rattfylleri": "Drink driving",
+      "grovt_rattfylleri": "Aggravated drink driving",
+      "vapenbrott": "Firearms offence",
+      "grovt_vapenbrott": "Aggravated firearms offence"
+    }
+  },
+  "anmalan": {
+    "status": {
+      "utkast": "Draft",
+      "inlamnad": "Submitted",
+      "atersand": "Returned",
+      "godkand": "Approved"
+    },
+    "roll": {
+      "misstankt": "Suspect",
+      "malsagande": "Injured party",
+      "vittne": "Witness",
+      "anmalare": "Reporting party",
+      "annan": "Other"
+    },
+    "stage": {
+      "fullbordat": "Completed",
+      "forsok": "Attempt",
+      "forberedelse": "Preparation",
+      "stampling": "Conspiracy"
+    },
+    "column": {
+      "number": "Report number",
+      "title": "Title",
+      "status": "Status",
+      "created": "Written",
+      "author": "Author",
+      "occurred": "Occurred",
+      "place": "Place",
+      "fu": "Investigation",
+      "version": "Version"
+    },
+    "action": {
+      "create": "New report",
+      "submit": "Submit for approval",
+      "approve": "Approve",
+      "atersand": "Return with comments",
+      "supplement": "Add supplemental",
+      "atersandNote": "Comment to the author"
+    },
+    "section": {
+      "brott": "Offences",
+      "personer": "People",
+      "handelseforlopp": "Narrative",
+      "versions": "Versions",
+      "supplements": "Supplementals"
+    },
+    "empty": "No reports match.",
+    "locked": "Approved and locked. Add a supplemental to amend it.",
+    "ownReport": "You cannot approve a report you wrote.",
+    "returnedNote": "Returned by the supervisor: {note}",
+    "aklagareIndicated": "The offences charged normally place this investigation under a prosecutor.",
+    "filter": {
+      "mine": "Mine only"
+    },
+    "detail": {
+      "none": "Select a report to open it."
+    },
+    "brott": {
+      "empty": "No offences charged."
+    },
+    "personer": {
+      "empty": "Nobody is recorded on this report."
+    },
+    "returnedHeading": "Returned by the supervisor",
+    "returnedNoReason": "No reason was given.",
+    "confirm": {
+      "approve": "Approving signs this report and locks it. It can then only be amended by a supplemental.",
+      "atersand": "Returning sends this report back to its author with your comment."
+    }
+  },
+  "fu": {
+    "status": {
+      "inledd": "Opened",
+      "slutdelgiven": "Disclosed to the suspect",
+      "redovisad": "Reported to the prosecutor",
+      "nedlagd": "Discontinued"
+    },
+    "ledareKind": {
+      "polis": "Police investigation leader",
+      "aklagare": "Prosecutor"
+    },
+    "column": {
+      "number": "Case number",
+      "title": "Title",
+      "status": "Status",
+      "ledare": "Led by",
+      "opened": "Opened",
+      "closed": "Closed"
+    },
+    "action": {
+      "create": "Open investigation",
+      "slutdelge": "Disclose the material",
+      "redovisa": "Report to the prosecutor",
+      "lagg_ned": "Discontinue",
+      "assign": "Reassign"
+    },
+    "reason": {
+      "brott_kan_ej_styrkas": "The offence cannot be proven",
+      "spaningsuppslag_saknas": "No further investigative leads",
+      "ej_brott": "No offence was committed",
+      "atalsunderlatelse": "Waiver of prosecution",
+      "annan": "Other, stated below"
+    },
+    "empty": "No investigations match."
+  },
+  "frihet": {
+    "status": {
+      "gripen": "Arrested",
+      "anhallen": "Detained by the prosecutor",
+      "framstalld": "Remand application filed",
+      "haktad": "Remanded in custody",
+      "frigiven": "Released"
+    },
+    "action": {
+      "gripande": "Record an arrest",
+      "anhallande": "Detain (prosecutor)",
+      "framstallan": "File remand application",
+      "haktning": "Remand in custody",
+      "frigiv": "Release",
+      "underratta": "Record notice of suspicion",
+      "log": "Add to the custody log"
+    },
+    "column": {
+      "number": "Reference",
+      "person": "Person",
+      "status": "Status",
+      "gripen": "Arrested",
+      "heldFor": "Time held",
+      "deadline": "Next deadline",
+      "grund": "Ground"
+    },
+    "deadline": {
+      "framstallan": "Remand application (RB 24:12)",
+      "forhandling": "Remand hearing (RB 24:13)",
+      "passed": "Overdue by {time}",
+      "remaining": "{time} remaining",
+      "none": "No deadline is running.",
+      "soon": "Due soon"
+    },
+    "grund": {
+      "pa_bar_garning": "Caught in the act",
+      "efterlyst": "Wanted",
+      "flyktfara": "Risk of flight",
+      "kollusionsfara": "Risk of interference with the investigation",
+      "recidivfara": "Risk of reoffending",
+      "identitet_oklar": "Identity not established",
+      "annan": "Other, stated in the log",
+      "choose": "Choose a ground"
+    },
+    "frigivningsgrund": {
+      "ej_anhallen": "Not detained by the prosecutor",
+      "beslut_upphavt": "Decision revoked",
+      "tiden_ute": "Statutory time expired",
+      "annan": "Other, stated in the log"
+    },
+    "logKind": {
+      "forhor": "Interview",
+      "forsvarare": "Defence counsel",
+      "maltid": "Meal",
+      "samtal": "Telephone call",
+      "lakare": "Medical attention",
+      "annan": "Other"
+    },
+    "empty": "Nobody is being held.",
+    "attention": "A statutory deadline needs attention.",
+    "filter": {
+      "openOnly": "Currently held only"
+    },
+    "emptyList": "No detentions match.",
+    "detail": {
+      "none": "Select a detention to open it."
+    },
+    "section": {
+      "chain": "Decisions",
+      "deadlines": "Statutory deadlines",
+      "brott": "Held for",
+      "log": "Custody log"
+    },
+    "chain": {
+      "pending": "Not taken",
+      "by": "By",
+      "notified": "Notified of suspicion (RB 24:9)",
+      "notNotified": "Not yet notified of suspicion."
+    },
+    "brott": {
+      "empty": "No offences recorded."
+    },
+    "log": {
+      "empty": "Nothing logged yet.",
+      "kind": "Entry",
+      "note": "Note",
+      "at": "Time",
+      "by": "By"
+    },
+    "confirm": {
+      "anhallande": "Anhållande is the prosecutor’s decision. It starts the RB 24:12 clock: the remand application must reach the court by noon on the third day after this decision — a local noon, not seventy-two hours.",
+      "framstallan": "This records that the remand application has been filed with the court. The RB 24:12 clock stops. The hearing must be held within four dygn of the arrest (RB 24:13).",
+      "haktning": "Häktning is the court’s decision. It ends the RB 24:13 deadline and the person stays in custody.",
+      "frigiv": "Releasing ends the detention. A later arrest is a new chain with its own statutory clocks, not a reopening of this one."
+    },
+    "duration": {
+      "days": "{count} d",
+      "hours": "{count} h",
+      "minutes": "{count} min"
+    },
+    "attentionSoon": "{deadline} is due soon.",
+    "attentionPassed": "{deadline} has passed.",
+    "stage": {
+      "gripen": "Gripande (police arrest)",
+      "anhallen": "Anhållande (prosecutor’s detention order)",
+      "framstalld": "Häktningsframställan (remand application)",
+      "haktad": "Häktning (remand by the court)",
+      "frigiven": "Frigivande (release)"
+    }
+  },
+  "tvang": {
+    "kind": {
+      "husrannsakan_reell": "Search of premises",
+      "husrannsakan_personell": "Search of premises for a person",
+      "kroppsvisitation": "Search of the person",
+      "kroppsbesiktning": "Bodily examination",
+      "beslag": "Seizure"
+    },
+    "target": {
+      "person": "Person",
+      "vehicle": "Vehicle",
+      "address": "Address"
+    },
+    "decider": {
+      "fu_ledare": "Investigation leader",
+      "aklagare": "Prosecutor",
+      "domare": "Judge"
+    },
+    "column": {
+      "number": "Reference",
+      "kind": "Measure",
+      "target": "Directed at",
+      "decided": "Decided by",
+      "valid": "Valid until",
+      "scope": "Scope",
+      "status": "Status"
+    },
+    "action": {
+      "decide": "Decide a measure",
+      "verkstall": "Record execution",
+      "upphav": "Revoke"
+    },
+    "grund": {
+      "skalig_misstanke": "Reasonable suspicion",
+      "sannolika_skal": "Probable grounds",
+      "eftersokande_person": "To locate a person to be arrested",
+      "sakra_bevis": "To secure evidence",
+      "fara_i_drojsmal": "Danger in delay",
+      "annan": "Other, stated in the scope"
+    },
+    "status": {
+      "live": "Valid",
+      "expired": "Expired",
+      "upphavd": "Revoked",
+      "not_yet": "Not yet in force",
+      "verkstalld": "Executed"
+    },
+    "empty": "No coercive measures match."
+  },
+  "efterlysning": {
+    "grund": {
+      "anhallen_i_franvaro": "Detained in absentia",
+      "haktad_i_franvaro": "Remanded in absentia",
+      "delgivning": "To be served a document",
+      "forsvunnen": "Missing person",
+      "oidentifierad": "Unidentified",
+      "annan": "Other"
+    },
+    "avlysningsgrund": {
+      "gripen": "Taken into custody",
+      "aterkallad": "Withdrawn",
+      "preskriberad": "Time-barred",
+      "annan": "Other"
+    },
+    "column": {
+      "number": "Reference",
+      "person": "Person",
+      "grund": "Ground",
+      "priority": "Priority",
+      "issued": "Issued",
+      "expires": "Expires"
+    },
+    "action": {
+      "create": "Issue a wanted notice",
+      "cancel": "Cancel"
+    },
+    "detainOnSight": "Detain on sight",
+    "notAnArrest": "Wanted, but not for arrest.",
+    "empty": "Nobody is wanted."
+  },
+  "spaning": {
+    "target": {
+      "person": "Person",
+      "vehicle": "Vehicle",
+      "other": "Description only"
+    },
+    "banner": {
+      "alert": "Alert",
+      "notice": "Notice",
+      "quiet": "On the record only"
+    },
+    "column": {
+      "number": "Reference",
+      "target": "Looking for",
+      "grund": "Reason",
+      "priority": "Priority",
+      "area": "Area",
+      "issued": "Raised",
+      "expires": "Expires",
+      "description": "Description"
+    },
+    "action": {
+      "create": "Raise a lookout",
+      "resolve": "Close the lookout"
+    },
+    "grund": {
+      "iakttagelse": "Sighting to follow up",
+      "efterlyst_fordon": "Vehicle sought",
+      "stulet_fordon": "Stolen vehicle",
+      "misstankt_fordon": "Vehicle linked to an offence",
+      "eftersokt_person": "Person sought for questioning",
+      "annan": "Other"
+    },
+    "avslutsgrund": {
+      "gripen": "Taken into custody",
+      "omhandertaget": "Vehicle recovered",
+      "aterkallad": "Withdrawn",
+      "tiden_ute": "Expired",
+      "annan": "Other"
+    },
+    "empty": "No lookouts are running.",
+    "notAnArrest": "A lookout, not a warrant. Report the sighting."
+  }
+}

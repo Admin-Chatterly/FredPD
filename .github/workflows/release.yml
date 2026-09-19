@@ -1,0 +1,144 @@
+name: Release
+
+# A pushed `v*` tag releases that version, as always.
+#
+# `workflow_call` is the same job without the tag, for `release-from-notes.yml`
+# -- because not every environment that can push commits can push tags (a token
+# scoped to one branch, for instance), and whoever finished the work should not
+# need somebody else to type three git commands before it ships. When called
+# that way the job creates the tag itself, with the Actions token.
+on:
+  push:
+    tags: ['v*']
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to release, without the leading v (e.g. 0.2.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish the resource bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # One place decides what is being released, so the tag path and the
+      # called path cannot drift apart. `inputs.version` is set only by
+      # release-from-notes.yml; on a tag push it is empty and the ref decides.
+      - name: Resolve the version
+        id: v
+        run: |
+          version="${{ inputs.version }}"
+          [ -n "$version" ] || version="${GITHUB_REF_NAME#v}"
+
+          case "$version" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::'${version}' is not a version"; exit 1 ;;
+          esac
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${version}" >> "$GITHUB_OUTPUT"
+          echo "Releasing v${version}"
+
+      # Stop rather than publish twice. Editing an old notes file would
+      # otherwise re-run everything and move a tag people have already
+      # installed from.
+      - name: Refuse to release a version that already exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ steps.v.outputs.tag }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "::error::${{ steps.v.outputs.tag }} is already released. Bump the version."
+            exit 1
+          fi
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # A tag can be pushed at any commit, so the release job verifies rather
+      # than trusting that CI already passed on whatever it points at. A bundle
+      # that reaches a server is not the place to find out.
+      - name: Checks
+        run: pnpm check
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build the NUI and the gateway
+        run: pnpm build
+
+      - name: Stamp the release version into each fxmanifest
+        run: |
+          version="${{ steps.v.outputs.version }}"
+          for manifest in resources/'[fredpd]'/*/fxmanifest.lua; do
+            sed -i "s/^version '.*'$/version '${version}'/" "$manifest"
+          done
+          grep -H "^version" resources/'[fredpd]'/*/fxmanifest.lua
+
+      - name: Bundle what a server actually installs
+        run: |
+          version="${{ steps.v.outputs.version }}"
+          staging="$(mktemp -d)"
+
+          # The resources, with the built NUI already inside fredpd/web/dist.
+          mkdir -p "$staging/fredpd-${version}"
+          cp -r resources "$staging/fredpd-${version}/"
+
+          # Migrations and seeds: a server needs these to install or upgrade.
+          cp -r database "$staging/fredpd-${version}/"
+
+          # The gateway, built, with the manifest needed to install it.
+          mkdir -p "$staging/fredpd-${version}/gateway"
+          cp -r gateway/dist gateway/package.json "$staging/fredpd-${version}/gateway/"
+
+          # The documentation somebody actually needs while installing: the
+          # Swedish setup guide and the in-character service manual, alongside
+          # the README and the specification.
+          mkdir -p "$staging/fredpd-${version}/docs"
+          cp docs/installation.sv.md docs/handbok.sv.md "$staging/fredpd-${version}/docs/"
+          cp README.md docs/FredPD.md "$staging/fredpd-${version}/"
+
+          ( cd "$staging" && zip -qr "fredpd-${version}.zip" "fredpd-${version}" )
+          mv "$staging/fredpd-${version}.zip" .
+
+      # Hand-written notes for this version, when there are any. The generated
+      # commit list says what changed; it cannot say "this release fixes
+      # something that left your existing install insecure, here is the SQL".
+      # That belongs at the top of the release, above the changelog.
+      - name: Find the release notes
+        id: notes
+        run: |
+          path="docs/releases/${{ steps.v.outputs.tag }}.md"
+
+          if [ -f "$path" ]; then
+            echo "path=${path}" >> "$GITHUB_OUTPUT"
+            echo "Using ${path}"
+          else
+            echo "No ${path}; publishing with generated notes only."
+          fi
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: fredpd-*.zip
+          # Named explicitly rather than taken from the ref: when this job is
+          # called rather than tag-triggered, the tag does not exist yet and
+          # this is what creates it.
+          tag_name: ${{ steps.v.outputs.tag }}
+          # Both together: the file becomes the body, and the generated commit
+          # list is appended under it.
+          body_path: ${{ steps.notes.outputs.path }}
+          generate_release_notes: true

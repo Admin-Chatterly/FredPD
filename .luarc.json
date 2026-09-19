@@ -1,0 +1,23 @@
+{
+  "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+  "runtime.version": "Lua 5.4",
+  "runtime.pathStrict": true,
+  "workspace.library": [],
+  "workspace.ignoreDir": [
+    "node_modules",
+    "vendor",
+    "web",
+    "resources/[fredpd]/fredpd/web/dist"
+  ],
+  "diagnostics.globals": ["FredPD"],
+  "diagnostics.severity": {
+    "undefined-global": "Error",
+    "lowercase-global": "Error",
+    "unused-local": "Warning",
+    "unused-function": "Warning",
+    "redefined-local": "Warning"
+  },
+  "diagnostics.disable": ["duplicate-set-field"],
+  "format.enable": false,
+  "telemetry.enable": false
+}

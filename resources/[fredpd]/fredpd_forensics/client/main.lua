@@ -1,0 +1,5 @@
+--- Client side of the forensics resource.
+---
+--- M3 adds scene markers, tape, collection interactions and the photography
+--- camera. Until then this file exists so the resource starts with a complete,
+--- lintable script set.
