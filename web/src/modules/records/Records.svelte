@@ -1,5 +1,6 @@
 <script lang="ts">
   import { nui } from '../../lib/nui';
+  import Query from './Query.svelte';
   import Anmalan from './Anmalan.svelte';
   import Frihet from './Frihet.svelte';
   import Tvang from './Tvang.svelte';
@@ -70,6 +71,7 @@
    */
 
   type Tab =
+    | 'query'
     | 'persons'
     | 'vehicles'
     | 'firearms'
@@ -132,7 +134,7 @@
     fromParty: 'records.firearm.transfer.fromParty',
   };
 
-  let tab = $state<Tab>('persons');
+  let tab = $state<Tab>('query');
   let failure = $state<Failure | null>(null);
   let busy = $state(false);
 
@@ -1031,6 +1033,10 @@
   }
 
   const tabs: Tab[] = [
+    // First, because it is what an officer reaches for: one box for a name, a
+    // plate or a serial. The three register tabs behind it are for working a
+    // record once it has been found.
+    'query',
     'persons',
     'vehicles',
     'firearms',
@@ -1069,7 +1075,13 @@
 </script>
 
 <section class="flex min-h-0 flex-col gap-4">
-  <nav class="flex gap-1 border-b border-[var(--color-border)]">
+  <!--
+    Wraps. Nine tabs of Swedish ("Frihetsberövanden", "Spaningsuppdrag") run
+    past the workspace at 1280 px and at the 125% text scale 6.4 allows, and
+    with `#app` now clipping rather than scrolling the page, a tab that runs
+    off the edge is a tab that cannot be reached at all.
+  -->
+  <nav class="flex flex-wrap gap-1 border-b border-[var(--color-border)]">
     {#each tabs as name (name)}
       <button
         type="button"
@@ -1136,7 +1148,15 @@
   </fieldset>
   {/if}
 
-  {#if tab === 'persons'}
+  {#if tab === 'query'}
+    <!--
+      The unified query (7.2). Its own component, and its own authority boxes:
+      it carries the same reason and case number as the registers but runs a
+      different route, and a refusal for want of one is drawn here as an offer
+      to run the search again rather than as a dead end.
+    -->
+    <Query />
+  {:else if tab === 'persons'}
     <!-- ------------------------------------------------------- persons -->
     <form class="flex flex-wrap items-end gap-3" onsubmit={runPersonSearch}>
       <label class="flex flex-col gap-1 text-xs">

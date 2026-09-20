@@ -2063,6 +2063,137 @@ function decideFrihet(input: unknown, action: string): unknown {
   return { id: row.id, status: to };
 }
 
+// ------------------------------------------------- the unified query (7.2)
+
+/**
+ * The hits the fixture raises, by the record they sit on.
+ *
+ * Shaped like `Query.hit`: `hitType`, `hitId`, `kind`, `recordType`,
+ * `recordId`, `confirmed`. `kind` is the flag kind, the firearm status, the
+ * caution kind or the efterlysning ground — the thing the banner names.
+ *
+ * Only hits the *server* would raise are here, which is the part worth being
+ * careful about: the four efterlysning grounds that are not "detain on sight"
+ * never become a hit at all, and a lookout only does at priority 1. A fixture
+ * that raised a banner for a missing person would let the screen be built
+ * against a server that does not exist.
+ */
+interface FixtureHit {
+  hitType: string;
+  hitId: number;
+  kind: string;
+  recordType: string;
+  recordId: number;
+  confirmed: boolean;
+}
+
+const queryHits: Record<string, FixtureHit[]> = {
+  // John Doe: anhållen i sin frånvaro. The one that ends with an officer
+  // stopping somebody, and the reason the confirmation step exists.
+  'person:1': [
+    {
+      hitType: 'efterlysning',
+      hitId: 1,
+      kind: 'anhallen_i_franvaro',
+      recordType: 'person',
+      recordId: 1,
+      confirmed: false,
+    },
+  ],
+  // Ellen Doe carries a caution, which is a different kind of warning: it is
+  // about how to approach somebody, not about detaining them.
+  'person:2': [
+    {
+      hitType: 'person_caution',
+      hitId: 7,
+      kind: 'violent',
+      recordType: 'person',
+      recordId: 2,
+      confirmed: false,
+    },
+  ],
+};
+
+/**
+ * `fpd_query_log`, named the way `Repo.queryLog` selects it.
+ *
+ * Every query writes one, including the query that found nothing and the one
+ * refused for want of a reason — that is the whole point of the table, which
+ * answers "who has been looking up their ex-partner".
+ */
+interface FixtureQueryLog {
+  id: number;
+  queryType: string;
+  term: string;
+  accessPoint: string | null;
+  restricted: boolean;
+  resultCount: number;
+  hitCount: number;
+  confirmationCount: number;
+  confirmedCount: number;
+  reason: string | null;
+  caseNumber: string | null;
+  createdAt: string;
+}
+
+const queryLog: FixtureQueryLog[] = [
+  {
+    id: 401,
+    queryType: 'plate',
+    term: '47ANX291',
+    accessPoint: null,
+    restricted: false,
+    resultCount: 1,
+    hitCount: 1,
+    confirmationCount: 1,
+    confirmedCount: 1,
+    reason: 'Traffic stop, Alta Street',
+    caseNumber: 'K26-00512',
+    createdAt: '2026-09-19T21:04:00.000Z',
+  },
+  {
+    // Found nothing, and is logged anyway. A query that matched nothing is
+    // part of the answer to "who has been looking somebody up".
+    id: 400,
+    queryType: 'person',
+    term: 'nilsson',
+    accessPoint: null,
+    restricted: false,
+    resultCount: 0,
+    hitCount: 0,
+    confirmationCount: 0,
+    confirmedCount: 0,
+    reason: null,
+    caseNumber: null,
+    createdAt: '2026-09-19T18:41:00.000Z',
+  },
+];
+
+let nextQueryId = 401;
+
+/** Which registers a term could mean, the way `Query.plan` decides it. */
+function planQuery(term: string, explicit?: string): { type: string; sources: string[] } {
+  if (explicit) {
+    const sources =
+      explicit === 'person' || explicit === 'phone' || explicit === 'address'
+        ? ['person']
+        : explicit === 'firearm'
+          ? ['firearm']
+          : ['vehicle'];
+
+    return { type: explicit, sources };
+  }
+
+  // A plate is short and alphanumeric; a person is words. The real planner is
+  // `Query.plan` and is considerably more careful — this only has to be
+  // consistent enough that the screen renders what the server would send.
+  if (/^[a-z0-9]{2,8}$/i.test(term.trim()) && /\d/.test(term)) {
+    return { type: 'plate', sources: ['vehicle'] };
+  }
+
+  return { type: 'person', sources: ['person', 'vehicle', 'firearm'] };
+}
+
 // ------------------------------------------- tvångsmedel och efterlysning
 
 /**
@@ -2559,6 +2690,152 @@ export const fixtures: FixtureSet = {
       ];
 
       return { id: row.id };
+    },
+
+    // --------------------------------------------------- the unified query
+
+    'query.run': (input) => {
+      const { term, type, reason, caseNumber } = (input ?? {}) as {
+        term?: string;
+        type?: string;
+        reason?: string;
+        caseNumber?: string;
+      };
+
+      if (!term || term.trim().length < 2) return refuse('invalid', { term: 'too_short' });
+
+      const plan = planQuery(term, type);
+      const results: Record<string, unknown>[] = [];
+
+      if (plan.sources.includes('person')) {
+        for (const entry of matches(registerPersons, term)) {
+          const row = entry.row as unknown as Record<string, unknown> & { id?: number };
+
+          // A stub passes through as it is: no id, no name, no hits (4.5).
+          results.push(
+            row.id === undefined
+              ? row
+              : { ...row, kind: 'person', score: 3, hits: queryHits[`person:${row.id}`] ?? [] },
+          );
+        }
+      }
+
+      if (plan.sources.includes('vehicle')) {
+        for (const entry of matches(registerVehicles, term)) {
+          const row = entry.row as unknown as Record<string, unknown> & {
+            id?: number;
+            hits?: string[];
+          };
+
+          results.push(
+            row.id === undefined
+              ? row
+              : {
+                  ...row,
+                  kind: 'vehicle',
+                  score: 2,
+                  // The register's own `hits` is a list of flag *kinds*; the
+                  // query sends hit rows. Shaped here the way the server
+                  // shapes them rather than passed through.
+                  hits: (row.hits ?? []).map((kind, index) => ({
+                    hitType: 'vehicle_flag',
+                    hitId: 500 + index,
+                    kind,
+                    recordType: 'vehicle',
+                    recordId: row.id as number,
+                    confirmed: false,
+                  })),
+                },
+          );
+        }
+      }
+
+      const hits = results.reduce<number>(
+        (total, row) => total + ((row.hits as unknown[] | undefined)?.length ?? 0),
+        0,
+      );
+
+      // 7.2: a query that reaches a restricted record needs a reason or a case
+      // number, and the refusal happens before anything is returned — so the
+      // officer learns nothing, not even that there was something worth a
+      // reason. The fixture's restricted row is the third Doe.
+      const reachesRestricted = results.some((row) => row.restricted === true);
+
+      if (reachesRestricted && !reason?.trim() && !caseNumber?.trim()) {
+        return refuse('invalid', { reason: 'required' });
+      }
+
+      nextQueryId += 1;
+
+      queryLog.unshift({
+        id: nextQueryId,
+        queryType: plan.type,
+        term,
+        accessPoint: null,
+        restricted: reachesRestricted,
+        resultCount: results.length,
+        hitCount: hits,
+        confirmationCount: 0,
+        confirmedCount: 0,
+        reason: reason?.trim() || null,
+        caseNumber: caseNumber?.trim() || null,
+        createdAt: new Date().toISOString(),
+      });
+
+      return {
+        queryId: nextQueryId,
+        type: plan.type,
+        derived: type === undefined,
+        sources: plan.sources,
+        results,
+        hits,
+      };
+    },
+
+    'query.hit.confirm': (input) => {
+      const { queryId, hitType, hitId, outcome, caseNumber, detail } = (input ?? {}) as {
+        queryId?: number;
+        hitType?: string;
+        hitId?: number;
+        outcome?: string;
+        caseNumber?: string;
+        detail?: string;
+      };
+
+      if (!hitType || !hitId) return refuse('invalid', { hitId: 'required' });
+      if (!outcome || !['confirmed', 'not_confirmed', 'unable'].includes(outcome)) {
+        return refuse('invalid', { outcome: 'not_allowed' });
+      }
+
+      // `Query.validateConfirm`: "it came back confirmed" is not an answer to
+      // "confirmed against what?".
+      if (outcome === 'confirmed' && !detail?.trim() && !caseNumber?.trim()) {
+        return refuse('invalid', { detail: 'required' });
+      }
+
+      for (const list of Object.values(queryHits)) {
+        for (const hit of list) {
+          if (hit.hitType === hitType && hit.hitId === hitId) hit.confirmed = true;
+        }
+      }
+
+      const entry = queryLog.find((row) => row.id === queryId);
+
+      if (entry) {
+        entry.confirmationCount += 1;
+        if (outcome === 'confirmed') entry.confirmedCount += 1;
+      }
+
+      return { id: hitId };
+    },
+
+    'query.log': (input) => {
+      const { limit } = (input ?? {}) as { mine?: boolean; limit?: number };
+
+      // `mine` is decided on the server from the session and never from the
+      // input, so the fixture has one officer's log and no way to ask for
+      // somebody else's.
+      return { entries: queryLog.slice(0, limit ?? 50) };
     },
 
     // --------------------------------------------------------- tvångsmedel

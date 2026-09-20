@@ -688,7 +688,9 @@
       "firearm": "Vapen",
       "person_caution": "Personvarning",
       "anhallen_i_franvaro": "EFTERLYST — anhållen i sin frånvaro. Bekräfta före åtgärd.",
-      "haktad_i_franvaro": "EFTERLYST — häktad i sin frånvaro. Bekräfta före åtgärd."
+      "haktad_i_franvaro": "EFTERLYST — häktad i sin frånvaro. Bekräfta före åtgärd.",
+      "efterlysning": "Efterlysning",
+      "spaning": "Spaningsuppdrag — prioritet 1"
     },
     "caution": {
       "armed": "Beväpnad",
@@ -702,8 +704,40 @@
     "confirm": {
       "confirmed": "Bekräftad",
       "not_confirmed": "Ej bekräftad",
-      "unable": "Inget svar från registerhållande myndighet"
-    }
+      "unable": "Inget svar från registerhållande myndighet",
+      "intro": "Bekräftar: {hit}",
+      "needsDetail": "Ange vad träffen bekräftats mot, eller ett ärendenummer."
+    },
+    "field": {
+      "term": "Sök",
+      "termPlaceholder": "Namn, regnummer, chassinummer, vapennummer, telefon eller adress",
+      "type": "Register",
+      "typeDerive": "Avgör utifrån söktermen",
+      "hit": "Träff",
+      "outcome": "Utfall",
+      "detail": "Bekräftat mot"
+    },
+    "ran": "Körd som {type} mot {sources}.",
+    "empty": "Ingen träff i de register slagningen nådde.",
+    "needsReason": "Något av det som matchade är skyddat. Ange skäl eller ärendenummer och kör om slagningen.",
+    "action": {
+      "giveReason": "Ange skäl",
+      "confirm": "Bekräfta träffen",
+      "log": "Mina senaste slagningar"
+    },
+    "log": {
+      "title": "Mina senaste slagningar",
+      "empty": "Du har inte gjort några slagningar.",
+      "at": "Tidpunkt",
+      "type": "Register",
+      "term": "Sökterm",
+      "results": "Träffar",
+      "acted": "Bekräftat",
+      "by": "Körd av",
+      "counts": "{results}, {hits} träff(ar)",
+      "confirmations": "{confirmed} av {total}"
+    },
+    "confirmed": "Registrerat: {hit} — {outcome}."
   },
   "access": {
     "unit": {
@@ -947,7 +981,8 @@
       "frihet": "Frihetsberövanden",
       "tvang": "Tvångsmedel",
       "efterlysning": "Efterlysningar",
-      "spaning": "Spaningsuppdrag"
+      "spaning": "Spaningsuppdrag",
+      "query": "Slagning"
     },
     "vehicle": {
       "column": {
@@ -1686,7 +1721,7 @@
     },
     "frigivningsgrund": {
       "ej_anhallen": "Ej anhållen av åklagare",
-      "beslut_upphavt": "Beslutet upphävt",
+      "beslut_upphavt": "Beslutet hävt",
       "tiden_ute": "Fristen har löpt ut",
       "annan": "Annan, anges i journalen"
     },
@@ -1780,12 +1815,12 @@
     "action": {
       "decide": "Fatta beslut",
       "verkstall": "Registrera verkställighet",
-      "upphav": "Upphäv beslutet"
+      "upphav": "Häv beslutet"
     },
     "grund": {
       "skalig_misstanke": "Skälig misstanke",
       "sannolika_skal": "Sannolika skäl",
-      "eftersokande_person": "Eftersökande av person som ska gripas",
+      "eftersokande_person": "Eftersökande av den som ska gripas, anhållas eller häktas",
       "sakra_bevis": "Säkra bevisning",
       "fara_i_drojsmal": "Fara i dröjsmål",
       "annan": "Annat, anges i omfattningen"
@@ -1793,10 +1828,11 @@
     "status": {
       "live": "Gällande",
       "expired": "Utgånget",
-      "upphavd": "Upphävt",
+      "upphavd": "Hävt",
       "not_yet": "Ej i kraft ännu",
       "verkstalld": "Verkställt",
-      "notLive": "Gäller inte"
+      "notLive": "Gäller ej",
+      "not_found": "Beslutet finns inte"
     },
     "empty": "Inga tvångsmedel matchar.",
     "filter": {
@@ -1811,9 +1847,10 @@
       "validHours": "{count} h",
       "note": "Anteckning",
       "validFrom": "Gäller från",
-      "upphavd": "Upphävt"
+      "upphavd": "Hävdes",
+      "validDays": "{count} dygn"
     },
-    "notLive": "Beslutet ger ingen befogenhet: {reason}.",
+    "notLive": "Beslutet ger inte stöd för någon åtgärd ({reason}).",
     "detail": {
       "none": "Välj ett beslut för att läsa det."
     },
@@ -1823,8 +1860,9 @@
     "verkstalld": "Verkställt {at}.",
     "notVerkstalld": "Ännu inte verkställt.",
     "confirm": {
-      "upphav": "Upphäva beslutet? Det ger ingen befogenhet härefter, och beslutet ligger kvar i akten."
-    }
+      "upphav": "Vill du häva beslutet? Det ger inte längre stöd för någon åtgärd, men beslutet ligger kvar i akten."
+    },
+    "revoked": "Beslut {number} hävt."
   },
   "efterlysning": {
     "grund": {
@@ -1865,7 +1903,8 @@
       "noExpiry": "Tills den avlyses",
       "expiryDays": "{count} dygn",
       "note": "Anteckning",
-      "avlysningsgrund": "Grund för avlysning"
+      "avlysningsgrund": "Grund för avlysning",
+      "avlysningsgrundChoose": "Välj grund för avlysning"
     },
     "priority": {
       "1": "Prioritet 1 — ingrip omgående",
@@ -1879,8 +1918,9 @@
       "expired": "Utgången"
     },
     "confirm": {
-      "cancel": "Avlysa efterlysningen {number}?"
-    }
+      "cancel": "Vill du avlysa efterlysningen {number}?"
+    },
+    "lifted": "Efterlysning {number} avlyst."
   },
   "spaning": {
     "target": {
@@ -1932,13 +1972,21 @@
       "grundChoose": "Välj grund",
       "valid": "Gäller i",
       "validDays": "{count} dygn",
-      "avslutsgrund": "Grund för avslut"
+      "avslutsgrund": "Grund för avslut",
+      "validOneDay": "1 dygn",
+      "avslutsgrundChoose": "Välj grund för avslut"
     },
     "priority": {
       "1": "Prioritet 1 — larm och bekräftelse",
       "2": "Prioritet 2 — brådskande",
       "3": "Prioritet 3 — rutin",
-      "4": "Prioritet 4 — endast i akten"
+      "4": "Prioritet 4 — endast i akten",
+      "short": {
+        "1": "Prio 1",
+        "2": "Prio 2",
+        "3": "Prio 3",
+        "4": "Prio 4"
+      }
     },
     "status": {
       "live": "Pågår",
@@ -1949,8 +1997,9 @@
       "none": "Välj ett uppdrag för att läsa det."
     },
     "confirm": {
-      "resolve": "Avsluta spaningsuppdraget {number}?"
+      "resolve": "Vill du avsluta spaningsuppdraget {number}?"
     },
-    "priorityOneWarning": "Prioritet 1 avbryter varje polis som slår på objektet med ett larm. Använd den när iakttagelsen är värd det."
+    "priorityOneWarning": "Prioritet 1 ger larm till varje polis som gör en slagning på objektet. Använd den bara när uppgiften måste nå alla direkt.",
+    "closed": "Spaningsuppdrag {number} avslutat."
   }
 }

@@ -191,6 +191,41 @@ for index = 1, #GRUNDER do IS_GRUND[GRUNDER[index]] = true end
 
 function Tvang.isGrund(value) return IS_GRUND[value] == true end
 
+-- -----------------------------------------------------------------------------
+-- The grounds that are locale keys (invariant 6)
+-- -----------------------------------------------------------------------------
+
+--- Why a coercive measure was decided (RB 27-28).
+---
+--- The NUI renders this with `t()`, which prints an unknown key verbatim — so
+--- a free string here puts whatever was sent onto the face of a register every
+--- officer reads, in both languages, untranslatable by construction. The
+--- schema can only say "a string of at most 128 characters"; this is where the
+--- set actually lives.
+---
+--- The same reasoning as `Frihet.isLogKind`, and the same refusal code.
+local TVANG_GRUNDER <const> = {
+    'skalig_misstanke', 'sannolika_skal', 'eftersokande_person',
+    'sakra_bevis', 'fara_i_drojsmal', 'annan',
+}
+
+local IS_TVANG_GRUND <const> = {}
+for index = 1, #TVANG_GRUNDER do IS_TVANG_GRUND[TVANG_GRUNDER[index]] = true end
+
+function Tvang.isTvangGrund(value) return IS_TVANG_GRUND[value] == true end
+
+--- Why a wanted notice was lifted.
+---
+--- "Taken into custody" and "withdrawn" are different facts about the same
+--- person, and the register is read months later — which is the reason this is
+--- a closed set rather than a note.
+local AVLYSNINGSGRUNDER <const> = { 'gripen', 'aterkallad', 'preskriberad', 'annan' }
+
+local IS_AVLYSNINGSGRUND <const> = {}
+for index = 1, #AVLYSNINGSGRUNDER do IS_AVLYSNINGSGRUND[AVLYSNINGSGRUNDER[index]] = true end
+
+function Tvang.isAvlysningsgrund(value) return IS_AVLYSNINGSGRUND[value] == true end
+
 --- Which grounds mean "detain this person on sight".
 ---
 --- The distinction the hit banner has to make. Somebody wanted for
@@ -290,6 +325,11 @@ function Tvang.validate(input)
 
     if type(input.grund) ~= 'string' or input.grund == '' then
         return 'invalid', { grund = 'required' }
+    end
+
+    -- A key, not prose. The NUI renders it with `t()`.
+    if not Tvang.isTvangGrund(input.grund) then
+        return 'invalid', { grund = 'not_a_key' }
     end
 
     return nil

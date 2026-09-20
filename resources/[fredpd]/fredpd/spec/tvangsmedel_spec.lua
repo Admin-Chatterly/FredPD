@@ -162,11 +162,51 @@ describe('tvangsmedel', function()
     end)
 
     -- -------------------------------------------------------------------------
+    describe('the grounds that are locale keys', function()
+        -- The NUI renders a ground with `t()`, which prints an unknown key
+        -- verbatim. The schema can only bound the string; the set lives here,
+        -- and without it a route call from an executor put arbitrary prose on
+        -- the face of a register every officer reads.
+
+        it('accepts the grounds RB gives', function()
+            for _, key in ipairs({
+                'skalig_misstanke', 'sannolika_skal', 'eftersokande_person',
+                'sakra_bevis', 'fara_i_drojsmal', 'annan',
+            }) do
+                assert.is_true(tvang.isTvangGrund(key))
+            end
+        end)
+
+        it('refuses prose, and refuses the qualified key', function()
+            assert.is_false(tvang.isTvangGrund('whatever the attacker likes'))
+            assert.is_false(tvang.isTvangGrund(''))
+            assert.is_false(tvang.isTvangGrund(nil))
+            -- The suffix alone, as the screen sends it: a fully-qualified key
+            -- would render as `tvang.grund.tvang.grund.x`.
+            assert.is_false(tvang.isTvangGrund('tvang.grund.skalig_misstanke'))
+        end)
+
+        it('refuses prose as a reason for lifting a wanted notice', function()
+            assert.is_true(tvang.isAvlysningsgrund('gripen'))
+            assert.is_false(tvang.isAvlysningsgrund('because I said so'))
+        end)
+
+        it('is what `validate` enforces', function()
+            local err, fields = tvang.validate({
+                kind = 'husrannsakan_reell', targetKind = 'address',
+                targetId = 5, grund = 'arbitrary prose',
+            })
+
+            assert.are.equal('invalid', err)
+            assert.are.equal('not_a_key', fields.grund)
+        end)
+    end)
+
     describe('validate', function()
         it('accepts a well-formed husrannsakan', function()
             assert.is_nil(tvang.validate({
                 kind = 'husrannsakan_reell', targetKind = 'address',
-                targetId = 5, grund = 'tvang.grund.skalig_misstanke',
+                targetId = 5, grund = 'skalig_misstanke',
             }))
         end)
 

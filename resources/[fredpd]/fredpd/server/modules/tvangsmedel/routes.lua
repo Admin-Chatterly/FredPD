@@ -83,15 +83,22 @@ route.define({
     handler = function(session, input)
         local now = os.time()
 
-        local rows = access.filterSearch(session, TVANG, repo.list(session.agencyId, {
+        local found = repo.list(session.agencyId, {
             kind = input.kind,
             fuId = input.fuId,
             liveOnly = input.liveOnly,
-        }, input.limit or 50))
+        }, input.limit or 50)
 
-        for index = 1, #rows do
-            rows[index].live = service.isValid(rows[index], now)
+        -- Before the filter, so `live` is never written onto a 4.5 stub. A
+        -- stub has no validity window, so `Tvang.isValid` would answer `true`
+        -- for one — harmless today because it is the same answer for every
+        -- stub, and exactly the hole `Access.stub`'s "built, never redacted"
+        -- rule exists to keep shut.
+        for index = 1, #found do
+            found[index].live = service.isValid(found[index], now)
         end
+
+        local rows = access.filterSearch(session, TVANG, found)
 
         return { tvangsmedel = rows }
     end,
@@ -262,6 +269,11 @@ route.define({
     handler = function(session, input)
         local row, refusal = readableEfterlysning(session, input.id)
         if not row then return refusal end
+
+        -- A locale key the NUI renders with `t()`, not a note.
+        if input.grund ~= nil and not service.isAvlysningsgrund(input.grund) then
+            return route.refuse(FredPD.ErrorCode.INVALID, { grund = 'not_a_key' })
+        end
 
         if repo.cancel(row.id, session.agencyId, session.discordId,
                        input.grund, input.version) == 0 then

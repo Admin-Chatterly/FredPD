@@ -68,14 +68,14 @@ test('renders the validity window in this decade', async ({ page }) => {
 test('refuses a bodily examination as not this officer’s decision', async ({ page }) => {
   await openMeasures(page);
 
-  await page.getByRole('button', { name: 'Decide a measure' }).click();
+  await page.getByRole('button', { name: 'Record a decision' }).click();
 
   const form = page.locator('form').filter({ hasText: 'Record id' });
 
   await form.getByLabel('Measure').selectOption('kroppsbesiktning');
   await form.getByLabel('Record id').fill('2');
   await form.getByLabel('Ground').selectOption('skalig_misstanke');
-  await form.getByRole('button', { name: 'Decide a measure' }).click();
+  await form.getByRole('button', { name: 'Record a decision' }).click();
 
   const panel = page.getByRole('alert');
 
@@ -86,7 +86,7 @@ test('refuses a bodily examination as not this officer’s decision', async ({ p
 test('does not offer a target the measure cannot be aimed at', async ({ page }) => {
   await openMeasures(page);
 
-  await page.getByRole('button', { name: 'Decide a measure' }).click();
+  await page.getByRole('button', { name: 'Record a decision' }).click();
 
   const form = page.locator('form').filter({ hasText: 'Record id' });
   const target = form.getByLabel('Directed at');
@@ -106,7 +106,7 @@ test('does not offer a target the measure cannot be aimed at', async ({ page }) 
 test('decides a measure and opens it', async ({ page }) => {
   await openMeasures(page);
 
-  await page.getByRole('button', { name: 'Decide a measure' }).click();
+  await page.getByRole('button', { name: 'Record a decision' }).click();
 
   const form = page.locator('form').filter({ hasText: 'Record id' });
 
@@ -114,7 +114,7 @@ test('decides a measure and opens it', async ({ page }) => {
   await form.getByLabel('Record id').fill('41');
   await form.getByLabel('Named as').fill('Sandstensvägen 7');
   await form.getByLabel('Ground').selectOption('sakra_bevis');
-  await form.getByRole('button', { name: 'Decide a measure' }).click();
+  await form.getByRole('button', { name: 'Record a decision' }).click();
 
   await expect(page.getByRole('heading', { name: /^W26-/ })).toBeVisible();
   await expect(page.getByText('Not yet carried out.')).toBeVisible();
@@ -125,7 +125,7 @@ test('records an execution without ending the measure', async ({ page }) => {
 
   await page.getByRole('button', { name: 'W26-00114' }).click();
   await page.getByLabel('Note').fill('Entry at 06:15, two officers.');
-  await page.getByRole('button', { name: 'Record execution' }).click();
+  await page.getByRole('button', { name: 'Record as carried out' }).click();
 
   await expect(page.getByText(/Carried out/)).toBeVisible();
 

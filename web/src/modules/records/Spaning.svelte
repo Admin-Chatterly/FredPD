@@ -4,6 +4,7 @@
   import { formatMoment } from '../../lib/time';
   import { SPANING_TARGETS } from '@fredpd/schema';
   import { fieldList, type Failure } from '../shared/failure';
+  import ConfirmDialog from '../shared/ConfirmDialog.svelte';
   import { isStub, type Maybe, type Restricted } from './types';
 
   /**
@@ -97,8 +98,10 @@
 
   let resolving = $state<SpaningRow | null>(null);
   let resolveGrund = $state('');
-  let confirmBox = $state<HTMLDivElement | null>(null);
   let trigger: HTMLButtonElement | null = null;
+
+  /** What just happened, for the officer who cannot see the row change. */
+  let status = $state('');
 
   const REQUIRED_MARK = '*';
 
@@ -128,12 +131,9 @@
     if (!takesTargetId && form.targetId) form.targetId = '';
   });
 
-  $effect(() => {
-    if (resolving && confirmBox) confirmBox.focus();
-  });
-
   function cancelConfirm(): void {
     resolving = null;
+    failure = null;
     trigger?.focus();
   }
 
@@ -206,7 +206,6 @@
     if (!row) return;
 
     busy = true;
-    resolving = null;
 
     const response = await nui.call('spaning.resolve', {
       id: row.id,
@@ -217,8 +216,14 @@
     if (response.ok) {
       failure = null;
       resolveGrund = '';
-      if (openId === row.id) await open(row.id);
-      await load();
+      // Closed once the server has agreed, not before: a stale `version` is
+      // the likeliest refusal and closing first discarded the ground with it.
+      resolving = null;
+      status = t('spaning.closed', { number: row.number });
+      trigger?.focus();
+      // Neither read depends on the other, so they go together rather than
+      // costing two round trips of bridge latency in series.
+      await Promise.all([openId === row.id ? open(row.id) : Promise.resolve(), load()]);
     } else {
       failure = response;
       busy = false;
@@ -343,7 +348,7 @@
       </label>
 
       <label class="flex flex-col gap-1 text-xs">
-        {t('spaning.column.grund')} <span aria-hidden="true">{REQUIRED_MARK}</span>
+        <span>{t('spaning.column.grund')} <span aria-hidden="true">{REQUIRED_MARK}</span></span>
         <select
           bind:value={form.grund}
           required
@@ -379,7 +384,11 @@
         {t('spaning.field.valid')}
         <select bind:value={form.validDays} class="border border-[var(--color-border)] px-2 py-1">
           {#each VALIDITY_DAYS as days (days)}
-            <option value={days}>{t('spaning.field.validDays', { count: String(days) })}</option>
+            <option value={days}>
+              {days === 1
+                ? t('spaning.field.validOneDay')
+                : t('spaning.field.validDays', { count: String(days) })}
+            </option>
           {/each}
         </select>
       </label>
@@ -403,52 +412,30 @@
     </form>
   {/if}
 
+  {#if status}
+    <p class="text-xs text-[var(--color-ink-muted)]" role="status">{status}</p>
+  {/if}
+
   {#if resolving}
-    <div
-      bind:this={confirmBox}
-      role="dialog"
-      aria-modal="true"
-      aria-label={t('spaning.action.resolve')}
-      tabindex="-1"
-      class="border border-[var(--color-border)] px-3 py-2 text-xs"
-      onkeydown={(event) => {
-        if (event.key !== 'Escape') return;
-
-        event.stopPropagation();
-        event.preventDefault();
-        cancelConfirm();
-      }}
+    <ConfirmDialog
+      label={t('spaning.action.resolve')}
+      question={t('spaning.confirm.resolve', { number: resolving.number })}
+      {busy}
+      {failure}
+      fieldLabels={FIELD_LABELS}
+      confirm={() => void resolve()}
+      cancel={cancelConfirm}
     >
-      <p>{t('spaning.confirm.resolve', { number: resolving.number })}</p>
-
       <label class="mt-2 flex flex-col gap-1">
-        {t('spaning.field.avslutsgrund')}
-        <select bind:value={resolveGrund} class="border border-[var(--color-border)] px-2 py-1">
-          <option value="">{t('spaning.field.grundChoose')}</option>
+        <span>{t('spaning.field.avslutsgrund')}</span>
+        <select bind:value={resolveGrund} class="w-64 border border-[var(--color-border)] px-2 py-1">
+          <option value="">{t('spaning.field.avslutsgrundChoose')}</option>
           {#each AVSLUTSGRUNDER as key (key)}
             <option value={key}>{t(`spaning.avslutsgrund.${key}`)}</option>
           {/each}
         </select>
       </label>
-
-      <div class="mt-2 flex gap-2">
-        <button
-          type="button"
-          class="border border-[var(--color-border)] px-3 py-1"
-          disabled={busy}
-          onclick={() => void resolve()}
-        >
-          {t('spaning.action.resolve')}
-        </button>
-        <button
-          type="button"
-          class="border border-[var(--color-border)] px-3 py-1"
-          onclick={() => cancelConfirm()}
-        >
-          {t('form.cancel')}
-        </button>
-      </div>
-    </div>
+    </ConfirmDialog>
   {/if}
 
   <div class="grid gap-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
@@ -490,7 +477,14 @@
                     </td>
                     <td class="px-2 py-1">{targetText(row)}</td>
                     <td class="px-2 py-1 whitespace-nowrap">
-                      {t(`spaning.priority.${row.priority}`)}
+                      <!--
+                        The short form in the grid. The full sentence
+                        ("Priority 1 — banner and confirmation") is 275 px of
+                        unbreakable text and pushed the Status column outside
+                        the panel; it belongs in the select, where the officer
+                        is choosing, and on the record below.
+                      -->
+                      {t(`spaning.priority.short.${row.priority}`)}
                       <!--
                         The banner level in words, from the server's own
                         `bannerFor`. Only `alert` is drawn in the alert colour,
@@ -586,6 +580,8 @@
               trigger = event.currentTarget;
               resolving = detail;
               resolveGrund = '';
+              failure = null;
+              status = '';
             }}
           >
             {t('spaning.action.resolve')}

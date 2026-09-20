@@ -42,13 +42,20 @@ route.define({
     handler = function(session, input)
         local now = os.time()
 
-        local rows = access.filterSearch(session, SPANING, repo.list(session.agencyId, {
+        local found = repo.list(session.agencyId, {
             targetKind = input.targetKind,
             priority = input.priority,
             includeResolved = input.includeResolved,
-        }, input.limit or 50))
+        }, input.limit or 50)
 
-        for index = 1, #rows do decorate(rows[index], now) end
+        -- Decorated *before* the filter, so the loop never writes fields onto
+        -- a 4.5 stub. A stub carries three fields and no more by design
+        -- (`Access.stub` builds it rather than redacting a row), and a
+        -- decorator that reaches it is how the next field somebody adds to
+        -- this loop becomes a leak.
+        for index = 1, #found do decorate(found[index], now) end
+
+        local rows = access.filterSearch(session, SPANING, found)
 
         return { spaningsuppdrag = rows }
     end,
@@ -117,6 +124,12 @@ route.define({
 
         if not access.read(session, SPANING, row) then
             return route.refuse(FredPD.ErrorCode.RESTRICTED)
+        end
+
+        -- The ground is a locale key the NUI renders with `t()`, so it is
+        -- checked here rather than merely bounded by the schema.
+        if input.grund ~= nil and not service.isAvslutsgrund(input.grund) then
+            return route.refuse(FredPD.ErrorCode.INVALID, { grund = 'not_a_key' })
         end
 
         if repo.resolve(row.id, session.agencyId, session.discordId,

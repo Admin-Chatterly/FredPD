@@ -4,6 +4,7 @@
   import { formatMoment } from '../../lib/time';
   import { EFTERLYSNING_GRUNDER } from '@fredpd/schema';
   import { fieldList, type Failure } from '../shared/failure';
+  import ConfirmDialog from '../shared/ConfirmDialog.svelte';
   import { isStub, type Maybe, type Restricted } from './types';
 
   /**
@@ -83,8 +84,10 @@
   /** The row being cancelled, and the ground the officer must give. */
   let cancelling = $state<EfterlysningRow | null>(null);
   let cancelGrund = $state('');
-  let confirmBox = $state<HTMLDivElement | null>(null);
   let trigger: HTMLButtonElement | null = null;
+
+  /** What just happened, for the officer who cannot see the row vanish. */
+  let status = $state('');
 
   const REQUIRED_MARK = '*';
 
@@ -100,12 +103,9 @@
 
   const messages = $derived(fieldList(failure, FIELD_LABELS));
 
-  $effect(() => {
-    if (cancelling && confirmBox) confirmBox.focus();
-  });
-
   function cancelConfirm(): void {
     cancelling = null;
+    failure = null;
     trigger?.focus();
   }
 
@@ -162,7 +162,6 @@
     if (!row) return;
 
     busy = true;
-    cancelling = null;
 
     const response = await nui.call('efterlysning.cancel', {
       id: row.id,
@@ -173,6 +172,16 @@
     if (response.ok) {
       failure = null;
       cancelGrund = '';
+      // Closed only once the server has agreed. A stale `version` is the
+      // likeliest refusal here — the version came from a list loaded before
+      // this box opened — and closing first threw away the ground the officer
+      // had just chosen along with the explanation.
+      cancelling = null;
+      // Said out loud, because the row simply disappears from the default
+      // list: without this a keyboard officer is returned to the top of the
+      // document with no evidence anything happened.
+      status = t('efterlysning.lifted', { number: row.number });
+      trigger?.focus();
       await load();
     } else {
       failure = response;
@@ -254,7 +263,7 @@
       onsubmit={(event) => void issue(event)}
     >
       <label class="flex flex-col gap-1 text-xs">
-        {t('efterlysning.field.personId')} <span aria-hidden="true">{REQUIRED_MARK}</span>
+        <span>{t('efterlysning.field.personId')} <span aria-hidden="true">{REQUIRED_MARK}</span></span>
         <input
           bind:value={form.personId}
           inputmode="numeric"
@@ -265,7 +274,7 @@
       </label>
 
       <label class="flex flex-col gap-1 text-xs">
-        {t('efterlysning.column.grund')} <span aria-hidden="true">{REQUIRED_MARK}</span>
+        <span>{t('efterlysning.column.grund')} <span aria-hidden="true">{REQUIRED_MARK}</span></span>
         <select
           bind:value={form.grund}
           required
@@ -324,52 +333,33 @@
     </form>
   {/if}
 
+  {#if status}
+    <p class="text-xs text-[var(--color-ink-muted)]" role="status">{status}</p>
+  {/if}
+
   {#if cancelling}
-    <div
-      bind:this={confirmBox}
-      role="dialog"
-      aria-modal="true"
-      aria-label={t('efterlysning.action.cancel')}
-      tabindex="-1"
-      class="border border-[var(--color-border)] px-3 py-2 text-xs"
-      onkeydown={(event) => {
-        if (event.key !== 'Escape') return;
-
-        event.stopPropagation();
-        event.preventDefault();
-        cancelConfirm();
-      }}
+    <ConfirmDialog
+      label={t('efterlysning.action.cancel')}
+      question={t('efterlysning.confirm.cancel', { number: cancelling.number })}
+      {busy}
+      {failure}
+      fieldLabels={FIELD_LABELS}
+      confirm={() => void cancel()}
+      cancel={cancelConfirm}
     >
-      <p>{t('efterlysning.confirm.cancel', { number: cancelling.number })}</p>
-
       <label class="mt-2 flex flex-col gap-1">
-        {t('efterlysning.field.avlysningsgrund')}
-        <select bind:value={cancelGrund} class="border border-[var(--color-border)] px-2 py-1">
-          <option value="">{t('efterlysning.field.grundChoose')}</option>
+        <span>{t('efterlysning.field.avlysningsgrund')}</span>
+        <select
+          bind:value={cancelGrund}
+          class="w-64 border border-[var(--color-border)] px-2 py-1"
+        >
+          <option value="">{t('efterlysning.field.avlysningsgrundChoose')}</option>
           {#each AVLYSNINGSGRUNDER as key (key)}
             <option value={key}>{t(`efterlysning.avlysningsgrund.${key}`)}</option>
           {/each}
         </select>
       </label>
-
-      <div class="mt-2 flex gap-2">
-        <button
-          type="button"
-          class="border border-[var(--color-border)] px-3 py-1"
-          disabled={busy}
-          onclick={() => void cancel()}
-        >
-          {t('efterlysning.action.cancel')}
-        </button>
-        <button
-          type="button"
-          class="border border-[var(--color-border)] px-3 py-1"
-          onclick={() => cancelConfirm()}
-        >
-          {t('form.cancel')}
-        </button>
-      </div>
-    </div>
+    </ConfirmDialog>
   {/if}
 
   <div class="border border-[var(--color-border)]">
@@ -416,7 +406,7 @@
                       for all six will treat all six the same way.
                     -->
                     {#if row.live && row.detainOnSight}
-                      <span class="ml-1 text-[var(--color-alert)] uppercase">
+                      <span class="ml-1 font-semibold text-[var(--color-alert)]">
                         {t('efterlysning.detainOnSight')}
                       </span>
                     {:else if row.live}
@@ -444,6 +434,8 @@
                           trigger = event.currentTarget;
                           cancelling = row;
                           cancelGrund = '';
+                          failure = null;
+                          status = '';
                         }}
                       >
                         {t('efterlysning.action.cancel')}

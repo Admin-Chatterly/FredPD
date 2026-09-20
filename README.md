@@ -70,13 +70,16 @@ Working today:
 - **Spaningsuppdrag**: lookouts on people, vehicles or a description alone,
   feeding the hot-file check (7.13).
 
+M2's interface is complete: every register and every workflow in it has a
+screen, and the Records module's eight tabs are the whole of what the M2 routes
+can do.
+
 Not built yet, and worth knowing before you install: the **gateway** service, so
 no media uploads, no PDFs and no printing; **booking**, **citations**,
-**impound**, **court** and **personnel** (all M6); **surveillance** (M5); and
-screens for frihetsberövande, tvångsmedel and spaning — their servers are done
-and callable, the Svelte is not written. None of this has run on a live FiveM
-server: the logic is covered by tests, and the parts that call game natives are
-not.
+**impound**, **court** and **personnel** (all M6); and **surveillance** (M5),
+whose resource exists as a boot stub and nothing more. None of this has run on a
+live FiveM server: the logic is covered by tests, and the parts that call game
+natives are not.
 
 ## Layout
 

@@ -218,6 +218,19 @@ function Repo.efterlysningList(agencyId, filter, limit)
 
     if not filter.includeCancelled then
         clauses[#clauses + 1] = 'e.cancelled_at IS NULL'
+
+        -- The expiry too, NULL-safe. Left out entirely at first, on the
+        -- grounds that a NULL means "stands until lifted" and expressing that
+        -- alongside the indexed comparison is how two definitions of "live"
+        -- drift apart. Measured at 50k notices, that read every notice the
+        -- agency had ever issued -- 56 ms of it -- to draw fifty, because
+        -- `cancelled_at IS NULL` alone removes a quarter of the table.
+        --
+        -- `Tvang.isLive` is still the one definition; this is the same
+        -- question asked in SQL so the rows never leave the database, and the
+        -- `OR ... IS NULL` is what keeps a prosecutor's standing decision in
+        -- the answer.
+        clauses[#clauses + 1] = '(e.expires_at IS NULL OR e.expires_at > CURRENT_TIMESTAMP(3))'
     end
 
     values[#values + 1] = limit

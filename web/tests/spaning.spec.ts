@@ -56,7 +56,7 @@ test('never says detain on sight', async ({ page }) => {
   await expect(page.getByText('Detain on sight')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'S26-00042' }).click();
-  await expect(page.getByText('A lookout, not a warrant. Report the sighting.')).toBeVisible();
+  await expect(page.getByText('A lookout, not a wanted notice. Report the sighting.')).toBeVisible();
 });
 
 test('carries a lookout with a description and no record behind it', async ({ page }) => {
@@ -75,10 +75,10 @@ test('warns before a lookout is raised at priority 1, not after', async ({ page 
 
   const form = page.locator('form').filter({ hasText: 'Area' });
 
-  await expect(form).not.toContainText('interrupts every officer');
+  await expect(form).not.toContainText('raises a banner for every officer');
 
   await form.getByLabel('Priority').selectOption('1');
-  await expect(form).toContainText('interrupts every officer');
+  await expect(form).toContainText('raises a banner for every officer');
 });
 
 test('drops the record id when the lookout names no record', async ({ page }) => {
@@ -134,7 +134,7 @@ test('asks why a lookout is being closed', async ({ page }) => {
   await dialog.getByLabel('Reason for closing').selectOption('omhandertaget');
   await dialog.getByRole('button', { name: 'Close the lookout' }).click();
 
-  await expect(page.getByText('Vehicle recovered')).toBeVisible();
+  await expect(page.getByText('Vehicle impounded')).toBeVisible();
 });
 
 test('Escape closes the dialog, not the whole interface', async ({ page }) => {

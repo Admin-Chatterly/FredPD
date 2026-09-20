@@ -170,10 +170,45 @@ describe('spaning', function()
     end)
 
     -- -------------------------------------------------------------------------
+    describe('the grounds that are locale keys', function()
+        -- `spaning.create` is a patrol permission — the lowest-privileged
+        -- write in the module — so this is the easiest of the four grounds to
+        -- reach from a route call, and the one most worth closing.
+
+        it('accepts the reasons a lookout is raised for', function()
+            for _, key in ipairs({
+                'iakttagelse', 'efterlyst_fordon', 'stulet_fordon',
+                'misstankt_fordon', 'eftersokt_person', 'annan',
+            }) do
+                assert.is_true(spaning.isGrund(key))
+            end
+        end)
+
+        it('refuses prose', function()
+            assert.is_false(spaning.isGrund('anything at all'))
+            assert.is_false(spaning.isGrund('spaning.grund.iakttagelse'))
+            assert.is_false(spaning.isGrund(nil))
+        end)
+
+        it('refuses prose as a reason for closing one', function()
+            assert.is_true(spaning.isAvslutsgrund('omhandertaget'))
+            assert.is_false(spaning.isAvslutsgrund('found it'))
+        end)
+
+        it('is what `validate` enforces', function()
+            local err, fields = spaning.validate({
+                targetKind = 'vehicle', targetId = 3, grund = 'arbitrary prose',
+            })
+
+            assert.are.equal('invalid', err)
+            assert.are.equal('not_a_key', fields.grund)
+        end)
+    end)
+
     describe('validate', function()
         it('accepts a lookout on a registered vehicle', function()
             assert.is_nil(spaning.validate({
-                targetKind = 'vehicle', targetId = 3, grund = 'spaning.grund.efterlyst_fordon',
+                targetKind = 'vehicle', targetId = 3, grund = 'efterlyst_fordon',
             }))
         end)
 
@@ -183,13 +218,13 @@ describe('spaning', function()
             assert.is_nil(spaning.validate({
                 targetKind = 'other',
                 description = 'Silver estate, no plate seen, three occupants',
-                grund = 'spaning.grund.iakttagelse',
+                grund = 'iakttagelse',
             }))
         end)
 
         it('refuses a lookout for nothing at all', function()
             local code, fields = spaning.validate({
-                targetKind = 'vehicle', grund = 'g',
+                targetKind = 'vehicle', grund = 'iakttagelse',
             })
 
             assert.are.equal('invalid', code)
@@ -200,7 +235,7 @@ describe('spaning', function()
             -- An id into nothing; the banner would try to open a record that
             -- does not exist.
             local code, fields = spaning.validate({
-                targetKind = 'other', targetId = 5, description = 'x', grund = 'g',
+                targetKind = 'other', targetId = 5, description = 'x', grund = 'iakttagelse',
             })
 
             assert.are.equal('invalid', code)
@@ -209,16 +244,16 @@ describe('spaning', function()
 
         it('refuses a priority outside 1-4', function()
             assert.are.equal('invalid', spaning.validate({
-                targetKind = 'vehicle', targetId = 1, grund = 'g', priority = 0,
+                targetKind = 'vehicle', targetId = 1, grund = 'iakttagelse', priority = 0,
             }))
             assert.are.equal('invalid', spaning.validate({
-                targetKind = 'vehicle', targetId = 1, grund = 'g', priority = 5,
+                targetKind = 'vehicle', targetId = 1, grund = 'iakttagelse', priority = 5,
             }))
         end)
 
         it('refuses a validity longer than the cap', function()
             local _, fields = spaning.validate({
-                targetKind = 'vehicle', targetId = 1, grund = 'g',
+                targetKind = 'vehicle', targetId = 1, grund = 'iakttagelse',
                 validSeconds = spaning.MAX_VALIDITY + 1,
             })
 
@@ -233,7 +268,7 @@ describe('spaning', function()
 
         it('refuses an unknown target kind', function()
             assert.are.equal('invalid', spaning.validate({
-                targetKind = 'building', targetId = 1, grund = 'g',
+                targetKind = 'building', targetId = 1, grund = 'iakttagelse',
             }))
         end)
     end)

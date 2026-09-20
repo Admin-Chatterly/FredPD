@@ -45,6 +45,31 @@ for index = 1, #TARGETS do IS_TARGET[TARGETS[index]] = true end
 
 function Spaning.isTarget(value) return IS_TARGET[value] == true end
 
+--- Why a lookout was raised, and why it was closed.
+---
+--- Both are locale keys and neither may be prose: the NUI renders them with
+--- `t()`, which prints an unknown key verbatim, so a free string reaches the
+--- face of a register every officer with `spaning.view` reads. `spaning.create`
+--- is a *patrol* permission — the lowest-privileged write in the module — which
+--- is exactly why the set belongs on the server rather than in the browser's
+--- dropdown.
+local GRUNDER <const> = {
+    'iakttagelse', 'efterlyst_fordon', 'stulet_fordon',
+    'misstankt_fordon', 'eftersokt_person', 'annan',
+}
+
+local IS_GRUND <const> = {}
+for index = 1, #GRUNDER do IS_GRUND[GRUNDER[index]] = true end
+
+function Spaning.isGrund(value) return IS_GRUND[value] == true end
+
+local AVSLUTSGRUNDER <const> = { 'gripen', 'omhandertaget', 'aterkallad', 'tiden_ute', 'annan' }
+
+local IS_AVSLUTSGRUND <const> = {}
+for index = 1, #AVSLUTSGRUNDER do IS_AVSLUTSGRUND[AVSLUTSGRUNDER[index]] = true end
+
+function Spaning.isAvslutsgrund(value) return IS_AVSLUTSGRUND[value] == true end
+
 function Spaning.targets()
     local out = {}
     for index = 1, #TARGETS do out[index] = TARGETS[index] end
@@ -181,6 +206,11 @@ function Spaning.validate(input)
 
     if type(input.grund) ~= 'string' or input.grund == '' then
         return 'invalid', { grund = 'required' }
+    end
+
+    -- A key, not prose. The NUI renders it with `t()`.
+    if not Spaning.isGrund(input.grund) then
+        return 'invalid', { grund = 'not_a_key' }
     end
 
     if input.priority ~= nil

@@ -15,7 +15,7 @@ async function openWanted(page: Page): Promise<void> {
   await page.goto('/');
 
   await page.locator('nav').first().getByRole('button', { name: 'Records' }).click();
-  await page.getByRole('button', { name: 'Wanted', exact: true }).click();
+  await page.getByRole('button', { name: 'Wanted notices', exact: true }).click();
 }
 
 test('lists the live notices, and not the lifted', async ({ page }) => {
@@ -39,7 +39,7 @@ test('shows a lifted notice, and why it was lifted, once the filter is cleared',
   const row = page.getByRole('row').filter({ hasText: 'W26-00099' });
 
   await expect(row).toContainText('Lifted');
-  await expect(row).toContainText('Taken into custody');
+  await expect(row).toContainText('Arrested');
 });
 
 test('marks detain-on-sight, and marks the others as not that', async ({ page }) => {

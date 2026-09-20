@@ -4,6 +4,7 @@
   import { formatMoment } from '../../lib/time';
   import { TVANG_KINDS, TVANG_TARGETS } from '@fredpd/schema';
   import { fieldList, type Failure } from '../shared/failure';
+  import ConfirmDialog from '../shared/ConfirmDialog.svelte';
   import { isStub, type Maybe, type Restricted } from './types';
 
   /**
@@ -106,8 +107,10 @@
 
   /** The revocation dialog, and the button that opened it (6.4). */
   let confirmingUpphav = $state(false);
-  let confirmBox = $state<HTMLDivElement | null>(null);
   let trigger: HTMLButtonElement | null = null;
+
+  /** What just happened, for the officer who cannot see the list change. */
+  let status = $state('');
 
   let verkstallNote = $state('');
 
@@ -156,12 +159,9 @@
     }
   });
 
-  $effect(() => {
-    if (confirmingUpphav && confirmBox) confirmBox.focus();
-  });
-
   function cancelConfirm(): void {
     confirmingUpphav = false;
+    failure = null;
     trigger?.focus();
   }
 
@@ -224,8 +224,7 @@
       form.targetId = '';
       form.targetLabel = '';
       form.scope = '';
-      await load();
-      await open(response.data.id);
+      await Promise.all([load(), open(response.data.id)]);
     } else {
       failure = response;
       busy = false;
@@ -253,8 +252,7 @@
     if (response.ok) {
       failure = null;
       verkstallNote = '';
-      await open(id);
-      await load();
+      await Promise.all([open(id), load()]);
     } else {
       failure = response;
       busy = false;
@@ -265,15 +263,21 @@
     if (!detail) return;
 
     busy = true;
-    confirmingUpphav = false;
     const id = detail.id;
+    const number = detail.number;
 
     const response = await nui.call('tvang.upphav', { id, version: detail.version });
 
     if (response.ok) {
       failure = null;
-      await open(id);
-      await load();
+      // Closed once the server has agreed. `version` came from a read that
+      // may be minutes old, so `conflict` is the likeliest answer of all here
+      // and it belongs in the dialog rather than behind it.
+      confirmingUpphav = false;
+      status = t('tvang.revoked', { number });
+      trigger?.focus();
+      // Neither read depends on the other.
+      await Promise.all([open(id), load()]);
     } else {
       failure = response;
       busy = false;
@@ -390,7 +394,7 @@
       </label>
 
       <label class="flex flex-col gap-1 text-xs">
-        {t('tvang.field.targetId')} <span aria-hidden="true">{REQUIRED_MARK}</span>
+        <span>{t('tvang.field.targetId')} <span aria-hidden="true">{REQUIRED_MARK}</span></span>
         <input
           bind:value={form.targetId}
           inputmode="numeric"
@@ -410,7 +414,7 @@
       </label>
 
       <label class="flex flex-col gap-1 text-xs">
-        {t('tvang.field.grund')} <span aria-hidden="true">{REQUIRED_MARK}</span>
+        <span>{t('tvang.field.grund')} <span aria-hidden="true">{REQUIRED_MARK}</span></span>
         <select
           bind:value={form.grund}
           required
@@ -431,7 +435,15 @@
           class="border border-[var(--color-border)] px-2 py-1"
         >
           {#each VALIDITY_HOURS as hours (hours)}
-            <option value={hours}>{t('tvang.field.validHours', { count: String(hours) })}</option>
+            <!--
+              Past three days the figure is read as days: "720 h" is a month
+              and nobody reads it as one.
+            -->
+            <option value={hours}>
+              {hours % 24 === 0 && hours > 72
+                ? t('tvang.field.validDays', { count: String(hours / 24) })
+                : t('tvang.field.validHours', { count: String(hours) })}
+            </option>
           {/each}
         </select>
       </label>
@@ -453,6 +465,10 @@
         {t('tvang.action.decide')}
       </button>
     </form>
+  {/if}
+
+  {#if status}
+    <p class="text-xs text-[var(--color-ink-muted)]" role="status">{status}</p>
   {/if}
 
   <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -618,44 +634,15 @@
         {#if !detail.upphavdAt}
           <section class="border-t border-[var(--color-border)] pt-3">
             {#if confirmingUpphav}
-              <div
-                bind:this={confirmBox}
-                role="dialog"
-                aria-modal="true"
-                aria-label={t('tvang.action.upphav')}
-                tabindex="-1"
-                class="border border-[var(--color-border)] px-2 py-2 text-xs"
-                onkeydown={(event) => {
-                  if (event.key !== 'Escape') return;
-
-                  // `main.ts` closes the whole NUI on Escape. Inside a dialog
-                  // about revoking a decision that would discard the record
-                  // the officer is reading; 6.4 wants Escape to close this.
-                  event.stopPropagation();
-                  event.preventDefault();
-                  cancelConfirm();
-                }}
-              >
-                <p>{t('tvang.confirm.upphav')}</p>
-
-                <div class="mt-2 flex gap-2">
-                  <button
-                    type="button"
-                    class="border border-[var(--color-border)] px-3 py-1"
-                    disabled={busy}
-                    onclick={() => void upphav()}
-                  >
-                    {t('tvang.action.upphav')}
-                  </button>
-                  <button
-                    type="button"
-                    class="border border-[var(--color-border)] px-3 py-1"
-                    onclick={() => cancelConfirm()}
-                  >
-                    {t('form.cancel')}
-                  </button>
-                </div>
-              </div>
+              <ConfirmDialog
+                label={t('tvang.action.upphav')}
+                question={t('tvang.confirm.upphav')}
+                {busy}
+                {failure}
+                fieldLabels={FIELD_LABELS}
+                confirm={() => void upphav()}
+                cancel={cancelConfirm}
+              />
             {:else}
               <button
                 type="button"
@@ -664,6 +651,8 @@
                 onclick={(event) => {
                   trigger = event.currentTarget;
                   confirmingUpphav = true;
+                  failure = null;
+                  status = '';
                 }}
               >
                 {t('tvang.action.upphav')}
