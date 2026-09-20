@@ -982,7 +982,9 @@
       "tvang": "Coercive measures",
       "efterlysning": "Wanted notices",
       "spaning": "Lookouts",
-      "query": "Query"
+      "query": "Query",
+      "fu": "Investigations",
+      "brott": "Offences"
     },
     "vehicle": {
       "column": {
@@ -1540,7 +1542,7 @@
       "atLeast": "at least {min}, up to {max}",
       "gemensam": "Combined range ({counts} counts)"
     },
-    "empty": "No offences in the catalogue.",
+    "empty": "No offence matches.",
     "superseded": "Superseded {date}",
     "rubrik": {
       "mord": "Murder",
@@ -1568,6 +1570,22 @@
       "grovt_rattfylleri": "Aggravated drink driving",
       "vapenbrott": "Firearms offence",
       "grovt_vapenbrott": "Aggravated firearms offence"
+    },
+    "filter": {
+      "term": "Find an offence",
+      "placeholder": "Citation, code or name"
+    },
+    "charges": {
+      "title": "Charges",
+      "empty": "Add offences to see the combined range (BrB 26:2).",
+      "add": "Charge",
+      "remove": "Remove"
+    },
+    "versions": {
+      "title": "Versions of {code}",
+      "version": "Version {version}",
+      "current": "In force",
+      "until": "Superseded {at}"
     }
   },
   "anmalan": {
@@ -1673,7 +1691,34 @@
       "atalsunderlatelse": "Waiver of prosecution",
       "annan": "Other, stated below"
     },
-    "empty": "No investigations match."
+    "empty": "No investigations match.",
+    "filter": {
+      "mine": "Led by me"
+    },
+    "detail": {
+      "none": "Select an investigation to read it."
+    },
+    "section": {
+      "anmalningar": "Reports under this investigation"
+    },
+    "anmalan": {
+      "empty": "No reports have been gathered under it yet."
+    },
+    "field": {
+      "reason": "Reason",
+      "reasonChoose": "Choose a reason",
+      "note": "Note"
+    },
+    "confirm": {
+      "slutdelge": "Disclose the investigation material to the suspect (RB 23:18a)? The investigation continues afterwards.",
+      "redovisa": "Report this investigation to the prosecutor? It leaves your hands.",
+      "lagg_ned": "Discontinue this investigation? It ends here, and the reason is what the suspect is told."
+    },
+    "done": {
+      "slutdelge": "Material in {number} disclosed to the suspect.",
+      "redovisa": "{number} reported to the prosecutor.",
+      "lagg_ned": "{number} discontinued."
+    }
   },
   "frihet": {
     "status": {

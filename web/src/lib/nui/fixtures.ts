@@ -2067,6 +2067,333 @@ function decideFrihet(input: unknown, action: string): unknown {
   return { id: row.id, status: to };
 }
 
+// ------------------------------------------ brottskatalogen (spec 7.10)
+
+/**
+ * An offence as `brott/repo.lua` selects one, plus the `citation` the route
+ * derives. Both halves matter: the citation is computed on the server so there
+ * is one definition of `BrB 8:1`, and a fixture that invented its own format
+ * would let the screen be built against a server that does not exist.
+ */
+interface FixtureBrott {
+  id: number;
+  code: string;
+  version: number;
+  balk: string;
+  kapitel: number;
+  paragraf: number;
+  stycke: number | null;
+  labelKey: string;
+  grad: string;
+  boter: boolean;
+  fangelseMinMonths: number | null;
+  fangelseMaxMonths: number | null;
+  forsok: boolean;
+  forberedelse: boolean;
+  preskriptionYears: number;
+  supersededAt: string | null;
+}
+
+const brottskatalog: FixtureBrott[] = [
+  {
+    id: 11,
+    code: 'BRB-8-4',
+    version: 2,
+    balk: 'BrB',
+    kapitel: 8,
+    paragraf: 4,
+    stycke: null,
+    labelKey: 'brott.rubrik.grov_stold',
+    grad: 'grov',
+    boter: false,
+    fangelseMinMonths: 6,
+    fangelseMaxMonths: 72,
+    forsok: true,
+    forberedelse: true,
+    preskriptionYears: 10,
+    supersededAt: null,
+  },
+  {
+    id: 12,
+    code: 'BRB-3-5',
+    version: 1,
+    balk: 'BrB',
+    kapitel: 3,
+    paragraf: 5,
+    stycke: null,
+    labelKey: 'brott.rubrik.misshandel',
+    grad: 'normal',
+    boter: false,
+    fangelseMinMonths: 0,
+    fangelseMaxMonths: 24,
+    forsok: false,
+    forberedelse: false,
+    preskriptionYears: 5,
+    supersededAt: null,
+  },
+  {
+    // Fines only, which is the other shape a straffskala takes.
+    id: 13,
+    code: 'BRB-8-2',
+    version: 1,
+    balk: 'BrB',
+    kapitel: 8,
+    paragraf: 2,
+    stycke: null,
+    labelKey: 'brott.rubrik.ringa_stold',
+    grad: 'ringa',
+    boter: true,
+    fangelseMinMonths: 0,
+    fangelseMaxMonths: 6,
+    forsok: false,
+    forberedelse: false,
+    preskriptionYears: 2,
+    supersededAt: null,
+  },
+];
+
+/** The version this offence had before the current one. */
+const supersededBrott: FixtureBrott[] = [
+  {
+    ...(brottskatalog[0] as FixtureBrott),
+    id: 10,
+    version: 1,
+    fangelseMinMonths: 6,
+    fangelseMaxMonths: 48,
+    supersededAt: '2026-04-01T00:00:00.000Z',
+  },
+];
+
+/** `Brott.citation` — `BrB 8:4`, with the stycke where there is one. */
+function citationOf(row: FixtureBrott): string {
+  const base = `${row.balk} ${row.kapitel}:${row.paragraf}`;
+
+  return row.stycke ? `${base} ${row.stycke} st` : base;
+}
+
+function brottRow(row: FixtureBrott): Record<string, unknown> {
+  return {
+    id: row.id,
+    agencyId: session.agencyId,
+    code: row.code,
+    version: row.version,
+    balk: row.balk,
+    kapitel: row.kapitel,
+    paragraf: row.paragraf,
+    stycke: row.stycke,
+    labelKey: row.labelKey,
+    descriptionKey: null,
+    grad: row.grad,
+    boter: row.boter,
+    fangelseMinMonths: row.fangelseMinMonths,
+    fangelseMaxMonths: row.fangelseMaxMonths,
+    forsok: row.forsok,
+    forberedelse: row.forberedelse,
+    preskriptionYears: row.preskriptionYears,
+    supersededAt: row.supersededAt,
+    createdAt: '2026-01-02T00:00:00.000Z',
+    citation: citationOf(row),
+  };
+}
+
+/**
+ * BrB 26:2's gemensam straffskala, mirroring `Brott.gemensamStraffskala`.
+ *
+ * Four rules, in the statute's order, and getting any of them wrong here would
+ * teach the screen an arithmetic the server does not do:
+ *
+ *   1. **The floor is the heaviest floor**, not the sum. Three offences each
+ *      carrying six months still have a six-month floor.
+ *   2. **The ceiling is the heaviest ceiling plus an uplift** — a year where
+ *      the heaviest is under four, two years under eight, four above that.
+ *   3. **Capped by the sum of the maxima.** Two six-month offences cannot
+ *      reach eighteen months however generous the band is.
+ *   4. **Then capped at eighteen years**, which BrB 26:1 allows for a fixed
+ *      term. Rule 3 before rule 4, because applying the statutory cap first
+ *      would let the sum push back above it.
+ *
+ * A single offence is not konkurrens at all and keeps its own span exactly.
+ */
+function konkurrensUplift(heaviestMax: number): number {
+  if (heaviestMax < 4 * 12) return 12;
+  if (heaviestMax < 8 * 12) return 24;
+
+  return 48;
+}
+
+const MAX_FIXED_MONTHS = 18 * 12;
+
+function gemensamStraffskala(rows: FixtureBrott[]): {
+  boter: boolean;
+  min: number;
+  max: number | null;
+} {
+  const floor = Math.max(...rows.map((row) => row.fangelseMinMonths ?? 0));
+  const boter = rows.every((row) => row.boter);
+
+  // A `null` maximum is life imprisonment, and it swallows everything.
+  if (rows.some((row) => row.fangelseMaxMonths === null)) {
+    return { boter: false, min: floor, max: null };
+  }
+
+  const maxima = rows.map((row) => row.fangelseMaxMonths as number);
+
+  if (rows.length === 1) {
+    return {
+      boter: rows[0]?.boter ?? false,
+      min: rows[0]?.fangelseMinMonths ?? 0,
+      max: maxima[0] ?? 0,
+    };
+  }
+
+  const heaviest = Math.max(...maxima);
+  const sum = maxima.reduce((total, value) => total + value, 0);
+
+  let ceiling = heaviest + konkurrensUplift(heaviest);
+
+  if (ceiling > sum) ceiling = sum;
+  if (ceiling > MAX_FIXED_MONTHS) ceiling = MAX_FIXED_MONTHS;
+
+  return { boter, min: floor, max: ceiling };
+}
+
+// --------------------------------------------- förundersökning (spec 7.8)
+
+/**
+ * A förundersökning as `FU_SELECT` sends one, column for column.
+ *
+ * `opened_at` and the rest are plain DATETIME here — this repo does not go
+ * through `UNIX_TIMESTAMP` — so the fixture sends ISO strings, which is what
+ * the server sends. The unit matters as much as the name.
+ */
+interface FixtureFu {
+  id: number;
+  number: string;
+  title: string;
+  status: string;
+  fuLedare: string | null;
+  ledareKind: string | null;
+  openedAt: string;
+  closedAt: string | null;
+  closedReason: string | null;
+  closedNote: string | null;
+  version: number;
+  /** The reports gathered under it, by anmälan id. */
+  anmalanIds: number[];
+}
+
+const forundersokningar: FixtureFu[] = [
+  {
+    // Open, led by the police. The ordinary case, and the one the three
+    // endings are drawn for.
+    id: 1,
+    number: 'FU26-00031',
+    title: 'Serial burglaries, Kvarngatan',
+    status: 'inledd',
+    fuLedare: FIXTURE_VIEWER,
+    ledareKind: 'polis',
+    openedAt: '2026-09-12T08:20:00.000Z',
+    closedAt: null,
+    closedReason: null,
+    closedNote: null,
+    version: 1,
+    anmalanIds: [1, 2],
+  },
+  {
+    // Led by a prosecutor, which is what happens once somebody is anhållen.
+    id: 2,
+    number: 'FU26-00028',
+    title: 'Aggravated assault, Sandstensvägen',
+    status: 'slutdelgiven',
+    fuLedare: '100000000000000003',
+    ledareKind: 'aklagare',
+    openedAt: '2026-08-30T14:05:00.000Z',
+    closedAt: null,
+    closedReason: null,
+    closedNote: null,
+    version: 2,
+    anmalanIds: [],
+  },
+  {
+    // Discontinued, and it says why — which is what the suspect is told.
+    id: 3,
+    number: 'FU26-00019',
+    title: 'Criminal damage, the ferry terminal',
+    status: 'nedlagd',
+    fuLedare: FIXTURE_VIEWER,
+    ledareKind: 'polis',
+    openedAt: '2026-07-02T19:40:00.000Z',
+    closedAt: '2026-08-11T11:00:00.000Z',
+    closedReason: 'brott_kan_ej_styrkas',
+    closedNote: 'No usable camera footage and the complainant withdrew.',
+    version: 3,
+    anmalanIds: [],
+  },
+];
+
+const restrictedFu = [
+  { restricted: true as const, recordType: 'fu', contact: 'internal_affairs' },
+  { restricted: true as const, recordType: 'fu', contact: 'homicide' },
+];
+
+function fuRow(row: FixtureFu): Record<string, unknown> {
+  return {
+    id: row.id,
+    agencyId: session.agencyId,
+    number: row.number,
+    title: row.title,
+    status: row.status,
+    fuLedare: row.fuLedare,
+    ledareKind: row.ledareKind,
+    intelCaseId: null,
+    openedBy: row.fuLedare,
+    openedAt: row.openedAt,
+    closedBy: row.closedAt ? FIXTURE_VIEWER : null,
+    closedAt: row.closedAt,
+    closedReason: row.closedReason,
+    closedNote: row.closedNote,
+    classification: 'internal',
+    version: row.version,
+    updatedAt: row.openedAt,
+  };
+}
+
+/** Mirrors the server's transitions: two endings are final. */
+const FU_NEXT: Record<string, Record<string, string>> = {
+  inledd: { slutdelge: 'slutdelgiven', redovisa: 'redovisad', lagg_ned: 'nedlagd' },
+  slutdelgiven: { redovisa: 'redovisad', lagg_ned: 'nedlagd' },
+};
+
+function decideFu(input: unknown, action: string): unknown {
+  const { id, version, reason, note } = (input ?? {}) as {
+    id?: number;
+    version?: number;
+    reason?: string;
+    note?: string;
+  };
+
+  const row = forundersokningar.find((entry) => entry.id === id);
+
+  if (!row) return refuse('not_found');
+
+  const to = FU_NEXT[row.status]?.[action];
+  if (!to) return refuse('conflict', { status: 'out_of_order' });
+  if (row.version !== version) return refuse('conflict', { version: 'stale' });
+
+  row.status = to;
+  row.version += 1;
+
+  // Only a discontinuation closes it. Slutdelgivning is a step in an
+  // investigation that carries on afterwards.
+  if (to === 'nedlagd' || to === 'redovisad') {
+    row.closedAt = new Date().toISOString();
+    row.closedReason = reason ?? null;
+    row.closedNote = note ?? null;
+  }
+
+  return { id: row.id, status: to };
+}
+
 // ------------------------------------------------- the unified query (7.2)
 
 /**
@@ -2741,6 +3068,125 @@ export const fixtures: FixtureSet = {
 
       return { id: row.id };
     },
+
+    // ------------------------------------------------------ brottskatalogen
+
+    'brott.list': () => ({ brott: brottskatalog.map(brottRow) }),
+
+    'brott.versions': (input) => {
+      const { code } = (input ?? {}) as { code?: string };
+
+      const rows = [...brottskatalog, ...supersededBrott]
+        .filter((row) => row.code === code)
+        .sort((left, right) => right.version - left.version);
+
+      if (rows.length === 0) return refuse('not_found');
+
+      return { versions: rows.map(brottRow) };
+    },
+
+    'brott.straffskala': (input) => {
+      const { brottIds } = (input ?? {}) as { brottIds?: string[] };
+
+      if (!brottIds || brottIds.length === 0) {
+        return refuse('invalid', { brottIds: 'empty' });
+      }
+
+      // One row per *count*, duplicates kept: BrB 26:2 is computed over counts
+      // rather than over distinct offences.
+      const rows = brottIds.map((id) => brottskatalog.find((row) => row.id === Number(id)));
+
+      if (rows.some((row) => row === undefined)) {
+        return refuse('not_found', { brottIds: 'unknown' });
+      }
+
+      const found = rows as FixtureBrott[];
+
+      return { straffskala: gemensamStraffskala(found), brott: found.map(brottRow) };
+    },
+
+    // ------------------------------------------------------ förundersökning
+
+    'fu.list': (input) => {
+      const filter = (input ?? {}) as { status?: string; mine?: boolean };
+
+      const found = forundersokningar.filter(
+        (row) =>
+          (!filter.status || row.status === filter.status) &&
+          (!filter.mine || row.fuLedare === FIXTURE_VIEWER),
+      );
+
+      return { forundersokningar: [...found.map(fuRow), ...restrictedFu] };
+    },
+
+    'fu.get': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const row = forundersokningar.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+
+      return {
+        fu: fuRow(row),
+        anmalningar: anmalningar
+          .filter((report) => row.anmalanIds.includes(report.id))
+          .map((report) => ({
+            id: report.id,
+            number: report.number,
+            title: report.title,
+            status: report.status,
+          })),
+      };
+    },
+
+    'fu.create': (input) => {
+      const { title, ledareKind } = (input ?? {}) as { title?: string; ledareKind?: string };
+
+      if (!title?.trim()) return refuse('invalid', { title: 'required' });
+
+      const id = forundersokningar.length + 1;
+      const number = `FU26-000${31 + id}`;
+
+      forundersokningar.unshift({
+        id,
+        number,
+        title,
+        status: 'inledd',
+        fuLedare: FIXTURE_VIEWER,
+        ledareKind: ledareKind ?? 'polis',
+        openedAt: new Date().toISOString(),
+        closedAt: null,
+        closedReason: null,
+        closedNote: null,
+        version: 1,
+        anmalanIds: [],
+      });
+
+      return { id, number };
+    },
+
+    'fu.assign': (input) => {
+      const { id, version, fuLedare, ledareKind } = (input ?? {}) as {
+        id?: number;
+        version?: number;
+        fuLedare?: string;
+        ledareKind?: string;
+      };
+
+      const row = forundersokningar.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+      if (row.version !== version) return refuse('conflict', { version: 'stale' });
+
+      row.fuLedare = fuLedare ?? row.fuLedare;
+      row.ledareKind = ledareKind ?? row.ledareKind;
+      row.version += 1;
+
+      return { id: row.id };
+    },
+
+    'fu.slutdelge': (input) => decideFu(input, 'slutdelge'),
+    'fu.redovisa': (input) => decideFu(input, 'redovisa'),
+    'fu.lagg_ned': (input) => decideFu(input, 'lagg_ned'),
 
     // --------------------------------------------------- the unified query
 

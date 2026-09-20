@@ -982,7 +982,9 @@
       "tvang": "Tvångsmedel",
       "efterlysning": "Efterlysningar",
       "spaning": "Spaningsuppdrag",
-      "query": "Slagning"
+      "query": "Slagning",
+      "fu": "Förundersökningar",
+      "brott": "Brottskatalog"
     },
     "vehicle": {
       "column": {
@@ -1540,7 +1542,7 @@
       "atLeast": "lägst {min} och högst {max}",
       "gemensam": "Gemensam straffskala ({counts} brott)"
     },
-    "empty": "Inga brott i katalogen.",
+    "empty": "Inget brott matchar.",
     "superseded": "Ersatt {date}",
     "rubrik": {
       "mord": "Mord",
@@ -1568,6 +1570,22 @@
       "grovt_rattfylleri": "Grovt rattfylleri",
       "vapenbrott": "Vapenbrott",
       "grovt_vapenbrott": "Grovt vapenbrott"
+    },
+    "filter": {
+      "term": "Sök brott",
+      "placeholder": "Lagrum, kod eller rubrik"
+    },
+    "charges": {
+      "title": "Brottsmisstankar",
+      "empty": "Lägg till brott för att se den gemensamma straffskalan (BrB 26:2).",
+      "add": "Lägg till",
+      "remove": "Ta bort"
+    },
+    "versions": {
+      "title": "Versioner av {code}",
+      "version": "Version {version}",
+      "current": "Gällande",
+      "until": "Ersatt {at}"
     }
   },
   "anmalan": {
@@ -1673,7 +1691,34 @@
       "atalsunderlatelse": "Åtalsunderlåtelse",
       "annan": "Annat skäl, anges nedan"
     },
-    "empty": "Inga förundersökningar matchar."
+    "empty": "Inga förundersökningar matchar.",
+    "filter": {
+      "mine": "Som jag leder"
+    },
+    "detail": {
+      "none": "Välj en förundersökning för att läsa den."
+    },
+    "section": {
+      "anmalningar": "Anmälningar i förundersökningen"
+    },
+    "anmalan": {
+      "empty": "Inga anmälningar har lagts till ännu."
+    },
+    "field": {
+      "reason": "Grund",
+      "reasonChoose": "Välj grund",
+      "note": "Anteckning"
+    },
+    "confirm": {
+      "slutdelge": "Vill du slutdelge förundersökningen till den misstänkte (RB 23:18a)? Förundersökningen fortsätter därefter.",
+      "redovisa": "Vill du redovisa förundersökningen till åklagaren? Den lämnar dina händer.",
+      "lagg_ned": "Vill du lägga ned förundersökningen? Den avslutas här, och grunden är det den misstänkte får veta."
+    },
+    "done": {
+      "slutdelge": "Materialet i {number} har slutdelgetts.",
+      "redovisa": "{number} har redovisats till åklagaren.",
+      "lagg_ned": "{number} har lagts ned."
+    }
   },
   "frihet": {
     "status": {

@@ -2,6 +2,8 @@
   import { nui } from '../../lib/nui';
   import Query from './Query.svelte';
   import Anmalan from './Anmalan.svelte';
+  import Fu from './Fu.svelte';
+  import Brott from './Brott.svelte';
   import Frihet from './Frihet.svelte';
   import Tvang from './Tvang.svelte';
   import Efterlysning from './Efterlysning.svelte';
@@ -76,7 +78,9 @@
     | 'vehicles'
     | 'firearms'
     | 'anmalan'
+    | 'fu'
     | 'frihet'
+    | 'brott'
     | 'tvang'
     | 'efterlysning'
     | 'spaning';
@@ -1041,10 +1045,12 @@
     'vehicles',
     'firearms',
     'anmalan',
+    'fu',
     'frihet',
     'tvang',
     'efterlysning',
     'spaning',
+    'brott',
   ];
 
   /**
@@ -2926,6 +2932,13 @@
       from an identifier the interface would have to be sent first.
     -->
     <Anmalan />
+  {:else if tab === 'fu'}
+    <!--
+      The investigation (7.8). The anmälan tab beside it holds the *reports*;
+      this is the case opened off the back of one, with its own leader and its
+      own three ways to end.
+    -->
+    <Fu />
   {:else if tab === 'frihet'}
     <!--
       Its own component for the same reason, and one more: it holds a ticking
@@ -2950,6 +2963,13 @@
       `EFTERLYSNING` was given its own record type to prevent.
     -->
     <Efterlysning />
+  {:else if tab === 'brott'}
+    <!--
+      Brottskatalogen (7.10) and BrB 26:2's arithmetic. Reference rather than
+      workflow, and last in the rail for that reason — but it is where the
+      combined range an officer quotes to a prosecutor is computed.
+    -->
+    <Brott />
   {:else if tab === 'spaning'}
     <!--
       The patrol lookout (7.13), which is emphatically not the tab beside it.
