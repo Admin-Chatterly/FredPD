@@ -1,6 +1,7 @@
 <script lang="ts">
   import { nui } from './lib/nui';
   import { t } from './lib/i18n';
+  import { setDepartmentTimezone } from './lib/time';
   import type { ErrorCode } from '@fredpd/schema';
   import type { Session } from './lib/types';
   import RoleMap from './modules/admin/RoleMap.svelte';
@@ -34,6 +35,9 @@
       if (response.ok) {
         session = response.data;
         error = null;
+        // Before anything renders a timestamp: every screen formats in the
+        // department's zone, not in the one the player's machine is set to.
+        setDepartmentTimezone(response.data.timezone);
         current ??= response.data.modules[0] ?? null;
       } else {
         error = response.err;

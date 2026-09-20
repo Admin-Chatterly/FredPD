@@ -944,7 +944,10 @@
       "persons": "Personer",
       "vehicles": "Fordon",
       "anmalan": "Anmälningar",
-      "frihet": "Frihetsberövanden"
+      "frihet": "Frihetsberövanden",
+      "tvang": "Tvångsmedel",
+      "efterlysning": "Efterlysningar",
+      "spaning": "Spaningsuppdrag"
     },
     "vehicle": {
       "column": {
@@ -1792,9 +1795,36 @@
       "expired": "Utgånget",
       "upphavd": "Upphävt",
       "not_yet": "Ej i kraft ännu",
-      "verkstalld": "Verkställt"
+      "verkstalld": "Verkställt",
+      "notLive": "Gäller inte"
     },
-    "empty": "Inga tvångsmedel matchar."
+    "empty": "Inga tvångsmedel matchar.",
+    "filter": {
+      "liveOnly": "Endast gällande"
+    },
+    "field": {
+      "targetId": "Objekt-id",
+      "targetLabel": "Benämning",
+      "grund": "Grund",
+      "grundChoose": "Välj grund",
+      "valid": "Gäller i",
+      "validHours": "{count} h",
+      "note": "Anteckning",
+      "validFrom": "Gäller från",
+      "upphavd": "Upphävt"
+    },
+    "notLive": "Beslutet ger ingen befogenhet: {reason}.",
+    "detail": {
+      "none": "Välj ett beslut för att läsa det."
+    },
+    "section": {
+      "verkstallighet": "Verkställighet"
+    },
+    "verkstalld": "Verkställt {at}.",
+    "notVerkstalld": "Ännu inte verkställt.",
+    "confirm": {
+      "upphav": "Upphäva beslutet? Det ger ingen befogenhet härefter, och beslutet ligger kvar i akten."
+    }
   },
   "efterlysning": {
     "grund": {
@@ -1825,7 +1855,32 @@
     },
     "detainOnSight": "Ska gripas",
     "notAnArrest": "Efterlyst, men inte för gripande.",
-    "empty": "Ingen är efterlyst."
+    "empty": "Ingen är efterlyst.",
+    "filter": {
+      "includeCancelled": "Visa även avlysta"
+    },
+    "field": {
+      "personId": "Person-id",
+      "grundChoose": "Välj grund",
+      "noExpiry": "Tills den avlyses",
+      "expiryDays": "{count} dygn",
+      "note": "Anteckning",
+      "avlysningsgrund": "Grund för avlysning"
+    },
+    "priority": {
+      "1": "Prioritet 1 — ingrip omgående",
+      "2": "Prioritet 2 — brådskande",
+      "3": "Prioritet 3 — rutin",
+      "4": "Prioritet 4 — endast i registret"
+    },
+    "status": {
+      "live": "Efterlyst",
+      "cancelled": "Avlyst",
+      "expired": "Utgången"
+    },
+    "confirm": {
+      "cancel": "Avlysa efterlysningen {number}?"
+    }
   },
   "spaning": {
     "target": {
@@ -1868,6 +1923,34 @@
       "annan": "Annat"
     },
     "empty": "Inga spaningsuppdrag pågår.",
-    "notAnArrest": "Spaningsuppdrag, inte efterlysning. Rapportera iakttagelsen."
+    "notAnArrest": "Spaningsuppdrag, inte efterlysning. Rapportera iakttagelsen.",
+    "filter": {
+      "includeResolved": "Visa även avslutade"
+    },
+    "field": {
+      "targetId": "Objekt-id",
+      "grundChoose": "Välj grund",
+      "valid": "Gäller i",
+      "validDays": "{count} dygn",
+      "avslutsgrund": "Grund för avslut"
+    },
+    "priority": {
+      "1": "Prioritet 1 — larm och bekräftelse",
+      "2": "Prioritet 2 — brådskande",
+      "3": "Prioritet 3 — rutin",
+      "4": "Prioritet 4 — endast i akten"
+    },
+    "status": {
+      "live": "Pågår",
+      "resolved": "Avslutat",
+      "expired": "Utgånget"
+    },
+    "detail": {
+      "none": "Välj ett uppdrag för att läsa det."
+    },
+    "confirm": {
+      "resolve": "Avsluta spaningsuppdraget {number}?"
+    },
+    "priorityOneWarning": "Prioritet 1 avbryter varje polis som slår på objektet med ett larm. Använd den när iakttagelsen är värd det."
   }
 }

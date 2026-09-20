@@ -261,6 +261,82 @@ describe('frihet', function()
     end)
 
     -- -------------------------------------------------------------------------
+    describe('the configured timezone offset', function()
+        -- `fredpd:timezone_offset` is the correction for a host whose clock
+        -- cannot be moved to the department's zone. It decides where noon is,
+        -- so a value that cannot be read has to be rejected loudly rather than
+        -- quietly becoming a different deadline.
+
+        it('is nothing at all when nothing is configured', function()
+            -- `nil` means the host's own zone, which is the documented default
+            -- and the only one that follows daylight saving.
+            local offset, rejected = frihet.offsetFromSetting(nil)
+
+            assert.is_nil(offset)
+            assert.is_false(rejected)
+
+            offset, rejected = frihet.offsetFromSetting('')
+
+            assert.is_nil(offset)
+            assert.is_false(rejected)
+        end)
+
+        it('reads the written forms an operator would use', function()
+            assert.are.equal(3600, (frihet.offsetFromSetting('+01:00')))
+            assert.are.equal(7200, (frihet.offsetFromSetting('02:00')))
+            assert.are.equal(-5 * 3600, (frihet.offsetFromSetting('-05:00')))
+
+            -- Half-hour and three-quarter-hour zones are real: India is +05:30
+            -- and Nepal is +05:45.
+            assert.are.equal(5 * 3600 + 30 * 60, (frihet.offsetFromSetting('+05:30')))
+            assert.are.equal(5 * 3600 + 45 * 60, (frihet.offsetFromSetting('+05:45')))
+        end)
+
+        it('reads a plain number as minutes', function()
+            -- Minutes rather than seconds: `-330` for India is easier to get
+            -- right, and to spot wrong, than `-19800`.
+            assert.are.equal(60 * 60, (frihet.offsetFromSetting('60')))
+            assert.are.equal(-330 * 60, (frihet.offsetFromSetting('-330')))
+            assert.are.equal(0, (frihet.offsetFromSetting('0')))
+        end)
+
+        it('rejects what it cannot read, rather than guessing', function()
+            for _, value in ipairs({ 'Europe/Stockholm', 'CET', '1:00pm', '99:00' }) do
+                local offset, rejected = frihet.offsetFromSetting(value)
+
+                assert.is_nil(offset)
+                assert.is_true(rejected)
+            end
+        end)
+
+        it('rejects an offset no timezone has', function()
+            -- The furthest any zone reaches is +14:00 (Kiritimati).
+            assert.is_true((select(2, frihet.offsetFromSetting('+15:00'))))
+            assert.is_true((select(2, frihet.offsetFromSetting('1500'))))
+
+            -- And every zone is a whole quarter of an hour from UTC. This is
+            -- the bound that catches `+1` — meant as an hour, read as a
+            -- minute, and one minute is not a timezone anybody lives in.
+            assert.is_true((select(2, frihet.offsetFromSetting('+1'))))
+            assert.is_true((select(2, frihet.offsetFromSetting('7'))))
+            assert.is_true((select(2, frihet.offsetFromSetting('+05:07'))))
+        end)
+
+        it('moves the deadline by exactly what it says', function()
+            -- The point of the whole setting. A host running in UTC while the
+            -- department is in Sweden computes noon an hour early; passing
+            -- +01:00 puts it back where RB 24:12 means it.
+            local anhallen = utc(2026, 1, 12, 14, 0)
+
+            local atUtc = frihet.deadlines({ anhallenAt = anhallen }, anhallen, 0)
+            local atCet = frihet.deadlines(
+                { anhallenAt = anhallen }, anhallen, frihet.offsetFromSetting('+01:00'))
+
+            assert.are.equal(3600, atUtc.framstallan.at - atCet.framstallan.at)
+        end)
+    end)
+
+    -- -------------------------------------------------------------------------
     describe('RB 24:13 — four dygn', function()
         it('is ninety-six hours from the gripande', function()
             local gripen = utc(2026, 3, 9, 14, 0)

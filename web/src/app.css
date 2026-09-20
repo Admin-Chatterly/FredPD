@@ -61,6 +61,21 @@ body {
   color: var(--color-ink);
 }
 
+/*
+ * The mount point is part of the chain, not a wrapper around it.
+ *
+ * `App.svelte` is `h-full` over a column whose `<main>` scrolls itself, which
+ * is the layout 6.1 asks for: the rail and the header stay put and the
+ * workspace moves under them. That only works if every ancestor has a height,
+ * and `#app` had none — so `h-full` resolved against an auto-height parent,
+ * collapsed to the content, and `overflow-y-auto` never had anything to clip.
+ * The whole page scrolled instead, taking the module rail off the top of the
+ * screen on any record long enough to need scrolling.
+ */
+#app {
+  height: 100%;
+}
+
 /* In-game the page floats over the world; in a browser it needs a backdrop. */
 body[data-standalone='true'] {
   background: var(--color-surface);

@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
   import { nui } from '../../lib/nui';
   import { t } from '../../lib/i18n';
+  import { formatMoment } from '../../lib/time';
   import { FRIHET_STATUSES } from '@fredpd/schema';
   import { fieldList, type Failure } from '../shared/failure';
   import { isStub, type Maybe, type Moment, type Restricted } from './types';
@@ -449,16 +450,6 @@
     if (!key) return null;
 
     return row.deadlines?.[key as 'framstallan' | 'forhandling'] ?? null;
-  }
-
-  /** A server timestamp; minutes are as fine as a custody log ever needs. */
-  function formatMoment(value: Moment): string {
-    if (value === null || value === undefined) return '';
-    if (typeof value === 'number') {
-      return new Date(value).toISOString().slice(0, 16).replace('T', ' ');
-    }
-
-    return value.replace('T', ' ').slice(0, 16);
   }
 
   /**

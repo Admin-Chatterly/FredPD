@@ -33,21 +33,34 @@ local FRIHET <const> = 'arrest'
 
 --- The timezone offset RB 24:12's local noon is computed in.
 ---
---- **The server's own zone**, which is what `nil` means to
---- `Frihet.localNoonAfter`. `fredpd:timezone` holds an IANA name
---- (`Europe/Stockholm`) and is used by `Intl` in the NUI for *formatting*; Lua
---- has no way to resolve a name to an offset without a tz database, so the
---- server's own clock is the only zone available here.
+--- **The host's own zone by default**, which is what `nil` means to
+--- `Frihet.localNoonAfter`: the host's C library carries a tz database and
+--- follows daylight saving, and Lua cannot resolve `fredpd:timezone`'s IANA
+--- name without one. Section 16 expects the host to be configured for the
+--- deployment, and this is the rule that depends on it.
 ---
---- That makes the host's timezone load-bearing for this one rule, and it is
---- worth saying out loud: a server whose host runs in UTC while the department
---- it simulates is in Sweden will compute the RB 24:12 deadline at 12:00 UTC
---- rather than 12:00 CET, an hour or two out. Section 16 already expects the
---- host to be configured for the deployment; this is the thing that depends on
---- it. The parameter exists on the service so busted can pin the arithmetic at
---- a known offset regardless of where CI runs.
+--- `fredpd:timezone_offset` overrides that for the host that cannot be
+--- reconfigured — a server running in UTC while the department it simulates is
+--- in Sweden would otherwise compute the deadline at 12:00 UTC rather than
+--- 12:00 CET, an hour or two early, on the figure an officer quotes to a
+--- prosecutor. `Frihet.offsetFromSetting` reads it, and busted pins both the
+--- reading and the arithmetic regardless of where CI runs.
+--- Read once, because a convar does not change under a running resource and
+--- this is called for every row of every list.
+local configuredOffset, offsetRejected =
+    service.offsetFromSetting(FredPD.Config.shared.timezoneOffset)
+
+if offsetRejected then
+    -- Loud, and not fatal: the deadline falls back to the host's own zone,
+    -- which is the documented default. Silence would leave a typo in a convar
+    -- quietly deciding when somebody must be released.
+    print(('[fredpd] fredpd:timezone_offset is not a readable offset (%s); '
+        .. 'RB 24:12 will be computed in the host timezone')
+        :format(tostring(FredPD.Config.shared.timezoneOffset)))
+end
+
 local function timezoneOffset()
-    return nil
+    return configuredOffset
 end
 
 --- Which legal capacity this session acts in.

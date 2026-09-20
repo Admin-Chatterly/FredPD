@@ -23,12 +23,13 @@
 /**
  * A timestamp as it arrives from the server.
  *
- * `string` when oxmysql hands the column over as text and `number` when it
- * hands over epoch milliseconds. Both happen depending on the driver's date
- * handling, and a screen that assumed one of the two would print `[object
- * Object]` on somebody's record. `formatMoment` and `formatDate` take either.
+ * Declared in `lib/types.ts` and re-exported here, because it is not a records
+ * shape: the same three forms arrive on a dispatch call and on a lab request.
+ * `lib/time.ts` holds the one reading of them.
  */
-export type Moment = string | number | null;
+import type { Moment } from '../../lib/types';
+
+export type { Moment };
 
 /**
  * A row the reader may know exists but may not read (4.5).

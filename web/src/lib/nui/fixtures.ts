@@ -89,6 +89,10 @@ const session = {
   agencyName: 'Los Santos Police Department',
   onDuty: true,
   permissionsStale: false,
+  // The department's clock. Every timestamp the interface draws is rendered in
+  // this zone rather than in the one the player's machine is set to, so the
+  // fixture sends it exactly as `session.get` does.
+  timezone: 'Europe/Stockholm',
   // Only what this fake session may open. The real list is derived from
   // Discord roles on the server (invariant 2).
   modules: ['records', 'dispatch', 'evidence', 'lab', 'intel', 'comms', 'admin'],
@@ -2059,6 +2063,396 @@ function decideFrihet(input: unknown, action: string): unknown {
   return { id: row.id, status: to };
 }
 
+// ------------------------------------------- tvångsmedel och efterlysning
+
+/**
+ * A measure as `TVANG_SELECT` sends one — column for column, **and in the
+ * server's units**.
+ *
+ * `tvangsmedel/repo.lua` selects every timestamp through `UNIX_TIMESTAMP`,
+ * which is epoch *seconds*. The fixture stores offsets and renders seconds for
+ * the same reason it mirrors the column names: a fixture that sent ISO strings
+ * would exercise a branch of the formatter the server never reaches, and the
+ * screen would pass every test while rendering 1970 in game. That is precisely
+ * how the missing `grund` survived a full test suite.
+ */
+interface FixtureTvang {
+  id: number;
+  number: string;
+  kind: string;
+  targetKind: string;
+  targetId: number;
+  targetLabel: string | null;
+  fuId: number | null;
+  deciderKind: string;
+  grund: string;
+  scope: string | null;
+  /** Seconds before "now"; negative is in the future. */
+  validFromAgo: number;
+  validUntilAgo: number;
+  verkstalldAgo?: number;
+  verkstalldNote?: string | null;
+  upphavdAgo?: number;
+  version: number;
+}
+
+const DAY = 24 * HOUR;
+
+const tvangsmedel: FixtureTvang[] = [
+  {
+    // In force, not yet carried out: the ordinary case, and the one the
+    // execution form is drawn for.
+    id: 1,
+    number: 'W26-00114',
+    kind: 'husrannsakan_reell',
+    targetKind: 'address',
+    targetId: 41,
+    targetLabel: 'Sandstensvägen 7',
+    fuId: 1,
+    deciderKind: 'fu_ledare',
+    grund: 'sakra_bevis',
+    scope: 'Kitchen, garage and the outbuilding. Tools and stolen goods.',
+    validFromAgo: 6 * HOUR,
+    validUntilAgo: -5 * DAY,
+    version: 1,
+  },
+  {
+    // Revoked. The row an officer at a door must not read as valid, and the
+    // reason the detail panel says *which* way it stopped being valid.
+    id: 2,
+    number: 'W26-00110',
+    kind: 'husrannsakan_personell',
+    targetKind: 'address',
+    targetId: 12,
+    targetLabel: 'Kvarngatan 3B',
+    fuId: 1,
+    deciderKind: 'aklagare',
+    grund: 'eftersokande_person',
+    scope: null,
+    validFromAgo: 2 * DAY,
+    validUntilAgo: -2 * DAY,
+    upphavdAgo: 4 * HOUR,
+    version: 2,
+  },
+  {
+    // Carried out, and still valid: RB allows a husrannsakan to be resumed, so
+    // execution is a record and not a state change.
+    id: 3,
+    number: 'W26-00108',
+    kind: 'kroppsvisitation',
+    targetKind: 'person',
+    targetId: 2,
+    targetLabel: null,
+    fuId: null,
+    deciderKind: 'fu_ledare',
+    grund: 'skalig_misstanke',
+    scope: null,
+    validFromAgo: 3 * DAY,
+    validUntilAgo: -4 * DAY,
+    verkstalldAgo: 2 * DAY,
+    verkstalldNote: 'Nothing found.',
+    version: 2,
+  },
+];
+
+const restrictedTvang = [
+  { restricted: true as const, recordType: 'warrant', contact: 'internal_affairs' },
+  { restricted: true as const, recordType: 'warrant', contact: 'homicide' },
+];
+
+/** Epoch seconds for an offset, the way `UNIX_TIMESTAMP` would answer. */
+function secondsAgo(ago: number): number {
+  return Math.floor(Date.now() / 1000) - ago;
+}
+
+/** `Tvang.isValid`, computed the way the server computes it. */
+function tvangLiveness(row: FixtureTvang): { live: boolean; why: string | null } {
+  if (row.upphavdAgo !== undefined) return { live: false, why: 'upphavd' };
+  if (row.validFromAgo < 0) return { live: false, why: 'not_yet' };
+  if (row.validUntilAgo > 0) return { live: false, why: 'expired' };
+
+  return { live: true, why: null };
+}
+
+function tvangRow(row: FixtureTvang, withReason: boolean): Record<string, unknown> {
+  const { live, why } = tvangLiveness(row);
+
+  const shaped: Record<string, unknown> = {
+    id: row.id,
+    agencyId: session.agencyId,
+    number: row.number,
+    kind: row.kind,
+    targetKind: row.targetKind,
+    targetId: row.targetId,
+    targetLabel: row.targetLabel,
+    fuId: row.fuId,
+    decidedBy: FIXTURE_VIEWER,
+    deciderKind: row.deciderKind,
+    grund: row.grund,
+    scope: row.scope,
+    validFrom: secondsAgo(row.validFromAgo),
+    validUntil: secondsAgo(row.validUntilAgo),
+    verkstalldAt: row.verkstalldAgo === undefined ? null : secondsAgo(row.verkstalldAgo),
+    verkstalldBy: row.verkstalldAgo === undefined ? null : FIXTURE_VIEWER,
+    verkstalldNote: row.verkstalldNote ?? null,
+    upphavdAt: row.upphavdAgo === undefined ? null : secondsAgo(row.upphavdAgo),
+    upphavdBy: row.upphavdAgo === undefined ? null : FIXTURE_VIEWER,
+    classification: 'internal',
+    version: row.version,
+    live,
+  };
+
+  // Only `tvang.get` sends the reason. A list row that is not live says just
+  // that, because the route does not compute why for fifty rows.
+  if (withReason) shaped.notLiveBecause = why;
+
+  return shaped;
+}
+
+/**
+ * The capacity the fixture session decides in.
+ *
+ * `capacityOf` falls through to `fu_ledare` for an officer holding neither the
+ * prosecutor nor the judge grant, which is this viewer. It is what makes
+ * kroppsbesiktning refuse with `wrong_capacity` — the measure FredPD holds
+ * back because it reaches inside somebody's body.
+ */
+const FIXTURE_TVANG_CAPACITY = 'fu_ledare';
+
+const TVANG_ALLOWED: Record<string, string[]> = {
+  fu_ledare: ['husrannsakan_reell', 'husrannsakan_personell', 'kroppsvisitation', 'beslag'],
+  aklagare: [
+    'husrannsakan_reell',
+    'husrannsakan_personell',
+    'kroppsvisitation',
+    'kroppsbesiktning',
+    'beslag',
+  ],
+};
+
+interface FixtureEfterlysning {
+  id: number;
+  number: string;
+  personId: number;
+  personNumber: string;
+  grund: string;
+  note: string | null;
+  priority: number;
+  issuedAgo: number;
+  /** Absent means it stands until it is lifted, which is the real default. */
+  expiresAgo?: number;
+  cancelledAgo?: number;
+  cancelledGrund?: string | null;
+  version: number;
+}
+
+const efterlysningar: FixtureEfterlysning[] = [
+  {
+    // Detain on sight: a prosecutor's decision, and the row the officer acts
+    // on.
+    id: 1,
+    number: 'W26-00115',
+    personId: 1,
+    personNumber: 'P-000431',
+    grund: 'anhallen_i_franvaro',
+    note: 'Believed to be staying with family in the north of the city.',
+    priority: 1,
+    issuedAgo: 2 * DAY,
+    version: 1,
+  },
+  {
+    // Wanted, and emphatically not for arrest. The distinction this register
+    // exists to draw: somebody to be handed a document is not somebody to
+    // put in a cell.
+    id: 2,
+    number: 'W26-00112',
+    personId: 3,
+    personNumber: 'P-000733',
+    grund: 'delgivning',
+    note: null,
+    priority: 3,
+    issuedAgo: 9 * DAY,
+    expiresAgo: -20 * DAY,
+    version: 1,
+  },
+  {
+    // A missing person — wanted for their own sake, and the second way the
+    // detain-on-sight line has to stay off.
+    id: 3,
+    number: 'W26-00105',
+    personId: 4,
+    personNumber: 'P-000108',
+    grund: 'forsvunnen',
+    note: 'Last seen at the ferry terminal.',
+    priority: 2,
+    issuedAgo: 30 * DAY,
+    version: 1,
+  },
+  {
+    // Lifted, and it says why. Only reachable with the filter off.
+    id: 4,
+    number: 'W26-00099',
+    personId: 2,
+    personNumber: 'P-000512',
+    grund: 'anhallen_i_franvaro',
+    note: null,
+    priority: 1,
+    issuedAgo: 40 * DAY,
+    cancelledAgo: 38 * DAY,
+    cancelledGrund: 'gripen',
+    version: 2,
+  },
+];
+
+const restrictedEfterlysning = [
+  { restricted: true as const, recordType: 'efterlysning', contact: 'internal_affairs' },
+  { restricted: true as const, recordType: 'efterlysning', contact: 'homicide' },
+];
+
+/** The two grounds that mean "detain on sight" — `Tvang.detainOnSight`. */
+const DETAIN_ON_SIGHT = ['anhallen_i_franvaro', 'haktad_i_franvaro'];
+
+function efterlysningRow(row: FixtureEfterlysning): Record<string, unknown> {
+  const cancelled = row.cancelledAgo !== undefined;
+  const expired = row.expiresAgo !== undefined && row.expiresAgo > 0;
+  const live = !cancelled && !expired;
+
+  return {
+    id: row.id,
+    agencyId: session.agencyId,
+    number: row.number,
+    personId: row.personId,
+    grund: row.grund,
+    frihetId: null,
+    fuId: null,
+    note: row.note,
+    priority: row.priority,
+    issuedBy: FIXTURE_VIEWER,
+    issuedAt: secondsAgo(row.issuedAgo),
+    expiresAt: row.expiresAgo === undefined ? null : secondsAgo(row.expiresAgo),
+    cancelledAt: cancelled ? secondsAgo(row.cancelledAgo as number) : null,
+    cancelledBy: cancelled ? FIXTURE_VIEWER : null,
+    cancelledGrund: row.cancelledGrund ?? null,
+    classification: 'internal',
+    version: row.version,
+    personNumber: row.personNumber,
+    live,
+    detainOnSight: DETAIN_ON_SIGHT.includes(row.grund),
+  };
+}
+
+// ---------------------------------------------------------------- spaning
+
+interface FixtureSpaning {
+  id: number;
+  number: string;
+  targetKind: string;
+  targetId: number | null;
+  description: string | null;
+  grund: string;
+  priority: number;
+  areaNote: string | null;
+  issuedAgo: number;
+  expiresAgo: number;
+  resolvedAgo?: number;
+  resolvedGrund?: string | null;
+  version: number;
+}
+
+const spaningsuppdrag: FixtureSpaning[] = [
+  {
+    // Priority 1: the only level that reaches a banner, and the only one the
+    // list draws in the alert colour.
+    id: 1,
+    number: 'S26-00042',
+    targetKind: 'vehicle',
+    targetId: 7,
+    description: null,
+    grund: 'stulet_fordon',
+    priority: 1,
+    areaNote: 'Southside, around the docks',
+    issuedAgo: 3 * HOUR,
+    expiresAgo: -6 * DAY,
+    version: 1,
+  },
+  {
+    // A description and no record behind it — the commonest lookout there is,
+    // and the case a foreign key cannot express.
+    id: 2,
+    number: 'S26-00041',
+    targetKind: 'other',
+    targetId: null,
+    description: 'Silver estate, no plate seen, three occupants',
+    grund: 'iakttagelse',
+    priority: 3,
+    areaNote: null,
+    issuedAgo: 2 * DAY,
+    expiresAgo: -5 * DAY,
+    version: 1,
+  },
+  {
+    // Closed, with the ground that closed it. Only reachable with the filter
+    // off.
+    id: 3,
+    number: 'S26-00033',
+    targetKind: 'person',
+    targetId: 3,
+    description: null,
+    grund: 'eftersokt_person',
+    priority: 2,
+    areaNote: null,
+    issuedAgo: 20 * DAY,
+    expiresAgo: -3 * DAY,
+    resolvedAgo: 9 * DAY,
+    resolvedGrund: 'gripen',
+    version: 2,
+  },
+];
+
+const restrictedSpaning = [
+  { restricted: true as const, recordType: 'spaning', contact: 'internal_affairs' },
+  { restricted: true as const, recordType: 'spaning', contact: 'homicide' },
+];
+
+/** `Spaning.bannerFor`: priority alone decides, and 1 is the only `alert`. */
+function bannerFor(priority: number): string {
+  if (priority <= 1) return 'alert';
+  if (priority <= 3) return 'notice';
+
+  return 'quiet';
+}
+
+function spaningRow(row: FixtureSpaning): Record<string, unknown> {
+  const live = row.resolvedAgo === undefined && row.expiresAgo < 0;
+  const banner = bannerFor(row.priority);
+
+  return {
+    id: row.id,
+    agencyId: session.agencyId,
+    number: row.number,
+    targetKind: row.targetKind,
+    targetId: row.targetId,
+    description: row.description,
+    grund: row.grund,
+    priority: row.priority,
+    beatId: null,
+    areaNote: row.areaNote,
+    fuId: null,
+    anmalanId: null,
+    issuedBy: FIXTURE_VIEWER,
+    issuedAt: secondsAgo(row.issuedAgo),
+    expiresAt: secondsAgo(row.expiresAgo),
+    resolvedAt: row.resolvedAgo === undefined ? null : secondsAgo(row.resolvedAgo),
+    resolvedBy: row.resolvedAgo === undefined ? null : FIXTURE_VIEWER,
+    resolvedGrund: row.resolvedGrund ?? null,
+    classification: 'internal',
+    version: row.version,
+    live,
+    banner,
+    needsConfirmation: banner === 'alert',
+  };
+}
+
 export const fixtures: FixtureSet = {
   ok: {
     'session.get': () => session,
@@ -2163,6 +2557,283 @@ export const fixtures: FixtureSet = {
         },
         ...row.log,
       ];
+
+      return { id: row.id };
+    },
+
+    // --------------------------------------------------------- tvångsmedel
+
+    'tvang.list': (input) => {
+      const filter = (input ?? {}) as { kind?: string; liveOnly?: boolean };
+
+      const found = tvangsmedel.filter(
+        (row) =>
+          (!filter.kind || row.kind === filter.kind) &&
+          (!filter.liveOnly || tvangLiveness(row).live),
+      );
+
+      return {
+        tvangsmedel: [...found.map((row) => tvangRow(row, false)), ...restrictedTvang],
+      };
+    },
+
+    'tvang.get': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const row = tvangsmedel.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+
+      return { tvangsmedel: tvangRow(row, true) };
+    },
+
+    'tvang.decide': (input) => {
+      const measure = (input ?? {}) as {
+        kind?: string;
+        targetKind?: string;
+        targetId?: number;
+        targetLabel?: string;
+        grund?: string;
+        scope?: string;
+        validSeconds?: number;
+      };
+
+      if (!measure.kind) return refuse('invalid', { kind: 'unknown' });
+      if (!measure.targetId) return refuse('invalid', { targetId: 'required' });
+      if (!measure.grund) return refuse('invalid', { grund: 'required' });
+
+      // `Tvang.validate`'s two target rules. The screen does not offer the
+      // combinations that trip these, and the server refuses them anyway.
+      const entersPlace =
+        measure.kind === 'husrannsakan_reell' || measure.kind === 'husrannsakan_personell';
+
+      if (entersPlace && measure.targetKind === 'person') {
+        return refuse('invalid', { targetKind: 'not_a_place' });
+      }
+
+      if (
+        (measure.kind === 'kroppsvisitation' || measure.kind === 'kroppsbesiktning') &&
+        measure.targetKind !== 'person'
+      ) {
+        return refuse('invalid', { targetKind: 'not_a_person' });
+      }
+
+      // The capacity rule. A kroppsbesiktning needs at least a prosecutor,
+      // and this viewer is an investigation leader — so the screen has to
+      // draw "that decision is not yours to take" rather than a role problem.
+      if (!(TVANG_ALLOWED[FIXTURE_TVANG_CAPACITY] ?? []).includes(measure.kind)) {
+        return refuse('forbidden', { kind: 'wrong_capacity' });
+      }
+
+      const id = tvangsmedel.length + 1;
+      const validSeconds = measure.validSeconds ?? 7 * DAY;
+
+      tvangsmedel.unshift({
+        id,
+        number: `W26-001${20 + id}`,
+        kind: measure.kind,
+        targetKind: measure.targetKind ?? 'address',
+        targetId: measure.targetId,
+        targetLabel: measure.targetLabel ?? null,
+        fuId: null,
+        deciderKind: FIXTURE_TVANG_CAPACITY,
+        grund: measure.grund,
+        scope: measure.scope ?? null,
+        validFromAgo: 0,
+        validUntilAgo: -validSeconds,
+        version: 1,
+      });
+
+      return { id, number: `W26-001${20 + id}` };
+    },
+
+    'tvang.verkstall': (input) => {
+      const { id, note } = (input ?? {}) as { id?: number; note?: string };
+      const row = tvangsmedel.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+
+      const { live, why } = tvangLiveness(row);
+      if (!live) return refuse('conflict', { status: why ?? 'expired' });
+
+      // Pressed twice is not an error: the first execution stays the recorded
+      // one, exactly as `Repo.verkstall`'s `verkstalld_at IS NULL` decides.
+      if (row.verkstalldAgo !== undefined) return { id: row.id, alreadyRecorded: true };
+
+      row.verkstalldAgo = 0;
+      row.verkstalldNote = note ?? null;
+      row.version += 1;
+
+      return { id: row.id };
+    },
+
+    'tvang.upphav': (input) => {
+      const { id, version } = (input ?? {}) as { id?: number; version?: number };
+      const row = tvangsmedel.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+      if (row.upphavdAgo !== undefined || row.version !== version) return refuse('conflict');
+
+      row.upphavdAgo = 0;
+      row.version += 1;
+
+      return { id: row.id };
+    },
+
+    // -------------------------------------------------------- efterlysning
+
+    'efterlysning.list': (input) => {
+      const filter = (input ?? {}) as { grund?: string; includeCancelled?: boolean };
+
+      const found = efterlysningar.filter(
+        (row) =>
+          (!filter.grund || row.grund === filter.grund) &&
+          (filter.includeCancelled || row.cancelledAgo === undefined),
+      );
+
+      return {
+        efterlysningar: [...found.map(efterlysningRow), ...restrictedEfterlysning],
+      };
+    },
+
+    'efterlysning.create': (input) => {
+      const notice = (input ?? {}) as {
+        personId?: number;
+        grund?: string;
+        priority?: number;
+        note?: string;
+        expiresInSeconds?: number;
+      };
+
+      if (!notice.personId) return refuse('invalid', { personId: 'required' });
+      if (!notice.grund) return refuse('invalid', { grund: 'required' });
+      if (!DETAIN_ON_SIGHT.includes(notice.grund) && !['delgivning', 'forsvunnen', 'oidentifierad', 'annan'].includes(notice.grund)) {
+        return refuse('invalid', { grund: 'unknown' });
+      }
+
+      const id = efterlysningar.length + 1;
+
+      const row: FixtureEfterlysning = {
+        id,
+        number: `W26-002${10 + id}`,
+        personId: notice.personId,
+        personNumber: `P-00${1000 + notice.personId}`,
+        grund: notice.grund,
+        note: notice.note ?? null,
+        priority: notice.priority ?? 3,
+        issuedAgo: 0,
+        version: 1,
+      };
+
+      // Absent means it stands until lifted, so the field stays absent rather
+      // than becoming a very distant expiry.
+      if (notice.expiresInSeconds) row.expiresAgo = -notice.expiresInSeconds;
+
+      efterlysningar.unshift(row);
+
+      return { id, number: row.number };
+    },
+
+    'efterlysning.cancel': (input) => {
+      const { id, version, grund } = (input ?? {}) as {
+        id?: number;
+        version?: number;
+        grund?: string;
+      };
+
+      const row = efterlysningar.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+      if (row.cancelledAgo !== undefined || row.version !== version) return refuse('conflict');
+
+      row.cancelledAgo = 0;
+      row.cancelledGrund = grund ?? null;
+      row.version += 1;
+
+      return { id: row.id };
+    },
+
+    // ------------------------------------------------------------- spaning
+
+    'spaning.list': (input) => {
+      const filter = (input ?? {}) as { targetKind?: string; includeResolved?: boolean };
+
+      const found = spaningsuppdrag.filter(
+        (row) =>
+          (!filter.targetKind || row.targetKind === filter.targetKind) &&
+          (filter.includeResolved || (row.resolvedAgo === undefined && row.expiresAgo < 0)),
+      );
+
+      return {
+        spaningsuppdrag: [...found.map(spaningRow), ...restrictedSpaning],
+      };
+    },
+
+    'spaning.get': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const row = spaningsuppdrag.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+
+      return { spaning: spaningRow(row) };
+    },
+
+    'spaning.create': (input) => {
+      const lookout = (input ?? {}) as {
+        targetKind?: string;
+        targetId?: number;
+        description?: string;
+        grund?: string;
+        priority?: number;
+        areaNote?: string;
+        validSeconds?: number;
+      };
+
+      if (!lookout.grund) return refuse('invalid', { grund: 'required' });
+
+      // `Spaning.validate`: a lookout has to be for something, and `other`
+      // names no record so it takes no id.
+      if (!lookout.targetId && !lookout.description?.trim()) {
+        return refuse('invalid', { description: 'required_without_target' });
+      }
+
+      if (lookout.targetKind === 'other' && lookout.targetId) {
+        return refuse('invalid', { targetId: 'not_allowed' });
+      }
+
+      const id = spaningsuppdrag.length + 1;
+
+      spaningsuppdrag.unshift({
+        id,
+        number: `S26-000${50 + id}`,
+        targetKind: lookout.targetKind ?? 'other',
+        targetId: lookout.targetId ?? null,
+        description: lookout.description ?? null,
+        grund: lookout.grund,
+        priority: lookout.priority ?? 3,
+        areaNote: lookout.areaNote ?? null,
+        issuedAgo: 0,
+        expiresAgo: -(lookout.validSeconds ?? 7 * DAY),
+        version: 1,
+      });
+
+      return { id, number: `S26-000${50 + id}` };
+    },
+
+    'spaning.resolve': (input) => {
+      const { id, version, grund } = (input ?? {}) as {
+        id?: number;
+        version?: number;
+        grund?: string;
+      };
+
+      const row = spaningsuppdrag.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+      if (row.resolvedAgo !== undefined || row.version !== version) return refuse('conflict');
+
+      row.resolvedAgo = 0;
+      row.resolvedGrund = grund ?? null;
+      row.version += 1;
 
       return { id: row.id };
     },

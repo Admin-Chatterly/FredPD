@@ -1,5 +1,21 @@
 /** Shapes the NUI receives from routes. Mirrors what the Lua handlers return. */
 
+/**
+ * A timestamp as it arrives from the server.
+ *
+ * Three shapes, all of them real:
+ *
+ *   * a **string**, when oxmysql hands a DATETIME over as text;
+ *   * epoch **milliseconds**, when it hands the same column over as a number;
+ *   * epoch **seconds**, from the modules that select through
+ *     `UNIX_TIMESTAMP(...)` because their service logic compares against
+ *     `os.time()` — `frihet`, `tvangsmedel`, `spaning` and `query`.
+ *
+ * `lib/time.ts` is the only place that decides which of the three it is
+ * holding. A screen that guessed printed 1970 on somebody's record.
+ */
+export type Moment = string | number | null;
+
 export interface Session {
   callsign: string | null;
   name: string;
@@ -8,6 +24,15 @@ export interface Session {
   onDuty: boolean;
   modules: string[];
   permissionsStale: boolean;
+  /**
+   * The department's timezone as an IANA name (`Europe/Stockholm`).
+   *
+   * Every timestamp in the interface is rendered in it, rather than in the
+   * zone of the machine the player happens to be sitting at: the record says
+   * when something happened in the department that wrote it, and RB 24:12's
+   * deadline is a *local* noon in that same zone.
+   */
+  timezone?: string;
 }
 
 export interface PermissionGroup {

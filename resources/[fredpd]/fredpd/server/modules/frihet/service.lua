@@ -145,6 +145,68 @@ end
 -- The clocks
 -- -----------------------------------------------------------------------------
 
+--- The offset a configured setting asks for, in seconds east of UTC.
+---
+--- `nil` means "use the host's own zone", which is what a correctly configured
+--- deployment wants: the host's C library carries a tz database and resolves
+--- daylight saving, and Lua has no way to do that from an IANA name.
+---
+--- The setting exists for the host that cannot be reconfigured. A server whose
+--- machine runs in UTC while the department it simulates is in Sweden computes
+--- RB 24:12's noon at 12:00 UTC — an hour or two early, on the deadline an
+--- officer quotes to a prosecutor — and `fredpd:timezone_offset` is how that
+--- is corrected without touching the host clock.
+---
+--- A fixed offset cannot follow daylight saving, and that is the reason it is
+--- the fallback rather than the default: `+01:00` is right in Stockholm in
+--- January and an hour out in July. A host set to `Europe/Stockholm` needs
+--- nothing here.
+---
+--- Accepts `+HH:MM`, `-HH:MM`, `HH:MM` and a plain number of minutes. Anything
+--- else is `nil`, with the second return saying it was rejected, because a
+--- typo in a convar must not silently become a different deadline.
+---
+--- Two bounds, and both reject rather than round:
+---
+---   * **At most fourteen hours.** The furthest any zone reaches is +14:00.
+---   * **A whole quarter of an hour.** Every timezone on earth is a multiple
+---     of fifteen minutes from UTC — :00, :15, :30 and :45, the last two being
+---     India and Nepal. This is the bound that catches the likely typo:
+---     `+1`, meant as an hour, reads as one minute otherwise, and one minute
+---     is not a timezone anybody lives in.
+---
+--- @param value string|nil
+--- @return number|nil seconds east of UTC
+--- @return boolean true when a value was given and could not be read
+function Frihet.offsetFromSetting(value)
+    if value == nil or value == '' then return nil, false end
+    if type(value) ~= 'string' then return nil, true end
+
+    local text = value:gsub('%s', '')
+
+    local minutes
+
+    local sign, hourPart, minutePart = text:match('^([+-]?)(%d%d?):(%d%d)$')
+
+    if hourPart then
+        minutes = (tonumber(hourPart) * 60) + tonumber(minutePart)
+        if sign == '-' then minutes = -minutes end
+    else
+        -- Minutes, not seconds: `-330` for India is easier to get right, and
+        -- to spot wrong, than `-19800`.
+        local plain = tonumber(text)
+
+        if not plain or plain ~= math.floor(plain) then return nil, true end
+
+        minutes = plain
+    end
+
+    if math.abs(minutes) > 14 * 60 then return nil, true end
+    if minutes % 15 ~= 0 then return nil, true end
+
+    return minutes * 60, false
+end
+
 --- Noon, local time, `days` days after the day `at` falls on.
 ---
 --- The arithmetic is done on a broken-down *local* date rather than by adding

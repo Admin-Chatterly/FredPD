@@ -34,7 +34,23 @@ FredPD.Config.shared = {
     locale = setting('fredpd:locale', 'sv'),
 
     --- Timezone used to render timestamps in the NUI.
+    ---
+    --- An IANA name, sent to the interface on `session.get` and used by `Intl`
+    --- there, so every officer reads the department's clock rather than the
+    --- one on their own machine. A player in Brisbane looking at a Swedish
+    --- department's custody log wants the Swedish time.
     timezone = setting('fredpd:timezone', 'Europe/Stockholm'),
+
+    --- The offset RB 24:12's *local* noon is computed in, on the server.
+    ---
+    --- Empty means the host's own zone, which is correct when the host is
+    --- configured for the deployment (spec 16) — the C library resolves
+    --- daylight saving and the name above cannot be resolved from Lua.
+    ---
+    --- Set it only when the host clock cannot be changed: `+01:00`, `-05:00`
+    --- or a plain number of minutes. Being fixed, it does not follow daylight
+    --- saving, so it is a correction and not a configuration to prefer.
+    timezoneOffset = setting('fredpd:timezone_offset', ''),
 
     --- Opens and closes the MDC while seated in an agency vehicle (spec 1.4).
     mdcKeybind = 'F6',

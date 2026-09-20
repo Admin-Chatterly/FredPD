@@ -944,7 +944,10 @@
       "persons": "Persons",
       "vehicles": "Vehicles",
       "anmalan": "Reports",
-      "frihet": "Custody"
+      "frihet": "Custody",
+      "tvang": "Coercive measures",
+      "efterlysning": "Wanted",
+      "spaning": "Lookouts"
     },
     "vehicle": {
       "column": {
@@ -1792,9 +1795,36 @@
       "expired": "Expired",
       "upphavd": "Revoked",
       "not_yet": "Not yet in force",
-      "verkstalld": "Executed"
+      "verkstalld": "Executed",
+      "notLive": "Not in force"
     },
-    "empty": "No coercive measures match."
+    "empty": "No coercive measures match.",
+    "filter": {
+      "liveOnly": "In force only"
+    },
+    "field": {
+      "targetId": "Record id",
+      "targetLabel": "Named as",
+      "grund": "Ground",
+      "grundChoose": "Choose a ground",
+      "valid": "Runs for",
+      "validHours": "{count} h",
+      "note": "Note",
+      "validFrom": "In force from",
+      "upphavd": "Revoked"
+    },
+    "notLive": "This measure authorises nothing: {reason}.",
+    "detail": {
+      "none": "Select a measure to read it."
+    },
+    "section": {
+      "verkstallighet": "Execution"
+    },
+    "verkstalld": "Carried out {at}.",
+    "notVerkstalld": "Not yet carried out.",
+    "confirm": {
+      "upphav": "Revoke this measure? It stops authorising anything from now on, and the decision stays on file."
+    }
   },
   "efterlysning": {
     "grund": {
@@ -1821,11 +1851,36 @@
     },
     "action": {
       "create": "Issue a wanted notice",
-      "cancel": "Cancel"
+      "cancel": "Lift the notice"
     },
     "detainOnSight": "Detain on sight",
     "notAnArrest": "Wanted, but not for arrest.",
-    "empty": "Nobody is wanted."
+    "empty": "Nobody is wanted.",
+    "filter": {
+      "includeCancelled": "Include lifted notices"
+    },
+    "field": {
+      "personId": "Person id",
+      "grundChoose": "Choose a ground",
+      "noExpiry": "Until lifted",
+      "expiryDays": "{count} days",
+      "note": "Note",
+      "avlysningsgrund": "Reason for lifting"
+    },
+    "priority": {
+      "1": "Priority 1 — act at once",
+      "2": "Priority 2 — urgent",
+      "3": "Priority 3 — routine",
+      "4": "Priority 4 — on the record"
+    },
+    "status": {
+      "live": "Wanted",
+      "cancelled": "Lifted",
+      "expired": "Lapsed"
+    },
+    "confirm": {
+      "cancel": "Lift the wanted notice {number}?"
+    }
   },
   "spaning": {
     "target": {
@@ -1868,6 +1923,34 @@
       "annan": "Other"
     },
     "empty": "No lookouts are running.",
-    "notAnArrest": "A lookout, not a warrant. Report the sighting."
+    "notAnArrest": "A lookout, not a warrant. Report the sighting.",
+    "filter": {
+      "includeResolved": "Include closed lookouts"
+    },
+    "field": {
+      "targetId": "Record id",
+      "grundChoose": "Choose a reason",
+      "valid": "Runs for",
+      "validDays": "{count} days",
+      "avslutsgrund": "Reason for closing"
+    },
+    "priority": {
+      "1": "Priority 1 — banner and confirmation",
+      "2": "Priority 2 — urgent",
+      "3": "Priority 3 — routine",
+      "4": "Priority 4 — on the record"
+    },
+    "status": {
+      "live": "Running",
+      "resolved": "Closed",
+      "expired": "Expired"
+    },
+    "detail": {
+      "none": "Select a lookout to read it."
+    },
+    "confirm": {
+      "resolve": "Close the lookout {number}?"
+    },
+    "priorityOneWarning": "Priority 1 interrupts every officer who runs this target with a banner. Use it where the sighting matters that much."
   }
 }

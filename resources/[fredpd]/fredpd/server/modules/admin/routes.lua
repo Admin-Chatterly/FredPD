@@ -229,6 +229,11 @@ route.define({
             onDuty = FredPD.Bridge.policejob.isOnDuty(session.src),
             modules = FredPD.Core.session.allowedModules(session),
             permissionsStale = FredPD.Core.session.isStale(session),
+            -- The department's clock, not the player's. An officer reading a
+            -- custody log from another continent needs the time the record was
+            -- written in the zone the department works in, and RB 24:12's
+            -- deadline is a local noon in that same zone.
+            timezone = FredPD.Config.shared.timezone,
         }
     end,
 })

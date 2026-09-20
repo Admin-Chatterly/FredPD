@@ -2,7 +2,11 @@
   import { nui } from '../../lib/nui';
   import Anmalan from './Anmalan.svelte';
   import Frihet from './Frihet.svelte';
+  import Tvang from './Tvang.svelte';
+  import Efterlysning from './Efterlysning.svelte';
+  import Spaning from './Spaning.svelte';
   import { t } from '../../lib/i18n';
+  import { formatDate, formatMoment } from '../../lib/time';
   import {
     CLASSIFICATIONS,
     FIREARM_STATUSES,
@@ -65,7 +69,15 @@
    * drawn as a refusal (invariant 4, spec 6.4).
    */
 
-  type Tab = 'persons' | 'vehicles' | 'firearms' | 'anmalan' | 'frihet';
+  type Tab =
+    | 'persons'
+    | 'vehicles'
+    | 'firearms'
+    | 'anmalan'
+    | 'frihet'
+    | 'tvang'
+    | 'efterlysning'
+    | 'spaning';
 
   /** Which form's label a rejected field belongs to (spec 3.5). */
   const FIELD_LABELS: Record<string, string> = {
@@ -139,22 +151,6 @@
   /** Moves the officer to the box the withheld notice is asking them to fill. */
   function askForReason(): void {
     reasonBox?.focus();
-  }
-
-  /** A server timestamp; minutes are as fine as a record log ever needs. */
-  function formatMoment(value: Moment): string {
-    if (value === null || value === undefined) return '';
-    if (typeof value === 'number') return new Date(value).toISOString().slice(0, 16).replace('T', ' ');
-
-    return value.replace('T', ' ').slice(0, 16);
-  }
-
-  /** A DATE column, which carries no time worth printing. */
-  function formatDate(value: Moment): string {
-    if (value === null || value === undefined) return '';
-    if (typeof value === 'number') return new Date(value).toISOString().slice(0, 10);
-
-    return value.slice(0, 10);
   }
 
   /** What a date box has to be bound to: `YYYY-MM-DD` or empty. */
@@ -1034,7 +1030,25 @@
     selectedFirearmId = id;
   }
 
-  const tabs: Tab[] = ['persons', 'vehicles', 'firearms', 'anmalan', 'frihet'];
+  const tabs: Tab[] = [
+    'persons',
+    'vehicles',
+    'firearms',
+    'anmalan',
+    'frihet',
+    'tvang',
+    'efterlysning',
+    'spaning',
+  ];
+
+  /**
+   * The tabs whose searches go into the name index and the registers (7.2).
+   *
+   * Only these take a reason and a case number, and only here is the authority
+   * fieldset drawn. The workflow tabs below read records the officer is
+   * already working on, through routes that take neither field.
+   */
+  const REGISTER_TABS = new Set<Tab>(['persons', 'vehicles', 'firearms']);
   const messages = $derived(fieldList(failure, FIELD_LABELS));
 
   const openVehicleRecord = $derived(vehicleDetail?.vehicle ?? null);
@@ -1081,10 +1095,20 @@
     </div>
   {/if}
 
-  <!-- Query authority (7.2). Part of the form on every tab, because a refusal
-       the officer cannot act on is a dead end: the registers refuse a result
-       that would open a restricted record without one of these two, and the
-       name index withholds the rows until one is given. -->
+  <!--
+    Query authority (7.2). Part of the form on the three *register* tabs,
+    because a refusal the officer cannot act on is a dead end: the registers
+    refuse a result that would open a restricted record without one of these
+    two, and the name index withholds the rows until one is given.
+
+    It is not drawn on the workflow tabs. `anmalan.list`, `frihet.open`,
+    `tvang.list` and their siblings do not take `reason` or `caseNumber` —
+    those routes are reads of a case the officer is already working, not
+    queries into the name index — so the boxes there were a form that asked for
+    something and then threw it away. An officer who typed a reason into them
+    had every ground to believe the search had been logged with it.
+  -->
+  {#if REGISTER_TABS.has(tab)}
   <fieldset class="flex flex-wrap items-end gap-3 border border-[var(--color-border)] p-3">
     <legend class="px-1 text-xs font-semibold">{t('records.authority.title')}</legend>
 
@@ -1110,6 +1134,7 @@
       />
     </label>
   </fieldset>
+  {/if}
 
   {#if tab === 'persons'}
     <!-- ------------------------------------------------------- persons -->
@@ -2889,5 +2914,26 @@
       could not do.
     -->
     <Frihet />
+  {:else if tab === 'tvang'}
+    <!--
+      Coercive measures (7.12). Its own component for the reason the two above
+      are: the decide form, the execution record and the revocation are a
+      workflow, not a register search.
+    -->
+    <Tvang />
+  {:else if tab === 'efterlysning'}
+    <!--
+      Wanted notices (7.13). Separate from tvångsmedel although the two share a
+      counter and a module on the server: an efterlysning names a person and
+      feeds the hot-file check, and a husrannsakan names a place and opens a
+      door. Putting them on one tab would be inviting the confusion
+      `EFTERLYSNING` was given its own record type to prevent.
+    -->
+    <Efterlysning />
+  {:else if tab === 'spaning'}
+    <!--
+      The patrol lookout (7.13), which is emphatically not the tab beside it.
+    -->
+    <Spaning />
   {/if}
 </section>
