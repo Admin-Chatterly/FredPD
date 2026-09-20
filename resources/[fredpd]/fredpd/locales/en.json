@@ -1684,13 +1684,14 @@
       "frigiven": "Released"
     },
     "action": {
-      "gripande": "Record an arrest",
+      "gripande": "Record the arrest",
       "anhallande": "Detain (prosecutor)",
       "framstallan": "File remand application",
       "haktning": "Remand in custody",
       "frigiv": "Release",
       "underratta": "Record notice of suspicion",
-      "log": "Add to the custody log"
+      "log": "Add to the custody log",
+      "newGripande": "Record an arrest"
     },
     "column": {
       "number": "Reference",
@@ -1783,6 +1784,10 @@
       "framstalld": "Häktningsframställan (remand application)",
       "haktad": "Häktning (remand by the court)",
       "frigiven": "Frigivande (release)"
+    },
+    "field": {
+      "personId": "Person id",
+      "plats": "Where"
     }
   },
   "tvang": {

@@ -1768,6 +1768,8 @@ interface FixtureFrihet {
   personId: number;
   personNumber: string;
   gripandeGrund: string;
+  /** Where the arrest happened. Free text — `repo.lua` selects it as this. */
+  gripandePlats?: string;
   anhallandeGrund?: string;
   frigivenGrund?: string;
   version: number;
@@ -1813,6 +1815,7 @@ const frihetsberovanden: FixtureFrihet[] = [
     personId: 2,
     personNumber: 'P-000512',
     gripandeGrund: 'pa_bar_garning',
+    gripandePlats: 'Kvarngatan 3B, outside the stairwell',
     version: 1,
     gripenAgo: 3 * HOUR,
     gripenBy: FIXTURE_VIEWER,
@@ -1983,6 +1986,7 @@ function withFixtureClocks(row: FixtureFrihet): Record<string, unknown> {
     personId: row.personId,
     personNumber: row.personNumber,
     gripandeGrund: row.gripandeGrund,
+    gripandePlats: row.gripandePlats ?? null,
     anhallandeGrund: row.anhallandeGrund ?? null,
     frigivenGrund: row.frigivenGrund ?? null,
     version: row.version,
@@ -2637,6 +2641,52 @@ export const fixtures: FixtureSet = {
           loggedAt: new Date(now - entry.loggedAgo * 1000).toISOString(),
         })),
       };
+    },
+
+    'frihet.gripande': (input) => {
+      const { personId, grund, plats } = (input ?? {}) as {
+        personId?: number;
+        grund?: string;
+        plats?: string;
+      };
+
+      if (!personId) return refuse('invalid', { personId: 'required' });
+      if (!grund) return refuse('invalid', { grund: 'required' });
+
+      const id = frihetsberovanden.length + 1;
+      const number = `A26-000${41 + id}`;
+
+      frihetsberovanden.unshift({
+        id,
+        number,
+        status: 'gripen',
+        personId,
+        personNumber: `P-00${1000 + personId}`,
+        gripandeGrund: grund,
+        // Omitted rather than set to undefined: `exactOptionalPropertyTypes`
+        // distinguishes the two, and so does the server — the column is
+        // nullable and an arrest with no place recorded is a real state.
+        ...(plats ? { gripandePlats: plats } : {}),
+        version: 1,
+        gripenAgo: 0,
+        gripenBy: FIXTURE_VIEWER,
+        brott: [],
+        log: [],
+      });
+
+      // 7.13's auto-resolve: a gripande is what an efterlysning existed to
+      // produce, and the server takes every live one on the person down. The
+      // fixture does the same, or the next query would still raise a "detain
+      // on sight" banner for somebody already in a cell.
+      for (const notice of efterlysningar) {
+        if (notice.personId === personId && notice.cancelledAgo === undefined) {
+          notice.cancelledAgo = 0;
+          notice.cancelledGrund = 'gripen';
+          notice.version += 1;
+        }
+      }
+
+      return { id, number };
     },
 
     'frihet.anhallande': (input) => decideFrihet(input, 'anhallande'),

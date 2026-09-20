@@ -291,3 +291,52 @@ test('renders the custody tab in Swedish', async ({ page }) => {
 
   await expect(page.getByText('Skyddad post — Kontakta Internutredningen')).toBeVisible();
 });
+
+test('records a gripande, which is how a chain starts at all', async ({ page }) => {
+  await openCustody(page);
+
+  // `frihet.gripande` had no caller anywhere in the interface: every decision
+  // *in* a chain could be taken and there was no way to begin one, so in game
+  // nobody could ever be booked in.
+  await page.getByRole('button', { name: 'Record an arrest' }).click();
+
+  const form = page.locator('form').filter({ hasText: 'Where' });
+
+  await form.getByLabel('Person id').fill('1');
+  await form.getByLabel('Ground').selectOption('pa_bar_garning');
+  await form.getByLabel('Where').fill('Kvarngatan 3B, outside the stairwell');
+  await form.getByRole('button', { name: 'Record the arrest' }).click();
+
+  await expect(page.getByRole('heading', { name: /^A26-/ })).toBeVisible();
+
+  // The place is drawn on the chain. The server has stored it since the module
+  // landed and nothing rendered it.
+  const arrest = page.getByRole('listitem').filter({ hasText: 'Gripande' });
+  await expect(arrest).toContainText('Kvarngatan 3B, outside the stairwell');
+});
+
+test('an arrest takes down the wanted notice that asked for it', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('nav').first().getByRole('button', { name: 'Records' }).click();
+
+  // John Doe (person 1) is anhållen i sin frånvaro.
+  await page.getByRole('button', { name: 'Wanted notices', exact: true }).click();
+  await expect(page.getByRole('row').filter({ hasText: 'W26-00115' })).toContainText(
+    'Detain on sight',
+  );
+
+  await page.getByRole('button', { name: 'Custody', exact: true }).click();
+  await page.getByRole('button', { name: 'Record an arrest' }).click();
+
+  const form = page.locator('form').filter({ hasText: 'Where' });
+  await form.getByLabel('Person id').fill('1');
+  await form.getByLabel('Ground').selectOption('efterlyst');
+  await form.getByRole('button', { name: 'Record the arrest' }).click();
+
+  // 7.13's auto-resolve. The arrest is what the notice existed to produce, and
+  // leaving it live means the next officer to run them gets a red "detain on
+  // sight" banner for somebody already in a cell — and the officer after that
+  // stops believing the banners.
+  await page.getByRole('button', { name: 'Wanted notices', exact: true }).click();
+  await expect(page.getByRole('cell', { name: 'W26-00115' })).toHaveCount(0);
+});

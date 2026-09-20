@@ -1684,13 +1684,14 @@
       "frigiven": "Frigiven"
     },
     "action": {
-      "gripande": "Registrera gripande",
+      "gripande": "Registrera gripandet",
       "anhallande": "Anhåll",
       "framstallan": "Lämna häktningsframställan",
       "haktning": "Häkta",
       "frigiv": "Frige",
       "underratta": "Registrera underrättelse om misstanke",
-      "log": "Lägg till i arrestjournalen"
+      "log": "Lägg till i arrestjournalen",
+      "newGripande": "Registrera gripande"
     },
     "column": {
       "number": "Diarienummer",
@@ -1783,6 +1784,10 @@
       "framstalld": "Häktningsframställan",
       "haktad": "Häktning",
       "frigiven": "Frigivande"
+    },
+    "field": {
+      "personId": "Person-id",
+      "plats": "Plats"
     }
   },
   "tvang": {

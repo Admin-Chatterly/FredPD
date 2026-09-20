@@ -179,6 +179,23 @@
   /** What a department logs in the arrestjournal (spec 7.9). Locale keys. */
   const LOG_KINDS = ['forhor', 'forsvarare', 'maltid', 'samtal', 'lakare', 'annan'];
 
+  /**
+   * Recording a gripande — the act that starts a chain (RB 24:7).
+   *
+   * Until this form existed, `frihet.gripande` was a route with no caller: the
+   * screen could take every decision *in* a chain and there was no way to
+   * begin one, so in game nobody could ever be booked in. The rest of M2's
+   * exit criterion hangs off it.
+   *
+   * It is the one decision here an ordinary officer takes on their own
+   * authority — the anhållande beside it belongs to a prosecutor — and it is
+   * also the one the server acts on beyond this module: a gripande takes down
+   * every live efterlysning on the person, because the arrest is what the
+   * wanted notice existed to produce.
+   */
+  let arresting = $state(false);
+  let arrest = $state({ personId: '', grund: '', plats: '' });
+
   let rows = $state<Maybe<FrihetRow>[]>([]);
   let detail = $state<Detail | null>(null);
   let failure = $state<Failure | null>(null);
@@ -336,6 +353,28 @@
       failure = null;
       await open(id);
       await load();
+    } else {
+      failure = response;
+      busy = false;
+    }
+  }
+
+  /** Starts a chain, and opens it. */
+  async function gripande(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    busy = true;
+
+    const response = await nui.call<{ id: number }>('frihet.gripande', {
+      personId: Number(arrest.personId) || undefined,
+      grund: arrest.grund || undefined,
+      plats: arrest.plats || undefined,
+    });
+
+    if (response.ok) {
+      failure = null;
+      arresting = false;
+      arrest = { personId: '', grund: '', plats: '' };
+      await Promise.all([load(), open(response.data.id)]);
     } else {
       failure = response;
       busy = false;
@@ -512,6 +551,7 @@
             at: record.gripenAt,
             grund: record.gripandeGrund,
             grundList: 'frihet.grund',
+            plats: record.gripandePlats,
           },
           {
             key: 'anhallen',
@@ -568,7 +608,72 @@
     >
       {t('form.search')}
     </button>
+
+    <button
+      type="button"
+      class="border border-[var(--color-border)] px-3 py-1 text-xs"
+      aria-expanded={arresting}
+      onclick={() => (arresting = !arresting)}
+    >
+      {t('frihet.action.newGripande')}
+    </button>
   </form>
+
+  {#if arresting}
+    <!--
+      RB 24:7. The ground is a locale key and required, because it is the
+      sentence quoted back when the detention is reviewed; the place is free
+      text, because "the alley behind Kvarngatan 3" is not a key anybody can
+      enumerate.
+    -->
+    <form
+      class="flex flex-wrap items-end gap-2 border border-[var(--color-border)] p-3"
+      onsubmit={(event) => void gripande(event)}
+    >
+      <label class="flex flex-col gap-1 text-xs">
+        <span>{t('frihet.field.personId')} <span aria-hidden="true">{REQUIRED_MARK}</span></span>
+        <input
+          bind:value={arrest.personId}
+          inputmode="numeric"
+          required
+          aria-required="true"
+          class="w-24 border border-[var(--color-border)] px-2 py-1"
+        />
+      </label>
+
+      <label class="flex flex-col gap-1 text-xs">
+        <span>{t('frihet.column.grund')} <span aria-hidden="true">{REQUIRED_MARK}</span></span>
+        <select
+          bind:value={arrest.grund}
+          required
+          aria-required="true"
+          class="border border-[var(--color-border)] px-2 py-1"
+        >
+          <option value="">{t('frihet.grund.choose')}</option>
+          {#each GRUND_KEYS['frihet.grund'] as key (key)}
+            <option value={key}>{t(`frihet.grund.${key}`)}</option>
+          {/each}
+        </select>
+      </label>
+
+      <label class="flex flex-1 flex-col gap-1 text-xs">
+        <span>{t('frihet.field.plats')}</span>
+        <input
+          bind:value={arrest.plats}
+          maxlength="191"
+          class="border border-[var(--color-border)] px-2 py-1"
+        />
+      </label>
+
+      <button
+        type="submit"
+        class="border border-[var(--color-border)] px-3 py-1 text-xs"
+        disabled={busy}
+      >
+        {t('frihet.action.gripande')}
+      </button>
+    </form>
+  {/if}
 
   {#if failure}
     <div class="border border-[var(--color-alert)] px-3 py-2 text-sm" role="alert">
@@ -789,6 +894,17 @@
                 {#if stage.grund}
                   <p class="text-[var(--color-ink-muted)]">
                     {t('frihet.column.grund')}: {t(`${stage.grundList}.${stage.grund}`)}
+                  </p>
+                {/if}
+                <!--
+                  Where it happened. Stored by `frihet.gripande` since the
+                  module landed and drawn nowhere — so the place an officer
+                  typed went into the record and out of sight, which is the
+                  same way the arrest ground was lost.
+                -->
+                {#if stage.plats}
+                  <p class="text-[var(--color-ink-muted)]">
+                    {t('frihet.field.plats')}: {stage.plats}
                   </p>
                 {/if}
               </li>
