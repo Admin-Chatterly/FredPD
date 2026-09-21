@@ -200,6 +200,19 @@ const REASONS = new Set([
   // recorded as though it were lawful.
   'wrong_capability',
   'not_live',
+
+  // Åtal och dom (spec 7.20). `already_decided` is a second charging
+  // decision on the same redovisad FU -- one åklagare beat another to it.
+  // `not_atalad` is entering a disposition on a referral that was declined,
+  // which has nothing to dispose of. The last four are
+  // `Court.sentenceWithinRange`'s own ways of refusing a sentence, mirroring
+  // the discipline `Tvang.isValid` uses: each has a name a domare can read.
+  'already_decided',
+  'not_atalad',
+  'below_min',
+  'above_max',
+  'not_available',
+  'no_charges',
 ]);
 
 export interface FieldMessage {

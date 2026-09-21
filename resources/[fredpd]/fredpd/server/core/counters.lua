@@ -86,6 +86,7 @@ local KINDS <const> = {
     lab_request = true,
     impound = true,
     hak = true,
+    atal = true,
 }
 
 --- The `year` value for a sequence that is not year-scoped.

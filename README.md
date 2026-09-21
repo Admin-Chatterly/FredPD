@@ -21,17 +21,20 @@ Two guides in Swedish, for the people who run and use the server:
 
 ## Status
 
-**M0–M3 complete. M2 records, M4 dispatch and M5 surveillance are in.** The
-platform core, the registers, the evidence and forensics chain, dispatch, the
-records half of M2 — anmälan, förundersökning, frihetsberövande, tvångsmedel
-and spaningsuppdrag — and M5's secret coercive measures — HAK, HRA,
-spårsändare, kameraövervakning, tingsrätt-decided unlike M2's — are built and
-tested. The gateway's media store, PDF renderer and retention scheduler are
-built too, standalone and tested, though nothing in the core resource calls
-them yet — that bridge (`server/bridges/gateway/*.lua`, spec 3.7) needs a
-verified Lua HMAC-SHA256 implementation this repository does not have, and
-shipping an unverified one was judged worse than leaving the gap open. M6
-court, personnel and booking are next; see the roadmap in spec section 17.
+**M0–M3 complete. M2 records, M4 dispatch and M5 surveillance are in, and M6
+has its first piece.** The platform core, the registers, the evidence and
+forensics chain, dispatch, the records half of M2 — anmälan, förundersökning,
+frihetsberövande, tvångsmedel and spaningsuppdrag — M5's secret coercive
+measures — HAK, HRA, spårsändare, kameraövervakning, tingsrätt-decided unlike
+M2's — and M6's åtal och dom — the prosecutor's charging decision and the
+court's disposition, picking up where `frihet.haktning` leaves off — are
+built and tested. The gateway's media store, PDF renderer and retention
+scheduler are built too, standalone and tested, though nothing in the core
+resource calls them yet — that bridge (`server/bridges/gateway/*.lua`, spec
+3.7) needs a verified Lua HMAC-SHA256 implementation this repository does not
+have, and shipping an unverified one was judged worse than leaving the gap
+open. Personnel and booking are M6's other two pieces and are next; see the
+roadmap in spec section 17.
 
 Two decisions that shape everything below: the framework is **ESX** (ADR-005),
 and the procedure is **Swedish** rather than US workflows with Swedish labels
@@ -78,11 +81,17 @@ Working today:
 - **Surveillance**: HAK, HRA, spårsändare and kameraövervakning, requested by
   an åklagare and only ever granted or refused by a domare, with
   `HasActiveWarrant` for other resources to check (spec 9, §14).
+- **Åtal och dom**: the åklagare's charging decision on a redovisad
+  förundersökning, and the domare's disposition — never the same session,
+  however many permissions it holds. Sentences are checked against
+  `Brott.gemensamStraffskala` for the exact charges on the case, the same
+  arithmetic the brottskatalog screen shows (7.20).
 
 M2's interface is complete: every register and every workflow in it has a
 screen, and the Records module's tabs are the whole of what the M2 routes can
-do. M5 has its own rail module rather than a Records tab, since it is a
-different clearance and a different pair of decision-makers.
+do. M5 and M6's åtal och dom each have their own rail module rather than a
+Records tab, since each is a different clearance and a different pair of
+decision-makers.
 
 Built and tested, but not reachable from inside the game yet: the **gateway**
 service — signed upload/download tokens over a local (or S3-compatible) media
@@ -94,9 +103,11 @@ but the Lua-side bridge that would let FXServer call it does not exist — see
 above. `web/index.html`'s CSP already carries a `VITE_MEDIA_HOST` slot for it
 either way.
 
-Not built at all yet: **booking**, **citations**, **impound**, **court** and
-**personnel** (all M6). None of this has run on a live FiveM server: the logic
-is covered by tests, and the parts that call game natives are not.
+Not built at all yet: **booking**, **citations**, **impound** and
+**personnel** (the rest of M6) — and, within court itself, the calendar,
+subpoenas, discovery and sealing spec 7.20 marks `[S]` rather than `[M]`.
+None of this has run on a live FiveM server: the logic is covered by tests,
+and the parts that call game natives are not.
 
 ## Layout
 

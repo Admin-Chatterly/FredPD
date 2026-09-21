@@ -1113,3 +1113,26 @@ export type HakMethod = (typeof HAK_METHODS)[number];
 export const HAK_STATUSES = ['begard', 'beviljad', 'avslagen', 'upphavd'] as const;
 
 export type HakStatus = (typeof HAK_STATUSES)[number];
+
+/**
+ * `ck_fpd_atal_beslut` — the åklagare's charging decision (spec 7.20).
+ *
+ * Only two: charge, or decline. "Request more investigation" is 7.20's third
+ * outcome and is not one of these — it would reopen a `redovisad`
+ * förundersökning, which 0016's header explains is a change to the FU's own
+ * lifecycle this table does not make.
+ */
+export const ATAL_BESLUT = ['atalad', 'ej_atal'] as const;
+
+export type AtalBeslut = (typeof ATAL_BESLUT)[number];
+
+/**
+ * `ck_fpd_atal_disposition` — how a charged case was decided (spec 7.20).
+ *
+ * NULL until a domare enters one, and only ever set together with
+ * `beslut = 'atalad'` (`ck_fpd_atal_disposition_needs_atal`) — a declined
+ * referral has nothing to dispose of.
+ */
+export const ATAL_DISPOSITIONS = ['guilty', 'not_guilty', 'dismissed', 'plea'] as const;
+
+export type AtalDisposition = (typeof ATAL_DISPOSITIONS)[number];

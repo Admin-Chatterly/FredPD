@@ -134,6 +134,12 @@ const PAIRED: Record<string, keyof typeof enums> = {
   ck_fpd_hak_status: 'HAK_STATUSES',
   ck_fpd_hak_class: 'CLASSIFICATIONS',
   ck_fpd_hak_intercepts_class: 'CLASSIFICATIONS',
+
+  // Åtal och dom (0016, spec 7.20).
+  ck_fpd_atal_beslut: 'ATAL_BESLUT',
+  ck_fpd_atal_disposition: 'ATAL_DISPOSITIONS',
+  ck_fpd_atal_class: 'CLASSIFICATIONS',
+  ck_fpd_atal_brott_stage: 'BROTT_STAGES',
 };
 
 /**

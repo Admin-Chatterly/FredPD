@@ -1,6 +1,8 @@
 import {
   ANMALAN_ROLLER,
   ANMALAN_STATUSES,
+  ATAL_BESLUT,
+  ATAL_DISPOSITIONS,
   BROADCAST_KINDS,
   BROTT_GRADER,
   CALL_DISPOSITIONS,
@@ -2326,6 +2328,57 @@ export const schemas = {
 
   HakLog: {
     hakId: { type: 'integer', required: true, min: 1 },
+  },
+
+  // -------------------------------------------------------- court (spec 7.20)
+
+  CourtReferralList: {
+    beslut: { type: 'enum', required: false, values: ATAL_BESLUT },
+    /** Only `atalad` rows with no disposition yet — the domare's own queue. */
+    awaitingDisposition: { type: 'boolean', required: false },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  CourtReferralPending: {},
+
+  CourtReferralGet: {
+    id: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
+   * The åklagare's charging decision on a redovisad FU (7.8, 7.20).
+   *
+   * `brottIds` and `stages` are required only for `beslut: 'atalad'` —
+   * `Court.validateReferral` enforces that, because a flat schema cannot say
+   * "required unless this other field is 'ej_atal'". Duplicates in
+   * `brottIds` survive: three counts of one offence is three rows, the same
+   * reasoning `AnmalanCharges` gives.
+   */
+  CourtReferralDecide: {
+    fuId: { type: 'integer', required: true, min: 1 },
+    beslut: { type: 'enum', required: true, values: ATAL_BESLUT },
+    beslutGrund: { type: 'string', required: false, max: 128 },
+    brottIds: { type: 'string[]', required: false, maxItems: 25, maxLength: 20 },
+    // Not an enum field, for the reason `AnmalanCharges.stages` gives: the
+    // server checks each entry against `BROTT_STAGES` *and* against the
+    // catalogue row it applies to (`Anmalan.stageIsAvailable`).
+    stages: { type: 'string[]', required: false, maxItems: 25, maxLength: 16 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
+  /**
+   * The domare's disposition. `sentenceMonths` is checked against
+   * `Brott.gemensamStraffskala` for the åtal's own charges in the route —
+   * the schema only bounds the number itself, generously, because the real
+   * bound depends on which charges are on the row.
+   */
+  CourtDispositionEnter: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    disposition: { type: 'enum', required: true, values: ATAL_DISPOSITIONS },
+    sentenceMonths: { type: 'integer', required: false, min: 0, max: 216 },
+    sentenceLivstid: { type: 'boolean', required: false },
+    note: { type: 'string', required: false, max: 500 },
   },
 
 } as const satisfies Record<string, Schema>;

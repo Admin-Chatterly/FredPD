@@ -346,6 +346,22 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('intel_handler', 'surv.tracker.view'),
     ('intel_handler', 'page.surveillance'),
 
+    -- Åtal och dom (spec 7.20). The charging decision is the åklagare's
+    -- alone -- `court.referral.review` -- and only a domare may enter a
+    -- disposition -- `court.disposition.enter`. Neither inherits the other,
+    -- the same separation `frihet.anhallande` and `frihet.haktning` keep,
+    -- and for the identical reason: a prosecutor who could also sentence
+    -- their own charge is a prosecutor who is also the court.
+    ('aklagare', 'court.referral.review'),
+    ('aklagare', 'page.court'),
+    ('domare', 'court.disposition.enter'),
+    -- A domare has to see the docket to pick a case to dispose of, and the
+    -- referral decision itself (which charges, on what ground) is exactly
+    -- what a sentence has to be read against.
+    ('domare', 'court.referral.review'),
+    ('domare', 'page.court'),
+    ('command', 'page.court'),
+
     -- The two field-level grants of spec 4.5. Without a group holding them the
     -- fields are not protected, they are invisible: the routes read the
     -- permission on every path that returns the field, so a department that

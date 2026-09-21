@@ -140,7 +140,13 @@
     "out_of_order": "Inte möjligt från det här stadiet.",
     "not_a_key": "Okänd händelsetyp.",
     "not_live": "gäller inte just nu",
-    "wrong_capability": "du saknar behörigheten för denna metod"
+    "wrong_capability": "du saknar behörigheten för denna metod",
+    "already_decided": "har redan ett åtalsbeslut",
+    "not_atalad": "detta åtal avslogs och har inget att döma i",
+    "below_min": "under vad detta åtal tillåter",
+    "above_max": "över vad detta åtal tillåter",
+    "not_available": "livstids fängelse är inte tillgängligt för dessa brott",
+    "no_charges": "inga åtalspunkter finns att döma efter"
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -2152,5 +2158,68 @@
       "image": "Bild",
       "other": "Annat"
     }
+  },
+  "court": {
+    "beslut": {
+      "atalad": "Åtalad",
+      "ej_atal": "Ej åtal"
+    },
+    "beslutGrund": {
+      "otillrackliga_bevis": "Otillräcklig bevisning",
+      "ej_brott": "Gärningen utgör inte brott",
+      "preskriberat": "Preskriberat",
+      "annan": "Annat"
+    },
+    "disposition": {
+      "guilty": "Fällande dom",
+      "not_guilty": "Friande dom",
+      "dismissed": "Avskrivet",
+      "plea": "Erkännande",
+      "pending": "Väntar på dom"
+    },
+    "column": {
+      "number": "Diarienummer",
+      "fu": "Förundersökning",
+      "beslut": "Beslut",
+      "disposition": "Dom",
+      "decided": "Beslutat"
+    },
+    "action": {
+      "decide": "Fatta åtalsbeslut",
+      "charge": "Väck åtal",
+      "decline": "Avslå",
+      "enterDisposition": "Registrera dom"
+    },
+    "field": {
+      "fuId": "Förundersökning",
+      "beslutChoose": "Välj beslut",
+      "beslutGrundChoose": "Välj grund",
+      "brottIds": "Åtalspunkter",
+      "brottIdsHelp": "Katalog-id, ett per åtalspunkt",
+      "disposition": "Dom",
+      "dispositionChoose": "Välj dom",
+      "sentenceMonths": "Påföljd (månader)",
+      "sentenceLivstid": "Livstids fängelse",
+      "note": "Anteckning"
+    },
+    "straffskala": {
+      "title": "Straffskala för åtalspunkterna",
+      "none": "Inga åtalspunkter är kopplade."
+    },
+    "empty": "Inga åtal matchar.",
+    "detail": {
+      "none": "Välj ett åtal för att läsa det."
+    },
+    "confirm": {
+      "charge": "Väck åtal på denna förundersökning? De brott som läggs till blir det mål domstolen läser.",
+      "decline": "Vill du avslå åtal på denna förundersökning?",
+      "enterDisposition": "Registrera domen? Den kan inte ändras sedan den registrerats."
+    },
+    "charged": "Åtal {number} väckt.",
+    "declined": "Åtal {number} avslaget.",
+    "disposed": "Dom registrerad på {number}.",
+    "notAtalad": "Detta åtal avslogs och har inget att döma i.",
+    "pendingTitle": "Väntar på åtalsbeslut",
+    "pendingEmpty": "Inga förundersökningar väntar på beslut."
   }
 }

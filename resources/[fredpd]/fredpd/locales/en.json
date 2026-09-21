@@ -140,7 +140,13 @@
     "out_of_order": "Not possible from this stage.",
     "not_a_key": "Not a recognised entry type.",
     "not_live": "not currently in force",
-    "wrong_capability": "you do not hold the capability for this method"
+    "wrong_capability": "you do not hold the capability for this method",
+    "already_decided": "already has a charging decision",
+    "not_atalad": "this referral was declined and has nothing to dispose of",
+    "below_min": "below the minimum this charge allows",
+    "above_max": "above the maximum this charge allows",
+    "not_available": "life imprisonment is not available for these charges",
+    "no_charges": "no charges are attached to enter a sentence against"
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -2152,5 +2158,68 @@
       "image": "Image",
       "other": "Other"
     }
+  },
+  "court": {
+    "beslut": {
+      "atalad": "Charged",
+      "ej_atal": "Declined"
+    },
+    "beslutGrund": {
+      "otillrackliga_bevis": "Insufficient evidence",
+      "ej_brott": "No offence was committed",
+      "preskriberat": "Time-barred",
+      "annan": "Other"
+    },
+    "disposition": {
+      "guilty": "Guilty",
+      "not_guilty": "Not guilty",
+      "dismissed": "Dismissed",
+      "plea": "Guilty plea",
+      "pending": "Awaiting disposition"
+    },
+    "column": {
+      "number": "Diarienummer",
+      "fu": "Investigation",
+      "beslut": "Decision",
+      "disposition": "Disposition",
+      "decided": "Decided"
+    },
+    "action": {
+      "decide": "Decide the referral",
+      "charge": "Charge",
+      "decline": "Decline",
+      "enterDisposition": "Enter disposition"
+    },
+    "field": {
+      "fuId": "Investigation",
+      "beslutChoose": "Choose a decision",
+      "beslutGrundChoose": "Choose a ground",
+      "brottIds": "Charges",
+      "brottIdsHelp": "Catalogue ids, one per count",
+      "disposition": "Disposition",
+      "dispositionChoose": "Choose a disposition",
+      "sentenceMonths": "Sentence (months)",
+      "sentenceLivstid": "Life imprisonment",
+      "note": "Note"
+    },
+    "straffskala": {
+      "title": "Range this charge sheet allows",
+      "none": "No charges are attached."
+    },
+    "empty": "No referrals match.",
+    "detail": {
+      "none": "Select a referral to read it."
+    },
+    "confirm": {
+      "charge": "File charges on this referral? The offences attached become the case a court reads.",
+      "decline": "Decline to charge this referral?",
+      "enterDisposition": "Enter this disposition? It is not retaken once entered."
+    },
+    "charged": "Referral {number} charged.",
+    "declined": "Referral {number} declined.",
+    "disposed": "Disposition entered on {number}.",
+    "notAtalad": "This referral was declined and has nothing to dispose of.",
+    "pendingTitle": "Awaiting a charging decision",
+    "pendingEmpty": "No investigations are waiting on a decision."
   }
 }

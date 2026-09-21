@@ -1311,4 +1311,36 @@ FredPD.Schema = {
     HakLog = {
         hakId = { type = 'integer', required = true, min = 1 },
     },
+
+    CourtReferralList = {
+        beslut = { type = 'enum', required = false, values = { 'atalad', 'ej_atal' } },
+        awaitingDisposition = { type = 'boolean', required = false },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    CourtReferralPending = {
+
+    },
+
+    CourtReferralGet = {
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
+    CourtReferralDecide = {
+        fuId = { type = 'integer', required = true, min = 1 },
+        beslut = { type = 'enum', required = true, values = { 'atalad', 'ej_atal' } },
+        beslutGrund = { type = 'string', required = false, max = 128 },
+        brottIds = { type = 'string[]', required = false, maxItems = 25, maxLength = 20 },
+        stages = { type = 'string[]', required = false, maxItems = 25, maxLength = 16 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    CourtDispositionEnter = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        disposition = { type = 'enum', required = true, values = { 'guilty', 'not_guilty', 'dismissed', 'plea' } },
+        sentenceMonths = { type = 'integer', required = false, min = 0, max = 216 },
+        sentenceLivstid = { type = 'boolean', required = false },
+        note = { type = 'string', required = false, max = 500 },
+    },
 }

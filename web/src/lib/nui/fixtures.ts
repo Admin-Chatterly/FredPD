@@ -95,7 +95,7 @@ const session = {
   timezone: 'Europe/Stockholm',
   // Only what this fake session may open. The real list is derived from
   // Discord roles on the server (invariant 2).
-  modules: ['records', 'dispatch', 'evidence', 'lab', 'intel', 'surveillance', 'comms', 'admin'],
+  modules: ['records', 'dispatch', 'evidence', 'lab', 'intel', 'surveillance', 'court', 'comms', 'admin'],
 };
 
 const groups: PermissionGroup[] = [
@@ -2329,6 +2329,54 @@ const forundersokningar: FixtureFu[] = [
     version: 3,
     anmalanIds: [],
   },
+  {
+    // Redovisad, and nothing has decided it yet — the court module's own
+    // queue (spec 7.20).
+    id: 4,
+    number: 'FU26-00030',
+    title: 'Aggravated theft, the marina',
+    status: 'redovisad',
+    fuLedare: '100000000000000003',
+    ledareKind: 'aklagare',
+    openedAt: '2026-08-15T09:00:00.000Z',
+    closedAt: '2026-09-10T10:00:00.000Z',
+    closedReason: null,
+    closedNote: null,
+    version: 2,
+    anmalanIds: [],
+  },
+  {
+    // Also redovisad, but already charged — `atal` below decides this one,
+    // so it does not appear in the pending queue.
+    id: 5,
+    number: 'FU26-00022',
+    title: 'Assault, the docks',
+    status: 'redovisad',
+    fuLedare: '100000000000000003',
+    ledareKind: 'aklagare',
+    openedAt: '2026-07-20T09:00:00.000Z',
+    closedAt: '2026-08-01T10:00:00.000Z',
+    closedReason: null,
+    closedNote: null,
+    version: 2,
+    anmalanIds: [],
+  },
+  {
+    // Charged, and still awaiting a disposition — the row
+    // `court.disposition.enter`'s `wrong_capacity` boundary needs.
+    id: 6,
+    number: 'FU26-00015',
+    title: 'Robbery, the corner store',
+    status: 'redovisad',
+    fuLedare: '100000000000000003',
+    ledareKind: 'aklagare',
+    openedAt: '2026-07-05T09:00:00.000Z',
+    closedAt: '2026-07-25T10:00:00.000Z',
+    closedReason: null,
+    closedNote: null,
+    version: 2,
+    anmalanIds: [],
+  },
 ];
 
 const restrictedFu = [
@@ -3106,6 +3154,131 @@ function hakRow(row: FixtureHak, withReason: boolean): Record<string, unknown> {
  * gives for `fu_ledare`).
  */
 const FIXTURE_HAK_CAPACITY: string = 'aklagare';
+
+// -------------------------------------------------------------------- court
+
+interface FixtureAtalCharge {
+  brottId: number;
+  stage: string;
+}
+
+interface FixtureAtal {
+  id: number;
+  fuId: number;
+  beslut: string;
+  beslutGrund?: string | null;
+  decidedAgo: number;
+  charges: FixtureAtalCharge[];
+  disposition?: string | null;
+  sentenceMonths?: number | null;
+  sentenceLivstid?: boolean;
+  dispositionAgo?: number;
+  version: number;
+}
+
+const atal: FixtureAtal[] = [
+  {
+    // Charged and already disposed — the aggravated theft from
+    // `brottskatalog` (id 11: 6-72 months), sentenced inside that range.
+    id: 1,
+    fuId: 5,
+    beslut: 'atalad',
+    decidedAgo: 20 * DAY,
+    charges: [{ brottId: 11, stage: 'fullbordat' }],
+    disposition: 'guilty',
+    sentenceMonths: 18,
+    sentenceLivstid: false,
+    dispositionAgo: 5 * DAY,
+    version: 2,
+  },
+  {
+    // Charged, and still awaiting a disposition.
+    id: 2,
+    fuId: 6,
+    beslut: 'atalad',
+    decidedAgo: 6 * DAY,
+    charges: [{ brottId: 11, stage: 'fullbordat' }],
+    version: 1,
+  },
+];
+
+const restrictedAtal = [
+  { restricted: true as const, recordType: 'case', contact: 'internal_affairs' },
+  { restricted: true as const, recordType: 'case', contact: 'homicide' },
+];
+
+/** The catalogue rows a charge's `brottId` list resolves to. */
+function atalCharges(row: FixtureAtal): Record<string, unknown>[] {
+  return row.charges.map((charge, index) => {
+    const catalogue = brottskatalog.find((entry) => entry.id === charge.brottId);
+
+    return {
+      id: row.id * 100 + index,
+      atalId: row.id,
+      brottId: charge.brottId,
+      stage: charge.stage,
+      code: catalogue?.code ?? 'UNKNOWN',
+      brottVersion: catalogue?.version ?? 1,
+      balk: catalogue?.balk ?? null,
+      kapitel: catalogue?.kapitel ?? null,
+      paragraf: catalogue?.paragraf ?? null,
+      labelKey: catalogue?.labelKey ?? 'brott.rubrik.unknown',
+      grad: catalogue?.grad ?? null,
+      boter: catalogue?.boter ?? false,
+      fangelseMinMonths: catalogue?.fangelseMinMonths ?? null,
+      fangelseMaxMonths: catalogue?.fangelseMaxMonths ?? null,
+    };
+  });
+}
+
+/** `Brott.gemensamStraffskala`, computed the way `gemensamStraffskala` above
+ * already does for the brottskatalog screen — reused rather than
+ * reimplemented, so the two screens cannot drift on the same arithmetic. */
+function atalStraffskala(row: FixtureAtal): Record<string, unknown> | null {
+  const rows = row.charges
+    .map((charge) => brottskatalog.find((entry) => entry.id === charge.brottId))
+    .filter((entry): entry is FixtureBrott => entry !== undefined);
+
+  if (rows.length === 0) return null;
+
+  return gemensamStraffskala(rows);
+}
+
+function atalRow(row: FixtureAtal, withCharges: boolean): Record<string, unknown> {
+  const shaped: Record<string, unknown> = {
+    id: row.id,
+    agencyId: session.agencyId,
+    number: `A26-000${10 + row.id}`,
+    fuId: row.fuId,
+    beslut: row.beslut,
+    beslutGrund: row.beslutGrund ?? null,
+    decidedBy: FIXTURE_VIEWER,
+    decidedAt: secondsAgo(row.decidedAgo),
+    disposition: row.disposition ?? null,
+    sentenceMonths: row.sentenceMonths ?? null,
+    sentenceLivstid: row.sentenceLivstid ?? false,
+    dispositionNote: null,
+    dispositionBy: row.disposition ? FIXTURE_VIEWER : null,
+    dispositionAt: row.dispositionAgo === undefined ? null : secondsAgo(row.dispositionAgo),
+    classification: 'internal',
+    version: row.version,
+  };
+
+  if (withCharges) {
+    shaped.charges = atalCharges(row);
+    shaped.straffskala = atalStraffskala(row);
+  }
+
+  return shaped;
+}
+
+/**
+ * The capacity the fixture session decides in, mirroring `FIXTURE_HAK_
+ * CAPACITY`'s reasoning: the åklagare, so `court.referral.decide` succeeds
+ * and `court.disposition.enter` refuses `wrong_capacity` — the boundary
+ * `court/service.lua`'s two-decision-maker split exists to draw.
+ */
+const FIXTURE_COURT_CAPACITY: string = 'aklagare';
 
 export const fixtures: FixtureSet = {
   ok: {
@@ -4005,6 +4178,107 @@ export const fixtures: FixtureSet = {
       ];
 
       return { id };
+    },
+
+    // ------------------------------------------------------------- court
+
+    'court.referral.list': (input) => {
+      const filter = (input ?? {}) as { beslut?: string; awaitingDisposition?: boolean };
+
+      const found = atal.filter(
+        (row) =>
+          (!filter.beslut || row.beslut === filter.beslut) &&
+          (!filter.awaitingDisposition || (row.beslut === 'atalad' && !row.disposition)),
+      );
+
+      return { atal: [...found.map((row) => atalRow(row, false)), ...restrictedAtal] };
+    },
+
+    'court.referral.pending': () => {
+      const decided = new Set(atal.map((row) => row.fuId));
+
+      return {
+        forundersokningar: forundersokningar
+          .filter((fu) => fu.status === 'redovisad' && !decided.has(fu.id))
+          .map((fu) => ({ id: fu.id, number: fu.number, title: fu.title })),
+      };
+    },
+
+    'court.referral.get': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const row = atal.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+
+      return { atal: atalRow(row, true) };
+    },
+
+    'court.referral.decide': (input) => {
+      const body = (input ?? {}) as {
+        fuId?: number;
+        beslut?: string;
+        beslutGrund?: string;
+        brottIds?: string[];
+      };
+
+      if (FIXTURE_COURT_CAPACITY !== 'aklagare') {
+        return refuse('forbidden', { _input: 'wrong_capacity' });
+      }
+
+      if (!body.fuId) return refuse('invalid', { fuId: 'required' });
+      if (!body.beslut) return refuse('invalid', { beslut: 'unknown' });
+
+      const fu = forundersokningar.find((entry) => entry.id === body.fuId);
+      if (!fu) return refuse('not_found', { fuId: 'unknown' });
+      if (fu.status !== 'redovisad') return refuse('conflict', { fuId: 'out_of_order' });
+      if (atal.some((entry) => entry.fuId === fu.id)) {
+        return refuse('conflict', { fuId: 'already_decided' });
+      }
+
+      const id = atal.length + 1;
+      const charges =
+        body.beslut === 'atalad'
+          ? (body.brottIds ?? []).map((value) => ({ brottId: Number(value), stage: 'fullbordat' }))
+          : [];
+
+      atal.unshift({
+        id,
+        fuId: fu.id,
+        beslut: body.beslut,
+        beslutGrund: body.beslutGrund ?? null,
+        decidedAgo: 0,
+        charges,
+        version: 1,
+      });
+
+      return { id, number: `A26-000${10 + id}` };
+    },
+
+    'court.disposition.enter': (input) => {
+      const body = (input ?? {}) as {
+        id?: number;
+        version?: number;
+        disposition?: string;
+        sentenceMonths?: number;
+        sentenceLivstid?: boolean;
+      };
+
+      if (FIXTURE_COURT_CAPACITY !== 'domare') {
+        return refuse('forbidden', { _input: 'wrong_capacity' });
+      }
+
+      const row = atal.find((entry) => entry.id === body.id);
+      if (!row) return refuse('not_found');
+      if (row.beslut !== 'atalad') return refuse('conflict', { disposition: 'not_atalad' });
+      if (row.version !== body.version) return refuse('conflict');
+
+      row.disposition = body.disposition ?? null;
+      row.sentenceMonths = body.sentenceLivstid ? null : body.sentenceMonths ?? null;
+      row.sentenceLivstid = body.sentenceLivstid ?? false;
+      row.dispositionAgo = 0;
+      row.version += 1;
+
+      return { id: row.id };
     },
 
     // ------------------------------------------------------------- anmälan

@@ -118,6 +118,12 @@ server_scripts {
     'server/modules/surveillance/repo.lua',
     'server/modules/surveillance/routes.lua',
 
+    -- Åtal och dom (spec 7.20, M6). After anmalan (reads FU rows through its
+    -- repo) and after brott (charges and sentencing arithmetic).
+    'server/modules/court/service.lua',
+    'server/modules/court/repo.lua',
+    'server/modules/court/routes.lua',
+
     'server/modules/placements/service.lua',
     'server/modules/placements/repo.lua',
     'server/modules/placements/routes.lua',

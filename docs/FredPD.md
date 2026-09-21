@@ -1837,6 +1837,7 @@ row it came from.
 | Booking | `booking` | `YYYY` | `B{YY}-{#####}` | B26-00102 |
 | Lab request | `lab_request` | `YYYY` | `L{YY}-{#####}` | L26-00031 |
 | Secret coercive measure (HAK/HRA/spårsändare) | `hak` | `YYYY` | `H{YY}-{#####}` | H26-00007 |
+| Åtal | `atal` | `YYYY` | `A{YY}-{#####}` | A26-00014 |
 
 **The `year` column is a scope key, not a year.** It carries `0` for a sequence
 that never restarts, `YYYY` for a year-scoped one, and `YYMMDD` for the one

@@ -209,6 +209,13 @@ local NUI_ROUTES <const> = {
     'hak.session.end',
     'hak.intercept.add',
 
+    -- Åtal och dom (spec 7.20, M6).
+    'court.referral.list',
+    'court.referral.pending',
+    'court.referral.get',
+    'court.referral.decide',
+    'court.disposition.enter',
+
     -- Crime scenes, evidence and the chain of custody (spec 8).
     'scene.create',
     'scene.release',
