@@ -794,6 +794,39 @@ interface CadBroadcast {
   createdAt: string;
 }
 
+/** As `Repo.listReads` returns one, before the route's own covert masking. */
+interface CadAlprRead {
+  id: number;
+  plate: string;
+  readAt: string;
+  readAtUnix: number;
+  x: number;
+  y: number;
+  z: number;
+  officerId: number | null;
+  discordId: string | null;
+  callsign: string | null;
+  camera: string;
+  hit: boolean;
+  hotlistId: number | null;
+  hotlistReason: string | null;
+}
+
+/** As `HOTLIST_COLUMNS` selects one. */
+interface CadHotlistEntry {
+  id: number;
+  plate: string;
+  reason: string;
+  detail: string | null;
+  caseNumber: string | null;
+  silent: boolean;
+  expiresAt: string | null;
+  cancelledAt: string | null;
+  cancelledBy: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
 /** The session's own unit. `call.self_assign` names no officer; this is it. */
 const OWN_OFFICER_ID = 1;
 
@@ -1280,6 +1313,152 @@ let cadBroadcasts: CadBroadcast[] = [
     expiresAt: inMinutes(60),
     cancelledAt: null,
     createdAt: minutesAgo(15).at,
+  },
+];
+
+// Same value `FIXTURE_VIEWER` holds below -- declared as a literal here rather
+// than imported forward, so these seed arrays can sit beside the rest of the
+// cad domain instead of after every module that comes before it in the file.
+const ALPR_VIEWER_DISCORD_ID = '100000000000000001';
+const ALPR_OTHER_DISCORD_ID = '100000000000000002';
+
+let nextHotlistId = 4;
+
+/**
+ * The hotlist (7.18), `HOTLIST_COLUMNS` column for column. Entry 3 is silent
+ * and created by somebody other than the fixture viewer -- the one row this
+ * session's own `alpr.hotlist.list` must never return, and whose reads
+ * `alpr.read.list` must mask exactly as `seesSilent` does server-side.
+ */
+let cadHotlist: CadHotlistEntry[] = [
+  {
+    id: 1,
+    plate: '6ABC123',
+    reason: 'stolen_vehicle',
+    detail: 'Reported stolen from Vinewood',
+    caseNumber: 'CR26-00118',
+    silent: false,
+    expiresAt: null,
+    cancelledAt: null,
+    cancelledBy: null,
+    createdBy: ALPR_VIEWER_DISCORD_ID,
+    createdAt: minutesAgo(180).at,
+  },
+  {
+    id: 2,
+    plate: '7XYZ890',
+    reason: 'investigation',
+    detail: null,
+    caseNumber: null,
+    silent: true,
+    expiresAt: inMinutes(1440),
+    cancelledAt: null,
+    cancelledBy: null,
+    createdBy: ALPR_VIEWER_DISCORD_ID,
+    createdAt: minutesAgo(40).at,
+  },
+  {
+    id: 3,
+    plate: '9QRS231',
+    reason: 'wanted_person',
+    detail: 'Federal warrant, approach with caution',
+    caseNumber: null,
+    silent: true,
+    expiresAt: null,
+    cancelledAt: null,
+    cancelledBy: null,
+    createdBy: ALPR_OTHER_DISCORD_ID,
+    createdAt: minutesAgo(600).at,
+  },
+];
+
+/**
+ * Plate reads, `Repo.listReads`' own SELECT column for column and units. Row
+ * 4 is a real hit against the covert entry above -- kept here as the DB would
+ * hold it, with the masking left to the route's own logic in the fixture
+ * handler below, exactly as `alpr.read.list`'s handler builds the response
+ * rather than redacting one.
+ */
+const alprReads: CadAlprRead[] = [
+  {
+    id: 1,
+    plate: '6ABC123',
+    readAt: minutesAgo(6).at,
+    readAtUnix: minutesAgo(6).unix,
+    x: 220.1,
+    y: -805.4,
+    z: 30.7,
+    officerId: OWN_OFFICER_ID,
+    discordId: ALPR_VIEWER_DISCORD_ID,
+    callsign: '12-40',
+    camera: 'front',
+    hit: true,
+    hotlistId: 1,
+    hotlistReason: 'stolen_vehicle',
+  },
+  {
+    id: 2,
+    plate: '4JKL556',
+    readAt: minutesAgo(14).at,
+    readAtUnix: minutesAgo(14).unix,
+    x: 118.9,
+    y: -1020.6,
+    z: 29.3,
+    officerId: 2,
+    discordId: ALPR_OTHER_DISCORD_ID,
+    callsign: '3A-12',
+    camera: 'rear',
+    hit: false,
+    hotlistId: null,
+    hotlistReason: null,
+  },
+  {
+    id: 3,
+    plate: '7XYZ890',
+    readAt: minutesAgo(35).at,
+    readAtUnix: minutesAgo(35).unix,
+    x: 402.2,
+    y: -560.8,
+    z: 28.5,
+    officerId: OWN_OFFICER_ID,
+    discordId: ALPR_VIEWER_DISCORD_ID,
+    callsign: '12-40',
+    camera: 'fixed',
+    hit: true,
+    hotlistId: 2,
+    hotlistReason: 'investigation',
+  },
+  {
+    id: 4,
+    plate: '9QRS231',
+    readAt: minutesAgo(50).at,
+    readAtUnix: minutesAgo(50).unix,
+    x: 340.6,
+    y: -480.3,
+    z: 28.9,
+    officerId: OWN_OFFICER_ID,
+    discordId: ALPR_VIEWER_DISCORD_ID,
+    callsign: '12-40',
+    camera: 'front',
+    hit: true,
+    hotlistId: 3,
+    hotlistReason: 'wanted_person',
+  },
+  {
+    id: 5,
+    plate: '2MNO447',
+    readAt: minutesAgo(90).at,
+    readAtUnix: minutesAgo(90).unix,
+    x: 95.4,
+    y: -1105.7,
+    z: 29.1,
+    officerId: 2,
+    discordId: ALPR_OTHER_DISCORD_ID,
+    callsign: '3A-12',
+    camera: 'rear',
+    hit: false,
+    hotlistId: null,
+    hotlistReason: null,
   },
 ];
 
@@ -5981,6 +6160,172 @@ export const fixtures: FixtureSet = {
       );
 
       return { id };
+    },
+
+    // ----------------------------------------------------------------- alpr
+
+    /**
+     * Whether this session may be shown a silent entry -- the same rule
+     * `seesSilent` runs server-side (7.18, section 9): only the session that
+     * created it.
+     */
+    'alpr.read.list': (input) => {
+      const filter = (input ?? {}) as {
+        plate?: string;
+        officerId?: number;
+        sinceHours?: number;
+        hitsOnly?: boolean;
+        limit?: number;
+      };
+
+      const hitsOnly = filter.hitsOnly === true;
+      const sinceHours = filter.sinceHours ?? 24;
+      const cutoff = Math.floor(Date.now() / 1000) - sinceHours * 3600;
+      const wanted = filter.plate ? filter.plate.trim().toUpperCase() : null;
+
+      const candidates = alprReads.filter(
+        (row) =>
+          (!wanted || row.plate === wanted) &&
+          (!filter.officerId || row.officerId === filter.officerId) &&
+          row.readAtUnix >= cutoff &&
+          (!hitsOnly || row.hit),
+      );
+
+      const out = [];
+
+      for (const row of candidates) {
+        const entry = row.hotlistId ? cadHotlist.find((h) => h.id === row.hotlistId) : undefined;
+        const covert = entry?.silent === true && entry.createdBy !== ALPR_VIEWER_DISCORD_ID;
+
+        // A masked row cannot stay in a `hitsOnly` answer -- every row in
+        // that answer is a hit by construction, and `hit: false` would name
+        // the one the reader was not allowed to see.
+        if (covert && hitsOnly) continue;
+
+        out.push({
+          id: row.id,
+          plate: row.plate,
+          readAt: row.readAt,
+          readAtUnix: row.readAtUnix,
+          x: row.x,
+          y: row.y,
+          z: row.z,
+          officerId: row.officerId,
+          discordId: row.discordId,
+          callsign: row.callsign,
+          camera: row.camera,
+          hit: covert ? false : row.hit,
+          hotlistId: covert ? null : row.hotlistId,
+          hotlistReason: covert ? null : row.hotlistReason,
+        });
+      }
+
+      return { reads: out.slice(0, filter.limit ?? 100) };
+    },
+
+    'alpr.hotlist.edit': (input) => {
+      const body = (input ?? {}) as {
+        plate?: string;
+        remove?: boolean;
+        reason?: string;
+        note?: string;
+        caseNumber?: string;
+        silent?: boolean;
+        expiresInMinutes?: number;
+      };
+
+      const wanted = body.plate ? body.plate.trim().toUpperCase() : '';
+      if (!wanted) return refuse('invalid', { plate: 'required' });
+
+      if (body.remove) {
+        // A removal naming a reason takes that entry; one that does not takes
+        // every live entry for the plate this session may see -- never a
+        // silent one it did not create, and never counts it either.
+        const matches = cadHotlist.filter(
+          (entry) =>
+            entry.plate === wanted &&
+            entry.cancelledAt === null &&
+            (!body.reason || entry.reason === body.reason) &&
+            (!entry.silent || entry.createdBy === ALPR_VIEWER_DISCORD_ID),
+        );
+
+        if (matches.length === 0) return refuse('not_found', { plate: 'unknown' });
+
+        const matchedIds = new Set(matches.map((entry) => entry.id));
+        cadHotlist = cadHotlist.map((entry) =>
+          matchedIds.has(entry.id)
+            ? { ...entry, cancelledAt: minutesAgo(0).at, cancelledBy: ALPR_VIEWER_DISCORD_ID }
+            : entry,
+        );
+
+        return { plate: wanted, removed: matches.length };
+      }
+
+      // Required by the handler and not by the schema, because a removal has
+      // nothing to justify -- the validator cannot express "required unless".
+      if (!body.reason) return refuse('invalid', { reason: 'required' });
+
+      const existing = cadHotlist.find(
+        (entry) =>
+          entry.plate === wanted && entry.reason === body.reason && entry.cancelledAt === null,
+      );
+
+      if (existing) {
+        existing.detail = body.note ?? null;
+        existing.caseNumber = body.caseNumber ?? null;
+        existing.silent = body.silent === true;
+        existing.expiresAt = body.expiresInMinutes ? inMinutes(body.expiresInMinutes) : null;
+      } else {
+        cadHotlist = [
+          {
+            id: nextHotlistId++,
+            plate: wanted,
+            reason: body.reason,
+            detail: body.note ?? null,
+            caseNumber: body.caseNumber ?? null,
+            silent: body.silent === true,
+            expiresAt: body.expiresInMinutes ? inMinutes(body.expiresInMinutes) : null,
+            cancelledAt: null,
+            cancelledBy: null,
+            createdBy: ALPR_VIEWER_DISCORD_ID,
+            createdAt: minutesAgo(0).at,
+          },
+          ...cadHotlist,
+        ];
+      }
+
+      return { plate: wanted, reason: body.reason };
+    },
+
+    'alpr.hotlist.list': (input) => {
+      const filter = (input ?? {}) as {
+        plate?: string;
+        reason?: string;
+        includeExpired?: boolean;
+        limit?: number;
+      };
+
+      const now = Date.now();
+      const wanted = filter.plate ? filter.plate.trim().toUpperCase() : null;
+
+      const rows = cadHotlist.filter((entry) => {
+        if (!filter.includeExpired) {
+          if (entry.cancelledAt !== null) return false;
+          if (entry.expiresAt !== null && new Date(entry.expiresAt).getTime() <= now) return false;
+        }
+
+        if (wanted && entry.plate !== wanted) return false;
+        if (filter.reason && entry.reason !== filter.reason) return false;
+
+        // Deliberately no `silent` field to ask for these by: the subject
+        // learns nothing, and the subject is sometimes an officer reading
+        // this very board.
+        if (entry.silent && entry.createdBy !== ALPR_VIEWER_DISCORD_ID) return false;
+
+        return true;
+      });
+
+      return { entries: rows.slice(0, filter.limit ?? 100) };
     },
 
     'beat.list': () => ({ beats: cadBeats }),
