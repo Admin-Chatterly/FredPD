@@ -6,6 +6,14 @@ import tailwindcss from '@tailwindcss/vite';
 
 const resourceRoot = fileURLToPath(new URL('../resources/[fredpd]/fredpd', import.meta.url));
 
+// `index.html`'s CSP interpolates `%VITE_MEDIA_HOST%` (Vite's HTML env
+// replacement) so the gateway's media origin can be named without a
+// wildcard (invariant 9). Left unset, Vite leaves the literal `%…%` in the
+// built HTML and warns on every build; a same-origin loopback default keeps
+// `pnpm dev:web` and a default build quiet, and a real deployment overrides
+// it with the gateway's actual `FREDPD_MEDIA_BASE_URL`.
+process.env['VITE_MEDIA_HOST'] ??= 'http://127.0.0.1:3080';
+
 export default defineConfig({
   plugins: [svelte(), tailwindcss()],
 

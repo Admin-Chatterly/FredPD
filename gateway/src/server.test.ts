@@ -1,3 +1,7 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import type { GatewayConfig } from './config.js';
@@ -10,6 +14,21 @@ const config: GatewayConfig = {
   port: 0,
   secret: 'test-secret',
   replayWindowSeconds: 30,
+  media: {
+    directory: join(mkdtempSync(join(tmpdir(), 'fredpd-media-')), 'store'),
+    tokenTtlSeconds: 300,
+    maxBytes: 15 * 1024 * 1024,
+    publicBaseUrl: 'http://127.0.0.1:3080',
+  },
+  pdf: {
+    chromiumExecutable: process.env['PLAYWRIGHT_CHROMIUM_EXECUTABLE'] ?? '/opt/pw-browsers/chromium',
+  },
+  scheduler: {
+    enabled: false,
+    intervalSeconds: 300,
+    databaseUrl: null,
+    retentionDays: { queryLog: 365, alprReads: 90, staleDrafts: 180, surveillanceSessions: 730 },
+  },
 };
 
 function signedHeaders(body: string, secret = config.secret) {

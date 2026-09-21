@@ -21,11 +21,17 @@ Two guides in Swedish, for the people who run and use the server:
 
 ## Status
 
-**M0–M3 complete. M2 records and M4 dispatch are in.** The platform core, the
-registers, the evidence and forensics chain, dispatch, and the records half of
-M2 — anmälan, förundersökning, frihetsberövande, tvångsmedel and
-spaningsuppdrag — are built and tested. M5 surveillance and M6 court, personnel
-and booking are next; see the roadmap in spec section 17.
+**M0–M3 complete. M2 records, M4 dispatch and M5 surveillance are in.** The
+platform core, the registers, the evidence and forensics chain, dispatch, the
+records half of M2 — anmälan, förundersökning, frihetsberövande, tvångsmedel
+and spaningsuppdrag — and M5's secret coercive measures — HAK, HRA,
+spårsändare, kameraövervakning, tingsrätt-decided unlike M2's — are built and
+tested. The gateway's media store, PDF renderer and retention scheduler are
+built too, standalone and tested, though nothing in the core resource calls
+them yet — that bridge (`server/bridges/gateway/*.lua`, spec 3.7) needs a
+verified Lua HMAC-SHA256 implementation this repository does not have, and
+shipping an unverified one was judged worse than leaving the gap open. M6
+court, personnel and booking are next; see the roadmap in spec section 17.
 
 Two decisions that shape everything below: the framework is **ESX** (ADR-005),
 and the procedure is **Swedish** rather than US workflows with Swedish labels
@@ -69,17 +75,28 @@ Working today:
   notices, with `HasSearchWarrant` for door and raid scripts (7.12, §14).
 - **Spaningsuppdrag**: lookouts on people, vehicles or a description alone,
   feeding the hot-file check (7.13).
+- **Surveillance**: HAK, HRA, spårsändare and kameraövervakning, requested by
+  an åklagare and only ever granted or refused by a domare, with
+  `HasActiveWarrant` for other resources to check (spec 9, §14).
 
 M2's interface is complete: every register and every workflow in it has a
-screen, and the Records module's eight tabs are the whole of what the M2 routes
-can do.
+screen, and the Records module's tabs are the whole of what the M2 routes can
+do. M5 has its own rail module rather than a Records tab, since it is a
+different clearance and a different pair of decision-makers.
 
-Not built yet, and worth knowing before you install: the **gateway** service, so
-no media uploads, no PDFs and no printing; **booking**, **citations**,
-**impound**, **court** and **personnel** (all M6); and **surveillance** (M5),
-whose resource exists as a boot stub and nothing more. None of this has run on a
-live FiveM server: the logic is covered by tests, and the parts that call game
-natives are not.
+Built and tested, but not reachable from inside the game yet: the **gateway**
+service — signed upload/download tokens over a local (or S3-compatible) media
+store, WebP thumbnails, a pluggable virus-scan hook, PDF rendering through
+headless Chromium from the same editor-JSON contract Tiptap will eventually
+produce, and a retention scheduler for query logs, ALPR reads, stale drafts and
+old surveillance sessions. It runs and is fully covered by its own test suite,
+but the Lua-side bridge that would let FXServer call it does not exist — see
+above. `web/index.html`'s CSP already carries a `VITE_MEDIA_HOST` slot for it
+either way.
+
+Not built at all yet: **booking**, **citations**, **impound**, **court** and
+**personnel** (all M6). None of this has run on a live FiveM server: the logic
+is covered by tests, and the parts that call game natives are not.
 
 ## Layout
 
@@ -87,7 +104,7 @@ natives are not.
 resources/[fredpd]/
   fredpd/               core: sessions, permissions, records, dispatch, NUI host
   fredpd_forensics/     evidence generation and scene tools      (M3)
-  fredpd_surveillance/  interception, warrant-gated              (M5)
+  fredpd_surveillance/  device/tracker plumbing, still a boot stub (M5)
   fredpd_assets/        streamed props and sounds
 web/                    Svelte 5 NUI, builds into fredpd/web/dist
 gateway/                Node.js service: Discord sync, media, PDF, scheduler
