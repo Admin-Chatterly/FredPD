@@ -111,6 +111,13 @@ server_scripts {
     'server/modules/spaning/routes.lua',
     'server/modules/spaning/events.lua',
 
+    -- Surveillance (spec 9, M5). The secret, tingsrätt-decided measures --
+    -- after frihet, whose capacity-derivation pattern `capacityOf` follows,
+    -- and after anmalan, whose förundersökning every request links to.
+    'server/modules/surveillance/service.lua',
+    'server/modules/surveillance/repo.lua',
+    'server/modules/surveillance/routes.lua',
+
     'server/modules/placements/service.lua',
     'server/modules/placements/repo.lua',
     'server/modules/placements/routes.lua',

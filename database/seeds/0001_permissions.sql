@@ -301,6 +301,51 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('patrol', 'spaning.view'),
     ('patrol', 'spaning.create'),
 
+    -- Surveillance (spec 9, M5). The secret, tingsrätt-decided measures --
+    -- HAK, HRA, spårsändare, kameraövervakning -- and the one place besides
+    -- frihet where a permission stands for a legal capacity rather than a job.
+    --
+    -- `surv.request` is the åklagare's application; `surv.decide` is the
+    -- domare's grant or refusal; `surv.upphav` is either's early revocation
+    -- (RB 27:23). None is seeded to a police group, for the same reason
+    -- `frihet.anhallande` and `frihet.haktning` are not: an officer who could
+    -- request would be taking the decision the prosecutor exists to take.
+    --
+    -- `surv.view` is broader -- reading the register, and the base gate on
+    -- observing once a measure is granted -- and it goes to command and the
+    -- source handler as well as to the DOJ groups, because an intelligence
+    -- unit built the case that led to the application and reads the result.
+    -- `surv.log.view` is narrower again: the observer log names who listened
+    -- and when, and stays with command and the DOJ groups only.
+    ('aklagare', 'surv.view'),
+    ('aklagare', 'surv.request'),
+    ('aklagare', 'surv.upphav'),
+    ('aklagare', 'surv.log.view'),
+    ('aklagare', 'page.surveillance'),
+    ('domare', 'surv.view'),
+    ('domare', 'surv.decide'),
+    ('domare', 'surv.upphav'),
+    ('domare', 'surv.log.view'),
+    ('domare', 'page.surveillance'),
+    ('command', 'surv.view'),
+    ('command', 'surv.log.view'),
+    ('command', 'page.surveillance'),
+
+    -- The per-method capability to actually observe once a measure is live
+    -- (`hak.session.start`, `hak.intercept.add`). Held by the source handler,
+    -- not by ordinary intelligence work: `intel_analyst` reads and writes the
+    -- register, and listening to a live interception is a further step up
+    -- from that, matching `intel_handler`'s own "may also see where protected
+    -- intelligence came from".
+    ('intel_handler', 'surv.view'),
+    ('intel_handler', 'surv.phone.intercept'),
+    ('intel_handler', 'surv.radio.monitor'),
+    ('intel_handler', 'surv.device.deploy'),
+    ('intel_handler', 'surv.device.listen'),
+    ('intel_handler', 'surv.tracker.deploy'),
+    ('intel_handler', 'surv.tracker.view'),
+    ('intel_handler', 'page.surveillance'),
+
     -- The two field-level grants of spec 4.5. Without a group holding them the
     -- fields are not protected, they are invisible: the routes read the
     -- permission on every path that returns the field, so a department that

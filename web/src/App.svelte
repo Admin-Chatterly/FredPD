@@ -13,6 +13,7 @@
   import Evidence from './modules/evidence/Evidence.svelte';
   import Lab from './modules/lab/Lab.svelte';
   import Intel from './modules/intel/Intel.svelte';
+  import Surveillance from './modules/surveillance/Surveillance.svelte';
 
   /**
    * The application shell (spec 6.3). M1 fills in the command line, tabs and
@@ -105,7 +106,7 @@
    * A module joins this list when its page is imported above; until then the
    * rail entry draws the placeholder.
    */
-  const BUILT = new Set(['records', 'dispatch', 'evidence', 'lab', 'intel', 'admin']);
+  const BUILT = new Set(['records', 'dispatch', 'evidence', 'lab', 'intel', 'surveillance', 'admin']);
 </script>
 
 <div class="flex h-full flex-col bg-[var(--color-panel)] text-[var(--color-ink)]">
@@ -160,6 +161,8 @@
         <Evidence />
       {:else if current === 'lab'}
         <Lab />
+      {:else if current === 'surveillance'}
+        <Surveillance />
       {:else if session && current === 'admin'}
         <nav class="mb-4 flex gap-1 border-b border-[var(--color-border)]">
           {#each ADMIN_TABS as tab (tab)}

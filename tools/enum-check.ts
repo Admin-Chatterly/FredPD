@@ -127,6 +127,13 @@ const PAIRED: Record<string, keyof typeof enums> = {
   // Spaningsuppdrag (0012).
   ck_fpd_spaning_target: 'SPANING_TARGETS',
   ck_fpd_spaning_class: 'CLASSIFICATIONS',
+
+  // Secret coercive measures (0015, spec 9).
+  ck_fpd_hak_target: 'HAK_TARGETS',
+  ck_fpd_hak_method: 'HAK_METHODS',
+  ck_fpd_hak_status: 'HAK_STATUSES',
+  ck_fpd_hak_class: 'CLASSIFICATIONS',
+  ck_fpd_hak_intercepts_class: 'CLASSIFICATIONS',
 };
 
 /**

@@ -95,7 +95,7 @@ const session = {
   timezone: 'Europe/Stockholm',
   // Only what this fake session may open. The real list is derived from
   // Discord roles on the server (invariant 2).
-  modules: ['records', 'dispatch', 'evidence', 'lab', 'intel', 'comms', 'admin'],
+  modules: ['records', 'dispatch', 'evidence', 'lab', 'intel', 'surveillance', 'comms', 'admin'],
 };
 
 const groups: PermissionGroup[] = [
@@ -2915,6 +2915,198 @@ function spaningRow(row: FixtureSpaning): Record<string, unknown> {
   };
 }
 
+// -------------------------------------------------------------- surveillance
+
+interface FixtureHak {
+  id: number;
+  number: string;
+  fuId: number;
+  targetKind: string;
+  targetId: number | null;
+  targetLabel: string | null;
+  method: string;
+  grund: string;
+  status: string;
+  requestedAgo: number;
+  decidedAgo?: number;
+  refusedGrund?: string | null;
+  courtRef?: string | null;
+  /** Present only once `beviljad`. */
+  validFromAgo?: number;
+  validUntilAgo?: number;
+  upphavdAgo?: number;
+  upphavdGrund?: string | null;
+  version: number;
+}
+
+const hak: FixtureHak[] = [
+  {
+    // Requested and not yet decided. Grant and refuse both refuse
+    // `wrong_capacity` for this viewer — see `FIXTURE_HAK_CAPACITY` below,
+    // and that refusal is the point: an åklagare cannot decide their own
+    // application.
+    id: 1,
+    number: 'H26-00003',
+    fuId: 31,
+    targetKind: 'phone',
+    targetId: null,
+    targetLabel: '070-5551234',
+    method: 'hak',
+    grund: 'sarskild_vikt',
+    status: 'begard',
+    requestedAgo: 2 * DAY,
+    version: 1,
+  },
+  {
+    // Granted and live: the row observing and logging a capture works on.
+    id: 2,
+    number: 'H26-00002',
+    fuId: 31,
+    targetKind: 'person',
+    targetId: 4,
+    targetLabel: null,
+    method: 'hra',
+    grund: 'grov_brottslighet',
+    status: 'beviljad',
+    requestedAgo: 10 * DAY,
+    decidedAgo: 9 * DAY,
+    courtRef: 'B 4471-26',
+    validFromAgo: 9 * DAY,
+    validUntilAgo: -21 * DAY,
+    version: 2,
+  },
+  {
+    // Refused, so the screen has something to show under `refusedGrund`.
+    id: 3,
+    number: 'H26-00001',
+    fuId: 28,
+    targetKind: 'vehicle',
+    targetId: 7,
+    targetLabel: null,
+    method: 'sparsandare',
+    grund: 'fara_i_drojsmal',
+    status: 'avslagen',
+    requestedAgo: 30 * DAY,
+    decidedAgo: 29 * DAY,
+    refusedGrund: 'annan',
+    version: 2,
+  },
+  {
+    // Granted, then revoked early (RB 27:23) — the third ending, and the one
+    // `upphavdGrund` exists to explain.
+    id: 4,
+    number: 'H25-00099',
+    fuId: 19,
+    targetKind: 'location',
+    targetId: null,
+    targetLabel: 'Förrådsvägen 4',
+    method: 'kameraovervakning',
+    grund: 'skalig_misstanke',
+    status: 'upphavd',
+    requestedAgo: 60 * DAY,
+    decidedAgo: 59 * DAY,
+    courtRef: 'B 3120-25',
+    validFromAgo: 59 * DAY,
+    validUntilAgo: -31 * DAY,
+    upphavdAgo: 15 * DAY,
+    upphavdGrund: 'syfte_uppnatt',
+    version: 3,
+  },
+];
+
+const restrictedHak = [
+  { restricted: true as const, recordType: 'surveillance', contact: 'internal_affairs' },
+  { restricted: true as const, recordType: 'surveillance', contact: 'homicide' },
+];
+
+const hakSessions: Record<number, { id: number; startedAgo: number; endedAgo?: number }[]> = {
+  2: [{ id: 1, startedAgo: 8 * DAY, endedAgo: 8 * DAY - 3600 }],
+};
+
+const hakIntercepts: Record<
+  number,
+  { id: number; kind: string; occurredAgo: number; summary: string | null }[]
+> = {
+  2: [
+    {
+      id: 1,
+      kind: 'surveillance.intercept.call',
+      occurredAgo: 8 * DAY,
+      summary: 'Call to an unregistered number, under two minutes.',
+    },
+  ],
+};
+
+let nextHakSessionId = 2;
+let nextHakInterceptId = 2;
+
+/** `Surveillance.isValid`, computed the way the server computes it. */
+function hakLiveness(row: FixtureHak): { live: boolean; why: string | null } {
+  if (row.status !== 'beviljad') return { live: false, why: row.status };
+  if (row.upphavdAgo !== undefined) return { live: false, why: 'upphavd' };
+  if ((row.validFromAgo ?? 0) < 0) return { live: false, why: 'not_yet' };
+  if ((row.validUntilAgo ?? 0) > 0) return { live: false, why: 'expired' };
+
+  return { live: true, why: null };
+}
+
+/** `Surveillance.bannerFor`. */
+function hakBannerFor(row: FixtureHak): string {
+  if (row.status === 'begard') return 'pending';
+
+  return hakLiveness(row).live ? 'active' : 'closed';
+}
+
+function hakRow(row: FixtureHak, withReason: boolean): Record<string, unknown> {
+  const { live, why } = hakLiveness(row);
+
+  const shaped: Record<string, unknown> = {
+    id: row.id,
+    agencyId: session.agencyId,
+    number: row.number,
+    fuId: row.fuId,
+    targetKind: row.targetKind,
+    targetId: row.targetId,
+    targetLabel: row.targetLabel,
+    method: row.method,
+    grund: row.grund,
+    status: row.status,
+    requestedBy: FIXTURE_VIEWER,
+    requestedAt: secondsAgo(row.requestedAgo),
+    decidedBy: row.decidedAgo === undefined ? null : FIXTURE_VIEWER,
+    decidedAt: row.decidedAgo === undefined ? null : secondsAgo(row.decidedAgo),
+    refusedGrund: row.refusedGrund ?? null,
+    courtRef: row.courtRef ?? null,
+    validFrom: row.validFromAgo === undefined ? null : secondsAgo(row.validFromAgo),
+    validUntil: row.validUntilAgo === undefined ? null : secondsAgo(row.validUntilAgo),
+    upphavdAt: row.upphavdAgo === undefined ? null : secondsAgo(row.upphavdAgo),
+    upphavdBy: row.upphavdAgo === undefined ? null : FIXTURE_VIEWER,
+    upphavdGrund: row.upphavdGrund ?? null,
+    classification: 'confidential',
+    version: row.version,
+    live,
+    banner: hakBannerFor(row),
+    needsRenewal:
+      live && row.validUntilAgo !== undefined && -row.validUntilAgo <= 24 * 3600,
+  };
+
+  // Only `hak.get` sends the reason, the same split `tvangRow` makes.
+  if (withReason) shaped.notLiveBecause = why;
+
+  return shaped;
+}
+
+/**
+ * The capacity the fixture session decides in.
+ *
+ * The åklagare, deliberately — the boundary this module exists to draw is
+ * that the prosecutor who applies for a secret measure is never the one who
+ * grants it, and picking `domare` instead would leave that refusal
+ * unreachable from this screen (the same reasoning `FIXTURE_TVANG_CAPACITY`
+ * gives for `fu_ledare`).
+ */
+const FIXTURE_HAK_CAPACITY: string = 'aklagare';
+
 export const fixtures: FixtureSet = {
   ok: {
     'session.get': () => session,
@@ -3609,6 +3801,210 @@ export const fixtures: FixtureSet = {
       row.version += 1;
 
       return { id: row.id };
+    },
+
+    // --------------------------------------------------------- surveillance
+
+    'hak.list': (input) => {
+      const filter = (input ?? {}) as { status?: string; liveOnly?: boolean };
+
+      const found = hak.filter(
+        (row) =>
+          (!filter.status || row.status === filter.status) &&
+          (!filter.liveOnly || hakLiveness(row).live),
+      );
+
+      return { hak: [...found.map((row) => hakRow(row, false)), ...restrictedHak] };
+    },
+
+    'hak.get': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const row = hak.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+
+      return { hak: hakRow(row, true) };
+    },
+
+    'hak.log': (input) => {
+      const { hakId } = (input ?? {}) as { hakId?: number };
+      const row = hak.find((entry) => entry.id === hakId);
+
+      if (!row) return refuse('not_found');
+
+      return {
+        id: row.id,
+        sessions: (hakSessions[row.id] ?? []).map((entry) => ({
+          id: entry.id,
+          hakId: row.id,
+          observer: FIXTURE_VIEWER,
+          startedAt: secondsAgo(entry.startedAgo),
+          endedAt: entry.endedAgo === undefined ? null : secondsAgo(entry.endedAgo),
+          minimizationNote: null,
+        })),
+        intercepts: (hakIntercepts[row.id] ?? []).map((entry) => ({
+          id: entry.id,
+          hakId: row.id,
+          kind: entry.kind,
+          occurredAt: secondsAgo(entry.occurredAgo),
+          summary: entry.summary,
+          mediaRef: null,
+          classification: 'confidential',
+          loggedBy: FIXTURE_VIEWER,
+          loggedAt: secondsAgo(entry.occurredAgo),
+        })),
+      };
+    },
+
+    'hak.request': (input) => {
+      const body = (input ?? {}) as {
+        fuId?: number;
+        targetKind?: string;
+        targetId?: number;
+        targetLabel?: string;
+        method?: string;
+        grund?: string;
+      };
+
+      if (!body.fuId) return refuse('invalid', { fuId: 'required' });
+      if (!body.targetKind) return refuse('invalid', { targetKind: 'unknown' });
+      if (!body.grund) return refuse('invalid', { grund: 'required' });
+
+      const id = hak.length + 1;
+      const number = `H26-000${10 + id}`;
+
+      hak.unshift({
+        id,
+        number,
+        fuId: body.fuId,
+        targetKind: body.targetKind,
+        targetId: body.targetId ?? null,
+        targetLabel: body.targetLabel ?? null,
+        method: body.method ?? 'hak',
+        grund: body.grund,
+        status: 'begard',
+        requestedAgo: 0,
+        version: 1,
+      });
+
+      return { id, number };
+    },
+
+    'hak.grant': (input) => {
+      const { id, version } = (input ?? {}) as { id?: number; version?: number };
+      const row = hak.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+
+      // Only a domare may grant (spec 9) — the boundary
+      // `FIXTURE_HAK_CAPACITY` exists to reach.
+      if (FIXTURE_HAK_CAPACITY !== 'domare') {
+        return refuse('forbidden', { _input: 'wrong_capacity' });
+      }
+
+      if (row.status !== 'begard' || row.version !== version) return refuse('conflict');
+
+      row.status = 'beviljad';
+      row.decidedAgo = 0;
+      row.validFromAgo = 0;
+      row.validUntilAgo = -30 * DAY;
+      row.version += 1;
+
+      return { id: row.id };
+    },
+
+    'hak.refuse': (input) => {
+      const { id, version, grund } = (input ?? {}) as {
+        id?: number;
+        version?: number;
+        grund?: string;
+      };
+      const row = hak.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+      if (FIXTURE_HAK_CAPACITY !== 'domare') {
+        return refuse('forbidden', { _input: 'wrong_capacity' });
+      }
+      if (!grund) return refuse('invalid', { grund: 'required' });
+      if (row.status !== 'begard' || row.version !== version) return refuse('conflict');
+
+      row.status = 'avslagen';
+      row.decidedAgo = 0;
+      row.refusedGrund = grund;
+      row.version += 1;
+
+      return { id: row.id };
+    },
+
+    'hak.upphav': (input) => {
+      const { id, version, grund } = (input ?? {}) as {
+        id?: number;
+        version?: number;
+        grund?: string;
+      };
+      const row = hak.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+
+      // Either decision-maker may revoke early (RB 27:23), and this viewer
+      // holds one of the two.
+      if (FIXTURE_HAK_CAPACITY !== 'aklagare' && FIXTURE_HAK_CAPACITY !== 'domare') {
+        return refuse('forbidden', { _input: 'wrong_capacity' });
+      }
+      if (row.status !== 'beviljad' || row.version !== version) return refuse('conflict');
+
+      row.status = 'upphavd';
+      row.upphavdAgo = 0;
+      row.upphavdGrund = grund ?? null;
+      row.version += 1;
+
+      return { id: row.id };
+    },
+
+    'hak.session.start': (input) => {
+      const { hakId } = (input ?? {}) as { hakId?: number };
+      const row = hak.find((entry) => entry.id === hakId);
+
+      if (!row) return refuse('not_found');
+      if (!hakLiveness(row).live) return refuse('conflict', { status: 'not_live' });
+
+      const id = ++nextHakSessionId;
+      hakSessions[row.id] = [...(hakSessions[row.id] ?? []), { id, startedAgo: 0 }];
+
+      return { id };
+    },
+
+    'hak.session.end': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+
+      for (const list of Object.values(hakSessions)) {
+        const entry = list.find((record) => record.id === id);
+        if (entry && entry.endedAgo === undefined) {
+          entry.endedAgo = 0;
+          return { id };
+        }
+      }
+
+      return refuse('not_found');
+    },
+
+    'hak.intercept.add': (input) => {
+      const body = (input ?? {}) as { hakId?: number; kind?: string; summary?: string };
+      const row = hak.find((entry) => entry.id === body.hakId);
+
+      if (!row) return refuse('not_found');
+      if (!body.kind || !body.kind.startsWith('surveillance.intercept.')) {
+        return refuse('invalid', { kind: 'not_a_key' });
+      }
+      if (!hakLiveness(row).live) return refuse('conflict', { status: 'not_live' });
+
+      const id = ++nextHakInterceptId;
+      hakIntercepts[row.id] = [
+        ...(hakIntercepts[row.id] ?? []),
+        { id, kind: body.kind, occurredAgo: 0, summary: body.summary ?? null },
+      ];
+
+      return { id };
     },
 
     // ------------------------------------------------------------- anmälan

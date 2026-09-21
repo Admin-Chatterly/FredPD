@@ -146,6 +146,7 @@ function Session.allowedModules(session)
         evidence = 'page.evidence',
         lab = 'page.lab',
         intel = 'page.intel',
+        surveillance = 'page.surveillance',
         court = 'page.court',
         personnel = 'page.personnel',
         comms = 'page.comms',
@@ -153,7 +154,10 @@ function Session.allowedModules(session)
     }
 
     -- Stable order, so the rail does not reshuffle between sessions.
-    local order = { 'records', 'dispatch', 'evidence', 'lab', 'intel', 'court', 'personnel', 'comms', 'admin' }
+    local order = {
+        'records', 'dispatch', 'evidence', 'lab', 'intel', 'surveillance',
+        'court', 'personnel', 'comms', 'admin',
+    }
 
     for index = 1, #order do
         local name = order[index]

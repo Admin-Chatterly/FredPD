@@ -294,7 +294,8 @@ route.define({
 local PERMISSION_CATALOGUE <const> = {
     -- Pages
     'page.query', 'page.dispatch', 'page.records', 'page.evidence', 'page.lab',
-    'page.intel', 'page.court', 'page.personnel', 'page.stats', 'page.admin', 'page.comms',
+    'page.intel', 'page.surveillance', 'page.court', 'page.personnel', 'page.stats',
+    'page.admin', 'page.comms',
 
     -- Queries
     'query.run', 'query.hit.confirm',
@@ -380,6 +381,7 @@ local PERMISSION_CATALOGUE <const> = {
     'lab.analysis.review', 'lab.report.release',
 
     -- Surveillance
+    'surv.view', 'surv.request', 'surv.decide', 'surv.upphav',
     'surv.phone.intercept', 'surv.radio.monitor', 'surv.device.deploy',
     'surv.device.listen', 'surv.tracker.deploy', 'surv.tracker.view', 'surv.log.view',
 

@@ -1076,3 +1076,40 @@ export type EfterlysningGrund = (typeof EFTERLYSNING_GRUNDER)[number];
 export const SPANING_TARGETS = ['person', 'vehicle', 'other'] as const;
 
 export type SpaningTarget = (typeof SPANING_TARGETS)[number];
+
+/**
+ * `ck_fpd_hak_target` — what a secret coercive measure is directed at (spec 9).
+ *
+ * `phone` and `location` are not foreign keys into anything this suite holds
+ * — a telephone number or a room is not a record — so those rows carry
+ * `targetLabel` rather than `targetId`. `person` and `vehicle` may point at
+ * either register.
+ */
+export const HAK_TARGETS = ['person', 'phone', 'vehicle', 'location'] as const;
+
+export type HakTarget = (typeof HAK_TARGETS)[number];
+
+/**
+ * `ck_fpd_hak_method` — the secret measures spec 9 names.
+ *
+ * Swedish names for the two RB gives: **hak** (hemlig avlyssning av
+ * elektronisk kommunikation, RB 27:18) is listening to a warranted number's
+ * calls; **hra** (hemlig rumsavlyssning, RB 27:20d) is a listening device in
+ * a place. `sparsandare` (a tracker) and `kameraovervakning` (a camera) are
+ * not in RB by those names but spec 9 requires the same tingsrätt gate for
+ * both, so they share this table rather than inventing a second one.
+ */
+export const HAK_METHODS = ['hak', 'hra', 'sparsandare', 'kameraovervakning'] as const;
+
+export type HakMethod = (typeof HAK_METHODS)[number];
+
+/**
+ * `ck_fpd_hak_status` — the request/decision chain (spec 9).
+ *
+ * `begard` is the åklagare's application; `beviljad` and `avslagen` are the
+ * domare's decision either way; `upphavd` is an early revocation of a
+ * `beviljad` measure (RB 27:23 — grounds may cease before the window does).
+ */
+export const HAK_STATUSES = ['begard', 'beviljad', 'avslagen', 'upphavd'] as const;
+
+export type HakStatus = (typeof HAK_STATUSES)[number];

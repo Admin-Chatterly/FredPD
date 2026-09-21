@@ -17,7 +17,8 @@
       "court": "Domstol",
       "personnel": "Personal",
       "comms": "Kommunikation",
-      "admin": "Administration"
+      "admin": "Administration",
+      "surveillance": "Hemlig avlyssning"
     },
     "status": {
       "unit": "Enhet {callsign}",
@@ -137,7 +138,9 @@
     "no_expiry": "Spaningsuppdraget saknar sluttid och kan inte användas.",
     "out_of_range": "Utanför tillåtet intervall.",
     "out_of_order": "Inte möjligt från det här stadiet.",
-    "not_a_key": "Okänd händelsetyp."
+    "not_a_key": "Okänd händelsetyp.",
+    "not_live": "gäller inte just nu",
+    "wrong_capability": "du saknar behörigheten för denna metod"
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -2051,5 +2054,103 @@
     },
     "priorityOneWarning": "Prioritet 1 ger larm till varje polis som gör en slagning på objektet. Använd den bara när uppgiften måste nå alla direkt.",
     "closed": "Spaningsuppdrag {number} avslutat."
+  },
+  "surveillance": {
+    "target": {
+      "person": "Person",
+      "phone": "Telefonnummer",
+      "vehicle": "Fordon",
+      "location": "Plats"
+    },
+    "method": {
+      "hak": "Hemlig avlyssning av elektronisk kommunikation",
+      "hra": "Hemlig rumsavlyssning",
+      "sparsandare": "Spårsändare",
+      "kameraovervakning": "Kameraövervakning"
+    },
+    "status": {
+      "begard": "Begärd",
+      "beviljad": "Beviljad",
+      "avslagen": "Avslagen",
+      "upphavd": "Hävd",
+      "not_yet": "Ej i kraft ännu",
+      "expired": "Utgången",
+      "not_found": "Åtgärden finns inte"
+    },
+    "banner": {
+      "pending": "Väntar på beslut",
+      "active": "Aktiv",
+      "closed": "Avslutad"
+    },
+    "grund": {
+      "skalig_misstanke": "Skälig misstanke",
+      "sarskild_vikt": "Av särskild vikt för utredningen",
+      "fara_i_drojsmal": "Fara i dröjsmål",
+      "grov_brottslighet": "Grov brottslighet som når straffvärdet",
+      "annan": "Annat, anges i framställan"
+    },
+    "upphavandegrund": {
+      "skal_upphorda": "Skälen har upphört",
+      "syfte_uppnatt": "Syftet är uppnått",
+      "annan": "Annat"
+    },
+    "column": {
+      "number": "Diarienummer",
+      "target": "Riktat mot",
+      "method": "Metod",
+      "status": "Status",
+      "requested": "Begärd",
+      "valid": "Giltigt till"
+    },
+    "action": {
+      "request": "Begär",
+      "grant": "Bevilja",
+      "refuse": "Avslå",
+      "upphav": "Häv beslutet",
+      "startSession": "Börja avlyssna",
+      "endSession": "Avsluta avlyssning",
+      "logIntercept": "Logga fångst"
+    },
+    "field": {
+      "fuId": "Förundersökning",
+      "targetId": "Objekt-id",
+      "targetLabel": "Benämning",
+      "grundChoose": "Välj grund",
+      "courtRef": "Domstolens referens",
+      "valid": "Gäller i",
+      "validDays": "{count} dygn",
+      "minimizationNote": "Minimeringsanteckning",
+      "kind": "Typ",
+      "summary": "Sammanfattning",
+      "mediaRef": "Mediareferens"
+    },
+    "empty": "Inga hemliga tvångsmedel matchar.",
+    "detail": {
+      "none": "Välj en åtgärd för att läsa den."
+    },
+    "notLive": "Åtgärden ger inte stöd för någon avlyssning ({reason}).",
+    "confirm": {
+      "grant": "Vill du bevilja framställan? Den ger stöd för avlyssning från och med nu till dess att tiden löper ut.",
+      "refuse": "Vill du avslå framställan?",
+      "upphav": "Vill du häva åtgärden? Den ger inte längre stöd för någon avlyssning, men beslutet ligger kvar i akten."
+    },
+    "log": {
+      "title": "Avlyssningslogg",
+      "sessions": "Pass",
+      "intercepts": "Fångster",
+      "empty": "Inget loggat ännu."
+    },
+    "requested": "Framställan {number} inlämnad.",
+    "granted": "Åtgärd {number} beviljad.",
+    "refused": "Åtgärd {number} avslagen.",
+    "revoked": "Åtgärd {number} hävd.",
+    "intercept": {
+      "call": "Samtal",
+      "message": "Meddelande",
+      "position": "Position",
+      "audio": "Ljud",
+      "image": "Bild",
+      "other": "Annat"
+    }
   }
 }

@@ -197,6 +197,18 @@ local NUI_ROUTES <const> = {
     'spaning.create',
     'spaning.resolve',
 
+    -- Surveillance: the secret coercive measures (spec 9, M5).
+    'hak.list',
+    'hak.get',
+    'hak.log',
+    'hak.request',
+    'hak.grant',
+    'hak.refuse',
+    'hak.upphav',
+    'hak.session.start',
+    'hak.session.end',
+    'hak.intercept.add',
+
     -- Crime scenes, evidence and the chain of custody (spec 8).
     'scene.create',
     'scene.release',

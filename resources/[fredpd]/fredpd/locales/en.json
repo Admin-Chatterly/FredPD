@@ -17,7 +17,8 @@
       "court": "Court",
       "personnel": "Personnel",
       "comms": "Communications",
-      "admin": "Administration"
+      "admin": "Administration",
+      "surveillance": "Surveillance"
     },
     "status": {
       "unit": "Unit {callsign}",
@@ -137,7 +138,9 @@
     "no_expiry": "This lookout has no expiry and cannot be trusted.",
     "out_of_range": "Outside the permitted range.",
     "out_of_order": "Not possible from this stage.",
-    "not_a_key": "Not a recognised entry type."
+    "not_a_key": "Not a recognised entry type.",
+    "not_live": "not currently in force",
+    "wrong_capability": "you do not hold the capability for this method"
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -2051,5 +2054,103 @@
     },
     "priorityOneWarning": "Priority 1 raises a banner for every officer who runs this target. Use it only when the sighting has to reach everyone at once.",
     "closed": "Lookout {number} closed."
+  },
+  "surveillance": {
+    "target": {
+      "person": "Person",
+      "phone": "Telephone number",
+      "vehicle": "Vehicle",
+      "location": "Place"
+    },
+    "method": {
+      "hak": "Interception of electronic communications",
+      "hra": "Room surveillance (listening device)",
+      "sparsandare": "Tracker",
+      "kameraovervakning": "Camera surveillance"
+    },
+    "status": {
+      "begard": "Requested",
+      "beviljad": "Granted",
+      "avslagen": "Refused",
+      "upphavd": "Revoked",
+      "not_yet": "Not yet in force",
+      "expired": "Expired",
+      "not_found": "No such measure"
+    },
+    "banner": {
+      "pending": "Awaiting decision",
+      "active": "Active",
+      "closed": "Closed"
+    },
+    "grund": {
+      "skalig_misstanke": "Reasonable suspicion",
+      "sarskild_vikt": "Of particular importance to the investigation",
+      "fara_i_drojsmal": "Danger in delay",
+      "grov_brottslighet": "Serious crime meeting the minimum penalty threshold",
+      "annan": "Other, stated in the application"
+    },
+    "upphavandegrund": {
+      "skal_upphorda": "Grounds no longer apply",
+      "syfte_uppnatt": "Purpose achieved",
+      "annan": "Other"
+    },
+    "column": {
+      "number": "Diarienummer",
+      "target": "Directed at",
+      "method": "Method",
+      "status": "Status",
+      "requested": "Requested",
+      "valid": "Valid until"
+    },
+    "action": {
+      "request": "Request",
+      "grant": "Grant",
+      "refuse": "Refuse",
+      "upphav": "Revoke",
+      "startSession": "Start observing",
+      "endSession": "End observing",
+      "logIntercept": "Log a capture"
+    },
+    "field": {
+      "fuId": "Investigation",
+      "targetId": "Record id",
+      "targetLabel": "Named as",
+      "grundChoose": "Choose a ground",
+      "courtRef": "Court reference",
+      "valid": "Runs for",
+      "validDays": "{count} days",
+      "minimizationNote": "Minimization note",
+      "kind": "Kind",
+      "summary": "Summary",
+      "mediaRef": "Media reference"
+    },
+    "empty": "No secret measures match.",
+    "detail": {
+      "none": "Select a measure to read it."
+    },
+    "notLive": "This measure authorises nothing: {reason}.",
+    "confirm": {
+      "grant": "Grant this application? It authorises listening from now until the window closes.",
+      "refuse": "Refuse this application?",
+      "upphav": "Revoke this measure? It stops authorising anything from now on, and the decision stays on file."
+    },
+    "log": {
+      "title": "Observer log",
+      "sessions": "Sessions",
+      "intercepts": "Captures",
+      "empty": "Nothing logged yet."
+    },
+    "requested": "Request {number} filed.",
+    "granted": "Measure {number} granted.",
+    "refused": "Measure {number} refused.",
+    "revoked": "Measure {number} revoked.",
+    "intercept": {
+      "call": "Call",
+      "message": "Message",
+      "position": "Position",
+      "audio": "Audio",
+      "image": "Image",
+      "other": "Other"
+    }
   }
 }

@@ -1696,7 +1696,7 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 
 | Area | Keys |
 |---|---|
-| Pages | `page.query`, `page.dispatch`, `page.records`, `page.evidence`, `page.lab`, `page.intel`, `page.court`, `page.personnel`, `page.stats`, `page.admin`, `page.comms` |
+| Pages | `page.query`, `page.dispatch`, `page.records`, `page.evidence`, `page.lab`, `page.intel`, `page.surveillance`, `page.court`, `page.personnel`, `page.stats`, `page.admin`, `page.comms` |
 | Queries | `query.run`, `query.hit.confirm`, `query.person.run`, `query.vehicle.run`, `query.firearm.run`, `query.phone.run`, `query.address.run`, `query.log.view` |
 | Records | `rms.person.view`, `rms.person.edit`, `rms.person.photo.upload`, `rms.person.caution.edit`, `rms.vehicle.view`, `rms.vehicle.edit`, `rms.vehicle.flag`, `rms.firearm.view`, `rms.firearm.edit`, `rms.firearm.trace`, `rms.brott.view`, `rms.location.view`, `rms.location.hazard.edit` |
 | Anmälan | `rms.anmalan.view`, `rms.anmalan.create`, `rms.anmalan.edit.any`, `rms.anmalan.approve`, `rms.anmalan.view.<type>` |
@@ -1712,7 +1712,7 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Forensics | `forensics.scene.create`, `forensics.scene.release`, `forensics.evidence.collect`, `forensics.tools.use` |
 | Property room | `evidence.item.view`, `evidence.item.intake`, `evidence.item.transfer`, `evidence.item.checkout`, `evidence.item.release`, `evidence.item.dispose`, `evidence.item.reseal`, `evidence.audit.run` |
 | Lab | `lab.request.create`, `lab.queue.view`, `lab.analysis.perform`, `lab.analysis.review`, `lab.report.release` |
-| Surveillance | `surv.phone.intercept`, `surv.radio.monitor`, `surv.device.deploy`, `surv.device.listen`, `surv.tracker.deploy`, `surv.tracker.view`, `surv.log.view` |
+| Surveillance | `surv.view`, `surv.request`, `surv.decide`, `surv.upphav`, `surv.phone.intercept`, `surv.radio.monitor`, `surv.device.deploy`, `surv.device.listen`, `surv.tracker.deploy`, `surv.tracker.view`, `surv.log.view` |
 | Intelligence | `intel.module.open`, `intel.report.create`, `intel.report.view`, `intel.report.edit`, `intel.person.view`, `intel.person.edit`, `intel.person.merge`, `intel.org.view`, `intel.org.edit`, `intel.case.view`, `intel.case.edit`, `intel.evidence.add`, `intel.record.delete`, `intel.surveillance.log`, `intel.source.view`, `intel.source.manage`, `intel.source.identity.view`, `intel.operation.approve` |
 | Personnel | `personnel.view`, `personnel.hire`, `personnel.promote`, `personnel.discipline`, `personnel.equipment.assign`, `ia.case.view`, `ia.case.manage`, `uof.review`, `policy.manage`, `policy.ack` |
 | Communications | `comms.message.send`, `comms.bulletin.post`, `comms.pdchat.send`, `comms.pdchat.view`, `comms.pdchat.all` |
@@ -1836,6 +1836,7 @@ row it came from.
 | Citation | `citation` | `YYYY` | `{AGENCY}-T{YY}-{######}` | LSPD-T26-000311 |
 | Booking | `booking` | `YYYY` | `B{YY}-{#####}` | B26-00102 |
 | Lab request | `lab_request` | `YYYY` | `L{YY}-{#####}` | L26-00031 |
+| Secret coercive measure (HAK/HRA/spårsändare) | `hak` | `YYYY` | `H{YY}-{#####}` | H26-00007 |
 
 **The `year` column is a scope key, not a year.** It carries `0` for a sequence
 that never restarts, `YYYY` for a year-scoped one, and `YYMMDD` for the one

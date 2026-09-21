@@ -20,6 +20,9 @@ import {
   FRIHET_STATUSES,
   FU_LEDARE_KINDS,
   FU_STATUSES,
+  HAK_METHODS,
+  HAK_STATUSES,
+  HAK_TARGETS,
   HOTLIST_REASONS,
   INTEL_CASE_STATUSES,
   INTEL_CONFIDENCE,
@@ -2246,6 +2249,83 @@ export const schemas = {
     id: { type: 'integer', required: true, min: 1 },
     version: { type: 'integer', required: true, min: 1 },
     grund: { type: 'string', required: false, max: 128 },
+  },
+
+  // ------------------------------------------------- surveillance (spec 9)
+
+  HakList: {
+    fuId: { type: 'integer', required: false, min: 1 },
+    status: { type: 'enum', required: false, values: HAK_STATUSES },
+    /** Only measures that are `beviljad` and inside their window right now. */
+    liveOnly: { type: 'boolean', required: false },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  HakGet: {
+    id: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
+   * The åklagare's application (RB 27:18, 27:20d).
+   *
+   * No `deciderKind` and no `status` field, for the same reason `TvangDecide`
+   * has neither: both are the server's to set. A request always starts
+   * `begard` — only `hak.grant` and `hak.refuse`, gated on the domare
+   * capacity, may move it.
+   */
+  HakRequest: {
+    fuId: { type: 'integer', required: true, min: 1 },
+    targetKind: { type: 'enum', required: true, values: HAK_TARGETS },
+    targetId: { type: 'integer', required: false, min: 1 },
+    targetLabel: { type: 'string', required: false, max: 191 },
+    method: { type: 'enum', required: true, values: HAK_METHODS },
+    grund: { type: 'string', required: true, min: 1, max: 128 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
+  /**
+   * The domare's grant. `validSeconds` bounds the window the same way
+   * `TvangDecide.validSeconds` does, and for the same reason: a secret
+   * measure with no end is a standing authority to listen, which RB does not
+   * grant either.
+   */
+  HakGrant: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    courtRef: { type: 'string', required: false, max: 64 },
+    validSeconds: { type: 'integer', required: false, min: 3600, max: 2592000 },
+  },
+
+  HakRefuse: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    grund: { type: 'string', required: true, min: 1, max: 128 },
+  },
+
+  HakUpphav: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    grund: { type: 'string', required: false, max: 128 },
+  },
+
+  HakInterceptAdd: {
+    hakId: { type: 'integer', required: true, min: 1 },
+    kind: { type: 'string', required: true, min: 1, max: 64 },
+    summary: { type: 'string', required: false, max: 500 },
+    mediaRef: { type: 'string', required: false, max: 191 },
+  },
+
+  HakSessionStart: {
+    hakId: { type: 'integer', required: true, min: 1 },
+  },
+
+  HakSessionEnd: {
+    id: { type: 'integer', required: true, min: 1 },
+    minimizationNote: { type: 'string', required: false, max: 500 },
+  },
+
+  HakLog: {
+    hakId: { type: 'integer', required: true, min: 1 },
   },
 
 } as const satisfies Record<string, Schema>;

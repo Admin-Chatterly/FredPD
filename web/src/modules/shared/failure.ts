@@ -191,6 +191,15 @@ const REASONS = new Set([
 
   // Record-level access (4.5): a classification above the writer's clearance.
   'over_clearance',
+
+  // Surveillance (spec 9). `wrong_capability` is an officer holding the base
+  // `surv.view` grant but not the per-method one a live measure's `method`
+  // requires — a different refusal from not holding `surv.view` at all.
+  // `not_live` is a measure that is not `beviljad` and inside its window;
+  // observing or logging a capture against one is refused before it is
+  // recorded as though it were lawful.
+  'wrong_capability',
+  'not_live',
 ]);
 
 export interface FieldMessage {

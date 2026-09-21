@@ -1251,4 +1251,64 @@ FredPD.Schema = {
         version = { type = 'integer', required = true, min = 1 },
         grund = { type = 'string', required = false, max = 128 },
     },
+
+    HakList = {
+        fuId = { type = 'integer', required = false, min = 1 },
+        status = { type = 'enum', required = false, values = { 'begard', 'beviljad', 'avslagen', 'upphavd' } },
+        liveOnly = { type = 'boolean', required = false },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    HakGet = {
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
+    HakRequest = {
+        fuId = { type = 'integer', required = true, min = 1 },
+        targetKind = { type = 'enum', required = true, values = { 'person', 'phone', 'vehicle', 'location' } },
+        targetId = { type = 'integer', required = false, min = 1 },
+        targetLabel = { type = 'string', required = false, max = 191 },
+        method = { type = 'enum', required = true, values = { 'hak', 'hra', 'sparsandare', 'kameraovervakning' } },
+        grund = { type = 'string', required = true, min = 1, max = 128 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    HakGrant = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        courtRef = { type = 'string', required = false, max = 64 },
+        validSeconds = { type = 'integer', required = false, min = 3600, max = 2592000 },
+    },
+
+    HakRefuse = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        grund = { type = 'string', required = true, min = 1, max = 128 },
+    },
+
+    HakUpphav = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        grund = { type = 'string', required = false, max = 128 },
+    },
+
+    HakInterceptAdd = {
+        hakId = { type = 'integer', required = true, min = 1 },
+        kind = { type = 'string', required = true, min = 1, max = 64 },
+        summary = { type = 'string', required = false, max = 500 },
+        mediaRef = { type = 'string', required = false, max = 191 },
+    },
+
+    HakSessionStart = {
+        hakId = { type = 'integer', required = true, min = 1 },
+    },
+
+    HakSessionEnd = {
+        id = { type = 'integer', required = true, min = 1 },
+        minimizationNote = { type = 'string', required = false, max = 500 },
+    },
+
+    HakLog = {
+        hakId = { type = 'integer', required = true, min = 1 },
+    },
 }
