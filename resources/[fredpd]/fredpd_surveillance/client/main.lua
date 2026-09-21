@@ -1,0 +1,5 @@
+--- Client side of the surveillance resource.
+---
+--- M5 adds device placement, the sweeper and the voice-target plumbing that
+--- pma-voice needs. Until then this file exists so the resource starts with a
+--- complete, lintable script set.

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      Invariant 9: the NUI only loads its own bundle, `nui://` assets and the
+      configured media host. No CDNs, no inline script, no remote fonts.
+      `connect-src` keeps `https://fredpd` because that is how NUI callbacks are
+      addressed from the browser context inside FiveM.
+
+      `%VITE_MEDIA_HOST%` is Vite's HTML env replacement (build.ts reads
+      `VITE_MEDIA_HOST` from the environment at `vite build` time, spec 3.9):
+      the origin the gateway's media service is reachable at
+      (`FREDPD_MEDIA_BASE_URL` on the gateway side, `media/routes.ts`), so a
+      signed upload or download URL the NUI receives from a route is one its
+      own CSP will actually let it reach. Unset, it substitutes to an empty
+      string and this policy allows no media host at all -- a deployment that
+      has not configured the gateway gets no media rather than a wildcard.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: nui:// %VITE_MEDIA_HOST%; media-src 'self' blob: nui:// %VITE_MEDIA_HOST%; font-src 'self'; connect-src 'self' https://fredpd %VITE_MEDIA_HOST%; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>FredPD</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

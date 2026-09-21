@@ -1,0 +1,233 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    # Working branches too, not just main. Without this, nothing on a feature
+    # branch is ever validated -- and the database job is the only place the
+    # migrations are actually applied to MariaDB.
+    branches:
+      - main
+      - 'claude/**'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Never a real secret: these jobs only need the gateway to boot and the
+  # signature paths to be exercised (invariant 7).
+  FREDPD_GATEWAY_SECRET: ci-test-secret
+
+jobs:
+  node:
+    name: Lint, types and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: ESLint
+        run: pnpm lint
+
+      - name: TypeScript
+        run: pnpm typecheck
+
+      - name: svelte-check
+        run: pnpm svelte-check
+
+      - name: Locales complete (en and sv)
+        run: pnpm i18n:check
+
+      # Nothing else here loads a FiveM resource, so a route can be written,
+      # schema'd and translated and still be unreachable. This is the only step
+      # that would have caught it.
+      - name: Everything written is reachable
+        run: pnpm wiring:check
+
+      # The database and the code have to agree about what a code value is.
+      # Nothing else compares them: the typecheck reads the TypeScript, the i18n
+      # check reads the locales, busted never touches SQL. A disagreement passes
+      # every other step here and fails at runtime as MariaDB error 4025, on the
+      # first write that happens to use the disputed value.
+      - name: Code values match their CHECK constraints
+        run: pnpm enum:check
+
+      - name: Generated schema is current
+        run: |
+          pnpm schema:gen
+          git diff --exit-code -- 'resources/**/shared/generated' \
+            || { echo '::error::Generated schema is stale. Run `pnpm schema:gen` and commit the result.'; exit 1; }
+
+      # The gateway's PDF tests (spec 3.3) launch a real Chromium rather than
+      # mocking it -- see render.test.ts's header. Only the e2e job installed
+      # one before this; the gateway's vitest run fell through to the
+      # sandbox-only fallback path in config.ts and failed to launch on every
+      # runner that isn't this repo's dev sandbox image.
+      - name: Install Chromium for gateway PDF tests
+        run: pnpm --filter @fredpd/gateway exec playwright-core install --with-deps chromium
+
+      # Resolved rather than guessed: this is the same install `discoverChromium`
+      # in web/playwright.config.ts reasons about, and its own executablePath()
+      # is the one source of truth for where it landed.
+      - name: Point the gateway at the installed Chromium
+        run: |
+          echo "PLAYWRIGHT_CHROMIUM_EXECUTABLE=$(pnpm --filter @fredpd/gateway exec node -e "console.log(require('playwright-core').chromium.executablePath())")" >> "$GITHUB_ENV"
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Dependency audit
+        run: pnpm audit --audit-level=high
+
+  e2e:
+    name: NUI tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The NUI imports generated Lua's TypeScript source, and the dev server
+      # serves from source, so no build is needed -- but the schema must exist.
+      - run: pnpm schema:gen
+
+      - name: Install Chromium
+        run: pnpm --filter @fredpd/web exec playwright install --with-deps chromium
+
+      - name: Playwright
+        run: pnpm test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: web/playwright-report/
+          retention-days: 7
+
+  lua:
+    name: Lua checks and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # The rocks, cached across runs. `luarocks install busted` resolves a
+      # dependency tree of eight rocks, several of which are fetched from
+      # GitHub rather than from luarocks.org, and any one of those downloads
+      # failing takes the whole job down before a single test has run -- which
+      # it has: mediator_lua once 404'd mid-install and reported as "Lua checks
+      # and tests" failing, on a commit whose tests were fine.
+      #
+      # Keyed on the workflow file, so changing a pinned version busts it.
+      - name: Cache the Lua rocks
+        id: rocks
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/lib/luarocks
+            /usr/local/share/lua
+            /usr/local/lib/lua
+            /usr/local/bin/busted
+            /usr/local/bin/luacheck
+          key: luarocks-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}
+
+      - name: Install the Lua toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends lua5.4 liblua5.4-dev luarocks
+
+      # Skipped entirely on a cache hit. On a miss, retried: a transient fetch
+      # failure is the common case and a second attempt costs a minute, where a
+      # red build costs a re-run and somebody reading the log to find out it was
+      # never about their change.
+      - name: Install busted and luacheck
+        if: steps.rocks.outputs.cache-hit != 'true'
+        run: |
+          for attempt in 1 2 3; do
+            # luarocks defaults to 5.1; the resources are Lua 5.4 and use
+            # <const>, so busted has to be built against 5.4 or every spec fails
+            # to parse.
+            sudo luarocks install luacheck \
+              && sudo luarocks --lua-version=5.4 --lua-dir=/usr install busted \
+              && exit 0
+            echo "rock install attempt $attempt failed; retrying"
+            sleep $((attempt * 10))
+          done
+          echo '::error::Could not install the Lua toolchain after three attempts.'
+          exit 1
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # luacheck reads the generated schema like any other source file.
+      - run: pnpm schema:gen
+
+      - name: luacheck
+        run: luacheck resources/
+
+      - name: busted
+        run: busted
+
+  database:
+    name: Migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: ci
+          MARIADB_DATABASE: fredpd
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Apply every migration to an empty database
+        run: |
+          for file in database/migrations/*.sql; do
+            echo "applying $file"
+            mysql --host=127.0.0.1 --user=root --password=ci fredpd < "$file"
+          done
+
+      - name: Re-apply to prove migrations are idempotent
+        run: |
+          for file in database/migrations/*.sql; do
+            mysql --host=127.0.0.1 --user=root --password=ci fredpd < "$file"
+          done

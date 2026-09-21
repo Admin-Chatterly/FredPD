@@ -1,0 +1,66 @@
+name: Release from notes
+
+# Adding `docs/releases/vX.Y.Z.md` releases that version.
+#
+# The notes file is the thing you would write for the release anyway, and its
+# name already carries the version -- so writing it is the whole ceremony. The
+# release job creates the tag itself with the Actions token.
+#
+# This exists because pushing a tag and pushing a commit are separate
+# permissions, and an environment that has the second but not the first should
+# still be able to ship. It is not a replacement for `git tag`: release.yml
+# still runs on a pushed `v*` tag exactly as before, and both end up in the same
+# job.
+#
+# Safe to edit an old notes file: the job refuses a version that is already
+# released.
+
+on:
+  push:
+    paths:
+      - 'docs/releases/v*.md'
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    name: Work out which version to release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.pick.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Two commits is enough to diff this push against what came before.
+          fetch-depth: 2
+
+      - name: Pick the notes file this push added
+        id: pick
+        run: |
+          # Only files this push touched -- not the newest file in the tree.
+          # Otherwise a typo fix on an old notes file would try to re-release
+          # whatever the highest version happens to be.
+          changed="$(git diff --name-only --diff-filter=AM HEAD~1 HEAD -- 'docs/releases/v*.md' || true)"
+
+          if [ -z "$changed" ]; then
+            echo "No release notes in this push; nothing to do."
+            exit 0
+          fi
+
+          # Highest version wins if a push somehow carries several.
+          newest="$(echo "$changed" | sed 's|.*/v||; s|\.md$||' | sort -V | tail -1)"
+
+          echo "version=${newest}" >> "$GITHUB_OUTPUT"
+          echo "Release notes for v${newest} changed in this push."
+
+  release:
+    name: Release
+    needs: version
+    if: needs.version.outputs.version != ''
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+    permissions:
+      contents: write

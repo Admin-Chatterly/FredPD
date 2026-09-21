@@ -1,0 +1,7 @@
+# Streamed props and sounds land here.
+#
+# M1: station terminal and MDC tablet props.
+# M3: evidence bags, scene markers, tape.
+#
+# Binary game assets are committed here deliberately: they are part of the
+# resource, not build output.

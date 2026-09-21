@@ -1,13 +1,13 @@
 # FredPD — Product & Engineering Specification
 
-Police records, dispatch, evidence and forensics suite for a QBox (qbx_core) FiveM server.
+Police records, dispatch, evidence and forensics suite for an ESX (es_extended) FiveM server.
 
 | Field | Value |
 |---|---|
 | Spec version | 0.1 (draft for implementation) |
 | Date | 2026-09-17 |
 | Owner | Rami |
-| Target platform | FiveM (OneSync) + QBox + ox stack, dedicated high-end host |
+| Target platform | FiveM (OneSync) + ESX + ox stack, dedicated high-end host |
 | Default language | English (`en`), with complete Swedish (`sv`) and custom translation overlays |
 | Permission source | Discord roles only |
 
@@ -50,7 +50,7 @@ Police records, dispatch, evidence and forensics suite for a QBox (qbx_core) Fiv
 These rules override convenience, deadlines and any other section.
 
 1. **Server-authoritative.** Clients send intent (IDs, text, a proposed position). The server validates and decides. Authors, officers, agencies, timestamps, record numbers, analysis results and biometric owners are always generated server-side.
-2. **Discord roles are the only permission source.** QBox job grades never grant anything. Job and duty state are used only as *context conditions* on top of a Discord-granted permission (see 4.3).
+2. **Discord roles are the only permission source.** ESX job grades never grant anything. Job and duty state are used only as *context conditions* on top of a Discord-granted permission (see 4.3).
 3. **One gateway for client calls.** Every client-to-server call goes through `route()` (session, permission, classification, schema validation, rate limit, audit). No raw `RegisterNetEvent` handler may change state.
 4. **Access is checked on the server for every read,** including search results, attachments, prints and exports. Hiding something in the UI is never the control.
 5. **No record broadcasts.** Never `TriggerClientEvent(..., -1, record)`. Push only to authorized, subscribed sessions. No sensitive data in state bags.
@@ -79,7 +79,7 @@ FredPD is the in-game computer system of a police agency, built to feel like the
 | `fredpd_forensics` | FiveM resource | In-world evidence generation, scene tools, packaging, destruction mechanics |
 | `fredpd_surveillance` | FiveM resource | Wiretaps, radio monitoring, listening devices, trackers (pma-voice) |
 | `fredpd_assets` | FiveM resource | Streamed props (MDC tablet, terminals, evidence bags, markers, tape), sounds |
-| `gateway` | Node.js service on the same host | Discord bot and role sync, media service, PDF rendering, scheduled jobs, optional web portal |
+| `gateway` | Node.js service on the same host | Media service, PDF rendering, scheduled jobs, Discord role *actions*, optional web portal. Off by default; role *sync* runs in FXServer (ADR-010) |
 | `web` | Built into `fredpd/web/dist` | The NUI application (MDC, station terminal, dispatch console, lab, property room layouts) |
 | PD-Span | Your existing system | Integrated as the intelligence module (section 10) |
 
@@ -141,7 +141,7 @@ Use real systems for **workflow and data structure**, FiveM resources for **game
 | Citations | Electronic citation systems (TraCS-style) | ps-mdt fines | Citation lifecycle, licence points, contest flow |
 | ALPR | Plate reader hotlists and retention policies | Wolfknight radar (wk_wars2x) | Hotlist hits, read retention |
 | Swedish vocabulary | Swedish Police systems and registers (RAR, DurTvå, Rakel; Belastningsregistret, Misstankeregistret, Vägtrafikregistret, Vapenregistret; DNA-registret, utredningsregistret, spårregistret) | — | Terminology for `sv.json` (Appendix A) |
-| Framework and libraries | — | qbx_core, ox_lib, ox_inventory, ox_target, oxmysql, pma-voice, screenshot-basic | Everything in-game |
+| Framework and libraries | — | es_extended, ox_lib, ox_inventory, ox_target, oxmysql, pma-voice, screenshot-basic | Everything in-game |
 | Discord permissions | Discord developer documentation | Badger_Discord_API (REST plus cache), discord.js | Gateway bot with role snapshots |
 | Tooling | — | overextended/fivem-ts, ps-mdt v3 Svelte 5 web build | Monorepo and build patterns |
 
@@ -169,7 +169,7 @@ fredpd/
 ├─ packages/
 │  └─ schema/                   # route and entity schemas → generated TS types + Lua validator tables
 ├─ database/
-│  ├─ migrations/               # append-only, numbered
+│  ├─ migrations/               # append-only, numbered; 0001 is the whole schema as first released
 │  └─ seeds/                    # code tables, penal code, default permission groups
 ├─ tools/                       # i18n checker, codegen, load-test harness
 ├─ vendor/pd-span/              # PD-Span source for integration work (section 10)
@@ -198,15 +198,15 @@ fredpd/
 
 | Layer | Choice | Reason |
 |---|---|---|
-| Server scripts | Lua 5.4 with ox_lib | Matches QBox and the ox ecosystem, best FiveM tooling |
-| NUI | Svelte 5 + TypeScript + Vite | Small runtime and fast updates; ps-mdt v3 proves it on QBX |
+| Server scripts | Lua 5.4 with ox_lib | Matches ESX and the ox ecosystem, best FiveM tooling |
+| NUI | Svelte 5 + TypeScript + Vite | Small runtime and fast updates; ps-mdt v3 proves it in production |
 | Styling | Tailwind CSS 4 with CSS-variable design tokens | Tokens from section 6 in one place |
 | Data in NUI | TanStack Query (cache), TanStack Virtual (long lists), TanStack Table core (grids) | Instant reopen, virtualized grids |
 | Rich text | Tiptap, stored as JSON | No raw HTML, schema-validated |
 | Map | Leaflet with `CRS.Simple` and self-hosted GTA V tiles, lazy-loaded | Light, proven for GTA maps |
 | Icons | Lucide SVG | Consistent, no emoji |
 | Gateway | TypeScript on Node.js 24 LTS, Fastify, discord.js, sharp, Playwright (PDF), pino | Mature, well-typed |
-| Database | MariaDB 11.4 LTS or newer, InnoDB, `utf8mb4_unicode_ci` | Same DB as QBox; FULLTEXT, generated columns, JSON |
+| Database | MariaDB 11.4 LTS or newer, InnoDB, `utf8mb4_unicode_ci` | Same DB as ESX; FULLTEXT, generated columns, JSON |
 | Monorepo | pnpm workspaces | Shared schema and locale packages |
 | Tests | busted (pure Lua modules), Vitest, Playwright | See section 15 |
 | Lint | luacheck and lua-language-server diagnostics (with fivem-lls-addon), ESLint, svelte-check, tsc | See section 15 |
@@ -262,6 +262,55 @@ Wrapper order: session exists → session not stale → permission → context c
 
 Response envelope: `{ ok = true, data = ... }` or `{ ok = false, err = 'code', fields = { ... } }`. Error codes: `no_session`, `forbidden`, `context`, `rate_limited`, `invalid`, `not_found`, `conflict` (stale version), `restricted`, `stale_permissions`, `internal`.
 
+#### 3.5.1 The public tier
+
+A session is opened only for a player with an `fpd_officers` row, so the wrapper
+above is reachable by officers and by nobody else. Section 8 needs the opposite
+for two of its calls: 8.3 requires that *any* player leaves traces — the whole
+value of a fingerprint is that the person who left it is not an officer — and
+8.10 requires that destroying evidence is "available to every player … Police-only
+restrictions must never block criminal gameplay."
+
+Those two calls use `route.public`, which is the same gateway (invariant 3), the
+same envelope, and the same registration:
+
+```lua
+route.public {
+    name    = 'forensics.destroy',
+    schema  = 'ForensicsDestroy',
+    limit   = { per = 20, window = 60 },    -- required, not defaulted
+    handler = function(src, input)          -- a server id, never a session
+        return destroy(src, input)
+    end
+}
+```
+
+Wrapper order: rate limit → schema → handler in `pcall` → response. What it drops
+is session, staleness, permission, context and audit — each of which needs a
+session to mean anything, so a public route declaring one fails at load rather
+than appearing to be protected.
+
+The handler receives a numeric `src` and not a session. The signature is not by
+itself the control, and saying it is overstates the design: a handler holding a
+server id can write `FredPD.Core.session.get(src)` and have the session back, so
+"a public handler has no identity" is a convention that nothing in Lua enforces.
+
+What enforces it is CI. `tools/wiring-check.ts` reads the body of every
+`route.public` handler and fails the build when it names the session, the
+permission set, an access check or a repo. So the guarantee is this: **a public
+handler is handed a number, and a public handler that reaches for identity or
+for a record does not merge.** What it is left with is the in-memory forensics
+grid, which holds no records and answers nothing (8.11).
+
+The check reads handler bodies, and only handler bodies. A function defined
+outside the handler and called from it is not covered — `forensics.destroy`
+has one, `auditDestruction`, which reads a `discordId` off a session that is
+usually absent and writes one append-only audit row. That is a deliberate
+exception with its reasoning written at the call site, not a loophole to use
+again: a helper reached from a public route has to be read with the same
+question in mind, because CI will not ask it. A third public route is a decision
+to be argued for in an ADR, not a convenience. See ADR-013.
+
 ### 3.6 Realtime updates
 
 - Sessions subscribe to channels while a view is open: `unit:<id>`, `call:<id>`, `record:<type>:<id>`, `board:<agency>`, `map:<agency>`.
@@ -271,15 +320,23 @@ Response envelope: `{ ok = true, data = ... }` or `{ ok = false, err = 'code', f
 
 ### 3.7 Gateway interface
 
-- **FXServer → gateway:** `PerformHttpRequest` to `http://127.0.0.1:<port>` with an HMAC signature and timestamp. Used for media upload tokens, PDF rendering, Discord role actions.
-- **Gateway → FXServer:** `SetHttpHandler` in `fredpd`, accepting loopback requests only, HMAC-signed, with a 30-second replay window. Used for role changes, lab timer completions, scheduled jobs.
-- **Reliability:** an outbox table on both sides with retries, so a gateway restart never loses events.
+Built (the outbound half). `server/bridges/gateway/{sha256,hmac,client,repo,service}.lua`, migration 0021.
+
+- **FXServer → gateway:** `PerformHttpRequest` to `http://127.0.0.1:<port>`, signed `HMAC-SHA256(secret, "<timestamp>.<body>")` in `x-fredpd-signature`/`x-fredpd-timestamp` — the exact wire format `gateway/src/hmac.ts`'s own `sign()` already implements on the gateway side, so the two sides can only ever agree or both be wrong the same way. `sha256.lua` and `hmac.lua` are pure Lua (no natives), pinned in busted against FIPS 180-4's own test vectors and RFC 4231's, respectively — an unverified hash implementation was judged worse than no bridge at all, which is why one was not shipped until it could be verified this way. `Gateway.requestUploadToken`, `.requestDownloadToken` and `.renderPdf` call the gateway's existing media and PDF routes; nothing calls them yet (no NUI screen uploads media or exports a PDF), so the bridge exists and is tested but is not yet reachable from a workflow.
+- **Gateway → FXServer:** not built. A reverse channel needs FXServer to run its own HTTP listener (`SetHttpHandler`), which nothing here currently requires — everything the gateway serves today (a token, a rendered PDF) is a synchronous reply to an FXServer-initiated request, not an event the gateway raises on its own. Left for whichever of "role changes, lab timer completions, scheduled jobs" is built first and actually needs to push.
+- **Reliability:** an outbox table on the FXServer side (`fpd_gateway_outbox`) retries a failed `renderPdf` call on a five-minute timer, up to 10 attempts or 24 hours old, whichever comes first. A gateway-side outbox is not built — nothing yet calls FXServer for the gateway to need to retry into.
+- **Discord role actions are not built.** See section 7.22's own note: ADR-010 settled that FXServer only reads the guild, and the reasoning against writing to it from anywhere in this suite generalised past the read path.
 
 ### 3.8 Bridges
 
 | Bridge | Responsibilities | Default implementation |
 |---|---|---|
-| framework | Characters, names, DOB, phone, jobs, duty, licences | qbx_core |
+| framework | Characters, names, DOB, phone, jobs, duty, licences | es_extended |
+| policejob | Duty state, rank, armory, cloakroom, impound | p_policejob (section 3.11) |
+| society | Agency funds, society-owned vehicles | esx_society |
+| textui | In-world prompts ("Press E to open the terminal") | esx_textui |
+| menu | In-world option menus and input dialogs | esx_menu_dialog |
+| garage | Agency motor pool vehicles (section 7.31) | Built-in, over society |
 | inventory | Items, metadata, stashes, hooks, weapons | ox_inventory |
 | target | Interactions | ox_target |
 | voice | Radio channels, voice targets | pma-voice |
@@ -298,9 +355,73 @@ Each bridge checks the target resource's state and version at startup and logs a
 
 ### 3.9 Configuration
 
-- Convars: `setr fredpd:locale en`, `set fredpd:gateway_url`, `set fredpd:gateway_secret`, `set fredpd:env production`, `setr fredpd:timezone Europe/Stockholm`.
-- Feature flags per module in `config/server.lua`.
+- **One file: `config/server.lua`** — the Discord bot token and guild, the agency, rate limits, and the gateway (off by default). It is in `server_scripts` and never in `files {}`, so nothing in it reaches a client. `config/shared.lua` carries what the client legitimately needs: environment, locale, timezone (ADR-010).
+- Convars still override every value where one is set, for hosts that template their configuration: `set fredpd:discord_token`, `set fredpd:discord_guild`, `set fredpd:env`, and — because the client reads them — `setr fredpd:locale`, `setr fredpd:timezone`. A normal install needs none of them.
+- Feature flags per module in `config/shared.lua`.
 - Agencies: id, name, short name, logo, seal, accent color, numbering prefixes, jurisdiction polygons, radio channels, report letterhead text.
+
+### 3.10 In-game configuration and world placement
+
+Nothing with a world position is hardcoded. Every terminal, lab bench, booking
+station, dispatch console, courthouse desk and motor pool ped is a **placement**
+row in `fpd_placements`, created and edited in game by an administrator holding
+`admin.placement.edit`. A server operator never edits a Lua config to move a
+desk, and never needs a restart to do it.
+
+A placement carries:
+
+| Field | Meaning |
+|---|---|
+| `kind` | What it opens — an access point (1.4), a motor pool ped, a scene-tool bench |
+| `agency_id` | Which agency owns it; `NULL` means shared |
+| `coords`, `heading` | Where it is |
+| `interaction` | `prop` (bind to a nearby prop model), `ped` (spawn one), or `zone` (a radius with no entity) |
+| `model` | Prop or ped model, for the `ped` and `prop` interactions |
+| `radius` | Interaction distance, default 1.5 m |
+| `label_key` | Locale key for the prompt, never a literal string (invariant 6) |
+| `enabled` | Off without deleting, so a station can be closed for an event |
+
+**The editor.** `/fredpd placement` opens placement mode: aim at a prop to bind
+it, or place a ped with a live preview, then pick the `kind` from a menu. Move,
+rotate, disable and delete are the same mode. Every write goes through a route
+with `admin.placement.edit` and is audited like any other change (invariant 11).
+
+**A placement decides *where*, never *who*.** It binds a prop to a UI element;
+it does not grant access to that element. Permission still comes from Discord
+roles, checked on the server for every route the element calls (invariants 2
+and 4). Disabling a placement hides an entrance, not a permission.
+
+**Placements are not trusted from the client.** A client that calls a route
+"from" a placement sends the placement id, and the server verifies the player is
+actually within `radius` of that placement's coordinates before honouring the
+access-point context condition (4.3). Otherwise the access-point rule would be
+worth nothing: any client could claim to be standing in the property room.
+
+Placements are pushed to clients as world geometry only — coordinates, models
+and label keys, for the placements that exist. They carry no permission data,
+because a client knowing a door exists is not the same as a client being able to
+open it.
+
+### 3.11 Coexistence with p_policejob
+
+FredPD does not replace the police job resource. `p_policejob` keeps the
+in-world job — duty toggle, armory, cloakroom, impound — and FredPD owns
+records, dispatch, evidence, lab, court, intelligence and the MDT.
+
+The `policejob` bridge is the only place that names it. Duty and rank are read
+through that bridge as **context conditions** (4.3), never as grants: a
+`p_policejob` rank grants nothing in FredPD, exactly as an ESX job grade does
+not (invariant 2).
+
+Where the two overlap, the rule is one owner per concern:
+
+| Concern | Owner |
+|---|---|
+| Duty toggle, armory, cloakroom | `p_policejob` |
+| Impound and tow (7.15) | `p_policejob` |
+| Agency motor pool (7.31) | FredPD |
+| MDT, records, CAD, evidence, court | FredPD |
+| Permissions for any of the above | FredPD, from Discord roles |
 - Code tables (call types, dispositions, offences, statuses) live in the database and are seeded from `database/seeds`.
 
 ---
@@ -309,24 +430,24 @@ Each bridge checks the target resource's state and version at startup and logs a
 
 ### 4.1 Identity model
 
-- Player → Discord ID (`GetPlayerIdentifierByType(src, 'discord')`, never from the client) → roster entry → bound character (citizenid).
+- Player → Discord ID (`GetPlayerIdentifierByType(src, 'discord')`, never from the client) → roster entry → bound character (the ESX character identifier, e.g. `char1:license:…`).
 - A Discord user can hold one bound character per agency. FredPD refuses to open on any other character ("This character is not registered as agency personnel"). This stops agency access being used on a criminal alt.
 - DOJ, defense and civilian access points bind the same way.
 - A player without a Discord identifier gets no access and sees an instruction to link Discord.
 
 ### 4.2 Discord role sync
 
-- The gateway bot uses the Server Members privileged intent. On start it snapshots every member holding a mapped role into `fpd_discord_members (discord_id, roles, synced_at)`.
-- Member update, join and leave events update the snapshot and push the change to FXServer, which recomputes affected sessions immediately. An open MDT loses pages the moment a role is removed.
-- FXServer never calls Discord directly.
+- FXServer calls the Discord API itself, with a bot token from `config/server.lua` and the Server Members privileged intent, and writes `fpd_discord_members (discord_id, roles, synced_at)`. This was originally the gateway bot's job; it moved so that a normal install deploys no second service (**ADR-010**).
+- **Two triggers:** the whole guild on a timer (`discord.refreshMinutes`, default 10), so a role *removed* in Discord takes effect without the member doing anything; and each player as they connect, so a role *granted* seconds ago is live when they join. After a successful refresh every open session is recomputed, and an open MDT loses pages it may no longer see.
+- **A failed fetch writes nothing.** Rows age instead, and the outage policy below narrows access on its own. Stamping `synced_at` without a role list Discord actually returned forges the one signal that policy reads, and is forbidden — including from outside the application, such as a cron job.
 - **Outage policy:**
   - Snapshot older than `perms.sensitive_stale_after` (default 15 minutes): approvals, releases, deletions, intelligence and surveillance actions are blocked.
   - Snapshot older than `perms.stale_after` (default 6 hours): read-only mode.
-- **Role actions from FredPD** (hire, promote, demote, suspend, dismiss) go FredPD → gateway → bot changes the Discord role → the update flows back. Discord stays the single source of truth. The bot's Discord role must sit above the roles it manages.
+- **Role actions from FredPD** (hire, promote, demote, suspend, dismiss) still belong to the gateway, which holds a bot able to *write* roles. Not built. Discord stays the single source of truth either way, and that bot's Discord role must sit above the roles it manages.
 
 ### 4.3 Permission model
 
-- **Permission keys:** `<area>.<object>.<action>`, optionally with a scope, for example `rms.report.approve` or `evidence.item.release`. Full catalog in Appendix B.
+- **Permission keys:** `<area>.<object>.<action>`, optionally with a scope, for example `rms.anmalan.approve` or `evidence.item.release`. Full catalog in Appendix B.
 - **Permission groups:** named bundles of keys. Groups can inherit from other groups.
 - **Role map:** Discord role ID → groups, scoped to an agency.
 - **Effective permissions:** the union of groups from all of a user's roles, per agency. Computed once per role change and cached in the session, so checks are constant-time.
@@ -522,7 +643,7 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 - [M] Sign-on screen with agency branding and authorized-use notice; identity from Discord plus bound character.
 - [M] Unit log-on: callsign, vehicle (auto-detected when in an agency vehicle), partner(s), assignment (beat, division).
 - [M] Unit status via F-keys and command line: Available, En route, On scene, Busy, Transporting, At station, Out of service, Emergency. Every change is timestamped in `fpd_unit_status_log`.
-- [M] Duty integration: sign-on sets QBox duty through the framework bridge (configurable).
+- [M] Duty integration: sign-on sets ESX duty through the framework bridge (configurable).
 - [S] Personal PIN and idle lock.
 - [S] Day/night theme switching by in-game time.
 
@@ -581,73 +702,110 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 - [S] Premise hazards appear automatically on dispatch call cards.
 - **Permissions:** `rms.location.view`, `rms.location.hazard.edit`.
 
-### 7.7 Incident reports (M2)
+### 7.7 Anmälan (M2)
 
-- [M] Report types: incident/offence, arrest, supplemental, traffic collision, use of force, vehicle pursuit, death investigation, missing person, found/safekeeping property, field interview, traffic stop.
-- [M] Structured sections, following the NIBRS structure: offences (code picker), persons with roles, property (stolen, recovered, seized, evidence), vehicles, narrative (rich text).
-- [M] Templates per report type; required fields enforced per type.
-- [M] Pre-fill from a dispatch call (location, times, involved units and persons).
-- [M] Drafts with autosave; co-authors.
-- [M] Workflow: Draft → Submitted → Returned (with supervisor comments) → Approved. Approved reports are locked.
-- [M] After approval, changes only through a supplemental report or a supervisor-approved amendment. Every version is kept.
-- [M] Electronic signature (name, badge number, timestamp) at submission and approval.
-- [M] Evidence and attachments linked (access-controlled).
-- [S] Print and PDF with letterhead and classification watermark.
-- [S] Void with reason (supervisor), never delete.
-- [O] Live co-editing (as in ps-mdt v3).
-- **Based on:** Mark43/Axon RMS workflows; NIBRS; ps-mdt v3 and ox_mdt reports.
-- **Permissions:** `rms.report.create`, `rms.report.edit.own`, `rms.report.submit`, `rms.report.approve`, `rms.report.return`, `rms.report.void`, `rms.report.view.<type>`.
+Built. Migration 0009, `server/modules/anmalan/`, the Reports tab in `web/src/modules/records/`.
 
-### 7.8 Case management (M2 basic, M6 full)
+Rewritten for Swedish procedure (ADR-014). The approval workflow this section always described survives intact; what changed is that the investigation left it for 7.8, because a supervisor's approval and a prosecutor's decision are not the same act.
 
-- [M] Case number, type, lead investigator, assigned team, status (Open, Active, Suspended, Closed) and clearance (cleared by arrest, exceptionally cleared, unfounded, referred).
-- [M] Linked reports, persons (with roles), vehicles, firearms, evidence, warrants, lab requests.
-- [M] Chronological case timeline built from linked events.
-- [M] Case notes with classification and compartments.
-- [S] Tasks and leads with assignee and due date.
-- [S] Solvability factors and supervisor review dates.
-- [S] Prosecution package: bundle of selected, redacted items for the prosecutor (section 7.20).
-- **Permissions:** `inv.case.create`, `inv.case.view`, `inv.case.edit`, `inv.case.assign`, `inv.case.close`.
+- [M] An **anmälan** records an offence: structured sections (brott from the catalogue, personer with roles, gods, fordon) plus a **händelseförlopp** as editor JSON — never HTML (invariant 10), and refused as such by a JSON column rather than on trust.
+- [M] **Roller**: `misstankt`, `malsagande`, `vittne`, `anmalare`, `annan`. Not a translation of the US set — **målsägande** is the injured party and carries rights a "victim" does not have, to be heard and to bring a claim alongside the prosecution. One person may hold two roles on one anmälan, which is the commonest report there is, so the key carries the role.
+- [M] **Charges are per count**, not per offence, because BrB 26:2 computes over counts. Each cites one immutable catalogue *version* (7.10), so the legal basis of a charge is fixed when it is written and still reads after the catalogue moves on. `stage` covers BrB 23 — försök, förberedelse and stämpling are only offered where the statute makes them punishable.
+- [M] **Workflow**: Utkast → Inlämnad → Återsänd → Godkänd. Godkänd is terminal because the transition map has no row for it, rather than because four write paths remember to check.
+- [M] **An officer may not approve their own anmälan**, whatever they hold. No permission reaches the rule and there is deliberately no key that would: the value of the step is that a second person looked, and on a small server the supervisor writes half the reports. The screen says so before the button is pressed.
+- [M] After approval, changes only through a **tilläggsuppgift** — its own row, number, author and approval, never an edit of its parent. Every version is kept, snapshotted by the same transaction that moves the status.
+- [M] Electronic signature (name, badge number, timestamp) at submission and approval, taken from the roster at the moment of signing so a later rank change does not rewrite it.
+- [M] Pre-fill from a **händelse** (7.16) — linked rather than copied, so the call's timestamps stay the authority on when things happened.
+- [M] Drafts with autosave; optimistic locking, so two officers editing one draft produces a refusal rather than a silent overwrite.
+- [S] Print and PDF with letterhead and classification watermark. Needs the gateway (M7).
+- [S] Co-authors, and void with reason (supervisor), never delete.
+- **Permissions:** `rms.anmalan.view`, `rms.anmalan.create` (both patrol), `rms.anmalan.edit.any`, `rms.anmalan.approve` (both supervisor).
 
-### 7.9 Arrests and booking (M2 arrest, M6 booking)
+### 7.8 Förundersökning (M2)
 
-- [M] Arrest record: charges (from penal code), time, place, arresting officer(s), rights advisement with timestamp, force used (links to a use-of-force report).
-- [S] Booking at the booking terminal: mugshot with height chart (screenshot-basic with a fixed camera), ten-print capture (adds the person to the fingerprint index), DNA reference swab when policy allows.
-- [S] Property inventory of the arrestee (dedicated ox_inventory stash per booking, returned on release).
-- [S] Sentence and bail handoff to the jail bridge; release record.
-- **Permissions:** `rms.arrest.create`, `booking.create`, `booking.biometrics.capture`, `booking.release`.
+Built. Migration 0009, `server/modules/anmalan/` (same module, separate table).
 
-### 7.10 Penal code and sentencing (M2)
+- [M] A **förundersökning** is opened by a decision (*inleda FU*), led by a **förundersökningsledare**, and ended by one: *lägga ned FU* with a stated ground, or **slutdelgivning** (RB 23:18a — the misstänkt and their försvarare are given the material) followed by **redovisning** to the åklagare.
+- [M] `ledare_kind` records the capacity — `polis` or `aklagare` — and it is not cosmetic: RB gives the åklagare powers a police FU-ledare does not have, and 7.12 reads this column. Reassignment writes the person and the capacity together or neither.
+- [M] Decisions belong to the FU-ledare. `inv.fu.assign` is the supervisor half, for an investigation whose ledare has left.
+- [M] Linked anmälningar, and through them the charges, the frihetsberövanden and the tvångsmedel.
+- [S] Tasks and leads with assignee and due date; solvability factors; prosecution package (M6).
+- **Not `fpd_intel_cases`.** The intelligence module has a case of its own (§10), and the two are deliberately separate: an intel case links `fpd_intel_persons` — the register's soft records, which exist precisely because intelligence is held about people with no master record — while an FU links the master index, because a misstänkt in a real investigation is an identified person. An FU has legal status and an intel case has none. `fpd_forundersokning.intel_case_id` links one to the other where intelligence work became an investigation.
+- **Permissions:** `inv.fu.view` (patrol), `inv.fu.open`, `inv.fu.lead` (supervisor), `inv.fu.assign` (command).
 
-- [M] Code table: code, title, class (felony, misdemeanor, infraction), fine, jail time, licence points, enhancements, lesser-included offences. Localized titles.
-- [M] Versioned: a change never alters past records; records store the version used.
-- [M] Sentencing calculator with totals, enhancements and reductions (plea, cooperation).
-- **Permissions:** `admin.penalcode.edit`, `court.sentence.calculate`.
+### 7.9 Frihetsberövande (M2), inskrivning i arrest (M6)
 
-### 7.11 Citations (M6)
+Built. Migration 0010, `server/modules/frihet/`.
 
-- [M] Traffic, parking and criminal citations with offence codes, location, vehicle, fine and points.
-- [M] Lifecycle: issued → paid, contested (goes to court) or overdue; fines through the billing bridge; points on the licence.
-- [S] Written warnings recorded without a fine.
-- **Permissions:** `rms.citation.issue`, `rms.citation.void`, `court.citation.adjudicate`.
+A chain of three decisions taken by three different people, not one arrest record (ADR-014).
 
-### 7.12 Warrants (M2)
+- [M] **Gripande** (RB 24:7). An officer seizes somebody caught in the act or already efterlyst. Provisional, and theirs to decide. The moment is stamped by the server and never accepted from input: every clock below runs from it.
+- [M] **Underrättelse om misstanke** (RB 24:9), recorded as a moment — the question asked afterwards is *when*, not whether — and written once, so a second call cannot move it later.
+- [M] **Anhållande** (RB 24:6). The **åklagare** decides whether the frihetsberövande continues. If they do not, the gripne is released.
+- [M] **Häktningsframställan**, then **häktning** (RB 24:13), decided by the **tingsrätt** at a hearing.
+- [M] **Frigivande is available from every open stage** and is the commonest outcome at the first. Its route is deliberately *not* marked `sensitive`, unlike every other decision here: the others keep somebody locked up and must not survive a stale permission snapshot, and this one lets somebody go — refusing it during a Discord outage would hold a person because a third party's API was down.
+- [M] **The two statutory clocks**, computed on the server and counted down on the screen:
+  - **RB 24:12** — the häktningsframställan is due *senast klockan tolv tredje dagen efter anhållningsbeslutet*. A wall-clock local noon, **not seventy-two hours**: 76 hours for an 08:00 anhållande, 62 for a 22:00 one.
+  - **RB 24:13** — the häktningsförhandling within four dygn of the gripande. That one is 96 hours.
+- [M] An append-only custody log: förhör, försvarare, måltider, the calls a detainee is entitled to.
+- [M] What somebody is held for is its own charge list, separate from the anmälan's: a prosecutor anhåller for two of the five offences reported, and the chain has to say which two.
+- [M] **Inskrivning i arrest** (M6). Built. Migration 0018, `server/modules/booking/`. Cell assignment and a property inventory, picking up from a `frihetsberövande` row still open; release requires a reason from a closed list, checked server-side the same way every other closed-list ground in this suite is. Mugshot and ten-print capture are not built — they need the media pipeline (section 3.2), which has no NUI wiring yet either. Fires `fredpd:arrestBooked` for the jail bridge (section 4.2 in its M6 state) to pick up.
+- **Permissions:** `frihet.view`, `frihet.gripande`, `frihet.frigiv` (patrol); `frihet.anhallande` (åklagare); `frihet.haktning` (domare); `booking.view` (patrol_basic), `booking.intake`, `booking.release` (patrol).
 
-- [M] Types: arrest, search (person, vehicle, address), bench, surveillance (section 9).
-- [M] Application with probable-cause statement, linked case and evidence.
-- [M] Judge review (DOJ role): approve with conditions and expiry, or deny with reason. Electronic signature.
-- [M] Lifecycle: Requested → Approved or Denied → Active → Served (return of service) / Recalled / Expired.
-- [M] Active arrest warrants create hot-file hits; search warrants define scope and validity window.
-- [M] Export `HasSearchWarrant(targetType, targetId)` so raid and door scripts can require a valid warrant (section 14).
-- [S] Emergency (exigent) entries logged with required justification and after-the-fact review.
-- **Permissions:** `court.warrant.request`, `court.warrant.review`, `court.warrant.recall`, `rms.warrant.serve`.
+### 7.10 Brottskatalogen och straffskalan (M2)
 
-### 7.13 BOLOs and attempts to locate (M2)
+Built. Migration 0008, `server/modules/brott/`, seed `database/seeds/0002_brott.sql`.
 
-- [M] Person and vehicle BOLOs with photos, reason, priority, area, expiry.
-- [M] Automatic hits on queries and ALPR reads; auto-resolve on arrest or impound.
-- [M] Shown on the roll-call board and context panel.
-- **Permissions:** `rms.bolo.create`, `rms.bolo.cancel`, `rms.bolo.view`.
+This section was originally written against a US penal code — a class (felony, misdemeanor, infraction), a fine, a jail time, licence points. The procedure decision (section 19) settled on Swedish procedure, and none of those five is a per-offence constant in Swedish law, so the shape below is what shipped instead.
+
+- [M] **Brottskatalog**: `code`, statutory citation (`balk`, `kapitel`, `paragraf`, `stycke`), rubrik and description as locale keys (5.3 — never literal text), `grad`, straffskala, whether försök and förberedelse are punishable (BrB 23), and the preskription period. One row per **grad**: ringa stöld (8:2) and grov stöld (8:4) are separate paragrafer with their own spans, not modifiers on stöld (8:1), which is also how a prosecutor cites them.
+- [M] **The straffskala is a span, not a number**: whether böter is available, a floor in months, and a ceiling in months that may be absent entirely (livstid). Stored in months throughout, so the arithmetic never mixes units. Böter and a fängelse floor above zero are mutually exclusive — no statute reads "böter eller fängelse i lägst sex månader" — and both the CHECK constraints and `Brott.straffskala` refuse the combination.
+- [M] **Versioned: a change never alters past records.** A row is immutable once records cite it; an edit supersedes the current version and inserts a new one, in that order, inside one transaction. Identity is `(agency_id, code, version)`; a record stores the version it was written under. There is no UPDATE and no DELETE route, because the rule is not enforceable by convention. A repealed offence is superseded, never removed, so the anmälningar citing it still render.
+- [M] **Gemensam straffskala** for several offences tried together (BrB 26:2), replacing the "sentencing calculator with enhancements and reductions" this section used to ask for. Four rules: the floor is the heaviest of the floors, never their sum; the ceiling is the heaviest ceiling plus a band uplift (one year under four, two years to eight, four years above); capped at the sum of the individual ceilings; and capped again at eighteen years (BrB 26:1). Livstid short-circuits all of it. Computed on the server and covered by `spec/brott_spec.lua`, because it is the one calculation here a prosecutor could be asked to justify in public.
+- **Deliberately absent:** any recommended or typical sentence. The span is the law; where inside it a sentence falls is the court's, and a number FredPD invented would be quoted as though it were not invented.
+- **Permissions:** `rms.brott.view` (patrol — an officer who cannot list the offences cannot write a charge), `admin.brott.edit` (admin only, and `sensitive`: a straffskala is the legal basis every charge is measured against).
+
+### 7.11 Ordningsbot (M6)
+
+Built. Migration 0019, `server/modules/ordningsbot/`.
+
+Renamed from "Citations": ordningsbot is the correct Swedish term for a summary on-the-spot fine, and the shape below is what actually shipped rather than the US traffic-court sketch above.
+
+- [M] A **versioned tariff**, the same immutable-version shape `fpd_brott` uses (7.10): a citation references one specific tariff row forever, so a later tariff change never alters what an already-issued citation says it was for.
+- [M] Lifecycle: issued → paid, contested or void, each a one-way transition out of `issued` only. Void requires a reason from a closed list.
+- **Not built:** points on a licence (no licence-points concept exists in this suite) and a billing-bridge integration for payment — `ordningsbot.pay` marks a citation paid directly, a deliberate scope-narrowing recorded in the migration's own header.
+- **Permissions:** `page.ordningsbot`, `ordningsbot.tariff.view`, `ordningsbot.view` (patrol_basic); `ordningsbot.issue`, `.contest`, `.pay` (patrol); `ordningsbot.void` (supervisor).
+
+### 7.12 Tvångsmedel och efterlysning (M2)
+
+Built. Migration 0011, `server/modules/tvangsmedel/`.
+
+Rewritten for Swedish procedure (ADR-014). **There is no judge in this section**, and that is the substantive change: RB gives almost all of these decisions to the förundersökningsledare.
+
+- [M] **Husrannsakan** in two kinds, which are separate decisions with separate grounds: *reell* (RB 28:1) searches a place for something, *personell* (RB 28:2) searches a place for a **person**, to arrest them.
+- [M] **Kroppsvisitation** (RB 28:11) — clothing and what somebody carries. **Kroppsbesiktning** (RB 28:12) — the body itself, and the measure that produces the reference sample the lab compares against. FredPD requires at least an **åklagare** for the second, which is stricter than RB and recorded as a policy choice: the alternative on a game server is that every officer who can open an investigation can order one.
+- [M] **Beslag** (RB 27:1) as a decision. The items have lived in the evidence module since M3.
+- [M] Decided by the **förundersökningsledare**, **åklagare** or **domare**. The capacity is derived from the session's permissions and is never a field a client sends.
+- [M] A **validity window**, because a decision with no end is a standing authority to enter somebody's home. Revocation (`upphävd`) overrides it. **Execution does not end it** — RB allows a husrannsakan to be resumed, and a door script refusing the second entry because the first was logged would enforce a rule nobody wrote.
+- [M] **`HasSearchWarrant(targetType, targetId)`** (§14), which `ox_doorlock` opens a door on. It asks the narrow question: only the two husrannsakan kinds authorise entry. A live kroppsvisitation against the same person does **not** open their front door, and a general "is there any measure" check would.
+- [M] **Efterlysning** replaces the US arrest warrant, which has no Swedish equivalent. The commonest ground is *anhållen i sin frånvaro* — a decision that lives in 7.9's chain, of which this is the consequence that makes somebody show up on a query.
+- [M] Only the two custody grounds mean **detain on sight**. Somebody wanted for **delgivning** is to be served a document and somebody **försvunnen** is wanted for their own sake; one red banner for all three teaches an officer that the banner does not mean what it says.
+- [M] `IsWanted(citizenid)` (§14) answers the narrow question too, and resolves the citizenid to a master record first.
+- [S] Emergency (**fara i dröjsmål**) entries logged with required justification and after-the-fact review.
+- **Permissions:** `tvang.view`, `tvang.verkstall` (patrol); `tvang.decide` (supervisor); `tvang.decide.aklagare`, `tvang.decide.domare` (DOJ); `efterlysning.issue` (command, åklagare).
+
+### 7.13 Spaningsuppdrag (M2)
+
+Built. Migration 0012, `server/modules/spaning/`.
+
+**Not the same thing as an efterlysning**, and keeping them apart is what lets the hit banner say something useful. An efterlysning is a legal status that means *detain this person*; a spaningsuppdrag is an operational lookout that means *look for this and tell us*.
+
+- [M] Person, vehicle, **or neither** — a description with no record behind it ("silver estate, no plate seen, three occupants") is the commonest lookout there is, and the case a foreign key cannot express.
+- [M] Raised by **any officer**, unlike an efterlysning. A department where a lookout needed command approval would not use it, and the sightings would stay in radio traffic where nothing can search them.
+- [M] Priority, area (a beat, so it joins the dispatch geography rather than inventing a second one), and a **required** expiry: a lookout that never expires is a banner that stays up until somebody remembers a van from three months ago.
+- [M] **Only priority 1 raises a banner.** Everything else is a notice on the record. The expensive mistake is the loud one: an officer shown a red banner for every "have a look for this van" learns within a shift that red banners are usually nothing, and then misses the one that was a person with a knife. No priority reaches the detain-on-sight treatment, which is 7.12's alone.
+- [M] Automatic hits on queries; **auto-resolve on gripande or omhändertagande**, as a server-local event (§14) rather than a call across modules.
+- **Permissions:** `spaning.view`, `spaning.create` (both patrol).
 
 ### 7.14 Field interviews and stop data (S, M6)
 
@@ -657,11 +815,14 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 
 ### 7.15 Impound and tow (M6)
 
-- [M] Impound with reason, hold type (standard, investigative hold, evidence hold), lot, vehicle inventory.
-- [M] Fees computed from dates, not timers (same approach as ps-mdt v3), capped.
-- [M] Release requires fees paid and, for holds, the investigator's release authorization.
-- [S] Impound resolves matching BOLOs.
-- **Permissions:** `rms.impound.create`, `rms.impound.release`, `rms.impound.hold.release`.
+Built. Migration 0020, `server/modules/impound/`.
+
+- [M] Impound with reason (investigative hold, evidence hold, abandoned, DUI, unregistered, other), plate, fee-per-day.
+- [M] Fees computed from dates, not timers: whole days held, minimum one, times the daily rate. Never re-added on the client — every read carries the server's own current figure.
+- [M] Release requires fees paid and, for an investigative or evidence hold, the investigator's release authorization.
+- [M] **Resolves a matching spaningsuppdrag** on creation, firing `fredpd:vehicleImpounded` — the same server-local event `spaning/events.lua` was already listening for before this module existed to raise it.
+- **Not built:** a lot/location field and a formal tow-lot inventory beyond the plate and model already on the row.
+- **Permissions:** `page.impound` (patrol_basic); `impound.view`, `.create`, `.release` (patrol); `impound.authorize` (supervisor).
 
 ### 7.16 Dispatch (CAD) (M4)
 
@@ -678,7 +839,44 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 - [S] Plain language or ten-codes (configurable per agency, localized).
 - [S] Broadcasts (BOLO, all-units messages).
 - **Based on:** PremierOne / HxGN OnCall / Mark43 CAD; ps-dispatch alerts; ox_mdt units and calls.
-- **Permissions:** `cad.call.create`, `cad.call.dispatch`, `cad.call.self_assign`, `cad.call.clear`, `cad.unit.manage`, `cad.broadcast`, `cad.console.open`.
+- **Permissions:** `cad.call.create`, `cad.call.dispatch`, `cad.call.self_assign`, `cad.call.clear`, `cad.call.note`, `cad.call.link`, `cad.unit.manage`, `cad.unit.status`, `cad.emergency`, `cad.broadcast`. `cad.call.note`, `cad.call.link`, `cad.unit.status` and `cad.emergency` were added while building M4 and are explained under Appendix B; `cad.console.open` was listed here and is retired, also under Appendix B. The reads — queue, call card, unit board, map, broadcast board — are gated on `page.dispatch` and have no key of their own.
+
+#### 7.16.1 The narrative log, and the locale key every generated line carries
+
+`fpd_call_log` has two kinds of line. A **note** is what a person typed: it goes
+in `body`, it is content, and it is never translated. Every **other** line is
+user-facing text the system wrote, so it goes in `message_key` plus
+`message_args` and the NUI renders it in the *reader's* language —
+`ck_fpd_call_log_content` makes the wrong one impossible to store. The i18n
+checker cannot see a key assembled at runtime, so this table is the only place
+the two halves are compared:
+
+| `entry_type` | `message_key` | `message_args` |
+|---|---|---|
+| `created` | `cad.log.created` | — |
+| `created` (from the `CreateCall` export) | `cad.log.created_external` | `resource` |
+| `note` | *none* — the text is in `body` | — |
+| `dispatched` | `cad.log.dispatched` | `callsign` |
+| `unit_joined` | `cad.log.unit_joined`, or `cad.log.self_assigned` on a self-assign | `callsign` |
+| `unit_left` | `cad.log.unit_left` | `callsign` |
+| `lead_changed` | `cad.log.lead_changed` | `callsign` |
+| `unit_status` | `cad.log.unit_status` | `callsign`, `status` |
+| `call_status` | `cad.log.call_status` | `status` |
+| `linked` | `cad.log.linked` | `label`, `role` |
+| `unlinked` | `cad.log.unlinked` | `label` |
+| `cleared` | `cad.log.cleared`, or `cad.log.cancelled` for a `duplicate` or `cancelled` disposition | `disposition` |
+
+**An argument that names a vocabulary carries the value, not a sentence.**
+`status`, `role` and `disposition` are stored as the enum member (`en_route`,
+`caller`, `arrest_made`) and the NUI resolves each through its own key —
+`cad.unitStatus.*`, `cad.callStatus.*`, `cad.linkRole.*`, `cad.disposition.*`.
+Writing the rendered label into `message_args` would put the dispatcher's
+language inside a Swedish officer's log line, which is invariant 6 defeated one
+level down. `callsign` and `label` are the two arguments that are genuinely
+data.
+
+The line's own label — the icon and the word beside the timestamp — is
+`cad.logKind.<entry_type>`, one key per value of `ck_fpd_call_log_type`.
 
 ### 7.17 Map, vehicle location, beats and geofences (M4)
 
@@ -692,7 +890,60 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 - [S] Plate reads from Wolfknight radar logged with time, place and unit.
 - [S] Hotlist checks against BOLOs, stolen vehicles and warrants; hit banner for the unit.
 - [S] Read retention (default 30 days) enforced by the gateway scheduler.
+- **Hotlist reasons** are `stolen_vehicle`, `wanted_person`, `warrant`, `bolo`, `investigation` and `other` — `ck_fpd_hotlist_reason` and `HOTLIST_REASONS`. The banner an officer reads before stopping a car is the reason's label, so each one has a key under **`alpr.reason.<value>`** (not `cad.*`: the hotlist, the reads and the hit banner are one screen and one namespace), and the free-text `note` beside it carries the detail.
 - **Permissions:** `alpr.read.view`, `alpr.hotlist.manage`.
+
+#### 7.18.1 What M4 shipped, and what it did not
+
+7.18 is [S] and M4 built the half of it that is storage and access control. The
+other half — the thing that reads a plate — is not built, and nothing on any
+screen says so, so this is where it is written down. **No plate has ever been
+read on a FredPD server**: `fpd_alpr_reads` is empty on every deployment and
+will stay empty until the bridge below exists.
+
+**Shipped and working.**
+
+- The tables, in migration `0007_dispatch.sql`: `fpd_hotlist` (with
+  `ck_fpd_hotlist_reason`, the per-entry `silent` flag and the live/expiry
+  handling) and `fpd_alpr_reads` (plate, time, position, unit, camera, and the
+  `hit`/`hotlist_id` pair that records what the read matched *at the time*).
+- Three routes, each with a schema, a permission, a grant in the seed and an
+  entry in `NUI_ROUTES`: `alpr.read.list` (`alpr.read.view`, rate limited,
+  audited), `alpr.hotlist.edit` (`alpr.hotlist.manage`, `sensitive`, audited)
+  and `alpr.hotlist.list` (`alpr.hotlist.manage`, rate limited). All three are
+  callable today by any client that names them.
+- The covert-watch rule, which is the part that was worth building first: a
+  `silent` entry is masked out of both reads for everyone but its author and
+  those cleared for it, the reads list is *built* field by field rather than
+  redacted, and a masked row is dropped from a hits-only list rather than sent
+  with `hit = 0`.
+- The locale namespace `alpr.*`, complete in `en` and `sv`, including the
+  `alpr.hit.*` banner strings and `alpr.reason.<value>`.
+- `alprRetentionDays` in `config/server.lua`, default 30.
+
+**Written but reachable from nothing.** Three repo functions have no caller:
+`Repo.hotlistHits`, `Repo.recordRead` and `Repo.purgeReads`. Their comments say
+so; this section says what it would take to change that.
+
+- **The reader.** There is no radar bridge. A plate is read on a client, so the
+  bridge belongs in `server/bridges/` and is the only file allowed to name
+  Wolfknight (3.8). Per read it calls `Repo.hotlistHits(agencyId, plate)` and
+  then `Repo.recordRead`, with the position taken off the *reading unit's* ped
+  on the server exactly as the AVL sweep does — a client that could send the
+  position of a read could place a car anywhere it liked (invariant 1).
+- **The hit banner.** Nothing pushes a hit and no client handler draws one, so
+  `alpr.hit.title`, `alpr.hit.banner` and `alpr.hit.advice` are strings nobody
+  has seen. The push must be to the reading unit alone and must respect
+  `silent` per entry (invariant 5, section 9): a silent entry is logged and the
+  unit is told nothing.
+- **The screen.** `cad.tab.alpr` exists as a tab label; `Dispatch.svelte` has
+  four tabs and this is not one of them. Nothing in the NUI calls the three
+  routes, so the reads file, the hotlist and its editor have no way in.
+- **Retention.** 13.3 gives the 30-day sweep to the gateway scheduler and the
+  gateway is off by default (ADR-010), so nothing calls `Repo.purgeReads` and
+  `alprRetentionDays` currently changes nothing. The number is a privacy
+  commitment under 11.4 that is **not being kept**; whichever scheduler ends up
+  owning it calls that function in batches, per agency.
 
 ### 7.19 Cameras (O, later)
 
@@ -701,12 +952,13 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 
 ### 7.20 Court and DOJ (M6)
 
-- [M] Prosecutor intake of case referrals; charging decision (file, decline with reason, request more investigation).
-- [M] Court calendar: hearings, trials, officer subpoenas with notifications.
-- [M] Dispositions: guilty, not guilty, dismissed, plea; sentences recorded and handed to the jail bridge.
-- [S] Discovery packages for defense attorneys: selected items, automatic redaction, access-limited and time-limited.
-- [S] Record sealing and expungement orders.
-- **Permissions:** `court.referral.review`, `court.calendar.manage`, `court.disposition.enter`, `court.discovery.issue`, `court.discovery.view`, `court.seal.order`.
+Built (the charging decision and the disposition). Migration 0016, `server/modules/court/`.
+
+- [M] Prosecutor intake of a redovisad förundersökning; charging decision (charge, or decline with a reason from a closed list). "Request more investigation" is not built — it would reopen a redovisad FU, which is a change to the FU's own lifecycle this module does not make (0016's header).
+- [S] Court calendar, hearings and officer subpoenas — not built.
+- [M] Dispositions: guilty, not guilty, dismissed, plea. A sentence is checked against `Brott.gemensamStraffskala` for the exact charges on the row, never trusted from input. Handoff to a jail bridge is not built (no such bridge exists yet).
+- [S] Discovery packages and record sealing — not built.
+- **Permissions:** `court.referral.review` (åklagare and domare — reading the docket is part of disposing of it), `court.disposition.enter` (domare only).
 
 ### 7.21 Corrections bridge (M6)
 
@@ -714,33 +966,50 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 
 ### 7.22 Personnel and roster (M6)
 
-- [M] Officer profile: badge number, callsign, rank (read from Discord roles), division, hire date, bound character.
-- [M] Hire, promote, demote, suspend, dismiss from FredPD, executed as Discord role changes through the gateway (section 4.2).
-- [M] Shift log: on-duty and off-duty times, hours per week.
-- [M] Equipment assignment: vehicle, radio, duty weapons (linked to the firearms registry).
-- [S] Commendations and awards.
-- [S] Scheduling.
-- **Permissions:** `personnel.view`, `personnel.hire`, `personnel.promote`, `personnel.discipline`, `personnel.equipment.assign`.
+Built. Migration 0017, `server/modules/personnel/`.
+
+- [M] Officer profile: badge number, callsign, division, hire date, bound character — extends `fpd_officers` (0001) rather than a second roster table. Rank is read-only display of the officer's mapped Discord roles (invariant 2); nothing here writes to Discord.
+- **Not built as sketched:** hire, promote, demote and dismiss as Discord role changes through the gateway. ADR-010 settled that FXServer only ever *reads* the guild — ADR-013's reasoning generalised: a resource that could also grant a role would be the permission source contradicting itself. "Promote" here means editing `division`, not a role.
+- [M] Shift log: start/end, self-service only (`personnel.shift.own` acts on the caller's own row, never an id in the input).
+- [M] Equipment assignment: item, optional serial, optionally linked to the firearms registry (0005) by id.
+- **Permissions:** `page.personnel`, `personnel.roster.view`, `personnel.shift.own` (patrol_basic); `personnel.roster.edit`, `personnel.equipment.manage`, `personnel.certification.manage` (supervisor); `personnel.discipline.view`, `personnel.discipline.manage` (command).
 
 ### 7.23 Training, field training and certifications (S, M6)
 
-- [S] Certifications (K9, air support, tactical, pursuit driving, FTO) with expiry. Certifications can be context conditions (only certified officers can sign on as K9 units).
-- [S] Field training program: phases, daily observation reports, competency ratings, sign-off (based on ps-mdt v3 FTO).
-- [S] Training records and course attendance.
+Built (certifications; not the field-training program).
+
+- [M] Certifications with expiry and revocation, from a closed list. `Repo.hasActiveCertification` is exported for other modules to use as a context condition, per the sketch above.
+- [S] The field training phases/observation-report program — not built; only the certification itself (`fto` is one of the closed-list keys) exists.
 
 ### 7.24 Internal affairs, use of force and early intervention (S, M6)
 
-- [S] Complaints from officers or civilians (public complaint form), intake, investigation, findings (sustained, not sustained, exonerated, unfounded), discipline.
-- [S] Use-of-force reports with supervisor review.
-- [S] Early-intervention alerts when thresholds are crossed (for example 3 use-of-force reports in 30 days), in the style of IAPro/BlueTeam.
-- [S] Internal-affairs records live in the `internal_affairs` compartment.
+Built (the disciplinary file only).
+
+- [M] A case per officer: category (from a closed list), summary, opened and closed with an outcome from a closed list. Written against `ia_case` (already allowlisted in `access/repo.lua` since M1) with `compartment = 'internal_affairs'`, which ships stubbed to everyone until an operator configures who may see it (spec 4.5) — the same closed-by-default posture `court`'s restricted åtal rows already exercise.
+- [S] A public complaint intake form, use-of-force reports and early-intervention thresholds — not built.
 
 ### 7.25 Policies and SOPs (S, M6)
 
 - [S] Policy library with versions, categories and required acknowledgement per role; tracking of who has read which version (PowerDMS style).
 
-### 7.26 Communications (M4)
+### 7.26 Communications (M4; internal chat M1)
 
+- [M] **Internal police channel in the game chat (M1).** A police-only channel
+  rendered in the standard FiveM chat box, so officers never have to open the
+  MDT to talk. `/pd <message>` by default, command configurable.
+  - Send needs `comms.pdchat.send`; a message is delivered only to sessions
+    holding `comms.pdchat.view`. It is never broadcast to everyone
+    (invariant 5) — the recipient list is computed on the server, per message.
+  - The sender's callsign, name and agency are resolved **server-side** from the
+    session and prefixed to the message; nothing about the author comes from the
+    client (invariant 1).
+  - Rate limited per session like any other route, and the body is length-capped
+    and stripped of chat colour codes, so the channel cannot be used to spam or
+    to forge another officer's prefix.
+  - Stored append-only in `fpd_chat_messages` and readable in the MDT comms log
+    with `comms.pdchat.view`, which is what makes it evidence rather than
+    ephemeral noise.
+  - Agency-scoped by default; a cross-agency channel needs `comms.pdchat.all`.
 - [M] Unit-to-unit and dispatcher-to-unit messages.
 - [M] Roll-call board: daily briefing with active BOLOs, warrants, officer-safety notes and announcements.
 - [M] Notification center.
@@ -770,6 +1039,35 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 - [S] Retention policies per data type (drafts, ALPR reads, query logs, wiretap sessions).
 - [S] System health: gateway status, Discord sync age, DB latency, route timings, queue depths.
 - [S] Feature flags and bridge status overview.
+- [M] **Placement editor** (3.10): create, move, rebind and disable the world
+  placements that open each module, in game, with `admin.placement.edit`.
+- [M] **Discord role mapping** (4.3): map a Discord role ID to permission groups
+  per agency from the MDT, with `admin.permissions.edit`. Every change is
+  audited and takes effect on the next permission push, without a restart.
+
+### 7.31 Agency motor pool (M1)
+
+The garage officers actually use. Impound and tow stay with `p_policejob`
+(3.11); this is the station motor pool only.
+
+- [M] A motor pool is a **placement** (3.10) with a `ped` interaction, so its
+  position and ped model are configured in game rather than in a config file.
+- [M] Draw a vehicle from the agency's configured fleet. Each fleet entry names
+  the model, the permission it needs and, optionally, a required certification
+  (7.23), so a pursuit vehicle or a helicopter can be restricted without a
+  separate garage.
+- [M] Return a vehicle at any motor pool of the same agency.
+- [M] Vehicles are society-owned through the `society` bridge, so the agency —
+  not the officer — owns the fleet.
+- [M] Every draw and return is logged in `fpd_motorpool_log` with the officer,
+  the vehicle, the placement and the time. A vehicle out for a whole shift is
+  visible to command, which is the point of logging it.
+- [M] Drawing requires being on duty (a context condition, 4.3) and standing at
+  the placement, verified server-side (3.10).
+- [S] Fleet editor in Admin, so the vehicle list is configurable in game too.
+- [S] Damage and fuel state carried over on return, where the framework exposes it.
+- **Permissions:** `garage.vehicle.draw`, `garage.vehicle.return`,
+  `garage.fleet.edit`.
 
 ---
 
@@ -804,6 +1102,19 @@ This replaces the noobsystems/evidences script with a server-authoritative desig
 | Digital | Seized phone item | Item | — | Phone evidence bag | Extraction through phone bridge (optional) | New |
 
 Decay times, success rates and caps are configured per type.
+
+Gunshot residue is the one row above with no position, so it is the one that is
+not in the evidence grid: it is a state on the shooter, set by every shot,
+decaying from the most recent one, cleared outright by washing (8.10) and taken
+off a person with a swab. The swab has no route of its own: it is
+`evidence.collect`, gated by `forensics.evidence.collect`, taking a `targetId`
+— the swabbed person's server id, resolved and range-checked server-side —
+where a trace would give it a `traceKey`. A swab is a collection, so it writes
+the item, the owner row and the first link of the custody chain in the one
+transaction every other collection uses (8.5, 8.6). What is
+deliberately not modelled: residue does not transfer to a passenger, a seat or
+anything handled afterwards, and it carries no weapon — a swab says this person
+fired something, never what.
 
 ### 8.3 Generation pipeline
 
@@ -900,7 +1211,7 @@ Decay times, success rates and caps are configured per type.
 
 ## 9. Surveillance and interception (M5)
 
-- [M] Every surveillance measure needs an active surveillance warrant (section 7.12) with scope (person, phone number, vehicle, location), method and expiry. Export `HasActiveWarrant(target, 'surveillance', method)`.
+- [M] Every surveillance measure needs an active, **tingsrätt-decided** measure with scope (person, phone number, vehicle, location), method and expiry — requested by an åklagare, granted or refused only by a domare, the same court-decision pattern `frihet.haktning` uses rather than the FU-ledare/åklagare decision section 7.12's husrannsakan and kroppsvisitation take. That distinction is why this module extends `frihet`'s capacity-derivation shape (`capacityOf`, spec 4.4) instead of `tvangsmedel`'s. Export `HasActiveWarrant(target, 'surveillance', method)`.
 - [M] Methods:
   - **Phone interception:** live listening to calls of a warranted number, with call metadata logging.
   - **Radio monitoring:** listening to a radio channel, with a configurable blocklist (police, EMS).
@@ -920,7 +1231,11 @@ Decay times, success rates and caps are configured per type.
 
 ### 10.1 Status
 
-PD-Span's code and data model are not described in this spec yet. The first integration task is an inventory by Claude Code (10.5). Until then this section defines the target and the contract.
+The inventory (10.5) is done: `docs/pd-span-inventory.md`. It found that PD-Span is a Next.js application on Supabase rather than a FiveM resource, so option 1 of 10.3 was taken in its reframed form — **the data model is ported into the monorepo as the `intel` module and the interface is rebuilt**, rather than a resource being merged or a bridge being written.
+
+The register now lives in the server's own MariaDB (the `fpd_intel_*` tables in migration 0001) and persists there. The existing PD-Span data is deliberately **not** migrated: the module starts empty and the register is built up in game.
+
+That makes the bridge contract in 10.4 unnecessary — there is no second system to bridge to. It is kept below as a record of what was considered.
 
 ### 10.2 What "directly integrated" means
 
@@ -991,7 +1306,7 @@ PD-Span's code and data model are not described in this spec yet. The first inte
 | Denial of service | Event floods, huge payloads, evidence spam | Rate limits, payload size caps, evidence caps and merging, latent events for bulk data |
 | Item duplication | Place/pickup flows that mint items | Server-side item checks, affected-row checks, transactions |
 | Stale permissions | Discord outage keeps revoked access alive | Snapshot age limits (4.2), live revocation |
-| Secret leakage | Bot token or HMAC secret in client files | `set` convars and gateway env only; CI secret scanning |
+| Secret leakage | Bot token or HMAC secret in client files | `config/server.lua` (server_scripts, never `files {}`), `set` convars, gateway env; CI secret scanning |
 | Server ID reuse | New player inherits a dropped player's session | Sessions destroyed on drop |
 
 ### 11.2 Required controls
@@ -1083,17 +1398,18 @@ Unauthenticated call, missing permission, failed context condition, invalid type
 
 | Area | Tables |
 |---|---|
-| Core | `fpd_migrations`, `fpd_settings`, `fpd_agencies`, `fpd_divisions`, `fpd_counters`, `fpd_audit_log`, `fpd_query_log`, `fpd_outbox`, `fpd_i18n_overrides` |
+| Core | `fpd_migrations`, `fpd_settings`, `fpd_agencies`, `fpd_divisions`, `fpd_counters`, `fpd_audit_log`, `fpd_query_log`, `fpd_outbox`, `fpd_i18n_overrides`, `fpd_placements` |
 | Access | `fpd_discord_members`, `fpd_role_map`, `fpd_permission_groups`, `fpd_group_permissions`, `fpd_classifications`, `fpd_compartments`, `fpd_record_compartments`, `fpd_record_grants`, `fpd_breakglass` |
 | Personnel | `fpd_officers`, `fpd_shift_log`, `fpd_certifications`, `fpd_training`, `fpd_equipment`, `fpd_commendations`, `fpd_fto_*`, `fpd_ia_cases`, `fpd_uof_reports`, `fpd_policies`, `fpd_policy_acks` |
 | Records | `fpd_persons`, `fpd_person_index`, `fpd_person_aliases`, `fpd_person_descriptors`, `fpd_person_photos`, `fpd_person_cautions`, `fpd_addresses`, `fpd_person_addresses`, `fpd_vehicles`, `fpd_vehicle_flags`, `fpd_firearms`, `fpd_firearm_events`, `fpd_notes`, `fpd_attachments` |
 | Reports and cases | `fpd_reports`, `fpd_report_versions`, `fpd_report_persons`, `fpd_report_offences`, `fpd_report_property`, `fpd_report_vehicles`, `fpd_cases`, `fpd_case_links`, `fpd_case_tasks` |
 | Enforcement | `fpd_arrests`, `fpd_arrest_charges`, `fpd_bookings`, `fpd_citations`, `fpd_warrants`, `fpd_warrant_events`, `fpd_bolos`, `fpd_fi_cards`, `fpd_stops`, `fpd_impounds` |
 | Legal | `fpd_penal_code`, `fpd_penal_code_versions`, `fpd_court_referrals`, `fpd_hearings`, `fpd_dispositions`, `fpd_discovery_packages` |
-| Dispatch | `fpd_calls`, `fpd_call_units`, `fpd_call_events`, `fpd_units`, `fpd_unit_status_log`, `fpd_beats`, `fpd_premise_hazards`, `fpd_alpr_reads`, `fpd_messages`, `fpd_bulletins` |
+| Dispatch | `fpd_calls`, `fpd_call_units`, `fpd_call_events`, `fpd_units`, `fpd_unit_status_log`, `fpd_beats`, `fpd_premise_hazards`, `fpd_alpr_reads`, `fpd_messages`, `fpd_bulletins`, `fpd_chat_messages` |
+| Motor pool | `fpd_fleet`, `fpd_motorpool_log` |
 | Forensics | `fpd_bio_identity` (hidden), `fpd_weapon_signatures` (hidden), `fpd_scenes`, `fpd_scene_log`, `fpd_scene_photos`, `fpd_evidence_world`, `fpd_evidence_items`, `fpd_custody`, `fpd_storage_locations`, `fpd_audits`, `fpd_lab_requests`, `fpd_lab_results`, `fpd_dna_index`, `fpd_print_index`, `fpd_ballistic_index`, `fpd_leads` |
 | Surveillance | `fpd_surv_sessions`, `fpd_surv_devices`, `fpd_surv_product_log` |
-| Intelligence | Defined after the PD-Span inventory (section 10.5) |
+| Intelligence | `fpd_intel_persons`, `fpd_intel_orgs`, `fpd_intel_memberships`, `fpd_intel_associates`, `fpd_intel_notes`, `fpd_intel_note_tags`, `fpd_intel_vehicles`, `fpd_intel_cases`, `fpd_intel_case_links`, `fpd_intel_evidence` |
 | Media | `fpd_media` (hash, type, size, owner record, access control reference) |
 
 ### 13.3 Retention jobs
@@ -1281,16 +1597,27 @@ Total: roughly 320–450 hours.
 
 ## 19. Open decisions and inputs needed
 
+**Settled since v0.1:** the framework is **ESX** (ADR-005), and the procedure is
+**Swedish** rather than US workflows with Swedish labels (ADR-014). Both were on
+this list; both were load-bearing enough that deferring them would have meant
+rewriting M2 rather than extending it.
+
+The procedure decision opened one input of its own, listed below: the host's
+timezone is now load-bearing for RB 24:12's local noon, because Lua cannot
+resolve an IANA name to an offset without a tz database.
+
 | Decision or input | Why it matters | Needed by |
 |---|---|---|
-| What PD-Span is technically and where its source lives | Integration option and effort | M0 (inventory), M5 (build) |
+| ~~What PD-Span is technically and where its source lives~~ | **Resolved.** A live Next.js app on Supabase, not a FiveM resource. See `docs/pd-span-inventory.md` | M0 — done |
 | Agencies at launch (names, logos, colors) | Branding, numbering, sharing rules | M1 |
 | Discord guild ID and role IDs (ranks, units, compartments, DOJ) | Permission seed | M1 |
-| Procedure style: US-style workflows with Swedish text, or Swedish-style procedure (gripande, anhållande, häktning, prosecutor-led förundersökning) | Report, warrant and court workflows | M2 |
 | UI framework confirmation (Svelte 5 or React) | Locks in the web stack | End of M1 |
-| Phone, jail, billing, garage, housing, appearance resources | Bridges | M2–M4 |
+| Phone, jail, billing, housing, appearance resources | Bridges | M2–M4 |
+| ~~Garage resource~~ | **Resolved.** FredPD owns the agency motor pool (7.31); impound stays with `p_policejob` | M1 — decided |
 | Dispatch alerts: built-in only or a ps-dispatch adapter | CAD scope | M4 |
+| Four call-log lines with no `entry_type`: `cad.log.acknowledged`, `cad.log.welfare_check`, `cad.log.report_created` (all three are features 7.16 names) and `cad.log.priority_changed` (which nothing names and no permission allows) | `ck_fpd_call_log_type` has eleven values and none of them fits these four, so either the CHECK grows, the lines ride on an existing value, or the strings go. Until it is settled they are keys no line can carry (7.16.1) | M4 |
 | Map tile source | Map module | M4 |
+| Host timezone for the deployment | RB 24:12's deadline is a *local* noon, and the server's own clock is the only zone Lua can resolve (ADR-014) | M2, now |
 | Retention periods per data type | Privacy and performance | M3 |
 | Lab turnaround times and success rates | Game balance | M3 |
 | Which evidence persists across restarts | Database load, realism | M3 |
@@ -1314,6 +1641,14 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Call (incident) | Händelse | |
 | Priority | Prioritet | Prio 1–4 |
 | Available / En route / On scene | Tillgänglig / På väg / På plats | |
+| Dispatched (a call) | Utlarmad | Utlarmning is the act |
+| Disposition (closing code) | Avslutskod | |
+| Beat / District | Område / Distrikt | |
+| Broadcast to all units | Utskick | |
+| Traffic stop | Fordonskontroll | |
+| Welfare check | Kontroll av person | |
+| Plate read (ALPR) | Skyltavläsning | |
+| Hotlist (plates) | Bevakningslista | |
 | Emergency button | Nödlarm | |
 | Shift / Briefing | Pass / Passgenomgång | |
 | Report (offence) | Anmälan | Brottsanmälan |
@@ -1373,25 +1708,98 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 
 | Area | Keys |
 |---|---|
-| Pages | `page.query`, `page.dispatch`, `page.records`, `page.evidence`, `page.lab`, `page.intel`, `page.court`, `page.personnel`, `page.stats`, `page.admin` |
-| Queries | `query.person.run`, `query.vehicle.run`, `query.firearm.run`, `query.phone.run`, `query.address.run`, `query.log.view` |
-| Records | `rms.person.view`, `rms.person.edit`, `rms.person.photo.upload`, `rms.person.caution.edit`, `rms.vehicle.view`, `rms.vehicle.edit`, `rms.vehicle.flag`, `rms.firearm.view`, `rms.firearm.edit`, `rms.firearm.trace`, `rms.location.view`, `rms.location.hazard.edit` |
-| Reports | `rms.report.create`, `rms.report.edit.own`, `rms.report.submit`, `rms.report.approve`, `rms.report.return`, `rms.report.void`, `rms.report.view.<type>` |
-| Enforcement | `rms.arrest.create`, `rms.citation.issue`, `rms.citation.void`, `rms.bolo.create`, `rms.bolo.cancel`, `rms.bolo.view`, `rms.fi.create`, `rms.stops.create`, `rms.impound.create`, `rms.impound.release`, `rms.impound.hold.release`, `rms.warrant.serve` |
-| Investigations | `inv.case.create`, `inv.case.view`, `inv.case.edit`, `inv.case.assign`, `inv.case.close` |
+| Pages | `page.query`, `page.dispatch`, `page.records`, `page.evidence`, `page.lab`, `page.intel`, `page.surveillance`, `page.court`, `page.personnel`, `page.stats`, `page.admin`, `page.comms` |
+| Queries | `query.run`, `query.hit.confirm`, `query.person.run`, `query.vehicle.run`, `query.firearm.run`, `query.phone.run`, `query.address.run`, `query.log.view` |
+| Records | `rms.person.view`, `rms.person.edit`, `rms.person.photo.upload`, `rms.person.caution.edit`, `rms.vehicle.view`, `rms.vehicle.edit`, `rms.vehicle.flag`, `rms.firearm.view`, `rms.firearm.edit`, `rms.firearm.trace`, `rms.brott.view`, `rms.location.view`, `rms.location.hazard.edit` |
+| Anmälan | `rms.anmalan.view`, `rms.anmalan.create`, `rms.anmalan.edit.any`, `rms.anmalan.approve`, `rms.anmalan.view.<type>` |
+| Förundersökning | `inv.fu.view`, `inv.fu.open`, `inv.fu.lead`, `inv.fu.assign` |
+| Frihetsberövande | `frihet.view`, `frihet.gripande`, `frihet.anhallande`, `frihet.haktning`, `frihet.frigiv` |
+| Tvångsmedel | `tvang.view`, `tvang.decide`, `tvang.decide.aklagare`, `tvang.decide.domare`, `tvang.verkstall`, `efterlysning.issue` |
+| Spaning | `spaning.view`, `spaning.create` |
+| Enforcement | `rms.arrest.create`, `rms.citation.issue`, `rms.citation.void`, `rms.fi.create`, `rms.stops.create`, `rms.impound.create`, `rms.impound.release`, `rms.impound.hold.release`, `rms.warrant.serve` |
+| Investigations (intelligence cases, §10) | `inv.case.create`, `inv.case.view`, `inv.case.edit`, `inv.case.assign`, `inv.case.close` |
 | Booking | `booking.create`, `booking.biometrics.capture`, `booking.release` |
 | Court | `court.warrant.request`, `court.warrant.review`, `court.warrant.recall`, `court.referral.review`, `court.calendar.manage`, `court.disposition.enter`, `court.discovery.issue`, `court.discovery.view`, `court.seal.order`, `court.citation.adjudicate`, `court.sentence.calculate` |
-| Dispatch | `cad.call.create`, `cad.call.dispatch`, `cad.call.self_assign`, `cad.call.clear`, `cad.unit.manage`, `cad.broadcast`, `cad.console.open`, `alpr.read.view`, `alpr.hotlist.manage` |
+| Dispatch | `cad.call.create`, `cad.call.dispatch`, `cad.call.self_assign`, `cad.call.clear`, `cad.call.note`, `cad.call.link`, `cad.unit.manage`, `cad.unit.status`, `cad.emergency`, `cad.broadcast`, `alpr.read.view`, `alpr.hotlist.manage` |
 | Forensics | `forensics.scene.create`, `forensics.scene.release`, `forensics.evidence.collect`, `forensics.tools.use` |
 | Property room | `evidence.item.view`, `evidence.item.intake`, `evidence.item.transfer`, `evidence.item.checkout`, `evidence.item.release`, `evidence.item.dispose`, `evidence.item.reseal`, `evidence.audit.run` |
 | Lab | `lab.request.create`, `lab.queue.view`, `lab.analysis.perform`, `lab.analysis.review`, `lab.report.release` |
-| Surveillance | `surv.phone.intercept`, `surv.radio.monitor`, `surv.device.deploy`, `surv.device.listen`, `surv.tracker.deploy`, `surv.tracker.view`, `surv.log.view` |
-| Intelligence | `intel.module.open`, `intel.report.create`, `intel.report.view`, `intel.surveillance.log`, `intel.source.view`, `intel.source.manage`, `intel.source.identity.view`, `intel.operation.approve` |
+| Surveillance | `surv.view`, `surv.request`, `surv.decide`, `surv.upphav`, `surv.phone.intercept`, `surv.radio.monitor`, `surv.device.deploy`, `surv.device.listen`, `surv.tracker.deploy`, `surv.tracker.view`, `surv.log.view` |
+| Intelligence | `intel.module.open`, `intel.report.create`, `intel.report.view`, `intel.report.edit`, `intel.person.view`, `intel.person.edit`, `intel.person.merge`, `intel.org.view`, `intel.org.edit`, `intel.case.view`, `intel.case.edit`, `intel.evidence.add`, `intel.record.delete`, `intel.surveillance.log`, `intel.source.view`, `intel.source.manage`, `intel.source.identity.view`, `intel.operation.approve` |
 | Personnel | `personnel.view`, `personnel.hire`, `personnel.promote`, `personnel.discipline`, `personnel.equipment.assign`, `ia.case.view`, `ia.case.manage`, `uof.review`, `policy.manage`, `policy.ack` |
-| Communications | `comms.message.send`, `comms.bulletin.post` |
+| Communications | `comms.message.send`, `comms.bulletin.post`, `comms.pdchat.send`, `comms.pdchat.view`, `comms.pdchat.all` |
+| Motor pool | `garage.vehicle.draw`, `garage.vehicle.return`, `garage.fleet.edit` |
 | Statistics | `stats.view`, `stats.export` |
-| Administration | `admin.permissions.edit`, `admin.penalcode.edit`, `admin.codetables.edit`, `admin.branding.edit`, `admin.audit.view`, `admin.retention.edit`, `admin.health.view` |
+| Administration | `admin.permissions.edit`, `admin.groups.edit`, `admin.brott.edit`, `admin.codetables.edit`, `admin.branding.edit`, `admin.audit.view`, `admin.retention.edit`, `admin.health.view`, `admin.placement.edit` |
 | Access | `records.breakglass`, `clearance.<level>`, `compartment.<name>`, `fields.mental_health.view`, `fields.victim_address.view` |
+
+**Reads have no key of their own where a page key already says the same thing.**
+The dispatch reads — the pending queue, a call card, the unit board, the live
+map (7.17) and the broadcast board — are gated on `page.dispatch` and on nothing
+else. 4.4 requires the page to declare what it needs and the routes to enforce
+the same rule, and a second `cad.call.view` beside it would be a key that is
+either always granted with the page or a rail entry that opens onto refusals.
+The same reasoning does *not* apply to the registers, where `rms.*.view` exists
+because a record can be above the reader's clearance (4.5).
+
+**Four dispatch keys were added building M4** and are not in 7.16's own list,
+because 7.16 lists what a dispatcher does and these are what an officer does:
+
+- `cad.unit.status` — set your own unit's status (Appendix F's `ST`), and report
+  your progress on a call you are assigned to. It names no officer: the row is
+  the session's own.
+- `cad.emergency` — the emergency button. Held apart from `cad.unit.status`
+  because it raises a P1 call as well as a status, and because a department
+  that has to take the button off one person must be able to do that without
+  taking their status keys with it.
+- `cad.call.note` — add a line to a call's narrative log.
+- `cad.call.link` — link a person or a vehicle to a call. Apart from
+  `cad.call.note` because it reaches into the registers, and the handler runs
+  the access check the register itself would.
+
+**A group that holds `cad.call.link` must also hold `rms.person.view` and
+`rms.vehicle.view`.** `call.link` takes a register row id and refuses a typed
+name or plate (7.16), so the only way to produce one is `person.search` or
+`vehicle.search`, and those two routes are gated on the register keys. A group
+given the link key without them is given a route it cannot reach: every search
+on the call card's picker answers `forbidden`. The seed grants both to
+`dispatch` beside the ALPR keys — written out rather than inherited, since
+`dispatch` inherits nothing — and they unlock four read routes
+(`person.search`, `person.get`, `vehicle.search`, `vehicle.get`) with clearance
+(4.5) and the `fields.*` grants still deciding what comes back.
+
+**`cad.console.open` is retired, and no key replaces it.** It was listed here
+and in 7.16 as the dispatcher's console key, and the seed said the dispatch
+console placement called it. No such mechanism exists: a placement carries
+geometry and nothing else (ADR-006), the two console-pinned routes are gated on
+`cad.call.create` and `cad.call.dispatch`, and no route, push or read ever asked
+for this key. Its only effect anywhere was in `cad/events.lua`, which read
+*holding* it as a reason to keep somebody off the unit board — so the catalog
+offered an administrator something that looked like a capability and worked as
+an amputation. Granted to `supervisor`, it signed every field supervisor off the
+board within one duty pass, pulled them off the calls they were on and left
+their panic button answering `no_unit`, while the console it appeared to open
+had never needed a key at all. It is out of the seed and out of the admin
+catalogue as well as out of this table; an existing database keeps its inert
+row, exactly as with `forensics.trace.report` under ADR-013.
+
+**Who is a unit is decided by `cad.unit.status` alone**, and that is a positive
+test with nothing negative beside it. A console operator is off the board
+because nothing grants them the key: `dispatch` is a root group and does not
+inherit `patrol_basic` (the seed spells out the four keys it used to take from
+it). This is the part a permission union can otherwise never express — an
+officer holding both the Dispatcher and the Patrol role holds the union of both
+groups, so *any* "holds the dispatcher key, therefore not a unit" rule throws
+their patrol half away and leaves a real officer permanently off the board with
+no screen able to say why. There is also no route that creates an `fpd_units`
+row: sign-on is the server's own observation of duty (7.1), so an officer who is
+missing from the board is missing the grant, duty, or a callsign on their roster
+row, and a supervisor cannot add them with `unit.manage`.
+
+7.16's *"cannot be cleared without supervisor acknowledgement"* is checked with
+`cad.unit.manage` rather than an acknowledgement key of its own: the groups that
+hold it — supervisor, command, dispatch — are exactly the ones who may give the
+acknowledgement.
 
 ## Appendix C — Default role template
 
@@ -1422,18 +1830,50 @@ Discord role names are examples; the mapping uses role IDs.
 
 ## Appendix D — Numbering formats
 
-| Record | Format | Example |
-|---|---|---|
-| Person (master) | `P-{######}` | P-000431 |
-| Report | `{AGENCY}-{YY}-{######}` | LSPD-26-000123 |
-| Case | `{AGENCY}-C{YY}-{#####}` | LSPD-C26-00045 |
-| Call | `{YYMMDD}-{####}` | 260917-0042 |
-| Scene | `S{YY}-{#####}` | S26-00017 |
-| Evidence | `E{YY}-{######}` (Code 128 barcode) | E26-001234 |
-| Warrant | `W{YY}-{#####}` | W26-00088 |
-| Citation | `{AGENCY}-T{YY}-{######}` | LSPD-T26-000311 |
-| Booking | `B{YY}-{#####}` | B26-00102 |
-| Lab request | `L{YY}-{#####}` | L26-00031 |
+Every number here is allocated from `fpd_counters` under a row lock, inside the
+transaction that writes the record (13.1, `server/core/counters.lua`). The
+counter row is `(agency_id, kind, year)`, so the **scope** column decides how
+often a sequence restarts, and each format below has to be readable back to the
+row it came from.
+
+| Record | Counter `kind` | Scope (`year`) | Format | Example |
+|---|---|---|---|---|
+| Person (master) | `person` | `0` — never restarts | `P-{######}` | P-000431 |
+| Report | `report` | `YYYY` | `{AGENCY}-{YY}-{######}` | LSPD-26-000123 |
+| Case | `case` | `YYYY` | `{AGENCY}-C{YY}-{#####}` | LSPD-C26-00045 |
+| Call | `call` | `YYMMDD` — restarts daily | `{YYMMDD}-{####}` | 260917-0042 |
+| Scene | `scene` | `YYYY` | `{AGENCY}-S-{YYYY}-{####}` | LSPD-S-2026-0017 |
+| Evidence | `evidence` | `YYYY` | `{AGENCY}-{YYYY}-{######}` (Code 128 barcode) | LSPD-2026-001234 |
+| Warrant | `warrant` | `YYYY` | `W{YY}-{#####}` | W26-00088 |
+| Citation | `citation` | `YYYY` | `{AGENCY}-T{YY}-{######}` | LSPD-T26-000311 |
+| Booking | `booking` | `YYYY` | `B{YY}-{#####}` | B26-00102 |
+| Lab request | `lab_request` | `YYYY` | `L{YY}-{#####}` | L26-00031 |
+| Secret coercive measure (HAK/HRA/spårsändare) | `hak` | `YYYY` | `H{YY}-{#####}` | H26-00007 |
+| Åtal | `atal` | `YYYY` | `A{YY}-{#####}` | A26-00014 |
+| Impound | `impound` | `YYYY` | `I{YY}-{#####}` | I26-00019 |
+| Internal affairs case | `ia_case` | `YYYY` | `IA{YY}-{#####}` | IA26-00003 |
+
+**The `year` column is a scope key, not a year.** It carries `0` for a sequence
+that never restarts, `YYYY` for a year-scoped one, and `YYMMDD` for the one
+day-scoped sequence in the suite. A call raised on 18 September 2026 counts in
+the row `(agency, 'call', 260918)` and the next day starts again at `0001`, so
+the module author passes the day key to `Counters.numberValues` and
+`Counters.transaction` as their `year` argument and does not have to invent an
+encoding. Six digits do not fit the `SMALLINT UNSIGNED` that 0005 declared, so
+migration 0007 widens the column; `YYYY` and `YYMMDD` values can never collide,
+because they sit under different `kind`s and are different magnitudes anyway.
+`{####}` caps a day at 9999 calls per agency, which is an order of magnitude
+above the busiest shift a server will have.
+
+**Where an agency appears, it is load-bearing.** `uq_fpd_scenes_number` and
+`uq_fpd_evidence_number` (0002) are unique over the number *alone*, not over
+`(agency_id, number)`, while the counter behind them is per agency — so two
+agencies allocating the same sequence in the same year would collide, and the
+second officer would see the insert fail. The scene and evidence formats
+therefore carry the agency and the full four-digit year, which is what
+`Evidence.numberPrefix` builds and what has shipped since M3. `fpd_calls` and
+`fpd_persons` are unique over `(agency_id, number)` instead, so a call number
+and a person number need no agency in them.
 
 ## Appendix E — Status tables
 
