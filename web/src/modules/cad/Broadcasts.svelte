@@ -11,10 +11,11 @@
    * The broadcast board (spec 7.16 [S], 7.26): what is out on the air.
    *
    * A broadcast is radio traffic rather than a record. A `bolo` here is the
-   * message that goes to every unit; it is not the formal BOLO record of 7.13,
-   * and putting a plate on one does nothing to that plate — making an ALPR
-   * banner fire is a hotlist entry under its own permission (7.18), because a
-   * plate worth stopping a car over is a decision with its own key.
+   * message that goes to every unit; it is not the formal Lookout record of
+   * 7.13 (`modules/spaning`), and putting a plate on one does nothing to that
+   * plate — making an ALPR banner fire is a hotlist entry under its own
+   * permission (7.18), because a plate worth stopping a car over is a
+   * decision with its own key.
    *
    * Nothing is ever deleted. Taking a message off the air stamps the row and
    * leaves it, so "what was out at the time" survives the shift it was asked

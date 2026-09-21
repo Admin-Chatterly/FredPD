@@ -565,7 +565,12 @@ end
 --- confirmed afterwards. That pair is the point of the view: it is what
 --- distinguishes an officer who acted on a confirmed record from one who acted
 --- on a lead, months later, when somebody is asked about it (7.2).
-function Repo.queryLog(agencyId, filter)
+--- Keyset-paginated on `(created_at, id)` descending (spec 12.2).
+---
+--- @param cursor string|nil the previous page's `nextCursor`
+--- @return table rows
+--- @return string|nil nextCursor set only when a further page exists
+function Repo.queryLog(agencyId, filter, cursor)
     local where = { 'q.agency_id = ?' }
     local values = { agencyId }
 
@@ -579,14 +584,24 @@ function Repo.queryLog(agencyId, filter)
         values[#values + 1] = filter.queryType
     end
 
-    values[#values + 1] = math.min(math.max(tonumber(filter.limit) or 50, 1), 200)
+    local limit = math.min(math.max(tonumber(filter.limit) or 50, 1), 200)
 
-    return db().query(
+    local after = FredPD.Core.pagination.decode(cursor, 2)
+    if after then
+        where[#where + 1] =
+            '(UNIX_TIMESTAMP(q.created_at) < ? OR (UNIX_TIMESTAMP(q.created_at) = ? AND q.id < ?))'
+        values[#values + 1], values[#values + 1], values[#values + 1] = after[1], after[1], after[2]
+    end
+
+    values[#values + 1] = limit + 1
+
+    local rows = db().query(
         ([[SELECT q.id, q.discord_id AS discordId, q.officer_id AS officerId,
                   q.query_type AS queryType, q.term, q.access_point AS accessPoint,
                   q.restricted, q.reason, q.case_number AS caseNumber,
                   q.result_count AS resultCount, q.hit_count AS hitCount,
                   q.created_at AS createdAt,
+                  UNIX_TIMESTAMP(q.created_at) AS createdAtEpoch,
                   (SELECT COUNT(*) FROM fpd_hotfile_confirmations c
                     WHERE c.query_id = q.id) AS confirmationCount,
                   (SELECT COUNT(*) FROM fpd_hotfile_confirmations c
@@ -597,6 +612,17 @@ function Repo.queryLog(agencyId, filter)
             LIMIT ?]]):format(table.concat(where, ' AND ')),
         values
     )
+
+    local nextCursor = nil
+    if #rows > limit then
+        rows[limit + 1] = nil
+        local last = rows[limit]
+        nextCursor = FredPD.Core.pagination.encode({ last.createdAtEpoch, last.id })
+    end
+
+    for index = 1, #rows do rows[index].createdAtEpoch = nil end
+
+    return rows, nextCursor
 end
 
 FredPD.Repo.query = Repo

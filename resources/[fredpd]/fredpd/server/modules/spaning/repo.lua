@@ -47,7 +47,14 @@ function Repo.forTarget(targetKind, targetId)
         { targetKind, targetId })
 end
 
-function Repo.list(agencyId, filter, limit)
+--- Keyset-paginated on `(priority ASC, issued_at DESC, id DESC)`, the same
+--- mixed-direction three-level expansion `tvangsmedel/repo.lua`'s
+--- `efterlysningList` uses and for the identical reason (spec 12.2).
+---
+--- @param cursor string|nil the previous page's `nextCursor`
+--- @return table rows
+--- @return string|nil nextCursor set only when a further page exists
+function Repo.list(agencyId, filter, limit, cursor)
     local clauses = { 'agency_id = ?' }
     local values = { agencyId }
 
@@ -65,12 +72,33 @@ function Repo.list(agencyId, filter, limit)
         clauses[#clauses + 1] = 'resolved_at IS NULL AND expires_at > CURRENT_TIMESTAMP(3)'
     end
 
-    values[#values + 1] = limit
+    local after = FredPD.Core.pagination.decode(cursor, 3)
+    if after then
+        clauses[#clauses + 1] = [[(
+            priority > ?
+            OR (priority = ? AND UNIX_TIMESTAMP(issued_at) < ?)
+            OR (priority = ? AND UNIX_TIMESTAMP(issued_at) = ? AND id < ?)
+        )]]
+        values[#values + 1] = after[1]
+        values[#values + 1], values[#values + 1] = after[1], after[2]
+        values[#values + 1], values[#values + 1], values[#values + 1] = after[1], after[2], after[3]
+    end
 
-    return FredPD.Core.db.query(
+    values[#values + 1] = limit + 1
+
+    local rows = FredPD.Core.db.query(
         SELECT .. ' WHERE ' .. table.concat(clauses, ' AND ')
-            .. ' ORDER BY priority, issued_at DESC LIMIT ?',
+            .. ' ORDER BY priority, issued_at DESC, id DESC LIMIT ?',
         values)
+
+    local nextCursor = nil
+    if #rows > limit then
+        rows[limit + 1] = nil
+        local last = rows[limit]
+        nextCursor = FredPD.Core.pagination.encode({ last.priority, last.issuedAt, last.id })
+    end
+
+    return rows, nextCursor
 end
 
 --- Raises a lookout, number allocated under the counter lock.

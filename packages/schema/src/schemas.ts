@@ -1096,6 +1096,11 @@ export const schemas = {
     // `Repo.queryLog` clamps to 1..200; the same ceiling here so a client
     // asking for more is told rather than silently given 200.
     limit: { type: 'integer', required: false, min: 1, max: 200 },
+    // The previous page's `nextCursor` (spec 12.2). Decoded and validated
+    // server-side (`Core.pagination.decode`); a malformed value is simply
+    // treated as no cursor at all, the same "not one of ours" reasoning
+    // `Core.pagination`'s own header gives.
+    cursor: { type: 'string', required: false, max: 64 },
   },
 
 
@@ -1897,6 +1902,8 @@ export const schemas = {
     fuId: { type: 'integer', required: false, min: 1 },
     includeSupplements: { type: 'boolean', required: false },
     limit: { type: 'integer', required: false, min: 1, max: 200 },
+    /** The previous page's `nextCursor` (spec 12.2). */
+    cursor: { type: 'string', required: false, max: 64 },
   },
 
   /** One anmälan by id, and the shape every transition route takes. */
@@ -1991,6 +1998,8 @@ export const schemas = {
     /** The investigations this session leads. Identity from the session. */
     mine: { type: 'boolean', required: false },
     limit: { type: 'integer', required: false, min: 1, max: 200 },
+    /** The previous page's `nextCursor` (spec 12.2). */
+    cursor: { type: 'string', required: false, max: 64 },
   },
 
   FuGet: {
@@ -2125,6 +2134,8 @@ export const schemas = {
     /** Only measures that authorise something right now. */
     liveOnly: { type: 'boolean', required: false },
     limit: { type: 'integer', required: false, min: 1, max: 200 },
+    /** The previous page's `nextCursor` (spec 12.2). */
+    cursor: { type: 'string', required: false, max: 64 },
   },
 
   TvangGet: {
@@ -2177,6 +2188,8 @@ export const schemas = {
     grund: { type: 'enum', required: false, values: EFTERLYSNING_GRUNDER },
     includeCancelled: { type: 'boolean', required: false },
     limit: { type: 'integer', required: false, min: 1, max: 200 },
+    /** The previous page's `nextCursor` (spec 12.2). */
+    cursor: { type: 'string', required: false, max: 64 },
   },
 
   /**
@@ -2211,6 +2224,8 @@ export const schemas = {
     priority: { type: 'integer', required: false, min: 1, max: 4 },
     includeResolved: { type: 'boolean', required: false },
     limit: { type: 'integer', required: false, min: 1, max: 200 },
+    /** The previous page's `nextCursor` (spec 12.2). */
+    cursor: { type: 'string', required: false, max: 64 },
   },
 
   SpaningGet: {

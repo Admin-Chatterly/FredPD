@@ -71,7 +71,8 @@ local TVANG_LIST_SELECT <const> = [[
            verkstalld_by AS verkstalldBy,
            UNIX_TIMESTAMP(upphavd_at)    AS upphavdAt,
            upphavd_by AS upphavdBy,
-           classification, version
+           classification, version,
+           UNIX_TIMESTAMP(created_at)    AS createdAt
       FROM fpd_tvangsmedel
 ]]
 
@@ -132,7 +133,15 @@ function Repo.forTargetAnyAgency(targetKind, targetId)
         { targetKind, targetId })
 end
 
-function Repo.list(agencyId, filter, limit)
+--- Keyset-paginated on `(created_at, id)` descending, both directions tied
+--- together the same way -- `id` alone is never the sole tiebreak column,
+--- because two rows created in the same millisecond would otherwise let one
+--- of them silently slip a page (spec 12.2).
+---
+--- @param cursor string|nil the previous page's `nextCursor`
+--- @return table rows
+--- @return string|nil nextCursor set only when a further page exists
+function Repo.list(agencyId, filter, limit, cursor)
     local clauses = { 'agency_id = ?' }
     local values = { agencyId }
 
@@ -150,12 +159,28 @@ function Repo.list(agencyId, filter, limit)
         clauses[#clauses + 1] = 'upphavd_at IS NULL AND valid_until > CURRENT_TIMESTAMP(3)'
     end
 
-    values[#values + 1] = limit
+    local after = FredPD.Core.pagination.decode(cursor, 2)
+    if after then
+        clauses[#clauses + 1] =
+            '(UNIX_TIMESTAMP(created_at) < ? OR (UNIX_TIMESTAMP(created_at) = ? AND id < ?))'
+        values[#values + 1], values[#values + 1], values[#values + 1] = after[1], after[1], after[2]
+    end
 
-    return FredPD.Core.db.query(
+    values[#values + 1] = limit + 1
+
+    local rows = FredPD.Core.db.query(
         TVANG_LIST_SELECT .. ' WHERE ' .. table.concat(clauses, ' AND ')
-            .. ' ORDER BY created_at DESC LIMIT ?',
+            .. ' ORDER BY created_at DESC, id DESC LIMIT ?',
         values)
+
+    local nextCursor = nil
+    if #rows > limit then
+        rows[limit + 1] = nil
+        local last = rows[limit]
+        nextCursor = FredPD.Core.pagination.encode({ last.createdAt, last.id })
+    end
+
+    return rows, nextCursor
 end
 
 --- Records a decision, with its number allocated under the counter lock.
@@ -249,7 +274,17 @@ function Repo.forPerson(personId)
         { personId })
 end
 
-function Repo.efterlysningList(agencyId, filter, limit)
+--- Keyset-paginated on `(priority ASC, issued_at DESC, id DESC)` -- the
+--- mixed-direction sort 0014's own header names as the reason
+--- `idx_fpd_efterlysning_sorted` exists, and the reason this cursor is a
+--- three-level `OR` expansion rather than one row-constructor comparison: a
+--- single `(priority, issued_at) < (?, ?)` compares both columns in the same
+--- direction, which is wrong for exactly this column.
+---
+--- @param cursor string|nil the previous page's `nextCursor`
+--- @return table rows
+--- @return string|nil nextCursor set only when a further page exists
+function Repo.efterlysningList(agencyId, filter, limit, cursor)
     local clauses = { 'e.agency_id = ?' }
     local values = { agencyId }
 
@@ -275,12 +310,33 @@ function Repo.efterlysningList(agencyId, filter, limit)
         clauses[#clauses + 1] = '(e.expires_at IS NULL OR e.expires_at > CURRENT_TIMESTAMP(3))'
     end
 
-    values[#values + 1] = limit
+    local after = FredPD.Core.pagination.decode(cursor, 3)
+    if after then
+        clauses[#clauses + 1] = [[(
+            e.priority > ?
+            OR (e.priority = ? AND UNIX_TIMESTAMP(e.issued_at) < ?)
+            OR (e.priority = ? AND UNIX_TIMESTAMP(e.issued_at) = ? AND e.id < ?)
+        )]]
+        values[#values + 1] = after[1]
+        values[#values + 1], values[#values + 1] = after[1], after[2]
+        values[#values + 1], values[#values + 1], values[#values + 1] = after[1], after[2], after[3]
+    end
 
-    return FredPD.Core.db.query(
+    values[#values + 1] = limit + 1
+
+    local rows = FredPD.Core.db.query(
         EFTER_LIST_SELECT .. ' WHERE ' .. table.concat(clauses, ' AND ')
-            .. ' ORDER BY e.priority, e.issued_at DESC LIMIT ?',
+            .. ' ORDER BY e.priority, e.issued_at DESC, e.id DESC LIMIT ?',
         values)
+
+    local nextCursor = nil
+    if #rows > limit then
+        rows[limit + 1] = nil
+        local last = rows[limit]
+        nextCursor = FredPD.Core.pagination.encode({ last.priority, last.issuedAt, last.id })
+    end
+
+    return rows, nextCursor
 end
 
 function Repo.efterlys(input, session)

@@ -42,11 +42,11 @@ route.define({
     handler = function(session, input)
         local now = os.time()
 
-        local found = repo.list(session.agencyId, {
+        local found, nextCursor = repo.list(session.agencyId, {
             targetKind = input.targetKind,
             priority = input.priority,
             includeResolved = input.includeResolved,
-        }, input.limit or 50)
+        }, input.limit or 50, input.cursor)
 
         -- Decorated *before* the filter, so the loop never writes fields onto
         -- a 4.5 stub. A stub carries three fields and no more by design
@@ -57,7 +57,7 @@ route.define({
 
         local rows = access.filterSearch(session, SPANING, found)
 
-        return { spaningsuppdrag = rows }
+        return { spaningsuppdrag = rows, nextCursor = nextCursor }
     end,
 })
 

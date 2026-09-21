@@ -63,7 +63,8 @@
     "cancel": "Cancel",
     "any": "Any",
     "search": "Search",
-    "save": "Save"
+    "save": "Save",
+    "loadMore": "Load more"
   },
   "fieldError": {
     "type": "the wrong kind of value",
@@ -476,7 +477,28 @@
       "noteCount": "{count} entries",
       "plates": "Plates",
       "confirmed": "Confirmed",
-      "suspected": "Suspected"
+      "suspected": "Suspected",
+      "merge": "Merge",
+      "mergeHint": "Every note, vehicle, membership, associate, case link and evidence entry attached to the other record moves to this one, and the other record is then deleted.",
+      "mergeKeepId": "Keep this record",
+      "mergeDropId": "Merge in record id",
+      "deleteConfirm": "Delete {name}? This cannot be undone.",
+      "plate": "Plate",
+      "model": "Model",
+      "color": "Color",
+      "vehicleNotes": "Notes",
+      "addVehicle": "Add vehicle",
+      "noVehicles": "No vehicles recorded.",
+      "orgId": "Organization id",
+      "role": "Role",
+      "addMembership": "Add to organization",
+      "noMemberships": "Not a known member of any organization.",
+      "associateId": "Person id",
+      "relationship": "Relationship",
+      "addAssociate": "Add associate",
+      "noAssociates": "No associates recorded.",
+      "noCases": "Not linked to any case.",
+      "noNotes": "No intelligence logged against this record yet."
     },
     "personStatus": {
       "unknown": "Unknown",
@@ -493,7 +515,14 @@
       "territory": "Territory",
       "members": "{count} members",
       "empty": "No organizations in the register yet.",
-      "roster": "Members"
+      "roster": "Members",
+      "type": "Type",
+      "status": "Status",
+      "notes": "Notes",
+      "personId": "Person id",
+      "addMember": "Add member",
+      "noRoster": "No known members.",
+      "deleteConfirm": "Delete {name}? This cannot be undone."
     },
     "orgType": {
       "gang": "Gang",
@@ -513,7 +542,16 @@
       "description": "Description",
       "empty": "No cases yet.",
       "linked": "{people} people, {orgs} organizations",
-      "links": "Linked to this case"
+      "links": "Linked to this case",
+      "status": "Status",
+      "deleteConfirm": "Delete {title}? This cannot be undone.",
+      "linkKind": "Kind",
+      "linkPerson": "Person",
+      "linkOrg": "Organization",
+      "linkId": "Record id",
+      "linkRole": "Role",
+      "addLink": "Link a record",
+      "noLinks": "Nothing linked to this case yet."
     },
     "caseStatus": {
       "open": "Open",
@@ -524,7 +562,18 @@
       "save": "Save",
       "cancel": "Cancel",
       "create": "Create",
-      "back": "Back"
+      "back": "Back",
+      "edit": "Edit",
+      "delete": "Delete",
+      "remove": "Remove"
+    },
+    "classification": "Classification",
+    "evidence": {
+      "title": "Evidence",
+      "empty": "No evidence attached.",
+      "url": "Link",
+      "caption": "Caption",
+      "add": "Add evidence"
     }
   },
   "admin": {
@@ -641,7 +690,7 @@
     "flag": {
       "stolen": "Stolen",
       "wanted": "Wanted",
-      "bolo": "BOLO",
+      "bolo": "Lookout notice",
       "impounded": "Impounded",
       "evidence_hold": "Evidence hold",
       "uninsured": "Uninsured"
@@ -1431,7 +1480,7 @@
       "fromCall": "From call {number}"
     },
     "broadcastKind": {
-      "bolo": "BOLO",
+      "bolo": "Lookout notice",
       "attempt_to_locate": "Attempt to locate",
       "all_units": "All units",
       "information": "Information"
@@ -1532,7 +1581,7 @@
       "stolen_vehicle": "Stolen vehicle",
       "wanted_person": "Wanted person",
       "warrant": "Warrant",
-      "bolo": "BOLO",
+      "bolo": "Lookout notice",
       "investigation": "Investigation",
       "other": "Other"
     }
@@ -2113,7 +2162,7 @@
       "annan": "Other"
     },
     "column": {
-      "number": "Diarienummer",
+      "number": "Reference",
       "target": "Directed at",
       "method": "Method",
       "status": "Status",
@@ -2190,7 +2239,7 @@
       "pending": "Awaiting disposition"
     },
     "column": {
-      "number": "Diarienummer",
+      "number": "Reference",
       "fu": "Investigation",
       "beslut": "Decision",
       "disposition": "Disposition",

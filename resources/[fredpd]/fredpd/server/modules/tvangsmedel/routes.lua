@@ -83,11 +83,11 @@ route.define({
     handler = function(session, input)
         local now = os.time()
 
-        local found = repo.list(session.agencyId, {
+        local found, nextCursor = repo.list(session.agencyId, {
             kind = input.kind,
             fuId = input.fuId,
             liveOnly = input.liveOnly,
-        }, input.limit or 50)
+        }, input.limit or 50, input.cursor)
 
         -- Before the filter, so `live` is never written onto a 4.5 stub. A
         -- stub has no validity window, so `Tvang.isValid` would answer `true`
@@ -100,7 +100,7 @@ route.define({
 
         local rows = access.filterSearch(session, TVANG, found)
 
-        return { tvangsmedel = rows }
+        return { tvangsmedel = rows, nextCursor = nextCursor }
     end,
 })
 
@@ -218,17 +218,17 @@ route.define({
     handler = function(session, input)
         local now = os.time()
 
-        local rows = repo.efterlysningList(session.agencyId, {
+        local rows, nextCursor = repo.efterlysningList(session.agencyId, {
             grund = input.grund,
             includeCancelled = input.includeCancelled,
-        }, input.limit or 50)
+        }, input.limit or 50, input.cursor)
 
         for index = 1, #rows do
             rows[index].live = service.isLive(rows[index], now)
             rows[index].detainOnSight = service.detainOnSight(rows[index].grund)
         end
 
-        return { efterlysningar = access.filterSearch(session, EFTERLYSNING, rows) }
+        return { efterlysningar = access.filterSearch(session, EFTERLYSNING, rows), nextCursor = nextCursor }
     end,
 })
 

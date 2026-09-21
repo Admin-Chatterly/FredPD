@@ -76,6 +76,37 @@ export function isRefusal(value: unknown): value is FixtureRefusal {
   return typeof value === 'object' && value !== null && REFUSAL in value;
 }
 
+/**
+ * The mock's own cursor (spec 12.2) -- a plain offset into an already-sorted
+ * array, opaque to the NUI exactly the way the server's own keyset cursor is:
+ * the screen only ever sends back what it was given, never parses it. The
+ * server's cursor encodes sort-key values because it cannot re-run "the
+ * fiftieth row" without them; the mock holds the whole array already sorted,
+ * so an offset says the same thing with far less code.
+ *
+ * `?pageSize=` overrides the requested page size, so a Playwright test can
+ * walk a genuine multi-page "load more" flow without the fixture arrays
+ * needing 50+ rows each.
+ */
+function pageSizeOverride(): number | null {
+  if (typeof window === 'undefined') return null;
+
+  const raw = new URLSearchParams(window.location.search).get('pageSize');
+  if (raw === null) return null;
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function paginate<T>(all: T[], cursor: string | undefined, pageSize: number): { page: T[]; nextCursor: string | null } {
+  const effectivePageSize = pageSizeOverride() ?? pageSize;
+  const start = cursor ? Number.parseInt(cursor, 10) || 0 : 0;
+  const page = all.slice(start, start + effectivePageSize);
+  const nextCursor = start + effectivePageSize < all.length ? String(start + effectivePageSize) : null;
+
+  return { page, nextCursor };
+}
+
 export interface FixtureSet {
   ok: Record<string, Fixture>;
   fail: Record<string, FixtureFailure>;
@@ -195,16 +226,109 @@ const intelTags: IntelTag[] = [
   { tag: 'docks', uses: 1 },
 ];
 
-const intelPersons: IntelPerson[] = [
+/**
+ * The intel register's own full records, `*_COLUMNS` column for column
+ * (spec 10). The list route's counts (`noteCount`, `memberCount`, …) are
+ * server-side correlated subqueries against the child tables below, so the
+ * fixture computes them the same way in `personListRow`/`orgListRow`/
+ * `caseListRow` rather than storing them redundantly, which is what let a
+ * mutation here go stale in the list while the detail panel moved on.
+ */
+interface FixtureIntelPerson {
+  id: number;
+  name: string | null;
+  alias: string | null;
+  description: string | null;
+  status: string;
+  classification: string;
+  version: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface FixtureIntelOrg {
+  id: number;
+  name: string;
+  type: string | null;
+  territory: string | null;
+  status: string;
+  notes: string | null;
+  classification: string;
+  version: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface FixtureIntelCase {
+  id: number;
+  title: string;
+  description: string | null;
+  status: string;
+  classification: string;
+  version: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface FixtureIntelVehicle {
+  id: number;
+  personId: number;
+  plate: string | null;
+  model: string | null;
+  color: string | null;
+  notes: string | null;
+  version: number;
+}
+
+/** One row per pair, `low` and `high` as `service.orderPair` would return them. */
+interface FixtureIntelAssociate {
+  low: number;
+  high: number;
+  relationship: string | null;
+  isConfirmed: boolean;
+}
+
+interface FixtureIntelMembership {
+  personId: number;
+  orgId: number;
+  role: string | null;
+  isConfirmed: boolean;
+}
+
+interface FixtureIntelCaseLink {
+  id: number;
+  caseId: number;
+  personId: number | null;
+  orgId: number | null;
+  role: string | null;
+}
+
+interface FixtureIntelEvidence {
+  id: number;
+  personId: number | null;
+  orgId: number | null;
+  caseId: number | null;
+  url: string | null;
+  caption: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
+let intelPersonsFull: FixtureIntelPerson[] = [
   {
     id: 1,
     name: 'Marko Petrov',
     alias: 'Slim',
     description: 'Tall, scar on left cheek.',
     status: 'active_investigation',
-    noteCount: 2,
-    plates: '4XYZ123',
+    classification: 'internal',
     version: 1,
+    createdBy: '100000000000000001',
+    createdAt: '2026-09-10T14:00:00.000Z',
+    updatedAt: '2026-09-16T21:14:00.000Z',
   },
   {
     // A person with no identity at all: a description and nothing else. This
@@ -214,38 +338,179 @@ const intelPersons: IntelPerson[] = [
     alias: null,
     description: 'Short, heavy build, grey hooded top, seen with the van on Alta Street.',
     status: 'poi',
-    noteCount: 0,
-    plates: null,
+    classification: 'internal',
     version: 1,
+    createdBy: '100000000000000001',
+    createdAt: '2026-09-14T09:00:00.000Z',
+    updatedAt: '2026-09-14T09:00:00.000Z',
+  },
+  {
+    id: 3,
+    name: 'Dean Ashworth',
+    alias: null,
+    description: null,
+    status: 'poi',
+    classification: 'internal',
+    version: 1,
+    createdBy: '100000000000000001',
+    createdAt: '2026-09-02T10:00:00.000Z',
+    updatedAt: '2026-09-02T10:00:00.000Z',
+  },
+  {
+    id: 4,
+    name: null,
+    alias: 'Chains',
+    description: 'Heavyset, neck tattoo.',
+    status: 'unknown',
+    classification: 'internal',
+    version: 1,
+    createdBy: '100000000000000001',
+    createdAt: '2026-09-02T10:05:00.000Z',
+    updatedAt: '2026-09-02T10:05:00.000Z',
+  },
+  {
+    id: 5,
+    name: 'Ivy Turner',
+    alias: null,
+    description: null,
+    status: 'poi',
+    classification: 'internal',
+    version: 1,
+    createdBy: '100000000000000001',
+    createdAt: '2026-09-02T10:10:00.000Z',
+    updatedAt: '2026-09-02T10:10:00.000Z',
   },
 ];
 
-const intelOrgs: IntelOrg[] = [
+let intelOrgsFull: FixtureIntelOrg[] = [
   {
     id: 1,
     name: 'Alta Street Crew',
     type: 'crew',
     territory: 'Alta Street, Mirror Park',
     status: 'active',
-    memberCount: 4,
-    confirmedCount: 2,
-    noteCount: 1,
+    notes: null,
+    classification: 'internal',
     version: 1,
+    createdBy: '100000000000000001',
+    createdAt: '2026-09-01T10:00:00.000Z',
+    updatedAt: '2026-09-15T18:02:00.000Z',
   },
 ];
 
-const intelCases: IntelCase[] = [
+let intelCasesFull: FixtureIntelCase[] = [
   {
     id: 1,
     title: 'Operation Kvarnen',
     description: 'Narcotics distribution around Alta Street.',
     status: 'open',
-    personCount: 2,
-    orgCount: 1,
-    noteCount: 1,
+    classification: 'internal',
+    version: 1,
+    createdBy: '100000000000000001',
+    createdAt: '2026-09-01T10:00:00.000Z',
+    updatedAt: '2026-09-15T18:02:00.000Z',
+  },
+];
+
+let intelVehicles: FixtureIntelVehicle[] = [
+  {
+    id: 1,
+    personId: 1,
+    plate: '4XYZ123',
+    model: 'Sultan',
+    color: 'Black',
+    notes: null,
     version: 1,
   },
 ];
+
+let intelMemberships: FixtureIntelMembership[] = [
+  { personId: 1, orgId: 1, role: 'Enforcer', isConfirmed: true },
+  { personId: 3, orgId: 1, role: 'Driver', isConfirmed: true },
+  { personId: 4, orgId: 1, role: null, isConfirmed: false },
+  { personId: 5, orgId: 1, role: 'Lookout', isConfirmed: false },
+];
+
+let intelAssociates: FixtureIntelAssociate[] = [
+  { low: 1, high: 2, relationship: 'Seen together on Alta Street', isConfirmed: false },
+];
+
+let intelCaseLinks: FixtureIntelCaseLink[] = [
+  { id: 1, caseId: 1, personId: 1, orgId: null, role: 'Subject' },
+  { id: 2, caseId: 1, personId: null, orgId: 1, role: 'Target organization' },
+  { id: 3, caseId: 1, personId: 2, orgId: null, role: 'Witness' },
+];
+
+let intelEvidence: FixtureIntelEvidence[] = [
+  {
+    id: 1,
+    personId: 1,
+    orgId: null,
+    caseId: null,
+    url: 'https://example.com/evidence/alta-street-1.jpg',
+    caption: 'Surveillance photo, Alta Street',
+    createdBy: '100000000000000001',
+    createdAt: '2026-09-16T21:20:00.000Z',
+  },
+];
+
+let nextIntelPersonId = 6;
+let nextIntelOrgId = 2;
+let nextIntelCaseId = 2;
+let nextIntelVehicleId = 2;
+let nextIntelCaseLinkId = 4;
+let nextIntelEvidenceId = 2;
+
+function personListRow(person: FixtureIntelPerson): IntelPerson {
+  const notes = intelNotes.filter((note) => note.personId === person.id);
+  const plates = intelVehicles
+    .filter((vehicle) => vehicle.personId === person.id)
+    .map((vehicle) => vehicle.plate)
+    .filter((plate): plate is string => Boolean(plate));
+
+  return {
+    id: person.id,
+    name: person.name,
+    alias: person.alias,
+    description: person.description,
+    status: person.status,
+    noteCount: notes.length,
+    lastNoteAt: notes[0]?.createdAt ?? null,
+    plates: plates.length > 0 ? plates.join(',') : null,
+    version: person.version,
+  };
+}
+
+function orgListRow(org: FixtureIntelOrg): IntelOrg {
+  const members = intelMemberships.filter((membership) => membership.orgId === org.id);
+
+  return {
+    id: org.id,
+    name: org.name,
+    type: org.type,
+    territory: org.territory,
+    status: org.status,
+    memberCount: members.length,
+    confirmedCount: members.filter((membership) => membership.isConfirmed).length,
+    noteCount: intelNotes.filter((note) => note.orgId === org.id).length,
+    version: org.version,
+  };
+}
+
+function caseListRow(record: FixtureIntelCase): IntelCase {
+  const links = intelCaseLinks.filter((link) => link.caseId === record.id);
+
+  return {
+    id: record.id,
+    title: record.title,
+    description: record.description,
+    status: record.status,
+    personCount: links.filter((link) => link.personId !== null).length,
+    orgCount: links.filter((link) => link.orgId !== null).length,
+    noteCount: intelNotes.filter((note) => note.caseId === record.id).length,
+    version: record.version,
+  };
+}
 
 /**
  * Evidence, property room and lab fixtures (spec 8).
@@ -763,6 +1028,39 @@ interface CadBroadcast {
   createdAt: string;
 }
 
+/** As `Repo.listReads` returns one, before the route's own covert masking. */
+interface CadAlprRead {
+  id: number;
+  plate: string;
+  readAt: string;
+  readAtUnix: number;
+  x: number;
+  y: number;
+  z: number;
+  officerId: number | null;
+  discordId: string | null;
+  callsign: string | null;
+  camera: string;
+  hit: boolean;
+  hotlistId: number | null;
+  hotlistReason: string | null;
+}
+
+/** As `HOTLIST_COLUMNS` selects one. */
+interface CadHotlistEntry {
+  id: number;
+  plate: string;
+  reason: string;
+  detail: string | null;
+  caseNumber: string | null;
+  silent: boolean;
+  expiresAt: string | null;
+  cancelledAt: string | null;
+  cancelledBy: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
 /** The session's own unit. `call.self_assign` names no officer; this is it. */
 const OWN_OFFICER_ID = 1;
 
@@ -1249,6 +1547,152 @@ let cadBroadcasts: CadBroadcast[] = [
     expiresAt: inMinutes(60),
     cancelledAt: null,
     createdAt: minutesAgo(15).at,
+  },
+];
+
+// Same value `FIXTURE_VIEWER` holds below -- declared as a literal here rather
+// than imported forward, so these seed arrays can sit beside the rest of the
+// cad domain instead of after every module that comes before it in the file.
+const ALPR_VIEWER_DISCORD_ID = '100000000000000001';
+const ALPR_OTHER_DISCORD_ID = '100000000000000002';
+
+let nextHotlistId = 4;
+
+/**
+ * The hotlist (7.18), `HOTLIST_COLUMNS` column for column. Entry 3 is silent
+ * and created by somebody other than the fixture viewer -- the one row this
+ * session's own `alpr.hotlist.list` must never return, and whose reads
+ * `alpr.read.list` must mask exactly as `seesSilent` does server-side.
+ */
+let cadHotlist: CadHotlistEntry[] = [
+  {
+    id: 1,
+    plate: '6ABC123',
+    reason: 'stolen_vehicle',
+    detail: 'Reported stolen from Vinewood',
+    caseNumber: 'CR26-00118',
+    silent: false,
+    expiresAt: null,
+    cancelledAt: null,
+    cancelledBy: null,
+    createdBy: ALPR_VIEWER_DISCORD_ID,
+    createdAt: minutesAgo(180).at,
+  },
+  {
+    id: 2,
+    plate: '7XYZ890',
+    reason: 'investigation',
+    detail: null,
+    caseNumber: null,
+    silent: true,
+    expiresAt: inMinutes(1440),
+    cancelledAt: null,
+    cancelledBy: null,
+    createdBy: ALPR_VIEWER_DISCORD_ID,
+    createdAt: minutesAgo(40).at,
+  },
+  {
+    id: 3,
+    plate: '9QRS231',
+    reason: 'wanted_person',
+    detail: 'Federal warrant, approach with caution',
+    caseNumber: null,
+    silent: true,
+    expiresAt: null,
+    cancelledAt: null,
+    cancelledBy: null,
+    createdBy: ALPR_OTHER_DISCORD_ID,
+    createdAt: minutesAgo(600).at,
+  },
+];
+
+/**
+ * Plate reads, `Repo.listReads`' own SELECT column for column and units. Row
+ * 4 is a real hit against the covert entry above -- kept here as the DB would
+ * hold it, with the masking left to the route's own logic in the fixture
+ * handler below, exactly as `alpr.read.list`'s handler builds the response
+ * rather than redacting one.
+ */
+const alprReads: CadAlprRead[] = [
+  {
+    id: 1,
+    plate: '6ABC123',
+    readAt: minutesAgo(6).at,
+    readAtUnix: minutesAgo(6).unix,
+    x: 220.1,
+    y: -805.4,
+    z: 30.7,
+    officerId: OWN_OFFICER_ID,
+    discordId: ALPR_VIEWER_DISCORD_ID,
+    callsign: '12-40',
+    camera: 'front',
+    hit: true,
+    hotlistId: 1,
+    hotlistReason: 'stolen_vehicle',
+  },
+  {
+    id: 2,
+    plate: '4JKL556',
+    readAt: minutesAgo(14).at,
+    readAtUnix: minutesAgo(14).unix,
+    x: 118.9,
+    y: -1020.6,
+    z: 29.3,
+    officerId: 2,
+    discordId: ALPR_OTHER_DISCORD_ID,
+    callsign: '3A-12',
+    camera: 'rear',
+    hit: false,
+    hotlistId: null,
+    hotlistReason: null,
+  },
+  {
+    id: 3,
+    plate: '7XYZ890',
+    readAt: minutesAgo(35).at,
+    readAtUnix: minutesAgo(35).unix,
+    x: 402.2,
+    y: -560.8,
+    z: 28.5,
+    officerId: OWN_OFFICER_ID,
+    discordId: ALPR_VIEWER_DISCORD_ID,
+    callsign: '12-40',
+    camera: 'fixed',
+    hit: true,
+    hotlistId: 2,
+    hotlistReason: 'investigation',
+  },
+  {
+    id: 4,
+    plate: '9QRS231',
+    readAt: minutesAgo(50).at,
+    readAtUnix: minutesAgo(50).unix,
+    x: 340.6,
+    y: -480.3,
+    z: 28.9,
+    officerId: OWN_OFFICER_ID,
+    discordId: ALPR_VIEWER_DISCORD_ID,
+    callsign: '12-40',
+    camera: 'front',
+    hit: true,
+    hotlistId: 3,
+    hotlistReason: 'wanted_person',
+  },
+  {
+    id: 5,
+    plate: '2MNO447',
+    readAt: minutesAgo(90).at,
+    readAtUnix: minutesAgo(90).unix,
+    x: 95.4,
+    y: -1105.7,
+    z: 29.1,
+    officerId: 2,
+    discordId: ALPR_OTHER_DISCORD_ID,
+    callsign: '3A-12',
+    camera: 'rear',
+    hit: false,
+    hotlistId: null,
+    hotlistReason: null,
   },
 ];
 
@@ -3836,7 +4280,7 @@ export const fixtures: FixtureSet = {
     // ------------------------------------------------------ förundersökning
 
     'fu.list': (input) => {
-      const filter = (input ?? {}) as { status?: string; mine?: boolean };
+      const filter = (input ?? {}) as { status?: string; mine?: boolean; limit?: number; cursor?: string };
 
       const found = forundersokningar.filter(
         (row) =>
@@ -3844,7 +4288,12 @@ export const fixtures: FixtureSet = {
           (!filter.mine || row.fuLedare === FIXTURE_VIEWER),
       );
 
-      return { forundersokningar: [...found.map(fuRow), ...restrictedFu] };
+      const { page, nextCursor } = paginate(found, filter.cursor, filter.limit ?? 50);
+
+      return {
+        forundersokningar: [...page.map(fuRow), ...(filter.cursor ? [] : restrictedFu)],
+        nextCursor,
+      };
     },
 
     'fu.get': (input) => {
@@ -4054,18 +4503,25 @@ export const fixtures: FixtureSet = {
     },
 
     'query.log': (input) => {
-      const { limit } = (input ?? {}) as { mine?: boolean; limit?: number };
+      const { limit, cursor } = (input ?? {}) as { mine?: boolean; limit?: number; cursor?: string };
 
       // `mine` is decided on the server from the session and never from the
       // input, so the fixture has one officer's log and no way to ask for
       // somebody else's.
-      return { entries: queryLog.slice(0, limit ?? 50) };
+      const { page, nextCursor } = paginate(queryLog, cursor, limit ?? 50);
+
+      return { entries: page, nextCursor };
     },
 
     // --------------------------------------------------------- tvångsmedel
 
     'tvang.list': (input) => {
-      const filter = (input ?? {}) as { kind?: string; liveOnly?: boolean };
+      const filter = (input ?? {}) as {
+        kind?: string;
+        liveOnly?: boolean;
+        limit?: number;
+        cursor?: string;
+      };
 
       const found = tvangsmedel.filter(
         (row) =>
@@ -4073,8 +4529,11 @@ export const fixtures: FixtureSet = {
           (!filter.liveOnly || tvangLiveness(row).live),
       );
 
+      const { page, nextCursor } = paginate(found, filter.cursor, filter.limit ?? 50);
+
       return {
-        tvangsmedel: [...found.map((row) => tvangRow(row, false)), ...restrictedTvang],
+        tvangsmedel: [...page.map((row) => tvangRow(row, false)), ...(filter.cursor ? [] : restrictedTvang)],
+        nextCursor,
       };
     },
 
@@ -4183,7 +4642,12 @@ export const fixtures: FixtureSet = {
     // -------------------------------------------------------- efterlysning
 
     'efterlysning.list': (input) => {
-      const filter = (input ?? {}) as { grund?: string; includeCancelled?: boolean };
+      const filter = (input ?? {}) as {
+        grund?: string;
+        includeCancelled?: boolean;
+        limit?: number;
+        cursor?: string;
+      };
 
       const found = efterlysningar.filter(
         (row) =>
@@ -4191,8 +4655,11 @@ export const fixtures: FixtureSet = {
           (filter.includeCancelled || row.cancelledAgo === undefined),
       );
 
+      const { page, nextCursor } = paginate(found, filter.cursor, filter.limit ?? 50);
+
       return {
-        efterlysningar: [...found.map(efterlysningRow), ...restrictedEfterlysning],
+        efterlysningar: [...page.map(efterlysningRow), ...(filter.cursor ? [] : restrictedEfterlysning)],
+        nextCursor,
       };
     },
 
@@ -4256,7 +4723,12 @@ export const fixtures: FixtureSet = {
     // ------------------------------------------------------------- spaning
 
     'spaning.list': (input) => {
-      const filter = (input ?? {}) as { targetKind?: string; includeResolved?: boolean };
+      const filter = (input ?? {}) as {
+        targetKind?: string;
+        includeResolved?: boolean;
+        limit?: number;
+        cursor?: string;
+      };
 
       const found = spaningsuppdrag.filter(
         (row) =>
@@ -4264,8 +4736,11 @@ export const fixtures: FixtureSet = {
           (filter.includeResolved || (row.resolvedAgo === undefined && row.expiresAgo < 0)),
       );
 
+      const { page, nextCursor } = paginate(found, filter.cursor, filter.limit ?? 50);
+
       return {
-        spaningsuppdrag: [...found.map(spaningRow), ...restrictedSpaning],
+        spaningsuppdrag: [...page.map(spaningRow), ...(filter.cursor ? [] : restrictedSpaning)],
+        nextCursor,
       };
     },
 
@@ -5083,7 +5558,12 @@ export const fixtures: FixtureSet = {
      * pressed rather than after.
      */
     'anmalan.list': (input) => {
-      const filter = (input ?? {}) as { status?: string; mine?: boolean };
+      const filter = (input ?? {}) as {
+        status?: string;
+        mine?: boolean;
+        limit?: number;
+        cursor?: string;
+      };
 
       const found = anmalningar.filter(
         (row) =>
@@ -5091,13 +5571,16 @@ export const fixtures: FixtureSet = {
           (!filter.mine || row.createdBy === FIXTURE_VIEWER),
       );
 
+      const { page, nextCursor } = paginate(found, filter.cursor, filter.limit ?? 50);
+
       return {
         anmalningar: [
-          ...found.map(({ brott: _brott, personer: _personer, ...row }) => row),
+          ...page.map(({ brott: _brott, personer: _personer, ...row }) => row),
           // Appended rather than interleaved so the readable rows keep stable
           // positions in the tests that click them.
-          ...restrictedAnmalningar,
+          ...(filter.cursor ? [] : restrictedAnmalningar),
         ],
+        nextCursor,
       };
     },
 
@@ -5913,6 +6396,172 @@ export const fixtures: FixtureSet = {
       return { id };
     },
 
+    // ----------------------------------------------------------------- alpr
+
+    /**
+     * Whether this session may be shown a silent entry -- the same rule
+     * `seesSilent` runs server-side (7.18, section 9): only the session that
+     * created it.
+     */
+    'alpr.read.list': (input) => {
+      const filter = (input ?? {}) as {
+        plate?: string;
+        officerId?: number;
+        sinceHours?: number;
+        hitsOnly?: boolean;
+        limit?: number;
+      };
+
+      const hitsOnly = filter.hitsOnly === true;
+      const sinceHours = filter.sinceHours ?? 24;
+      const cutoff = Math.floor(Date.now() / 1000) - sinceHours * 3600;
+      const wanted = filter.plate ? filter.plate.trim().toUpperCase() : null;
+
+      const candidates = alprReads.filter(
+        (row) =>
+          (!wanted || row.plate === wanted) &&
+          (!filter.officerId || row.officerId === filter.officerId) &&
+          row.readAtUnix >= cutoff &&
+          (!hitsOnly || row.hit),
+      );
+
+      const out = [];
+
+      for (const row of candidates) {
+        const entry = row.hotlistId ? cadHotlist.find((h) => h.id === row.hotlistId) : undefined;
+        const covert = entry?.silent === true && entry.createdBy !== ALPR_VIEWER_DISCORD_ID;
+
+        // A masked row cannot stay in a `hitsOnly` answer -- every row in
+        // that answer is a hit by construction, and `hit: false` would name
+        // the one the reader was not allowed to see.
+        if (covert && hitsOnly) continue;
+
+        out.push({
+          id: row.id,
+          plate: row.plate,
+          readAt: row.readAt,
+          readAtUnix: row.readAtUnix,
+          x: row.x,
+          y: row.y,
+          z: row.z,
+          officerId: row.officerId,
+          discordId: row.discordId,
+          callsign: row.callsign,
+          camera: row.camera,
+          hit: covert ? false : row.hit,
+          hotlistId: covert ? null : row.hotlistId,
+          hotlistReason: covert ? null : row.hotlistReason,
+        });
+      }
+
+      return { reads: out.slice(0, filter.limit ?? 100) };
+    },
+
+    'alpr.hotlist.edit': (input) => {
+      const body = (input ?? {}) as {
+        plate?: string;
+        remove?: boolean;
+        reason?: string;
+        note?: string;
+        caseNumber?: string;
+        silent?: boolean;
+        expiresInMinutes?: number;
+      };
+
+      const wanted = body.plate ? body.plate.trim().toUpperCase() : '';
+      if (!wanted) return refuse('invalid', { plate: 'required' });
+
+      if (body.remove) {
+        // A removal naming a reason takes that entry; one that does not takes
+        // every live entry for the plate this session may see -- never a
+        // silent one it did not create, and never counts it either.
+        const matches = cadHotlist.filter(
+          (entry) =>
+            entry.plate === wanted &&
+            entry.cancelledAt === null &&
+            (!body.reason || entry.reason === body.reason) &&
+            (!entry.silent || entry.createdBy === ALPR_VIEWER_DISCORD_ID),
+        );
+
+        if (matches.length === 0) return refuse('not_found', { plate: 'unknown' });
+
+        const matchedIds = new Set(matches.map((entry) => entry.id));
+        cadHotlist = cadHotlist.map((entry) =>
+          matchedIds.has(entry.id)
+            ? { ...entry, cancelledAt: minutesAgo(0).at, cancelledBy: ALPR_VIEWER_DISCORD_ID }
+            : entry,
+        );
+
+        return { plate: wanted, removed: matches.length };
+      }
+
+      // Required by the handler and not by the schema, because a removal has
+      // nothing to justify -- the validator cannot express "required unless".
+      if (!body.reason) return refuse('invalid', { reason: 'required' });
+
+      const existing = cadHotlist.find(
+        (entry) =>
+          entry.plate === wanted && entry.reason === body.reason && entry.cancelledAt === null,
+      );
+
+      if (existing) {
+        existing.detail = body.note ?? null;
+        existing.caseNumber = body.caseNumber ?? null;
+        existing.silent = body.silent === true;
+        existing.expiresAt = body.expiresInMinutes ? inMinutes(body.expiresInMinutes) : null;
+      } else {
+        cadHotlist = [
+          {
+            id: nextHotlistId++,
+            plate: wanted,
+            reason: body.reason,
+            detail: body.note ?? null,
+            caseNumber: body.caseNumber ?? null,
+            silent: body.silent === true,
+            expiresAt: body.expiresInMinutes ? inMinutes(body.expiresInMinutes) : null,
+            cancelledAt: null,
+            cancelledBy: null,
+            createdBy: ALPR_VIEWER_DISCORD_ID,
+            createdAt: minutesAgo(0).at,
+          },
+          ...cadHotlist,
+        ];
+      }
+
+      return { plate: wanted, reason: body.reason };
+    },
+
+    'alpr.hotlist.list': (input) => {
+      const filter = (input ?? {}) as {
+        plate?: string;
+        reason?: string;
+        includeExpired?: boolean;
+        limit?: number;
+      };
+
+      const now = Date.now();
+      const wanted = filter.plate ? filter.plate.trim().toUpperCase() : null;
+
+      const rows = cadHotlist.filter((entry) => {
+        if (!filter.includeExpired) {
+          if (entry.cancelledAt !== null) return false;
+          if (entry.expiresAt !== null && new Date(entry.expiresAt).getTime() <= now) return false;
+        }
+
+        if (wanted && entry.plate !== wanted) return false;
+        if (filter.reason && entry.reason !== filter.reason) return false;
+
+        // Deliberately no `silent` field to ask for these by: the subject
+        // learns nothing, and the subject is sometimes an officer reading
+        // this very board.
+        if (entry.silent && entry.createdBy !== ALPR_VIEWER_DISCORD_ID) return false;
+
+        return true;
+      });
+
+      return { entries: rows.slice(0, filter.limit ?? 100) };
+    },
+
     'beat.list': () => ({ beats: cadBeats }),
 
     'map.view': (input) => {
@@ -6001,6 +6650,9 @@ export const fixtures: FixtureSet = {
 
     'intel.note.create': (input) => {
       const body = input as {
+        personId?: number;
+        orgId?: number;
+        caseId?: number;
         body: string;
         tags?: string[];
         source?: string;
@@ -6010,9 +6662,9 @@ export const fixtures: FixtureSet = {
       intelNotes = [
         {
           id: nextNoteId,
-          personId: null,
-          orgId: null,
-          caseId: null,
+          personId: body.personId ?? null,
+          orgId: body.orgId ?? null,
+          caseId: body.caseId ?? null,
           body: body.body,
           source: body.source ?? null,
           confidence: body.confidence ?? 'medium',
@@ -6028,9 +6680,585 @@ export const fixtures: FixtureSet = {
     },
 
     'intel.tags': () => ({ tags: intelTags }),
-    'intel.person.list': () => ({ persons: intelPersons }),
-    'intel.org.list': () => ({ orgs: intelOrgs }),
-    'intel.case.list': () => ({ cases: intelCases }),
+    'intel.person.list': () => ({ persons: intelPersonsFull.map(personListRow) }),
+    'intel.org.list': () => ({ orgs: intelOrgsFull.map(orgListRow) }),
+    'intel.case.list': () => ({ cases: intelCasesFull.map(caseListRow) }),
+
+    'intel.person.get': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const person = intelPersonsFull.find((row) => row.id === id);
+      if (!person) return refuse('not_found');
+
+      const memberships = intelMemberships
+        .filter((membership) => membership.personId === id)
+        .map((membership) => {
+          const org = intelOrgsFull.find((row) => row.id === membership.orgId);
+
+          return {
+            orgId: membership.orgId,
+            role: membership.role,
+            isConfirmed: membership.isConfirmed,
+            orgName: org?.name ?? '',
+            orgType: org?.type ?? null,
+            orgStatus: org?.status ?? '',
+          };
+        });
+
+      const associates = intelAssociates
+        .filter((pair) => pair.low === id || pair.high === id)
+        .map((pair) => {
+          const otherId = pair.low === id ? pair.high : pair.low;
+          const other = intelPersonsFull.find((row) => row.id === otherId);
+
+          return {
+            personId: otherId,
+            name: other?.name ?? null,
+            alias: other?.alias ?? null,
+            status: other?.status ?? '',
+            relationship: pair.relationship,
+            isConfirmed: pair.isConfirmed,
+          };
+        });
+
+      const vehicles = intelVehicles.filter((vehicle) => vehicle.personId === id);
+
+      const cases = intelCaseLinks
+        .filter((link) => link.personId === id)
+        .map((link) => {
+          const record = intelCasesFull.find((row) => row.id === link.caseId);
+
+          return {
+            id: link.id,
+            caseId: link.caseId,
+            role: link.role,
+            title: record?.title ?? '',
+            status: record?.status ?? '',
+          };
+        });
+
+      const evidence = intelEvidence.filter((item) => item.personId === id);
+      const notes = intelNotes.filter((note) => note.personId === id);
+
+      return { person, memberships, associates, vehicles, cases, evidence, notes };
+    },
+
+    'intel.person.create': (input) => {
+      const body = (input ?? {}) as {
+        name?: string;
+        alias?: string;
+        description?: string;
+        status?: string;
+        classification?: string;
+      };
+
+      const now = new Date().toISOString();
+      const id = nextIntelPersonId++;
+
+      intelPersonsFull = [
+        {
+          id,
+          name: body.name ?? null,
+          alias: body.alias ?? null,
+          description: body.description ?? null,
+          status: body.status ?? 'unknown',
+          classification: body.classification ?? 'internal',
+          version: 1,
+          createdBy: '100000000000000001',
+          createdAt: now,
+          updatedAt: now,
+        },
+        ...intelPersonsFull,
+      ];
+
+      return { id };
+    },
+
+    'intel.person.update': (input) => {
+      const body = (input ?? {}) as {
+        id?: number;
+        version?: number;
+        name?: string;
+        alias?: string;
+        description?: string;
+        status?: string;
+        classification?: string;
+      };
+
+      const person = intelPersonsFull.find((row) => row.id === body.id);
+      if (!person) return refuse('not_found');
+      if (person.version !== body.version) return refuse('conflict');
+
+      if (body.name !== undefined) person.name = body.name || null;
+      if (body.alias !== undefined) person.alias = body.alias || null;
+      if (body.description !== undefined) person.description = body.description || null;
+      if (body.status !== undefined) person.status = body.status;
+      if (body.classification !== undefined) person.classification = body.classification;
+      person.version += 1;
+      person.updatedAt = new Date().toISOString();
+
+      return { id: person.id };
+    },
+
+    'intel.person.delete': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const exists = intelPersonsFull.some((row) => row.id === id);
+      if (!exists) return refuse('not_found');
+
+      intelPersonsFull = intelPersonsFull.filter((row) => row.id !== id);
+
+      return { id };
+    },
+
+    'intel.person.merge': (input) => {
+      const { keepId, dropId } = (input ?? {}) as { keepId?: number; dropId?: number };
+
+      if (keepId === dropId) return refuse('invalid', { dropId: 'same_as_keep' });
+
+      const keep = intelPersonsFull.find((row) => row.id === keepId);
+      const drop = intelPersonsFull.find((row) => row.id === dropId);
+      if (!keep || !drop) return refuse('not_found');
+
+      // Reattach the dropped record's intelligence to the kept one, then
+      // remove it -- the same plan `service.mergePlan` builds server-side.
+      keep.name = keep.name ?? drop.name;
+      keep.alias = keep.alias ?? drop.alias;
+      keep.description = keep.description ?? drop.description;
+
+      intelVehicles = intelVehicles.map((vehicle) =>
+        vehicle.personId === dropId ? { ...vehicle, personId: keepId as number } : vehicle,
+      );
+      intelMemberships = intelMemberships.map((membership) =>
+        membership.personId === dropId ? { ...membership, personId: keepId as number } : membership,
+      );
+      intelAssociates = intelAssociates
+        .filter((pair) => !(pair.low === dropId && pair.high === keepId) && !(pair.high === dropId && pair.low === keepId))
+        .map((pair) => {
+          if (pair.low === dropId) return { ...pair, low: keepId as number };
+          if (pair.high === dropId) return { ...pair, high: keepId as number };
+
+          return pair;
+        });
+      intelCaseLinks = intelCaseLinks.map((link) =>
+        link.personId === dropId ? { ...link, personId: keepId as number } : link,
+      );
+      intelEvidence = intelEvidence.map((item) =>
+        item.personId === dropId ? { ...item, personId: keepId as number } : item,
+      );
+      intelNotes = intelNotes.map((note) =>
+        note.personId === dropId ? { ...note, personId: keepId as number } : note,
+      );
+
+      intelPersonsFull = intelPersonsFull.filter((row) => row.id !== dropId);
+      keep.version += 1;
+
+      return { id: keepId };
+    },
+
+    'intel.vehicle.create': (input) => {
+      const body = (input ?? {}) as {
+        personId?: number;
+        plate?: string;
+        model?: string;
+        color?: string;
+        notes?: string;
+      };
+
+      if (!body.personId) return refuse('invalid', { personId: 'required' });
+
+      const id = nextIntelVehicleId++;
+
+      intelVehicles = [
+        ...intelVehicles,
+        {
+          id,
+          personId: body.personId,
+          plate: body.plate ? body.plate.trim().toUpperCase().replace(/\s+/g, '') : null,
+          model: body.model ?? null,
+          color: body.color ?? null,
+          notes: body.notes ?? null,
+          version: 1,
+        },
+      ];
+
+      return { id };
+    },
+
+    'intel.vehicle.delete': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const exists = intelVehicles.some((vehicle) => vehicle.id === id);
+      if (!exists) return refuse('not_found');
+
+      intelVehicles = intelVehicles.filter((vehicle) => vehicle.id !== id);
+
+      return { id };
+    },
+
+    'intel.membership.set': (input) => {
+      const body = (input ?? {}) as {
+        personId?: number;
+        orgId?: number;
+        role?: string;
+        isConfirmed?: boolean;
+      };
+
+      if (!intelPersonsFull.some((row) => row.id === body.personId)) return refuse('not_found');
+      if (!intelOrgsFull.some((row) => row.id === body.orgId)) return refuse('not_found');
+
+      const existing = intelMemberships.find(
+        (membership) => membership.personId === body.personId && membership.orgId === body.orgId,
+      );
+
+      if (existing) {
+        existing.role = body.role ?? null;
+        existing.isConfirmed = body.isConfirmed === true;
+      } else {
+        intelMemberships = [
+          ...intelMemberships,
+          {
+            personId: body.personId as number,
+            orgId: body.orgId as number,
+            role: body.role ?? null,
+            isConfirmed: body.isConfirmed === true,
+          },
+        ];
+      }
+
+      return { personId: body.personId, orgId: body.orgId };
+    },
+
+    'intel.membership.remove': (input) => {
+      const { personId, orgId } = (input ?? {}) as { personId?: number; orgId?: number };
+      const before = intelMemberships.length;
+
+      intelMemberships = intelMemberships.filter(
+        (membership) => !(membership.personId === personId && membership.orgId === orgId),
+      );
+
+      if (intelMemberships.length === before) return refuse('not_found');
+
+      return { personId, orgId };
+    },
+
+    'intel.associate.set': (input) => {
+      const body = (input ?? {}) as {
+        personId?: number;
+        associateId?: number;
+        relationship?: string;
+        isConfirmed?: boolean;
+      };
+
+      if (body.personId === body.associateId) return refuse('invalid', { associateId: 'same_person' });
+
+      const low = Math.min(body.personId ?? 0, body.associateId ?? 0);
+      const high = Math.max(body.personId ?? 0, body.associateId ?? 0);
+
+      if (!intelPersonsFull.some((row) => row.id === low) || !intelPersonsFull.some((row) => row.id === high)) {
+        return refuse('not_found');
+      }
+
+      const existing = intelAssociates.find((pair) => pair.low === low && pair.high === high);
+
+      if (existing) {
+        existing.relationship = body.relationship ?? null;
+        existing.isConfirmed = body.isConfirmed === true;
+      } else {
+        intelAssociates = [
+          ...intelAssociates,
+          { low, high, relationship: body.relationship ?? null, isConfirmed: body.isConfirmed === true },
+        ];
+      }
+
+      return { personId: low, associateId: high };
+    },
+
+    'intel.associate.remove': (input) => {
+      const { personId, associateId } = (input ?? {}) as { personId?: number; associateId?: number };
+      const low = Math.min(personId ?? 0, associateId ?? 0);
+      const high = Math.max(personId ?? 0, associateId ?? 0);
+      const before = intelAssociates.length;
+
+      intelAssociates = intelAssociates.filter((pair) => !(pair.low === low && pair.high === high));
+
+      if (intelAssociates.length === before) return refuse('not_found');
+
+      return { personId: low, associateId: high };
+    },
+
+    'intel.org.get': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const org = intelOrgsFull.find((row) => row.id === id);
+      if (!org) return refuse('not_found');
+
+      const roster = intelMemberships
+        .filter((membership) => membership.orgId === id)
+        .map((membership) => {
+          const person = intelPersonsFull.find((row) => row.id === membership.personId);
+
+          return {
+            personId: membership.personId,
+            role: membership.role,
+            isConfirmed: membership.isConfirmed,
+            name: person?.name ?? null,
+            alias: person?.alias ?? null,
+            status: person?.status ?? '',
+          };
+        });
+
+      const evidence = intelEvidence.filter((item) => item.orgId === id);
+      const notes = intelNotes.filter((note) => note.orgId === id);
+
+      return { org, roster, evidence, notes };
+    },
+
+    'intel.org.create': (input) => {
+      const body = (input ?? {}) as {
+        name?: string;
+        type?: string;
+        territory?: string;
+        status?: string;
+        notes?: string;
+        classification?: string;
+      };
+
+      if (!body.name) return refuse('invalid', { name: 'required' });
+
+      const now = new Date().toISOString();
+      const id = nextIntelOrgId++;
+
+      intelOrgsFull = [
+        {
+          id,
+          name: body.name,
+          type: body.type ?? null,
+          territory: body.territory ?? null,
+          status: body.status ?? 'active',
+          notes: body.notes ?? null,
+          classification: body.classification ?? 'internal',
+          version: 1,
+          createdBy: '100000000000000001',
+          createdAt: now,
+          updatedAt: now,
+        },
+        ...intelOrgsFull,
+      ];
+
+      return { id };
+    },
+
+    'intel.org.update': (input) => {
+      const body = (input ?? {}) as {
+        id?: number;
+        version?: number;
+        name?: string;
+        type?: string;
+        territory?: string;
+        status?: string;
+        notes?: string;
+        classification?: string;
+      };
+
+      const org = intelOrgsFull.find((row) => row.id === body.id);
+      if (!org) return refuse('not_found');
+      if (org.version !== body.version) return refuse('conflict');
+
+      if (body.name !== undefined) org.name = body.name || org.name;
+      if (body.type !== undefined) org.type = body.type;
+      if (body.territory !== undefined) org.territory = body.territory || null;
+      if (body.status !== undefined) org.status = body.status;
+      if (body.notes !== undefined) org.notes = body.notes || null;
+      if (body.classification !== undefined) org.classification = body.classification;
+      org.version += 1;
+      org.updatedAt = new Date().toISOString();
+
+      return { id: org.id };
+    },
+
+    'intel.org.delete': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const exists = intelOrgsFull.some((row) => row.id === id);
+      if (!exists) return refuse('not_found');
+
+      intelOrgsFull = intelOrgsFull.filter((row) => row.id !== id);
+
+      return { id };
+    },
+
+    'intel.case.get': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const record = intelCasesFull.find((row) => row.id === id);
+      if (!record) return refuse('not_found');
+
+      const links = intelCaseLinks
+        .filter((link) => link.caseId === id)
+        .map((link) => {
+          const person = link.personId ? intelPersonsFull.find((row) => row.id === link.personId) : undefined;
+          const org = link.orgId ? intelOrgsFull.find((row) => row.id === link.orgId) : undefined;
+
+          return {
+            id: link.id,
+            caseId: link.caseId,
+            personId: link.personId,
+            orgId: link.orgId,
+            role: link.role,
+            targetKind: link.personId !== null ? 'person' : 'org',
+            personName: person?.name ?? null,
+            personAlias: person?.alias ?? null,
+            personStatus: person?.status ?? null,
+            orgName: org?.name ?? null,
+            orgType: org?.type ?? null,
+          };
+        });
+
+      const evidence = intelEvidence.filter((item) => item.caseId === id);
+      const notes = intelNotes.filter((note) => note.caseId === id);
+
+      return { case: record, links, evidence, notes };
+    },
+
+    'intel.case.create': (input) => {
+      const body = (input ?? {}) as {
+        title?: string;
+        description?: string;
+        status?: string;
+        classification?: string;
+      };
+
+      if (!body.title) return refuse('invalid', { title: 'required' });
+
+      const now = new Date().toISOString();
+      const id = nextIntelCaseId++;
+
+      intelCasesFull = [
+        {
+          id,
+          title: body.title,
+          description: body.description ?? null,
+          status: body.status ?? 'open',
+          classification: body.classification ?? 'internal',
+          version: 1,
+          createdBy: '100000000000000001',
+          createdAt: now,
+          updatedAt: now,
+        },
+        ...intelCasesFull,
+      ];
+
+      return { id };
+    },
+
+    'intel.case.update': (input) => {
+      const body = (input ?? {}) as {
+        id?: number;
+        version?: number;
+        title?: string;
+        description?: string;
+        status?: string;
+        classification?: string;
+      };
+
+      const record = intelCasesFull.find((row) => row.id === body.id);
+      if (!record) return refuse('not_found');
+      if (record.version !== body.version) return refuse('conflict');
+
+      if (body.title !== undefined) record.title = body.title || record.title;
+      if (body.description !== undefined) record.description = body.description || null;
+      if (body.status !== undefined) record.status = body.status;
+      if (body.classification !== undefined) record.classification = body.classification;
+      record.version += 1;
+      record.updatedAt = new Date().toISOString();
+
+      return { id: record.id };
+    },
+
+    'intel.case.delete': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const exists = intelCasesFull.some((row) => row.id === id);
+      if (!exists) return refuse('not_found');
+
+      intelCasesFull = intelCasesFull.filter((row) => row.id !== id);
+
+      return { id };
+    },
+
+    'intel.case.link.add': (input) => {
+      const body = (input ?? {}) as {
+        caseId?: number;
+        personId?: number;
+        orgId?: number;
+        role?: string;
+      };
+
+      const targets = (body.personId ? 1 : 0) + (body.orgId ? 1 : 0);
+      if (targets !== 1) return refuse('invalid', { target: 'exactly_one' });
+      if (!intelCasesFull.some((row) => row.id === body.caseId)) return refuse('not_found');
+
+      const id = nextIntelCaseLinkId++;
+
+      intelCaseLinks = [
+        ...intelCaseLinks,
+        {
+          id,
+          caseId: body.caseId as number,
+          personId: body.personId ?? null,
+          orgId: body.orgId ?? null,
+          role: body.role ?? null,
+        },
+      ];
+
+      return { id };
+    },
+
+    'intel.case.link.remove': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const exists = intelCaseLinks.some((link) => link.id === id);
+      if (!exists) return refuse('not_found');
+
+      intelCaseLinks = intelCaseLinks.filter((link) => link.id !== id);
+
+      return { id };
+    },
+
+    'intel.evidence.add': (input) => {
+      const body = (input ?? {}) as {
+        personId?: number;
+        orgId?: number;
+        caseId?: number;
+        storagePath?: string;
+        url?: string;
+        caption?: string;
+      };
+
+      if (body.storagePath) return refuse('invalid', { storagePath: 'uploads_unavailable' });
+      if (!body.url && !body.caption) return refuse('invalid', { url: 'required' });
+
+      const id = nextIntelEvidenceId++;
+
+      intelEvidence = [
+        {
+          id,
+          personId: body.personId ?? null,
+          orgId: body.orgId ?? null,
+          caseId: body.caseId ?? null,
+          url: body.url ?? null,
+          caption: body.caption ?? null,
+          createdBy: '100000000000000001',
+          createdAt: new Date().toISOString(),
+        },
+        ...intelEvidence,
+      ];
+
+      return { id };
+    },
+
+    'intel.evidence.delete': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const exists = intelEvidence.some((item) => item.id === id);
+      if (!exists) return refuse('not_found');
+
+      intelEvidence = intelEvidence.filter((item) => item.id !== id);
+
+      return { id };
+    },
 
     // ------------------------------------------------------------- evidence
 

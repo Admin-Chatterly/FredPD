@@ -5,6 +5,7 @@
   import { TVANG_KINDS, TVANG_TARGETS } from '@fredpd/schema';
   import { fieldList, type Failure } from '../shared/failure';
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
+  import LoadMore from '../shared/LoadMore.svelte';
   import { isStub, type Maybe, type Restricted } from './types';
 
   /**
@@ -98,6 +99,7 @@
   const HOUR = 3600;
 
   let rows = $state<Maybe<TvangRow>[]>([]);
+  let nextCursor = $state<string | null>(null);
   let detail = $state<TvangRow | null>(null);
   let failure = $state<Failure | null>(null);
   let busy = $state(false);
@@ -165,23 +167,33 @@
     trigger?.focus();
   }
 
-  async function load(): Promise<void> {
+  async function load(reset = true): Promise<void> {
     busy = true;
 
-    const response = await nui.call<{ tvangsmedel: Maybe<TvangRow>[] }>('tvang.list', {
-      kind: kindFilter || undefined,
-      liveOnly: liveOnly || undefined,
-      limit: 50,
-    });
+    const response = await nui.call<{ tvangsmedel: Maybe<TvangRow>[]; nextCursor?: string | null }>(
+      'tvang.list',
+      {
+        kind: kindFilter || undefined,
+        liveOnly: liveOnly || undefined,
+        limit: 50,
+        cursor: reset ? undefined : (nextCursor ?? undefined),
+      },
+    );
 
     if (response.ok) {
-      rows = response.data.tvangsmedel ?? [];
+      const page = response.data.tvangsmedel ?? [];
+      rows = reset ? page : [...rows, ...page];
+      nextCursor = response.data.nextCursor ?? null;
       failure = null;
     } else {
       failure = response;
     }
 
     busy = false;
+  }
+
+  function loadMore(): void {
+    void load(false);
   }
 
   async function open(id: number): Promise<void> {
@@ -526,6 +538,7 @@
             </tbody>
           </table>
         </div>
+        <LoadMore {nextCursor} {busy} {loadMore} />
       {/if}
     </div>
 

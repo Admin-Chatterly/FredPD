@@ -570,12 +570,12 @@ route.define({
             return route.refuse(FredPD.ErrorCode.FORBIDDEN, { discordId = 'not_allowed' })
         end
 
-        return {
-            entries = repo.queryLog(session.agencyId, {
-                discordId = discordId,
-                queryType = service.canonicalType(input.queryType),
-                limit = input.limit,
-            }),
-        }
+        local entries, nextCursor = repo.queryLog(session.agencyId, {
+            discordId = discordId,
+            queryType = service.canonicalType(input.queryType),
+            limit = input.limit,
+        }, input.cursor)
+
+        return { entries = entries, nextCursor = nextCursor }
     end,
 })

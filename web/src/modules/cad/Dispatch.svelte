@@ -465,9 +465,9 @@
    * action, it is a dead end that writes an `audit.denied` row per press.
    */
 
-  type Tab = 'queue' | 'board' | 'map' | 'broadcasts';
+  type Tab = 'queue' | 'board' | 'map' | 'alpr' | 'broadcasts';
 
-  const TABS: Tab[] = ['queue', 'board', 'map', 'broadcasts'];
+  const TABS: Tab[] = ['queue', 'board', 'map', 'alpr', 'broadcasts'];
 
   let tab = $state<Tab>('queue');
 
@@ -942,6 +942,15 @@
     {:then loaded}
       {@const MapView = loaded.default}
       <MapView {beats} {now} onselect={(id) => respond(id)} />
+    {/await}
+  {:else if tab === 'alpr'}
+    <!-- Lazy-loaded like the map: plate reads and the hotlist are not needed
+         on first paint either, and a console opens without either open. -->
+    {#await import('./Alpr.svelte')}
+      <p class="text-sm text-[var(--color-ink-muted)]">{t('app.loading')}</p>
+    {:then loaded}
+      {@const AlprView = loaded.default}
+      <AlprView />
     {/await}
   {:else}
     <Broadcasts {calls} />

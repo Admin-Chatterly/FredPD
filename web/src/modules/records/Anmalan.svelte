@@ -3,6 +3,7 @@
   import { t } from '../../lib/i18n';
   import { ANMALAN_STATUSES } from '@fredpd/schema';
   import { fieldList, type Failure } from '../shared/failure';
+  import LoadMore from '../shared/LoadMore.svelte';
   import { isStub, type Maybe, type Restricted } from './types';
 
   /**
@@ -91,6 +92,7 @@
   }
 
   let rows = $state<Maybe<AnmalanRow>[]>([]);
+  let nextCursor = $state<string | null>(null);
   let detail = $state<Detail | null>(null);
   let failure = $state<Failure | null>(null);
   let busy = $state(false);
@@ -156,23 +158,33 @@
     return t('records.restricted.contact', { unit: t(`access.unit.${row.contact}`) });
   }
 
-  async function load(): Promise<void> {
+  async function load(reset = true): Promise<void> {
     busy = true;
 
-    const response = await nui.call<{ anmalningar: Maybe<AnmalanRow>[] }>('anmalan.list', {
-      status: statusFilter || undefined,
-      mine: mine || undefined,
-      limit: 50,
-    });
+    const response = await nui.call<{ anmalningar: Maybe<AnmalanRow>[]; nextCursor?: string | null }>(
+      'anmalan.list',
+      {
+        status: statusFilter || undefined,
+        mine: mine || undefined,
+        limit: 50,
+        cursor: reset ? undefined : (nextCursor ?? undefined),
+      },
+    );
 
     if (response.ok) {
-      rows = response.data.anmalningar ?? [];
+      const page = response.data.anmalningar ?? [];
+      rows = reset ? page : [...rows, ...page];
+      nextCursor = response.data.nextCursor ?? null;
       failure = null;
     } else {
       failure = response;
     }
 
     busy = false;
+  }
+
+  function loadMore(): void {
+    void load(false);
   }
 
   async function open(id: number): Promise<void> {
@@ -365,6 +377,7 @@
             {/each}
           </tbody>
         </table>
+        <LoadMore {nextCursor} {busy} {loadMore} />
       {/if}
     </div>
 
