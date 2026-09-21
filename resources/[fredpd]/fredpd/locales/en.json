@@ -477,7 +477,28 @@
       "noteCount": "{count} entries",
       "plates": "Plates",
       "confirmed": "Confirmed",
-      "suspected": "Suspected"
+      "suspected": "Suspected",
+      "merge": "Merge",
+      "mergeHint": "Every note, vehicle, membership, associate, case link and evidence entry attached to the other record moves to this one, and the other record is then deleted.",
+      "mergeKeepId": "Keep this record",
+      "mergeDropId": "Merge in record id",
+      "deleteConfirm": "Delete {name}? This cannot be undone.",
+      "plate": "Plate",
+      "model": "Model",
+      "color": "Color",
+      "vehicleNotes": "Notes",
+      "addVehicle": "Add vehicle",
+      "noVehicles": "No vehicles recorded.",
+      "orgId": "Organization id",
+      "role": "Role",
+      "addMembership": "Add to organization",
+      "noMemberships": "Not a known member of any organization.",
+      "associateId": "Person id",
+      "relationship": "Relationship",
+      "addAssociate": "Add associate",
+      "noAssociates": "No associates recorded.",
+      "noCases": "Not linked to any case.",
+      "noNotes": "No intelligence logged against this record yet."
     },
     "personStatus": {
       "unknown": "Unknown",
@@ -494,7 +515,14 @@
       "territory": "Territory",
       "members": "{count} members",
       "empty": "No organizations in the register yet.",
-      "roster": "Members"
+      "roster": "Members",
+      "type": "Type",
+      "status": "Status",
+      "notes": "Notes",
+      "personId": "Person id",
+      "addMember": "Add member",
+      "noRoster": "No known members.",
+      "deleteConfirm": "Delete {name}? This cannot be undone."
     },
     "orgType": {
       "gang": "Gang",
@@ -514,7 +542,16 @@
       "description": "Description",
       "empty": "No cases yet.",
       "linked": "{people} people, {orgs} organizations",
-      "links": "Linked to this case"
+      "links": "Linked to this case",
+      "status": "Status",
+      "deleteConfirm": "Delete {title}? This cannot be undone.",
+      "linkKind": "Kind",
+      "linkPerson": "Person",
+      "linkOrg": "Organization",
+      "linkId": "Record id",
+      "linkRole": "Role",
+      "addLink": "Link a record",
+      "noLinks": "Nothing linked to this case yet."
     },
     "caseStatus": {
       "open": "Open",
@@ -525,7 +562,18 @@
       "save": "Save",
       "cancel": "Cancel",
       "create": "Create",
-      "back": "Back"
+      "back": "Back",
+      "edit": "Edit",
+      "delete": "Delete",
+      "remove": "Remove"
+    },
+    "classification": "Classification",
+    "evidence": {
+      "title": "Evidence",
+      "empty": "No evidence attached.",
+      "url": "Link",
+      "caption": "Caption",
+      "add": "Add evidence"
     }
   },
   "admin": {

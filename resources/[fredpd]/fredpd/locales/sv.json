@@ -477,7 +477,28 @@
       "noteCount": "{count} poster",
       "plates": "Registreringsnummer",
       "confirmed": "Bekräftad",
-      "suspected": "Misstänkt"
+      "suspected": "Misstänkt",
+      "merge": "Slå ihop",
+      "mergeHint": "Alla anteckningar, fordon, medlemskap, kontakter, ärendekopplingar och bevis knutna till den andra posten flyttas till denna, och den andra posten tas sedan bort.",
+      "mergeKeepId": "Behåll denna post",
+      "mergeDropId": "Slå ihop in post-id",
+      "deleteConfirm": "Ta bort {name}? Detta kan inte ångras.",
+      "plate": "Registreringsnummer",
+      "model": "Modell",
+      "color": "Färg",
+      "vehicleNotes": "Anteckning",
+      "addVehicle": "Lägg till fordon",
+      "noVehicles": "Inga fordon registrerade.",
+      "orgId": "Organisations-id",
+      "role": "Roll",
+      "addMembership": "Lägg till i organisation",
+      "noMemberships": "Inte känd medlem i någon organisation.",
+      "associateId": "Person-id",
+      "relationship": "Relation",
+      "addAssociate": "Lägg till kontakt",
+      "noAssociates": "Inga kontakter registrerade.",
+      "noCases": "Inte kopplad till något ärende.",
+      "noNotes": "Ingen underrättelseinformation loggad på denna post ännu."
     },
     "personStatus": {
       "unknown": "Okänd",
@@ -494,7 +515,14 @@
       "territory": "Område",
       "members": "{count} medlemmar",
       "empty": "Inga organisationer i registret än.",
-      "roster": "Medlemmar"
+      "roster": "Medlemmar",
+      "type": "Typ",
+      "status": "Status",
+      "notes": "Anteckningar",
+      "personId": "Person-id",
+      "addMember": "Lägg till medlem",
+      "noRoster": "Inga kända medlemmar.",
+      "deleteConfirm": "Ta bort {name}? Detta kan inte ångras."
     },
     "orgType": {
       "gang": "Gäng",
@@ -514,7 +542,16 @@
       "description": "Beskrivning",
       "empty": "Inga ärenden än.",
       "linked": "{people} personer, {orgs} organisationer",
-      "links": "Kopplat till ärendet"
+      "links": "Kopplat till ärendet",
+      "status": "Status",
+      "deleteConfirm": "Ta bort {title}? Detta kan inte ångras.",
+      "linkKind": "Typ",
+      "linkPerson": "Person",
+      "linkOrg": "Organisation",
+      "linkId": "Post-id",
+      "linkRole": "Roll",
+      "addLink": "Koppla en post",
+      "noLinks": "Inget kopplat till detta ärende ännu."
     },
     "caseStatus": {
       "open": "Öppet",
@@ -525,7 +562,18 @@
       "save": "Spara",
       "cancel": "Avbryt",
       "create": "Skapa",
-      "back": "Tillbaka"
+      "back": "Tillbaka",
+      "edit": "Redigera",
+      "delete": "Ta bort",
+      "remove": "Avlägsna"
+    },
+    "classification": "Sekretessnivå",
+    "evidence": {
+      "title": "Bevis",
+      "empty": "Inget bevis bifogat.",
+      "url": "Länk",
+      "caption": "Bildtext",
+      "add": "Lägg till bevis"
     }
   },
   "admin": {
