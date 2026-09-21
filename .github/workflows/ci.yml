@@ -69,6 +69,21 @@ jobs:
           git diff --exit-code -- 'resources/**/shared/generated' \
             || { echo '::error::Generated schema is stale. Run `pnpm schema:gen` and commit the result.'; exit 1; }
 
+      # The gateway's PDF tests (spec 3.3) launch a real Chromium rather than
+      # mocking it -- see render.test.ts's header. Only the e2e job installed
+      # one before this; the gateway's vitest run fell through to the
+      # sandbox-only fallback path in config.ts and failed to launch on every
+      # runner that isn't this repo's dev sandbox image.
+      - name: Install Chromium for gateway PDF tests
+        run: pnpm --filter @fredpd/gateway exec playwright-core install --with-deps chromium
+
+      # Resolved rather than guessed: this is the same install `discoverChromium`
+      # in web/playwright.config.ts reasons about, and its own executablePath()
+      # is the one source of truth for where it landed.
+      - name: Point the gateway at the installed Chromium
+        run: |
+          echo "PLAYWRIGHT_CHROMIUM_EXECUTABLE=$(pnpm --filter @fredpd/gateway exec node -e "console.log(require('playwright-core').chromium.executablePath())")" >> "$GITHUB_ENV"
+
       - name: Unit tests
         run: pnpm test
 
