@@ -39,6 +39,12 @@ server_scripts {
     -- generates no evidence at all.
     'server/bridges/inventory.lua',
     'server/bridges/appearance.lua',
+    -- The gateway link (spec 3.7, C4). Pure crypto and the HTTP client only --
+    -- no database, so it loads with the other bridges. `sha256` before `hmac`
+    -- before `client`: each reads the namespace the one before it fills.
+    'server/bridges/gateway/sha256.lua',
+    'server/bridges/gateway/hmac.lua',
+    'server/bridges/gateway/client.lua',
 
     -- Core, in dependency order. route.lua last: it references the rest.
     'server/core/db.lua',
@@ -54,6 +60,12 @@ server_scripts {
     'server/core/placements.lua',
     'server/core/counters.lua',
     'server/core/route.lua',
+    -- The gateway outbox (spec 3.7). After `core/db.lua`, which it reads;
+    -- physically under `server/bridges/gateway/` alongside the rest of the
+    -- link, but loaded here because this is the first point the database
+    -- wrapper it needs actually exists.
+    'server/bridges/gateway/repo.lua',
+    'server/bridges/gateway/service.lua',
 
     -- Modules: service (logic) and repo (SQL) before the routes that use them.
 
@@ -123,6 +135,31 @@ server_scripts {
     'server/modules/court/service.lua',
     'server/modules/court/repo.lua',
     'server/modules/court/routes.lua',
+
+    -- Personnel (spec 7.22-7.24, M6). Reads `fpd_officers` (0001) and the
+    -- firearms registry (0005), so it loads after `registry`.
+    'server/modules/personnel/service.lua',
+    'server/modules/personnel/repo.lua',
+    'server/modules/personnel/routes.lua',
+
+    -- Booking (spec 7.9, M6). After frihet, whose gripande and häktning rows
+    -- it reads.
+    'server/modules/booking/service.lua',
+    'server/modules/booking/repo.lua',
+    'server/modules/booking/routes.lua',
+
+    -- Ordningsbot (spec 7.11, M6). After brott, whose versioned-catalogue
+    -- pattern its tariff table follows.
+    'server/modules/ordningsbot/service.lua',
+    'server/modules/ordningsbot/repo.lua',
+    'server/modules/ordningsbot/routes.lua',
+
+    -- Impound (spec 7.15, M6). After spaning, whose `fredpd:vehicleImpounded`
+    -- handler (already wired in `spaning/events.lua`, waiting on this module)
+    -- it fires.
+    'server/modules/impound/service.lua',
+    'server/modules/impound/repo.lua',
+    'server/modules/impound/routes.lua',
 
     'server/modules/placements/service.lua',
     'server/modules/placements/repo.lua',

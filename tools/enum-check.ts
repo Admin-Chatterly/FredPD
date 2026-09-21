@@ -140,6 +140,20 @@ const PAIRED: Record<string, keyof typeof enums> = {
   ck_fpd_atal_disposition: 'ATAL_DISPOSITIONS',
   ck_fpd_atal_class: 'CLASSIFICATIONS',
   ck_fpd_atal_brott_stage: 'BROTT_STAGES',
+
+  // Personnel (0017, spec 7.22-7.24).
+  ck_fpd_discipline_class: 'CLASSIFICATIONS',
+
+  // Booking (0018, spec 7.9).
+  ck_fpd_booking_class: 'CLASSIFICATIONS',
+
+  // Ordningsbot (0019, spec 7.11).
+  ck_fpd_ordningsbot_status: 'ORDNINGSBOT_STATUSES',
+  ck_fpd_ordningsbot_class: 'CLASSIFICATIONS',
+
+  // Impound (0020, spec 7.15).
+  ck_fpd_impound_reason: 'IMPOUND_HELD_REASONS',
+  ck_fpd_impound_class: 'CLASSIFICATIONS',
 };
 
 /**

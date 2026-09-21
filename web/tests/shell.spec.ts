@@ -37,10 +37,12 @@ test('draws only the modules the session is permitted to open', async ({ page })
   // Court moved from the negative case to the positive one when its åtal och
   // dom screen shipped, the same way Dispatch did for M4 — the seed grants
   // `page.court` to `aklagare` and `domare`, and this fixture session holds
-  // it. Personnel is M6 and still unbuilt, so it is the negative case now:
-  // the UI must not advertise a module the server did not open.
+  // it. Personnel and Booking join it now that M6's roster and inskrivning
+  // screens exist: the seed grants `page.personnel` and `page.booking` to
+  // `patrol_basic`, and this fixture session holds both.
   await expect(rail.getByRole('button', { name: 'Court' })).toBeVisible();
-  await expect(rail.getByRole('button', { name: 'Personnel' })).toHaveCount(0);
+  await expect(rail.getByRole('button', { name: 'Personnel' })).toBeVisible();
+  await expect(rail.getByRole('button', { name: 'Booking' })).toBeVisible();
 });
 
 test('shows a translated message when a route refuses', async ({ page }) => {

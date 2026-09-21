@@ -8,6 +8,8 @@
   import Tvang from './Tvang.svelte';
   import Efterlysning from './Efterlysning.svelte';
   import Spaning from './Spaning.svelte';
+  import Ordningsbot from './Ordningsbot.svelte';
+  import Impound from './Impound.svelte';
   import { t } from '../../lib/i18n';
   import { formatDate, formatMoment } from '../../lib/time';
   import {
@@ -83,7 +85,9 @@
     | 'brott'
     | 'tvang'
     | 'efterlysning'
-    | 'spaning';
+    | 'spaning'
+    | 'ordningsbot'
+    | 'impound';
 
   /** Which form's label a rejected field belongs to (spec 3.5). */
   const FIELD_LABELS: Record<string, string> = {
@@ -1051,6 +1055,8 @@
     'efterlysning',
     'spaning',
     'brott',
+    'ordningsbot',
+    'impound',
   ];
 
   /**
@@ -2975,5 +2981,11 @@
       The patrol lookout (7.13), which is emphatically not the tab beside it.
     -->
     <Spaning />
+  {:else if tab === 'ordningsbot'}
+    <!-- Citations (7.11) sit on the Records rail rather than a rail of
+         their own -- the plan for this module states that choice plainly. -->
+    <Ordningsbot />
+  {:else if tab === 'impound'}
+    <Impound />
   {/if}
 </section>

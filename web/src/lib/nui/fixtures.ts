@@ -95,7 +95,10 @@ const session = {
   timezone: 'Europe/Stockholm',
   // Only what this fake session may open. The real list is derived from
   // Discord roles on the server (invariant 2).
-  modules: ['records', 'dispatch', 'evidence', 'lab', 'intel', 'surveillance', 'court', 'comms', 'admin'],
+  modules: [
+    'records', 'dispatch', 'evidence', 'lab', 'intel', 'surveillance', 'court',
+    'personnel', 'booking', 'comms', 'admin',
+  ],
 };
 
 const groups: PermissionGroup[] = [
@@ -3280,6 +3283,366 @@ function atalRow(row: FixtureAtal, withCharges: boolean): Record<string, unknown
  */
 const FIXTURE_COURT_CAPACITY: string = 'aklagare';
 
+// ---------------------------------------------------------------- personnel
+
+interface FixtureEquipment {
+  id: number;
+  itemKey: string;
+  serial?: string | null;
+  assignedAgo: number;
+  returnedAgo?: number;
+}
+
+interface FixtureCertification {
+  id: number;
+  certKey: string;
+  issuedAgo: number;
+  expiresInAgo?: number;
+  revokedAgo?: number;
+}
+
+interface FixtureOfficer {
+  id: number;
+  discordId: string;
+  callsign: string;
+  badgeNumber: string | null;
+  division: string | null;
+  name: string;
+  active: boolean;
+  discordRoles: string[];
+  equipment: FixtureEquipment[];
+  certifications: FixtureCertification[];
+  openShiftAgo?: number;
+}
+
+const officers: FixtureOfficer[] = [
+  {
+    id: 1,
+    discordId: FIXTURE_VIEWER,
+    callsign: '12-40',
+    badgeNumber: '1042',
+    division: 'Patrol',
+    name: 'A. Lindqvist',
+    active: true,
+    discordRoles: ['Officer'],
+    equipment: [
+      { id: 1, itemKey: 'radio', serial: 'RAD-118', assignedAgo: 90 * DAY },
+      { id: 2, itemKey: 'vest', assignedAgo: 90 * DAY, returnedAgo: 1 * DAY },
+    ],
+    certifications: [
+      { id: 1, certKey: 'fto', issuedAgo: 200 * DAY },
+      { id: 2, certKey: 'evoc', issuedAgo: 400 * DAY, revokedAgo: 10 * DAY },
+    ],
+    openShiftAgo: 2 * HOUR,
+  },
+  {
+    id: 2,
+    discordId: '100000000000000002',
+    callsign: '12-41',
+    badgeNumber: '1108',
+    division: 'Patrol',
+    name: 'M. Berg',
+    active: true,
+    discordRoles: ['Supervisor'],
+    equipment: [],
+    certifications: [],
+  },
+];
+
+interface FixtureDiscipline {
+  id: number;
+  officerId: number;
+  number: string;
+  category: string;
+  summary: string;
+  createdAgo: number;
+  closedAgo?: number;
+  outcomeKey?: string;
+  version: number;
+}
+
+const discipline: FixtureDiscipline[] = [
+  {
+    id: 1,
+    officerId: 2,
+    number: 'IA26-00003',
+    category: 'policy',
+    summary: 'Late equipment return, addressed verbally.',
+    createdAgo: 30 * DAY,
+    closedAgo: 25 * DAY,
+    outcomeKey: 'sustained_counseled',
+    version: 2,
+  },
+];
+
+const restrictedDiscipline = [
+  { restricted: true as const, recordType: 'ia_case', contact: 'internal_affairs' },
+];
+
+function officerRow(row: FixtureOfficer, detailed: boolean): Record<string, unknown> {
+  const shaped: Record<string, unknown> = {
+    id: row.id,
+    discordId: row.discordId,
+    callsign: row.callsign,
+    badgeNumber: row.badgeNumber,
+    division: row.division,
+    name: row.name,
+    active: row.active,
+  };
+
+  if (detailed) {
+    shaped.discordRoles = row.discordRoles;
+    shaped.equipment = row.equipment.map((item) => ({
+      id: item.id,
+      itemKey: item.itemKey,
+      serial: item.serial ?? null,
+      assignedAt: secondsAgo(item.assignedAgo),
+      returnedAt: item.returnedAgo === undefined ? null : secondsAgo(item.returnedAgo),
+    }));
+    shaped.certifications = row.certifications.map((cert) => ({
+      id: cert.id,
+      certKey: cert.certKey,
+      issuedAt: secondsAgo(cert.issuedAgo),
+      expiresAt: cert.expiresInAgo === undefined ? null : secondsAgo(cert.expiresInAgo),
+      revokedAt: cert.revokedAgo === undefined ? null : secondsAgo(cert.revokedAgo),
+    }));
+    shaped.openShift =
+      row.openShiftAgo === undefined ? null : { id: 1, startedAt: secondsAgo(row.openShiftAgo), endedAt: null };
+    shaped.shiftLog = shaped.openShift
+      ? [{ id: 1, startedAt: secondsAgo(row.openShiftAgo ?? 0), endedAt: null }]
+      : [];
+  }
+
+  return shaped;
+}
+
+// ------------------------------------------------------------------ booking
+
+interface FixtureBookingProperty {
+  id: number;
+  itemLabel: string;
+  quantity: number;
+  loggedAgo: number;
+  returnedAgo?: number;
+}
+
+interface FixtureBooking {
+  id: number;
+  number: string;
+  frihetId: number;
+  cell: string | null;
+  bookedAgo: number;
+  releasedAgo?: number;
+  releaseReasonKey?: string;
+  version: number;
+  property: FixtureBookingProperty[];
+}
+
+const bookings: FixtureBooking[] = [
+  {
+    id: 1,
+    number: 'B26-00042',
+    frihetId: 2,
+    cell: 'A-3',
+    bookedAgo: 4 * HOUR,
+    version: 1,
+    property: [
+      { id: 1, itemLabel: 'Wallet, black leather', quantity: 1, loggedAgo: 4 * HOUR },
+      { id: 2, itemLabel: 'Mobile phone', quantity: 1, loggedAgo: 4 * HOUR, returnedAgo: 1 * HOUR },
+    ],
+  },
+  {
+    id: 2,
+    number: 'B26-00039',
+    frihetId: 1,
+    cell: 'A-1',
+    bookedAgo: 3 * DAY,
+    releasedAgo: 1 * DAY,
+    releaseReasonKey: 'bail',
+    version: 2,
+    property: [],
+  },
+];
+
+const restrictedBookings = [
+  { restricted: true as const, recordType: 'arrest', contact: 'internal_affairs' },
+];
+
+function bookingRow(row: FixtureBooking, detailed: boolean): Record<string, unknown> {
+  const shaped: Record<string, unknown> = {
+    id: row.id,
+    number: row.number,
+    frihetId: row.frihetId,
+    cell: row.cell,
+    bookedAt: secondsAgo(row.bookedAgo),
+    releasedAt: row.releasedAgo === undefined ? null : secondsAgo(row.releasedAgo),
+    releaseReasonKey: row.releaseReasonKey ?? null,
+    version: row.version,
+  };
+
+  if (detailed) {
+    shaped.property = row.property.map((item) => ({
+      id: item.id,
+      itemLabel: item.itemLabel,
+      quantity: item.quantity,
+      loggedAt: secondsAgo(item.loggedAgo),
+      returnedAt: item.returnedAgo === undefined ? null : secondsAgo(item.returnedAgo),
+    }));
+  }
+
+  return shaped;
+}
+
+// -------------------------------------------------------------- ordningsbot
+
+interface FixtureTariff {
+  id: number;
+  code: string;
+  labelKey: string;
+  amount: number;
+  version: number;
+}
+
+const tariffs: FixtureTariff[] = [
+  { id: 1, code: 'parking', labelKey: 'ordningsbot.tariff.parking', amount: 800, version: 1 },
+  { id: 2, code: 'noise', labelKey: 'ordningsbot.tariff.noise', amount: 1500, version: 1 },
+];
+
+interface FixtureCitation {
+  id: number;
+  number: string;
+  tariffId: number;
+  personId?: number;
+  vehicleId?: number;
+  issuedAgo: number;
+  status: string;
+  voidReasonKey?: string;
+  version: number;
+}
+
+const citations: FixtureCitation[] = [
+  {
+    id: 1,
+    number: 'LSPD-T26-000301',
+    tariffId: 1,
+    vehicleId: 7,
+    issuedAgo: 2 * DAY,
+    status: 'issued',
+    version: 1,
+  },
+  {
+    id: 2,
+    number: 'LSPD-T26-000287',
+    tariffId: 2,
+    personId: 3,
+    issuedAgo: 10 * DAY,
+    status: 'paid',
+    version: 2,
+  },
+];
+
+const restrictedCitations = [
+  { restricted: true as const, recordType: 'citation', contact: 'internal_affairs' },
+];
+
+function citationRow(row: FixtureCitation, detailed: boolean): Record<string, unknown> {
+  const shaped: Record<string, unknown> = {
+    id: row.id,
+    number: row.number,
+    tariffId: row.tariffId,
+    personId: row.personId ?? null,
+    vehicleId: row.vehicleId ?? null,
+    issuedAt: secondsAgo(row.issuedAgo),
+    issuedBy: FIXTURE_VIEWER,
+    status: row.status,
+    voidReasonKey: row.voidReasonKey ?? null,
+    version: row.version,
+  };
+
+  if (detailed) {
+    const tariff = tariffs.find((entry) => entry.id === row.tariffId);
+    shaped.tariff = tariff ?? null;
+  }
+
+  return shaped;
+}
+
+// ----------------------------------------------------------------- impound
+
+interface FixtureImpound {
+  id: number;
+  number: string;
+  vehicleId?: number;
+  plate: string;
+  model: string | null;
+  heldReasonKey: string;
+  holdAuthorizedAgo?: number;
+  feePerDay: number;
+  impoundedAgo: number;
+  releasedAgo?: number;
+  feePaid: boolean;
+  version: number;
+}
+
+const impounds: FixtureImpound[] = [
+  {
+    id: 1,
+    number: 'I26-00019',
+    vehicleId: 7,
+    plate: 'ABC123',
+    model: 'Vapid Stanier',
+    heldReasonKey: 'investigative',
+    feePerDay: 50,
+    impoundedAgo: 2 * DAY,
+    feePaid: false,
+    version: 1,
+  },
+  {
+    id: 2,
+    number: 'I26-00014',
+    plate: 'XYZ987',
+    model: 'Declasse Merit',
+    heldReasonKey: 'abandoned',
+    feePerDay: 30,
+    impoundedAgo: 10 * DAY,
+    releasedAgo: 1 * DAY,
+    feePaid: true,
+    version: 2,
+  },
+];
+
+const restrictedImpounds = [
+  { restricted: true as const, recordType: 'vehicle', contact: 'narcotics' },
+];
+
+function impoundRow(row: FixtureImpound, detailed: boolean): Record<string, unknown> {
+  // Elapsed seconds between impound and release (or now, when still held) --
+  // the same arithmetic `Impound.feeOwed` does server-side, in the fixture's
+  // own "ago" units.
+  const elapsedSeconds = row.impoundedAgo - (row.releasedAgo ?? 0);
+  const days = Math.max(1, Math.ceil(elapsedSeconds / 86400));
+
+  const shaped: Record<string, unknown> = {
+    id: row.id,
+    number: row.number,
+    plate: row.plate,
+    model: row.model,
+    heldReasonKey: row.heldReasonKey,
+    holdAuthorizedAt: row.holdAuthorizedAgo === undefined ? null : secondsAgo(row.holdAuthorizedAgo),
+    feePerDay: row.feePerDay,
+    impoundedAt: secondsAgo(row.impoundedAgo),
+    releasedAt: row.releasedAgo === undefined ? null : secondsAgo(row.releasedAgo),
+    feePaid: row.feePaid,
+    version: row.version,
+  };
+
+  if (detailed) {
+    shaped.feeOwed = days * row.feePerDay;
+  }
+
+  return shaped;
+}
+
 export const fixtures: FixtureSet = {
   ok: {
     'session.get': () => session,
@@ -4276,6 +4639,433 @@ export const fixtures: FixtureSet = {
       row.sentenceMonths = body.sentenceLivstid ? null : body.sentenceMonths ?? null;
       row.sentenceLivstid = body.sentenceLivstid ?? false;
       row.dispositionAgo = 0;
+      row.version += 1;
+
+      return { id: row.id };
+    },
+
+    // -------------------------------------------------------- personnel
+
+    'personnel.roster.list': (input) => {
+      const filter = (input ?? {}) as { active?: boolean; division?: string };
+
+      const found = officers.filter(
+        (row) =>
+          (filter.active === undefined || row.active === filter.active) &&
+          (!filter.division || row.division === filter.division),
+      );
+
+      return { officers: found.map((row) => officerRow(row, false)) };
+    },
+
+    'personnel.roster.get': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const row = officers.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+
+      return { officer: officerRow(row, true) };
+    },
+
+    'personnel.roster.update': (input) => {
+      const body = (input ?? {}) as { id?: number; badgeNumber?: string; division?: string };
+      const row = officers.find((entry) => entry.id === body.id);
+
+      if (!row) return refuse('not_found');
+
+      row.badgeNumber = body.badgeNumber ?? row.badgeNumber;
+      row.division = body.division ?? row.division;
+
+      return { id: row.id };
+    },
+
+    'personnel.shift.start': () => {
+      const row = officers.find((entry) => entry.discordId === FIXTURE_VIEWER);
+      if (!row) return refuse('forbidden');
+      if (row.openShiftAgo !== undefined) return refuse('conflict', { _input: 'already_on_shift' });
+
+      row.openShiftAgo = 0;
+
+      return { id: 1 };
+    },
+
+    'personnel.shift.end': () => {
+      const row = officers.find((entry) => entry.discordId === FIXTURE_VIEWER);
+      if (!row) return refuse('forbidden');
+      if (row.openShiftAgo === undefined) return refuse('conflict', { _input: 'not_on_shift' });
+
+      delete row.openShiftAgo;
+
+      return { id: 1 };
+    },
+
+    'personnel.equipment.assign': (input) => {
+      const body = (input ?? {}) as { officerId?: number; itemKey?: string; serial?: string };
+      const row = officers.find((entry) => entry.id === body.officerId);
+
+      if (!row) return refuse('not_found');
+      if (!body.itemKey) return refuse('invalid', { itemKey: 'not_a_key' });
+
+      const id = row.equipment.length + 1;
+      row.equipment.push({ id, itemKey: body.itemKey, serial: body.serial ?? null, assignedAgo: 0 });
+
+      return { id };
+    },
+
+    'personnel.equipment.return': (input) => {
+      const body = (input ?? {}) as { id?: number; officerId?: number };
+      const row = officers.find((entry) => entry.id === body.officerId);
+      const item = row?.equipment.find((entry) => entry.id === body.id);
+
+      if (!row || !item) return refuse('conflict');
+      if (item.returnedAgo !== undefined) return refuse('conflict');
+
+      item.returnedAgo = 0;
+
+      return { id: item.id };
+    },
+
+    'personnel.certification.issue': (input) => {
+      const body = (input ?? {}) as { officerId?: number; certKey?: string };
+      const row = officers.find((entry) => entry.id === body.officerId);
+
+      if (!row) return refuse('not_found');
+      if (!body.certKey) return refuse('invalid', { certKey: 'not_a_key' });
+
+      const id = row.certifications.length + 1;
+      row.certifications.push({ id, certKey: body.certKey, issuedAgo: 0 });
+
+      return { id };
+    },
+
+    'personnel.certification.revoke': (input) => {
+      const body = (input ?? {}) as { id?: number; officerId?: number };
+      const row = officers.find((entry) => entry.id === body.officerId);
+      const cert = row?.certifications.find((entry) => entry.id === body.id);
+
+      if (!row || !cert) return refuse('conflict');
+      if (cert.revokedAgo !== undefined) return refuse('conflict');
+
+      cert.revokedAgo = 0;
+
+      return { id: cert.id };
+    },
+
+    'personnel.discipline.list': (input) => {
+      const { officerId } = (input ?? {}) as { officerId?: number };
+
+      const found = discipline
+        .filter((row) => row.officerId === officerId)
+        .map((row) => ({
+          id: row.id,
+          number: row.number,
+          category: row.category,
+          summary: row.summary,
+          createdAt: secondsAgo(row.createdAgo),
+          closedAt: row.closedAgo === undefined ? null : secondsAgo(row.closedAgo),
+          outcomeKey: row.outcomeKey ?? null,
+          version: row.version,
+        }));
+
+      // The restricted stub renders regardless of which officer was asked for
+      // -- it exists to prove a reader without `internal_affairs` sees a stub
+      // rather than nothing, the same way `restrictedAtal` always shows.
+      return { cases: [...found, ...restrictedDiscipline] };
+    },
+
+    'personnel.discipline.open': (input) => {
+      const body = (input ?? {}) as { officerId?: number; category?: string; summary?: string };
+
+      if (!body.category) return refuse('invalid', { category: 'not_a_key' });
+      if (!body.summary) return refuse('invalid', { summary: 'required' });
+
+      const id = discipline.length + 1;
+      discipline.push({
+        id,
+        officerId: body.officerId ?? 0,
+        number: `IA26-000${10 + id}`,
+        category: body.category,
+        summary: body.summary,
+        createdAgo: 0,
+        version: 1,
+      });
+
+      return { id, number: `IA26-000${10 + id}` };
+    },
+
+    'personnel.discipline.close': (input) => {
+      const body = (input ?? {}) as { id?: number; version?: number; outcomeKey?: string };
+      const row = discipline.find((entry) => entry.id === body.id);
+
+      if (!row) return refuse('not_found');
+      if (row.version !== body.version) return refuse('conflict');
+      if (!body.outcomeKey) return refuse('invalid', { outcomeKey: 'not_a_key' });
+
+      row.closedAgo = 0;
+      row.outcomeKey = body.outcomeKey;
+      row.version += 1;
+
+      return { id: row.id };
+    },
+
+    // ------------------------------------------------------------- booking
+
+    'booking.list': (input) => {
+      const filter = (input ?? {}) as { open?: boolean };
+
+      const found = bookings.filter((row) => !filter.open || row.releasedAgo === undefined);
+
+      return { bookings: [...found.map((row) => bookingRow(row, false)), ...restrictedBookings] };
+    },
+
+    'booking.get': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const row = bookings.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+
+      return { booking: bookingRow(row, true) };
+    },
+
+    'booking.book': (input) => {
+      const body = (input ?? {}) as { frihetId?: number; cell?: string };
+
+      if (!body.frihetId) return refuse('invalid', { frihetId: 'required' });
+      if (bookings.some((row) => row.frihetId === body.frihetId)) {
+        return refuse('conflict', { frihetId: 'already_booked' });
+      }
+
+      const id = bookings.length + 1;
+      const number = `B26-000${40 + id}`;
+
+      bookings.unshift({
+        id,
+        number,
+        frihetId: body.frihetId,
+        cell: body.cell ?? null,
+        bookedAgo: 0,
+        version: 1,
+        property: [],
+      });
+
+      return { id, number };
+    },
+
+    'booking.property.add': (input) => {
+      const body = (input ?? {}) as { bookingId?: number; itemLabel?: string; quantity?: number };
+      const row = bookings.find((entry) => entry.id === body.bookingId);
+
+      if (!row) return refuse('not_found');
+      if (!body.itemLabel) return refuse('invalid', { itemLabel: 'required' });
+
+      const id = row.property.length + 1;
+      row.property.push({ id, itemLabel: body.itemLabel, quantity: body.quantity ?? 1, loggedAgo: 0 });
+
+      return { id };
+    },
+
+    'booking.property.release': (input) => {
+      const body = (input ?? {}) as { id?: number; bookingId?: number };
+      const row = bookings.find((entry) => entry.id === body.bookingId);
+      const item = row?.property.find((entry) => entry.id === body.id);
+
+      if (!row || !item) return refuse('conflict');
+      if (item.returnedAgo !== undefined) return refuse('conflict');
+
+      item.returnedAgo = 0;
+
+      return { id: item.id };
+    },
+
+    'booking.release': (input) => {
+      const body = (input ?? {}) as { id?: number; version?: number; releaseReasonKey?: string };
+      const row = bookings.find((entry) => entry.id === body.id);
+
+      if (!row) return refuse('not_found');
+      if (row.releasedAgo !== undefined) return refuse('conflict', { _input: 'already_released' });
+      if (row.version !== body.version) return refuse('conflict');
+      if (!body.releaseReasonKey) return refuse('invalid', { releaseReasonKey: 'not_a_key' });
+
+      row.releasedAgo = 0;
+      row.releaseReasonKey = body.releaseReasonKey;
+      row.version += 1;
+
+      return { id: row.id };
+    },
+
+    // -------------------------------------------------------- ordningsbot
+
+    'ordningsbot.tariff.list': () => ({ tariffs }),
+
+    'ordningsbot.list': (input) => {
+      const filter = (input ?? {}) as { status?: string };
+
+      const found = citations.filter((row) => !filter.status || row.status === filter.status);
+
+      return { citations: [...found.map((row) => citationRow(row, false)), ...restrictedCitations] };
+    },
+
+    'ordningsbot.get': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const row = citations.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+
+      return { citation: citationRow(row, true) };
+    },
+
+    'ordningsbot.issue': (input) => {
+      const body = (input ?? {}) as { tariffId?: number; personId?: number; vehicleId?: number };
+
+      if (!body.tariffId) return refuse('invalid', { tariffId: 'required' });
+      if (!tariffs.some((entry) => entry.id === body.tariffId)) {
+        return refuse('not_found', { tariffId: 'unknown' });
+      }
+      if (!body.personId && !body.vehicleId) {
+        return refuse('invalid', { personId: 'required' });
+      }
+
+      const id = citations.length + 1;
+      const number = `LSPD-T26-0003${10 + id}`;
+
+      citations.unshift({
+        id,
+        number,
+        tariffId: body.tariffId,
+        ...(body.personId !== undefined ? { personId: body.personId } : {}),
+        ...(body.vehicleId !== undefined ? { vehicleId: body.vehicleId } : {}),
+        issuedAgo: 0,
+        status: 'issued',
+        version: 1,
+      });
+
+      return { id, number };
+    },
+
+    'ordningsbot.void': (input) => {
+      const body = (input ?? {}) as { id?: number; version?: number; voidReasonKey?: string };
+      const row = citations.find((entry) => entry.id === body.id);
+
+      if (!row) return refuse('not_found');
+      if (row.status !== 'issued') return refuse('conflict', { _input: 'not_issued' });
+      if (row.version !== body.version) return refuse('conflict');
+      if (!body.voidReasonKey) return refuse('invalid', { voidReasonKey: 'not_a_key' });
+
+      row.status = 'void';
+      row.voidReasonKey = body.voidReasonKey;
+      row.version += 1;
+
+      return { id: row.id };
+    },
+
+    'ordningsbot.contest': (input) => {
+      const body = (input ?? {}) as { id?: number; version?: number };
+      const row = citations.find((entry) => entry.id === body.id);
+
+      if (!row) return refuse('not_found');
+      if (row.status !== 'issued') return refuse('conflict', { _input: 'not_issued' });
+      if (row.version !== body.version) return refuse('conflict');
+
+      row.status = 'contested';
+      row.version += 1;
+
+      return { id: row.id };
+    },
+
+    'ordningsbot.pay': (input) => {
+      const body = (input ?? {}) as { id?: number; version?: number };
+      const row = citations.find((entry) => entry.id === body.id);
+
+      if (!row) return refuse('not_found');
+      if (row.status !== 'issued') return refuse('conflict', { _input: 'not_issued' });
+      if (row.version !== body.version) return refuse('conflict');
+
+      row.status = 'paid';
+      row.version += 1;
+
+      return { id: row.id };
+    },
+
+    // ----------------------------------------------------------- impound
+
+    'impound.list': (input) => {
+      const filter = (input ?? {}) as { held?: boolean };
+
+      const found = impounds.filter((row) => !filter.held || row.releasedAgo === undefined);
+
+      return { impounds: [...found.map((row) => impoundRow(row, false)), ...restrictedImpounds] };
+    },
+
+    'impound.get': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const row = impounds.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+
+      return { impound: impoundRow(row, true) };
+    },
+
+    'impound.create': (input) => {
+      const body = (input ?? {}) as {
+        plate?: string;
+        model?: string;
+        heldReasonKey?: string;
+        feePerDay?: number;
+      };
+
+      if (!body.plate) return refuse('invalid', { plate: 'required' });
+      if (!body.heldReasonKey) return refuse('invalid', { heldReasonKey: 'not_a_key' });
+
+      const id = impounds.length + 1;
+      const number = `I26-000${20 + id}`;
+
+      impounds.unshift({
+        id,
+        number,
+        plate: body.plate,
+        model: body.model ?? null,
+        heldReasonKey: body.heldReasonKey,
+        feePerDay: body.feePerDay ?? 0,
+        impoundedAgo: 0,
+        feePaid: false,
+        version: 1,
+      });
+
+      return { id, number };
+    },
+
+    'impound.authorize': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const row = impounds.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+      if (row.heldReasonKey !== 'investigative' && row.heldReasonKey !== 'evidence') {
+        return refuse('conflict', { _input: 'not_needed' });
+      }
+      if (row.holdAuthorizedAgo !== undefined) return refuse('conflict', { _input: 'already_authorized' });
+
+      row.holdAuthorizedAgo = 0;
+
+      return { id: row.id };
+    },
+
+    'impound.release': (input) => {
+      const body = (input ?? {}) as { id?: number; version?: number; feePaid?: boolean };
+      const row = impounds.find((entry) => entry.id === body.id);
+
+      if (!row) return refuse('not_found');
+      if (row.releasedAgo !== undefined) return refuse('conflict', { _input: 'already_released' });
+      if (row.version !== body.version) return refuse('conflict');
+      if (!body.feePaid) return refuse('forbidden', { _input: 'fee_unpaid' });
+      if (
+        (row.heldReasonKey === 'investigative' || row.heldReasonKey === 'evidence') &&
+        row.holdAuthorizedAgo === undefined
+      ) {
+        return refuse('forbidden', { _input: 'not_authorized' });
+      }
+
+      row.releasedAgo = 0;
+      row.feePaid = true;
       row.version += 1;
 
       return { id: row.id };

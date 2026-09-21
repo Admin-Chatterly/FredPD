@@ -15,6 +15,8 @@
   import Intel from './modules/intel/Intel.svelte';
   import Surveillance from './modules/surveillance/Surveillance.svelte';
   import Court from './modules/court/Court.svelte';
+  import Personnel from './modules/personnel/Personnel.svelte';
+  import Booking from './modules/booking/Booking.svelte';
 
   /**
    * The application shell (spec 6.3). M1 fills in the command line, tabs and
@@ -116,6 +118,8 @@
     'surveillance',
     'court',
     'admin',
+    'personnel',
+    'booking',
   ]);
 </script>
 
@@ -175,6 +179,10 @@
         <Surveillance />
       {:else if current === 'court'}
         <Court />
+      {:else if current === 'personnel'}
+        <Personnel />
+      {:else if current === 'booking'}
+        <Booking />
       {:else if session && current === 'admin'}
         <nav class="mb-4 flex gap-1 border-b border-[var(--color-border)]">
           {#each ADMIN_TABS as tab (tab)}

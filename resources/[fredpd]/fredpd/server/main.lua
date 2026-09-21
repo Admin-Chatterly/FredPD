@@ -236,6 +236,8 @@ AddEventHandler('onResourceStart', function(resource)
     -- so the instructions are the last thing in the console rather than buried
     -- under the first sync.
     FredPD.Core.discord.start()
+    -- A no-op when the gateway is off (ADR-010, spec 3.7's own default).
+    FredPD.Bridge.gateway.service.start()
     FredPD.Modules.bootstrap.announce()
 end)
 

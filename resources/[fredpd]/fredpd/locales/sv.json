@@ -18,7 +18,8 @@
       "personnel": "Personal",
       "comms": "Kommunikation",
       "admin": "Administration",
-      "surveillance": "Hemlig avlyssning"
+      "surveillance": "Hemlig avlyssning",
+      "booking": "Häkte"
     },
     "status": {
       "unit": "Enhet {callsign}",
@@ -61,7 +62,8 @@
   "form": {
     "cancel": "Avbryt",
     "any": "Alla",
-    "search": "Sök"
+    "search": "Sök",
+    "save": "Spara"
   },
   "fieldError": {
     "type": "fel typ av värde",
@@ -146,7 +148,15 @@
     "below_min": "under vad detta åtal tillåter",
     "above_max": "över vad detta åtal tillåter",
     "not_available": "livstids fängelse är inte tillgängligt för dessa brott",
-    "no_charges": "inga åtalspunkter finns att döma efter"
+    "no_charges": "inga åtalspunkter finns att döma efter",
+    "already_booked": "Redan inskriven",
+    "not_in_custody": "Inte längre intagen",
+    "retired": "Denna bottaxa gäller inte längre",
+    "not_issued": "Inte i status utfärdad",
+    "not_needed": "Detta beslag kräver inte godkännande",
+    "already_authorized": "Redan godkänt",
+    "fee_unpaid": "Avgiften är inte betald",
+    "not_authorized": "Utredares godkännande krävs"
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -993,7 +1003,9 @@
       "spaning": "Spaningsuppdrag",
       "query": "Slagning",
       "fu": "Förundersökningar",
-      "brott": "Brottskatalog"
+      "brott": "Brottskatalog",
+      "ordningsbot": "Ordningsböter",
+      "impound": "Beslag"
     },
     "vehicle": {
       "column": {
@@ -2221,5 +2233,216 @@
     "notAtalad": "Detta åtal avslogs och har inget att döma i.",
     "pendingTitle": "Väntar på åtalsbeslut",
     "pendingEmpty": "Inga förundersökningar väntar på beslut."
+  },
+  "personnel": {
+    "filter": {
+      "activeOnly": "Endast aktiva"
+    },
+    "empty": "Inga befattningshavare hittades",
+    "detail": {
+      "none": "Välj en befattningshavare"
+    },
+    "saved": "Sparat",
+    "column": {
+      "callsign": "Anropssignal",
+      "badge": "Tjänstenummer",
+      "division": "Avdelning"
+    },
+    "field": {
+      "badgeNumber": "Tjänstenummer",
+      "division": "Avdelning"
+    },
+    "shift": {
+      "start": "Starta pass",
+      "end": "Avsluta pass"
+    },
+    "equipment": {
+      "title": "Utrustning",
+      "itemChoose": "Föremål",
+      "serial": "Serienummer",
+      "assign": "Tilldela",
+      "return": "Återlämna",
+      "returned": "Återlämnat",
+      "item": {
+        "sidearm": "Tjänstevapen",
+        "taser": "Eltapistol",
+        "vest": "Skyddsväst",
+        "radio": "Radio",
+        "bodycam": "Kroppskamera",
+        "laptop": "Bärbar dator",
+        "less_lethal": "Mindre livsfarligt vapen",
+        "other": "Övrigt"
+      }
+    },
+    "certification": {
+      "title": "Certifieringar",
+      "choose": "Certifiering",
+      "issue": "Utfärda",
+      "revoke": "Återkalla",
+      "revoked": "Återkallad",
+      "key": {
+        "fto": "Handledare",
+        "firearms_instructor": "Skjutinstruktör",
+        "evoc": "Utryckningskörning",
+        "k9_handler": "Hundförare",
+        "swat": "Piket",
+        "crisis_negotiator": "Förhandlare",
+        "motor_unit": "MC-enhet",
+        "air_unit": "Flygenhet",
+        "field_training": "Fältutbildning",
+        "breach": "Forcering"
+      }
+    },
+    "discipline": {
+      "title": "Personalärende",
+      "reveal": "Visa",
+      "empty": "Inga personalärenden",
+      "categoryChoose": "Kategori",
+      "summary": "Sammanfattning",
+      "outcomeChoose": "Utfall",
+      "open": "Öppna ärende",
+      "close": "Avsluta ärende",
+      "confirmClose": "Avsluta detta personalärende? Det återupptas inte.",
+      "category": {
+        "conduct": "Uppträdande",
+        "use_of_force": "Våldsanvändning",
+        "policy": "Policyavvikelse",
+        "performance": "Tjänsteutövning",
+        "complaint_external": "Extern anmälan"
+      },
+      "outcome": {
+        "unfounded": "Ogrundad",
+        "exonerated": "Friad",
+        "sustained_counseled": "Fastställd — tillrättavisning",
+        "sustained_written": "Fastställd — skriftlig varning",
+        "sustained_suspension": "Fastställd — avstängning",
+        "sustained_termination": "Fastställd — avsked"
+      }
+    }
+  },
+  "booking": {
+    "filter": {
+      "openOnly": "Endast intagna"
+    },
+    "field": {
+      "frihetId": "Frihetsberövande-id",
+      "cell": "Cell"
+    },
+    "action": {
+      "book": "Skriv in",
+      "release": "Skriv ut",
+      "addProperty": "Lägg till föremål",
+      "releaseProperty": "Återlämna föremål"
+    },
+    "booked": "Inskrivning {number} registrerad.",
+    "releasedStatus": "{number} utskriven.",
+    "empty": "Ingen intagen",
+    "emptyList": "Inga inskrivningar hittades",
+    "column": {
+      "number": "Nummer",
+      "cell": "Cell",
+      "status": "Status"
+    },
+    "status": {
+      "open": "Intagen",
+      "released": "Frigiven"
+    },
+    "property": {
+      "section": "Egendomsförteckning",
+      "itemLabel": "Föremål",
+      "quantity": "Antal",
+      "empty": "Ingen egendom registrerad",
+      "released": "Återlämnat"
+    },
+    "releaseReason": {
+      "label": "Grund för frigivning",
+      "bail": "Borgen erlagd",
+      "released_no_charge": "Frigiven utan åtal",
+      "transferred": "Överförd",
+      "time_served": "Avtjänat straff",
+      "other": "Annan"
+    },
+    "confirm": {
+      "release": "Frige denna person från häktet?"
+    }
+  },
+  "ordningsbot": {
+    "field": {
+      "status": "Status",
+      "tariff": "Bot",
+      "person": "Person-id",
+      "vehicle": "Fordon-id",
+      "number": "Botens nummer"
+    },
+    "action": {
+      "issue": "Utfärda ordningsbot",
+      "pay": "Markera betald",
+      "contest": "Markera bestridd",
+      "void": "Makulera"
+    },
+    "issued": "Ordningsbot {number} utfärdad.",
+    "empty": "Inga ordningsböter hittades",
+    "detail": {
+      "none": "Välj en ordningsbot"
+    },
+    "confirm": {
+      "void": "Makulera denna ordningsbot? Den kan inte återutfärdas."
+    },
+    "status": {
+      "issued": "Utfärdad",
+      "paid": "Betald",
+      "contested": "Bestridd",
+      "void": "Makulerad"
+    },
+    "voidReason": {
+      "label": "Grund för makulering",
+      "issued_in_error": "Felaktigt utfärdad",
+      "identity_mistake": "Fel identitet",
+      "duplicate": "Dubblettbot",
+      "other": "Annan"
+    },
+    "tariff": {
+      "parking": "Otillåten parkering",
+      "noise": "Förargelseväckande beteende"
+    }
+  },
+  "impound": {
+    "filter": {
+      "heldOnly": "Endast kvarhållna"
+    },
+    "field": {
+      "plate": "Registreringsskylt",
+      "model": "Modell",
+      "heldReason": "Grund för beslag",
+      "feePerDay": "Avgift per dygn",
+      "feeOwed": "Skuldbelopp",
+      "impoundedAt": "Omhändertaget",
+      "feePaidConfirm": "Avgiften är betald"
+    },
+    "action": {
+      "create": "Beslagta fordon",
+      "authorize": "Godkänn beslag",
+      "release": "Lämna ut fordon"
+    },
+    "created": "Beslag {number} registrerat.",
+    "empty": "Inga beslag hittades",
+    "detail": {
+      "none": "Välj ett beslag"
+    },
+    "confirm": {
+      "release": "Lämna ut detta fordon?"
+    },
+    "status": {
+      "held": "Kvarhållet",
+      "released": "Utlämnat"
+    },
+    "held_reason": {
+      "investigative": "Förundersökningsbeslag",
+      "evidence": "Bevisbeslag",
+      "abandoned": "Övergivet",
+      "dui": "Rattfylleri",
+      "unregistered": "Oregistrerat",
+      "other": "Övrigt"
+    }
   }
 }

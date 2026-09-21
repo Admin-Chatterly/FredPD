@@ -216,6 +216,44 @@ local NUI_ROUTES <const> = {
     'court.referral.decide',
     'court.disposition.enter',
 
+    -- Personnel (spec 7.22-7.24, M6).
+    'personnel.roster.list',
+    'personnel.roster.get',
+    'personnel.roster.update',
+    'personnel.shift.start',
+    'personnel.shift.end',
+    'personnel.equipment.assign',
+    'personnel.equipment.return',
+    'personnel.certification.issue',
+    'personnel.certification.revoke',
+    'personnel.discipline.list',
+    'personnel.discipline.open',
+    'personnel.discipline.close',
+
+    -- Booking (spec 7.9, M6).
+    'booking.list',
+    'booking.get',
+    'booking.book',
+    'booking.property.add',
+    'booking.property.release',
+    'booking.release',
+
+    -- Ordningsbot (spec 7.11, M6).
+    'ordningsbot.tariff.list',
+    'ordningsbot.list',
+    'ordningsbot.get',
+    'ordningsbot.issue',
+    'ordningsbot.void',
+    'ordningsbot.contest',
+    'ordningsbot.pay',
+
+    -- Impound (spec 7.15, M6).
+    'impound.list',
+    'impound.get',
+    'impound.create',
+    'impound.authorize',
+    'impound.release',
+
     -- Crime scenes, evidence and the chain of custody (spec 8).
     'scene.create',
     'scene.release',

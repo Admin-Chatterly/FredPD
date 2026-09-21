@@ -21,20 +21,20 @@ Two guides in Swedish, for the people who run and use the server:
 
 ## Status
 
-**M0–M3 complete. M2 records, M4 dispatch and M5 surveillance are in, and M6
-has its first piece.** The platform core, the registers, the evidence and
-forensics chain, dispatch, the records half of M2 — anmälan, förundersökning,
-frihetsberövande, tvångsmedel and spaningsuppdrag — M5's secret coercive
-measures — HAK, HRA, spårsändare, kameraövervakning, tingsrätt-decided unlike
-M2's — and M6's åtal och dom — the prosecutor's charging decision and the
-court's disposition, picking up where `frihet.haktning` leaves off — are
-built and tested. The gateway's media store, PDF renderer and retention
-scheduler are built too, standalone and tested, though nothing in the core
-resource calls them yet — that bridge (`server/bridges/gateway/*.lua`, spec
-3.7) needs a verified Lua HMAC-SHA256 implementation this repository does not
-have, and shipping an unverified one was judged worse than leaving the gap
-open. Personnel and booking are M6's other two pieces and are next; see the
-roadmap in spec section 17.
+**M0–M6 built.** The platform core, the registers, the evidence and forensics
+chain, dispatch, all of M2's records, M5's secret coercive measures — HAK,
+HRA, spårsändare, kameraövervakning, tingsrätt-decided unlike M2's — and all
+five of M6's pieces — åtal och dom, personnel, booking, ordningsbot and
+impound — are built and tested. The gateway's media store, PDF renderer and
+retention scheduler are built too, and now has a verified Lua-side bridge
+(`server/bridges/gateway/*.lua`, spec 3.7): a pure-Lua SHA-256 and HMAC-SHA256,
+pinned in busted against FIPS 180-4's and RFC 4231's own test vectors — the
+verification the previous state of this repository was missing, and the
+reason that bridge did not exist before now. The bridge calls the gateway's
+existing media and PDF routes and retries a failed PDF render from an outbox
+table; nothing in the NUI uploads media or exports a PDF yet, so the link is
+built and tested but not yet reachable from a workflow. See the roadmap in
+spec section 17 for what is still open.
 
 Two decisions that shape everything below: the framework is **ESX** (ADR-005),
 and the procedure is **Swedish** rather than US workflows with Swedish labels
@@ -86,28 +86,45 @@ Working today:
   however many permissions it holds. Sentences are checked against
   `Brott.gemensamStraffskala` for the exact charges on the case, the same
   arithmetic the brottskatalog screen shows (7.20).
+- **Personnel**: roster detail, equipment assignment, certifications usable
+  as context conditions, and the disciplinary file — restricted by default
+  the same way every other internal-affairs record in this suite is (7.22–7.24).
+- **Booking**: inskrivning i arrest — cell assignment and a property
+  inventory, picking up from an open frihetsberövande chain (7.9).
+- **Ordningsbot**: on-the-spot fines against a versioned tariff, so a later
+  tariff change never rewrites what an already-issued citation says it cost
+  (7.11).
+- **Impound**: fees computed from dates rather than a timer, release gated on
+  payment and, for an investigative or evidence hold, an investigator's
+  authorization, and auto-resolving a matching spaningsuppdrag on creation (7.15).
 
 M2's interface is complete: every register and every workflow in it has a
 screen, and the Records module's tabs are the whole of what the M2 routes can
-do. M5 and M6's åtal och dom each have their own rail module rather than a
-Records tab, since each is a different clearance and a different pair of
-decision-makers.
+do. Ordningsbot and impound are Records tabs too, beside the registers and
+the other M2 workflows they sit alongside; surveillance, åtal och dom,
+personnel and booking each have their own rail module instead, since each is
+a different clearance and a different pair of decision-makers.
 
-Built and tested, but not reachable from inside the game yet: the **gateway**
-service — signed upload/download tokens over a local (or S3-compatible) media
-store, WebP thumbnails, a pluggable virus-scan hook, PDF rendering through
-headless Chromium from the same editor-JSON contract Tiptap will eventually
-produce, and a retention scheduler for query logs, ALPR reads, stale drafts and
-old surveillance sessions. It runs and is fully covered by its own test suite,
-but the Lua-side bridge that would let FXServer call it does not exist — see
-above. `web/index.html`'s CSP already carries a `VITE_MEDIA_HOST` slot for it
-either way.
+Built and tested: the **gateway** service — signed upload/download tokens over
+a local (or S3-compatible) media store, WebP thumbnails, a pluggable
+virus-scan hook, PDF rendering through headless Chromium from the same
+editor-JSON contract Tiptap will eventually produce, and a retention scheduler
+for query logs, ALPR reads, stale drafts and old surveillance sessions — and
+now its Lua-side bridge, signing every FXServer→gateway call and retrying a
+failed PDF render from an outbox table. Nothing in the NUI calls it yet: no
+screen uploads media or exports a PDF, so the link is reachable in principle
+and unreachable in practice until one does. `web/index.html`'s CSP already
+carries a `VITE_MEDIA_HOST` slot for it either way.
 
-Not built at all yet: **booking**, **citations**, **impound** and
-**personnel** (the rest of M6) — and, within court itself, the calendar,
-subpoenas, discovery and sealing spec 7.20 marks `[S]` rather than `[M]`.
-None of this has run on a live FiveM server: the logic is covered by tests,
-and the parts that call game natives are not.
+Not built: Discord role actions (hire, promote, demote) through the gateway —
+ADR-010 settled that FXServer only ever reads the guild, and that reasoning
+against writing to it generalised past the read path, so this is now a
+closed question rather than an open one. Also not built: within court, the
+calendar, subpoenas, discovery and sealing spec 7.20 marks `[S]` rather than
+`[M]`; within personnel, the field-training program and use-of-force/complaint
+intake spec 7.23–7.24 mark `[S]`. None of this has run on a live FiveM
+server: the logic is covered by tests, and the parts that call game natives
+are not.
 
 ## Layout
 
@@ -118,7 +135,7 @@ resources/[fredpd]/
   fredpd_surveillance/  device/tracker plumbing, still a boot stub (M5)
   fredpd_assets/        streamed props and sounds
 web/                    Svelte 5 NUI, builds into fredpd/web/dist
-gateway/                Node.js service: Discord sync, media, PDF, scheduler
+gateway/                Node.js service: media, PDF, scheduler. Off by default
 packages/schema/        route and entity schemas → TS types and generated Lua
 database/               append-only migrations, and seeds
 tools/                  i18n checker

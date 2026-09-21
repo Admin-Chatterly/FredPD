@@ -320,9 +320,12 @@ to be argued for in an ADR, not a convenience. See ADR-013.
 
 ### 3.7 Gateway interface
 
-- **FXServer → gateway:** `PerformHttpRequest` to `http://127.0.0.1:<port>` with an HMAC signature and timestamp. Used for media upload tokens, PDF rendering, Discord role actions.
-- **Gateway → FXServer:** `SetHttpHandler` in `fredpd`, accepting loopback requests only, HMAC-signed, with a 30-second replay window. Used for role changes, lab timer completions, scheduled jobs.
-- **Reliability:** an outbox table on both sides with retries, so a gateway restart never loses events.
+Built (the outbound half). `server/bridges/gateway/{sha256,hmac,client,repo,service}.lua`, migration 0021.
+
+- **FXServer → gateway:** `PerformHttpRequest` to `http://127.0.0.1:<port>`, signed `HMAC-SHA256(secret, "<timestamp>.<body>")` in `x-fredpd-signature`/`x-fredpd-timestamp` — the exact wire format `gateway/src/hmac.ts`'s own `sign()` already implements on the gateway side, so the two sides can only ever agree or both be wrong the same way. `sha256.lua` and `hmac.lua` are pure Lua (no natives), pinned in busted against FIPS 180-4's own test vectors and RFC 4231's, respectively — an unverified hash implementation was judged worse than no bridge at all, which is why one was not shipped until it could be verified this way. `Gateway.requestUploadToken`, `.requestDownloadToken` and `.renderPdf` call the gateway's existing media and PDF routes; nothing calls them yet (no NUI screen uploads media or exports a PDF), so the bridge exists and is tested but is not yet reachable from a workflow.
+- **Gateway → FXServer:** not built. A reverse channel needs FXServer to run its own HTTP listener (`SetHttpHandler`), which nothing here currently requires — everything the gateway serves today (a token, a rendered PDF) is a synchronous reply to an FXServer-initiated request, not an event the gateway raises on its own. Left for whichever of "role changes, lab timer completions, scheduled jobs" is built first and actually needs to push.
+- **Reliability:** an outbox table on the FXServer side (`fpd_gateway_outbox`) retries a failed `renderPdf` call on a five-minute timer, up to 10 attempts or 24 hours old, whichever comes first. A gateway-side outbox is not built — nothing yet calls FXServer for the gateway to need to retry into.
+- **Discord role actions are not built.** See section 7.22's own note: ADR-010 settled that FXServer only reads the guild, and the reasoning against writing to it from anywhere in this suite generalised past the read path.
 
 ### 3.8 Bridges
 
@@ -746,8 +749,8 @@ A chain of three decisions taken by three different people, not one arrest recor
   - **RB 24:13** — the häktningsförhandling within four dygn of the gripande. That one is 96 hours.
 - [M] An append-only custody log: förhör, försvarare, måltider, the calls a detainee is entitled to.
 - [M] What somebody is held for is its own charge list, separate from the anmälan's: a prosecutor anhåller for two of the five offences reported, and the chain has to say which two.
-- [S] **Inskrivning i arrest** (M6): mugshot, ten-print capture, property inventory, sentence handoff.
-- **Permissions:** `frihet.view`, `frihet.gripande`, `frihet.frigiv` (patrol); `frihet.anhallande` (åklagare); `frihet.haktning` (domare).
+- [M] **Inskrivning i arrest** (M6). Built. Migration 0018, `server/modules/booking/`. Cell assignment and a property inventory, picking up from a `frihetsberövande` row still open; release requires a reason from a closed list, checked server-side the same way every other closed-list ground in this suite is. Mugshot and ten-print capture are not built — they need the media pipeline (section 3.2), which has no NUI wiring yet either. Fires `fredpd:arrestBooked` for the jail bridge (section 4.2 in its M6 state) to pick up.
+- **Permissions:** `frihet.view`, `frihet.gripande`, `frihet.frigiv` (patrol); `frihet.anhallande` (åklagare); `frihet.haktning` (domare); `booking.view` (patrol_basic), `booking.intake`, `booking.release` (patrol).
 
 ### 7.10 Brottskatalogen och straffskalan (M2)
 
@@ -762,12 +765,16 @@ This section was originally written against a US penal code — a class (felony,
 - **Deliberately absent:** any recommended or typical sentence. The span is the law; where inside it a sentence falls is the court's, and a number FredPD invented would be quoted as though it were not invented.
 - **Permissions:** `rms.brott.view` (patrol — an officer who cannot list the offences cannot write a charge), `admin.brott.edit` (admin only, and `sensitive`: a straffskala is the legal basis every charge is measured against).
 
-### 7.11 Citations (M6)
+### 7.11 Ordningsbot (M6)
 
-- [M] Traffic, parking and criminal citations with offence codes, location, vehicle, fine and points.
-- [M] Lifecycle: issued → paid, contested (goes to court) or overdue; fines through the billing bridge; points on the licence.
-- [S] Written warnings recorded without a fine.
-- **Permissions:** `rms.citation.issue`, `rms.citation.void`, `court.citation.adjudicate`.
+Built. Migration 0019, `server/modules/ordningsbot/`.
+
+Renamed from "Citations": ordningsbot is the correct Swedish term for a summary on-the-spot fine, and the shape below is what actually shipped rather than the US traffic-court sketch above.
+
+- [M] A **versioned tariff**, the same immutable-version shape `fpd_brott` uses (7.10): a citation references one specific tariff row forever, so a later tariff change never alters what an already-issued citation says it was for.
+- [M] Lifecycle: issued → paid, contested or void, each a one-way transition out of `issued` only. Void requires a reason from a closed list.
+- **Not built:** points on a licence (no licence-points concept exists in this suite) and a billing-bridge integration for payment — `ordningsbot.pay` marks a citation paid directly, a deliberate scope-narrowing recorded in the migration's own header.
+- **Permissions:** `page.ordningsbot`, `ordningsbot.tariff.view`, `ordningsbot.view` (patrol_basic); `ordningsbot.issue`, `.contest`, `.pay` (patrol); `ordningsbot.void` (supervisor).
 
 ### 7.12 Tvångsmedel och efterlysning (M2)
 
@@ -808,11 +815,14 @@ Built. Migration 0012, `server/modules/spaning/`.
 
 ### 7.15 Impound and tow (M6)
 
-- [M] Impound with reason, hold type (standard, investigative hold, evidence hold), lot, vehicle inventory.
-- [M] Fees computed from dates, not timers (same approach as ps-mdt v3), capped.
-- [M] Release requires fees paid and, for holds, the investigator's release authorization.
-- [S] Impound resolves matching BOLOs.
-- **Permissions:** `rms.impound.create`, `rms.impound.release`, `rms.impound.hold.release`.
+Built. Migration 0020, `server/modules/impound/`.
+
+- [M] Impound with reason (investigative hold, evidence hold, abandoned, DUI, unregistered, other), plate, fee-per-day.
+- [M] Fees computed from dates, not timers: whole days held, minimum one, times the daily rate. Never re-added on the client — every read carries the server's own current figure.
+- [M] Release requires fees paid and, for an investigative or evidence hold, the investigator's release authorization.
+- [M] **Resolves a matching spaningsuppdrag** on creation, firing `fredpd:vehicleImpounded` — the same server-local event `spaning/events.lua` was already listening for before this module existed to raise it.
+- **Not built:** a lot/location field and a formal tow-lot inventory beyond the plate and model already on the row.
+- **Permissions:** `page.impound` (patrol_basic); `impound.view`, `.create`, `.release` (patrol); `impound.authorize` (supervisor).
 
 ### 7.16 Dispatch (CAD) (M4)
 
@@ -942,12 +952,13 @@ so; this section says what it would take to change that.
 
 ### 7.20 Court and DOJ (M6)
 
-- [M] Prosecutor intake of case referrals; charging decision (file, decline with reason, request more investigation).
-- [M] Court calendar: hearings, trials, officer subpoenas with notifications.
-- [M] Dispositions: guilty, not guilty, dismissed, plea; sentences recorded and handed to the jail bridge.
-- [S] Discovery packages for defense attorneys: selected items, automatic redaction, access-limited and time-limited.
-- [S] Record sealing and expungement orders.
-- **Permissions:** `court.referral.review`, `court.calendar.manage`, `court.disposition.enter`, `court.discovery.issue`, `court.discovery.view`, `court.seal.order`.
+Built (the charging decision and the disposition). Migration 0016, `server/modules/court/`.
+
+- [M] Prosecutor intake of a redovisad förundersökning; charging decision (charge, or decline with a reason from a closed list). "Request more investigation" is not built — it would reopen a redovisad FU, which is a change to the FU's own lifecycle this module does not make (0016's header).
+- [S] Court calendar, hearings and officer subpoenas — not built.
+- [M] Dispositions: guilty, not guilty, dismissed, plea. A sentence is checked against `Brott.gemensamStraffskala` for the exact charges on the row, never trusted from input. Handoff to a jail bridge is not built (no such bridge exists yet).
+- [S] Discovery packages and record sealing — not built.
+- **Permissions:** `court.referral.review` (åklagare and domare — reading the docket is part of disposing of it), `court.disposition.enter` (domare only).
 
 ### 7.21 Corrections bridge (M6)
 
@@ -955,26 +966,27 @@ so; this section says what it would take to change that.
 
 ### 7.22 Personnel and roster (M6)
 
-- [M] Officer profile: badge number, callsign, rank (read from Discord roles), division, hire date, bound character.
-- [M] Hire, promote, demote, suspend, dismiss from FredPD, executed as Discord role changes through the gateway (section 4.2).
-- [M] Shift log: on-duty and off-duty times, hours per week.
-- [M] Equipment assignment: vehicle, radio, duty weapons (linked to the firearms registry).
-- [S] Commendations and awards.
-- [S] Scheduling.
-- **Permissions:** `personnel.view`, `personnel.hire`, `personnel.promote`, `personnel.discipline`, `personnel.equipment.assign`.
+Built. Migration 0017, `server/modules/personnel/`.
+
+- [M] Officer profile: badge number, callsign, division, hire date, bound character — extends `fpd_officers` (0001) rather than a second roster table. Rank is read-only display of the officer's mapped Discord roles (invariant 2); nothing here writes to Discord.
+- **Not built as sketched:** hire, promote, demote and dismiss as Discord role changes through the gateway. ADR-010 settled that FXServer only ever *reads* the guild — ADR-013's reasoning generalised: a resource that could also grant a role would be the permission source contradicting itself. "Promote" here means editing `division`, not a role.
+- [M] Shift log: start/end, self-service only (`personnel.shift.own` acts on the caller's own row, never an id in the input).
+- [M] Equipment assignment: item, optional serial, optionally linked to the firearms registry (0005) by id.
+- **Permissions:** `page.personnel`, `personnel.roster.view`, `personnel.shift.own` (patrol_basic); `personnel.roster.edit`, `personnel.equipment.manage`, `personnel.certification.manage` (supervisor); `personnel.discipline.view`, `personnel.discipline.manage` (command).
 
 ### 7.23 Training, field training and certifications (S, M6)
 
-- [S] Certifications (K9, air support, tactical, pursuit driving, FTO) with expiry. Certifications can be context conditions (only certified officers can sign on as K9 units).
-- [S] Field training program: phases, daily observation reports, competency ratings, sign-off (based on ps-mdt v3 FTO).
-- [S] Training records and course attendance.
+Built (certifications; not the field-training program).
+
+- [M] Certifications with expiry and revocation, from a closed list. `Repo.hasActiveCertification` is exported for other modules to use as a context condition, per the sketch above.
+- [S] The field training phases/observation-report program — not built; only the certification itself (`fto` is one of the closed-list keys) exists.
 
 ### 7.24 Internal affairs, use of force and early intervention (S, M6)
 
-- [S] Complaints from officers or civilians (public complaint form), intake, investigation, findings (sustained, not sustained, exonerated, unfounded), discipline.
-- [S] Use-of-force reports with supervisor review.
-- [S] Early-intervention alerts when thresholds are crossed (for example 3 use-of-force reports in 30 days), in the style of IAPro/BlueTeam.
-- [S] Internal-affairs records live in the `internal_affairs` compartment.
+Built (the disciplinary file only).
+
+- [M] A case per officer: category (from a closed list), summary, opened and closed with an outcome from a closed list. Written against `ia_case` (already allowlisted in `access/repo.lua` since M1) with `compartment = 'internal_affairs'`, which ships stubbed to everyone until an operator configures who may see it (spec 4.5) — the same closed-by-default posture `court`'s restricted åtal rows already exercise.
+- [S] A public complaint intake form, use-of-force reports and early-intervention thresholds — not built.
 
 ### 7.25 Policies and SOPs (S, M6)
 
@@ -1199,7 +1211,7 @@ fired something, never what.
 
 ## 9. Surveillance and interception (M5)
 
-- [M] Every surveillance measure needs an active surveillance warrant (section 7.12) with scope (person, phone number, vehicle, location), method and expiry. Export `HasActiveWarrant(target, 'surveillance', method)`.
+- [M] Every surveillance measure needs an active, **tingsrätt-decided** measure with scope (person, phone number, vehicle, location), method and expiry — requested by an åklagare, granted or refused only by a domare, the same court-decision pattern `frihet.haktning` uses rather than the FU-ledare/åklagare decision section 7.12's husrannsakan and kroppsvisitation take. That distinction is why this module extends `frihet`'s capacity-derivation shape (`capacityOf`, spec 4.4) instead of `tvangsmedel`'s. Export `HasActiveWarrant(target, 'surveillance', method)`.
 - [M] Methods:
   - **Phone interception:** live listening to calls of a warranted number, with call metadata logging.
   - **Radio monitoring:** listening to a radio channel, with a configurable blocklist (police, EMS).
@@ -1838,6 +1850,8 @@ row it came from.
 | Lab request | `lab_request` | `YYYY` | `L{YY}-{#####}` | L26-00031 |
 | Secret coercive measure (HAK/HRA/spårsändare) | `hak` | `YYYY` | `H{YY}-{#####}` | H26-00007 |
 | Åtal | `atal` | `YYYY` | `A{YY}-{#####}` | A26-00014 |
+| Impound | `impound` | `YYYY` | `I{YY}-{#####}` | I26-00019 |
+| Internal affairs case | `ia_case` | `YYYY` | `IA{YY}-{#####}` | IA26-00003 |
 
 **The `year` column is a scope key, not a year.** It carries `0` for a sequence
 that never restarts, `YYYY` for a year-scoped one, and `YYMMDD` for the one

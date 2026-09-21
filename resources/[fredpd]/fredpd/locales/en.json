@@ -18,7 +18,8 @@
       "personnel": "Personnel",
       "comms": "Communications",
       "admin": "Administration",
-      "surveillance": "Surveillance"
+      "surveillance": "Surveillance",
+      "booking": "Booking"
     },
     "status": {
       "unit": "Unit {callsign}",
@@ -61,7 +62,8 @@
   "form": {
     "cancel": "Cancel",
     "any": "Any",
-    "search": "Search"
+    "search": "Search",
+    "save": "Save"
   },
   "fieldError": {
     "type": "the wrong kind of value",
@@ -146,7 +148,15 @@
     "below_min": "below the minimum this charge allows",
     "above_max": "above the maximum this charge allows",
     "not_available": "life imprisonment is not available for these charges",
-    "no_charges": "no charges are attached to enter a sentence against"
+    "no_charges": "no charges are attached to enter a sentence against",
+    "already_booked": "Already booked",
+    "not_in_custody": "Not currently in custody",
+    "retired": "This tariff version is no longer current",
+    "not_issued": "Not in the issued state",
+    "not_needed": "This hold does not require authorization",
+    "already_authorized": "Already authorized",
+    "fee_unpaid": "Fee not yet paid",
+    "not_authorized": "Investigator authorization required"
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -993,7 +1003,9 @@
       "spaning": "Lookouts",
       "query": "Query",
       "fu": "Investigations",
-      "brott": "Offences"
+      "brott": "Offences",
+      "ordningsbot": "Citations",
+      "impound": "Impound"
     },
     "vehicle": {
       "column": {
@@ -2221,5 +2233,216 @@
     "notAtalad": "This referral was declined and has nothing to dispose of.",
     "pendingTitle": "Awaiting a charging decision",
     "pendingEmpty": "No investigations are waiting on a decision."
+  },
+  "personnel": {
+    "filter": {
+      "activeOnly": "Active only"
+    },
+    "empty": "No officers match",
+    "detail": {
+      "none": "Select an officer to read their record"
+    },
+    "saved": "Saved",
+    "column": {
+      "callsign": "Callsign",
+      "badge": "Badge",
+      "division": "Division"
+    },
+    "field": {
+      "badgeNumber": "Badge number",
+      "division": "Division"
+    },
+    "shift": {
+      "start": "Start shift",
+      "end": "End shift"
+    },
+    "equipment": {
+      "title": "Equipment",
+      "itemChoose": "Item",
+      "serial": "Serial",
+      "assign": "Assign",
+      "return": "Return",
+      "returned": "Returned",
+      "item": {
+        "sidearm": "Sidearm",
+        "taser": "Taser",
+        "vest": "Vest",
+        "radio": "Radio",
+        "bodycam": "Body camera",
+        "laptop": "Laptop",
+        "less_lethal": "Less-lethal",
+        "other": "Other"
+      }
+    },
+    "certification": {
+      "title": "Certifications",
+      "choose": "Certification",
+      "issue": "Issue",
+      "revoke": "Revoke",
+      "revoked": "Revoked",
+      "key": {
+        "fto": "Field training officer",
+        "firearms_instructor": "Firearms instructor",
+        "evoc": "Emergency vehicle operations",
+        "k9_handler": "K9 handler",
+        "swat": "SWAT",
+        "crisis_negotiator": "Crisis negotiator",
+        "motor_unit": "Motor unit",
+        "air_unit": "Air unit",
+        "field_training": "Field training",
+        "breach": "Breaching"
+      }
+    },
+    "discipline": {
+      "title": "Disciplinary file",
+      "reveal": "Show",
+      "empty": "No disciplinary cases",
+      "categoryChoose": "Category",
+      "summary": "Summary",
+      "outcomeChoose": "Outcome",
+      "open": "Open case",
+      "close": "Close case",
+      "confirmClose": "Close this disciplinary case? It is not reopened once closed.",
+      "category": {
+        "conduct": "Conduct",
+        "use_of_force": "Use of force",
+        "policy": "Policy violation",
+        "performance": "Performance",
+        "complaint_external": "External complaint"
+      },
+      "outcome": {
+        "unfounded": "Unfounded",
+        "exonerated": "Exonerated",
+        "sustained_counseled": "Sustained — counseled",
+        "sustained_written": "Sustained — written warning",
+        "sustained_suspension": "Sustained — suspension",
+        "sustained_termination": "Sustained — termination"
+      }
+    }
+  },
+  "booking": {
+    "filter": {
+      "openOnly": "In custody only"
+    },
+    "field": {
+      "frihetId": "Frihetsberövande id",
+      "cell": "Cell"
+    },
+    "action": {
+      "book": "Book in",
+      "release": "Release",
+      "addProperty": "Add item",
+      "releaseProperty": "Return item"
+    },
+    "booked": "Booking {number} recorded.",
+    "releasedStatus": "{number} released.",
+    "empty": "No one in custody",
+    "emptyList": "No bookings found",
+    "column": {
+      "number": "Number",
+      "cell": "Cell",
+      "status": "Status"
+    },
+    "status": {
+      "open": "In custody",
+      "released": "Released"
+    },
+    "property": {
+      "section": "Property inventory",
+      "itemLabel": "Item",
+      "quantity": "Quantity",
+      "empty": "No property logged",
+      "released": "Returned"
+    },
+    "releaseReason": {
+      "label": "Reason for release",
+      "bail": "Bail posted",
+      "released_no_charge": "Released, no charge",
+      "transferred": "Transferred",
+      "time_served": "Time served",
+      "other": "Other"
+    },
+    "confirm": {
+      "release": "Release this person from custody?"
+    }
+  },
+  "ordningsbot": {
+    "field": {
+      "status": "Status",
+      "tariff": "Fine",
+      "person": "Person id",
+      "vehicle": "Vehicle id",
+      "number": "Citation number"
+    },
+    "action": {
+      "issue": "Issue citation",
+      "pay": "Mark paid",
+      "contest": "Mark contested",
+      "void": "Void"
+    },
+    "issued": "Citation {number} issued.",
+    "empty": "No citations found",
+    "detail": {
+      "none": "Select a citation to read it"
+    },
+    "confirm": {
+      "void": "Void this citation? It cannot be reissued."
+    },
+    "status": {
+      "issued": "Issued",
+      "paid": "Paid",
+      "contested": "Contested",
+      "void": "Void"
+    },
+    "voidReason": {
+      "label": "Reason for voiding",
+      "issued_in_error": "Issued in error",
+      "identity_mistake": "Wrong identity",
+      "duplicate": "Duplicate citation",
+      "other": "Other"
+    },
+    "tariff": {
+      "parking": "Illegal parking",
+      "noise": "Disturbing the peace"
+    }
+  },
+  "impound": {
+    "filter": {
+      "heldOnly": "Currently held only"
+    },
+    "field": {
+      "plate": "Plate",
+      "model": "Model",
+      "heldReason": "Reason held",
+      "feePerDay": "Fee per day",
+      "feeOwed": "Fee owed",
+      "impoundedAt": "Impounded",
+      "feePaidConfirm": "Fee has been paid"
+    },
+    "action": {
+      "create": "Impound vehicle",
+      "authorize": "Authorize hold",
+      "release": "Release vehicle"
+    },
+    "created": "Impound {number} recorded.",
+    "empty": "No impounds found",
+    "detail": {
+      "none": "Select an impound to read it"
+    },
+    "confirm": {
+      "release": "Release this vehicle?"
+    },
+    "status": {
+      "held": "Held",
+      "released": "Released"
+    },
+    "held_reason": {
+      "investigative": "Investigative hold",
+      "evidence": "Evidence hold",
+      "abandoned": "Abandoned",
+      "dui": "DUI",
+      "unregistered": "Unregistered",
+      "other": "Other"
+    }
   }
 }

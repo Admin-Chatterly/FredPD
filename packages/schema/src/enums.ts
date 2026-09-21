@@ -1136,3 +1136,19 @@ export type AtalBeslut = (typeof ATAL_BESLUT)[number];
 export const ATAL_DISPOSITIONS = ['guilty', 'not_guilty', 'dismissed', 'plea'] as const;
 
 export type AtalDisposition = (typeof ATAL_DISPOSITIONS)[number];
+
+/** `ck_fpd_ordningsbot_status` (spec 7.11). `issued` is the only state a
+ * client's `ordningsbot.issue` writes; the other three are transitions the
+ * server makes from it. */
+export const ORDNINGSBOT_STATUSES = ['issued', 'paid', 'contested', 'void'] as const;
+
+export type OrdningsbotStatus = (typeof ORDNINGSBOT_STATUSES)[number];
+
+/** `ck_fpd_impound_reason` (spec 7.15). `investigative` and `evidence` are
+ * the two `Impound.needsAuthorization` treats as needing an investigator's
+ * sign-off before release. */
+export const IMPOUND_HELD_REASONS = [
+  'investigative', 'evidence', 'abandoned', 'dui', 'unregistered', 'other',
+] as const;
+
+export type ImpoundHeldReason = (typeof IMPOUND_HELD_REASONS)[number];

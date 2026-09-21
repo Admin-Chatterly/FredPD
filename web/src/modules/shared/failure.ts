@@ -213,6 +213,28 @@ const REASONS = new Set([
   'above_max',
   'not_available',
   'no_charges',
+
+  // Personnel (spec 7.22-7.24). Self-service shift toggle only, already
+  // clocked on or off.
+  'already_on_shift',
+  'not_on_shift',
+
+  // Booking (spec 7.9). A second booking against the same frihet chain, or
+  // one raised on a chain that is not currently in custody.
+  'already_booked',
+  'not_in_custody',
+
+  // Ordningsbot (spec 7.11). A tariff version that has since been
+  // superseded, and a transition attempted from any status but `issued`.
+  'retired',
+  'not_issued',
+
+  // Impound (spec 7.15). `Impound.mayRelease`'s own two refusals, and the
+  // hold-authorization state machine's two.
+  'not_needed',
+  'already_authorized',
+  'fee_unpaid',
+  'not_authorized',
 ]);
 
 export interface FieldMessage {

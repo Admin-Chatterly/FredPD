@@ -87,6 +87,7 @@ local KINDS <const> = {
     impound = true,
     hak = true,
     atal = true,
+    ia_case = true,
 }
 
 --- The `year` value for a sequence that is not year-scoped.

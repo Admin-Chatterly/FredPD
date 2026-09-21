@@ -713,3 +713,92 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     -- outlive the record it hung on, and destroying it should be a decision
     -- somebody is named for.
     ('intel_command', 'intel.record.delete');
+
+-- -----------------------------------------------------------------------------
+-- Personnel (spec 7.22-7.24, M6)
+--
+-- Every officer opens their own roster entry and clocks their own shift --
+-- `personnel.shift.own` never takes an id, so granting it widely grants
+-- nothing beyond the presser's own row (spec 7.22's own reasoning, the same
+-- shape `cad.unit.status` already uses for the panic button). Editing
+-- somebody else's roster row, assigning equipment and issuing certifications
+-- are supervisory. The disciplinary file is IA-classified and ships stubbed
+-- to everyone until an operator configures `internal_affairs` (spec 4.5), so
+-- granting `personnel.discipline.view` here only decides who is *asked* --
+-- the compartment decides who is *shown*.
+-- -----------------------------------------------------------------------------
+
+INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
+    ('patrol_basic', 'page.personnel'),
+    ('patrol_basic', 'personnel.roster.view'),
+    ('patrol_basic', 'personnel.shift.own'),
+
+    ('supervisor', 'personnel.roster.edit'),
+    ('supervisor', 'personnel.equipment.manage'),
+    ('supervisor', 'personnel.certification.manage'),
+
+    ('command', 'personnel.discipline.view'),
+    ('command', 'personnel.discipline.manage');
+
+-- -----------------------------------------------------------------------------
+-- Booking (spec 7.9, M6)
+--
+-- Custodial administration, not a legal decision -- the same tier split
+-- `frihet` uses for `gripande`/`frigiv`: visibility for everyone including a
+-- trainee (`page.booking`, `booking.view` at `patrol_basic`), intake and
+-- release for an ordinary officer (`booking.intake`, `booking.release` at
+-- `patrol`). Neither `aklagare` nor `domare` gets anything here.
+-- -----------------------------------------------------------------------------
+
+INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
+    ('patrol_basic', 'page.booking'),
+    ('patrol_basic', 'booking.view'),
+
+    ('patrol', 'booking.intake'),
+    ('patrol', 'booking.release');
+
+-- -----------------------------------------------------------------------------
+-- Vehicle impound (spec 7.15, M6)
+--
+-- Viewing and creating an impound is ordinary patrol work -- an officer who
+-- tows a car writes the record for it, the same reasoning `rms.anmalan.create`
+-- gets. Authorizing an investigative or evidence hold is the investigator-tier
+-- decision spec 7.15 calls out by name; it sits with `inv.fu.lead` at
+-- `supervisor` rather than with `inv.fu.assign` at `command`, because it is the
+-- same "leads the investigation" capacity that already opens and leads an FU,
+-- not the narrower reassignment power `command` alone holds. Release is
+-- patrol work again: `Impound.mayRelease` is the real gate (fee paid, and
+-- authorized when the hold needs it), so nothing is gained by also
+-- restricting who may press the button once those conditions are met.
+-- -----------------------------------------------------------------------------
+
+INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
+    ('patrol_basic', 'page.impound'),
+    ('patrol', 'impound.view'),
+    ('patrol', 'impound.create'),
+    ('patrol', 'impound.release'),
+    ('supervisor', 'impound.authorize');
+
+-- -----------------------------------------------------------------------------
+-- Ordningsbot (spec 7.11, M6)
+--
+-- The fine schedule and citation history are visible department-wide, the
+-- same tier `booking.view` gets. Issuing, marking a citation contested (intake
+-- paperwork, not a disposition -- the disposition is `court.disposition.enter`
+-- if it goes to court) and marking one paid (no billing bridge exists yet; see
+-- 0019's header) are full-duty work at `patrol`, so the officer who wrote the
+-- ticket is never stranded from its own follow-up. Voiding an already-issued
+-- citation is a correction, held at `supervisor` the same way
+-- `impound.authorize` holds a reversal above the tier that first acted.
+-- -----------------------------------------------------------------------------
+
+INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
+    ('patrol_basic', 'page.ordningsbot'),
+    ('patrol_basic', 'ordningsbot.tariff.view'),
+    ('patrol_basic', 'ordningsbot.view'),
+
+    ('patrol', 'ordningsbot.issue'),
+    ('patrol', 'ordningsbot.contest'),
+    ('patrol', 'ordningsbot.pay'),
+
+    ('supervisor', 'ordningsbot.void');

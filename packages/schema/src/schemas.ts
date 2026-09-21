@@ -26,6 +26,7 @@ import {
   HAK_STATUSES,
   HAK_TARGETS,
   HOTLIST_REASONS,
+  IMPOUND_HELD_REASONS,
   INTEL_CASE_STATUSES,
   INTEL_CONFIDENCE,
   INTEL_ORG_STATUSES,
@@ -35,6 +36,7 @@ import {
   LAB_ANALYSES,
   LAB_ANALYSIS_STATUSES,
   LAB_PRIORITIES,
+  ORDNINGSBOT_STATUSES,
   PERSON_CAUTION_KINDS,
   PERSON_SEXES,
   PLACEMENT_INTERACTIONS,
@@ -2379,6 +2381,190 @@ export const schemas = {
     sentenceMonths: { type: 'integer', required: false, min: 0, max: 216 },
     sentenceLivstid: { type: 'boolean', required: false },
     note: { type: 'string', required: false, max: 500 },
+  },
+
+  // ----------------------------------------------------- personnel (spec 7.22-7.24)
+
+  PersonnelRosterList: {
+    active: { type: 'boolean', required: false },
+    division: { type: 'string', required: false, max: 64 },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  PersonnelRosterGet: {
+    id: { type: 'integer', required: true, min: 1 },
+  },
+
+  PersonnelRosterUpdate: {
+    id: { type: 'integer', required: true, min: 1 },
+    badgeNumber: { type: 'string', required: false, max: 16 },
+    division: { type: 'string', required: false, max: 64 },
+  },
+
+  PersonnelShiftStart: {},
+  PersonnelShiftEnd: {},
+
+  PersonnelEquipmentAssign: {
+    officerId: { type: 'integer', required: true, min: 1 },
+    itemKey: { type: 'string', required: true, min: 1, max: 64 },
+    firearmId: { type: 'integer', required: false, min: 1 },
+    serial: { type: 'string', required: false, max: 64 },
+  },
+
+  PersonnelEquipmentReturn: {
+    id: { type: 'integer', required: true, min: 1 },
+    officerId: { type: 'integer', required: true, min: 1 },
+  },
+
+  PersonnelCertificationIssue: {
+    officerId: { type: 'integer', required: true, min: 1 },
+    certKey: { type: 'string', required: true, min: 1, max: 64 },
+    expiresAt: { type: 'integer', required: false, min: 0 },
+  },
+
+  PersonnelCertificationRevoke: {
+    id: { type: 'integer', required: true, min: 1 },
+    officerId: { type: 'integer', required: true, min: 1 },
+  },
+
+  PersonnelDisciplineList: {
+    officerId: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
+   * `summary` is the officer's own account of what is under review, capped
+   * generously (2000 in the schema) -- this is a case file, not a form field.
+   */
+  PersonnelDisciplineOpen: {
+    officerId: { type: 'integer', required: true, min: 1 },
+    category: { type: 'string', required: true, min: 1, max: 64 },
+    summary: { type: 'string', required: true, min: 1, max: 2000 },
+  },
+
+  PersonnelDisciplineClose: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    outcomeKey: { type: 'string', required: true, min: 1, max: 64 },
+  },
+
+  // ------------------------------------------------------------- booking (spec 7.9)
+
+  BookingList: {
+    open: { type: 'boolean', required: false },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  BookingGet: {
+    id: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
+   * Cell assignment on an open frihetsberövande chain. `personId` is never
+   * taken from input -- the route reads it off the frihet chain itself
+   * (invariant 1).
+   */
+  BookingBook: {
+    frihetId: { type: 'integer', required: true, min: 1 },
+    cell: { type: 'string', required: false, max: 32 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
+  /**
+   * `itemLabel` is free text -- an officer's own inventory note, never a
+   * locale key and never rendered through `t()` (invariant 6 does not apply
+   * to it; the module header explains why).
+   */
+  BookingPropertyAdd: {
+    bookingId: { type: 'integer', required: true, min: 1 },
+    itemLabel: { type: 'string', required: true, min: 1, max: 191 },
+    quantity: { type: 'integer', required: false, min: 1 },
+  },
+
+  BookingPropertyRelease: {
+    id: { type: 'integer', required: true, min: 1 },
+    bookingId: { type: 'integer', required: true, min: 1 },
+  },
+
+  BookingRelease: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    releaseReasonKey: { type: 'string', required: true, min: 1, max: 64 },
+  },
+
+  // -------------------------------------------------------------- impound (spec 7.15)
+
+  ImpoundList: {
+    held: { type: 'boolean', required: false },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  ImpoundGet: {
+    id: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
+   * `vehicleId` is never accepted here -- the server resolves it from `plate`
+   * against `fpd_vehicles` itself (invariant 1). `heldReasonKey` is checked
+   * against `Impound.isHeldReason` in the service, not just the schema.
+   */
+  ImpoundCreate: {
+    plate: { type: 'string', required: true, min: 1, max: 16 },
+    model: { type: 'string', required: false, max: 191 },
+    heldReasonKey: { type: 'enum', required: true, values: IMPOUND_HELD_REASONS },
+    feePerDay: { type: 'integer', required: false, min: 0 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
+  ImpoundAuthorize: {
+    id: { type: 'integer', required: true, min: 1 },
+  },
+
+  ImpoundRelease: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    feePaid: { type: 'boolean', required: true },
+  },
+
+  // -------------------------------------------------------- ordningsbot (spec 7.11)
+
+  OrdningsbotTariffList: {},
+
+  OrdningsbotList: {
+    status: { type: 'enum', required: false, values: ORDNINGSBOT_STATUSES },
+    limit: { type: 'integer', required: false, min: 1, max: 200 },
+  },
+
+  OrdningsbotGet: {
+    id: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
+   * `personId`/`vehicleId` are both optional at the schema level -- at least
+   * one is required, which `Ordningsbot.validateIssue` enforces (the schema
+   * cannot express "one of two fields", the same shape `CourtReferralDecide`
+   * is in for `brottIds`).
+   */
+  OrdningsbotIssue: {
+    tariffId: { type: 'integer', required: true, min: 1 },
+    personId: { type: 'integer', required: false, min: 1 },
+    vehicleId: { type: 'integer', required: false, min: 1 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
+  OrdningsbotVoid: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    voidReasonKey: { type: 'string', required: true, min: 1, max: 64 },
+  },
+
+  OrdningsbotContest: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+  },
+
+  OrdningsbotPay: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
   },
 
 } as const satisfies Record<string, Schema>;

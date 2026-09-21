@@ -1343,4 +1343,162 @@ FredPD.Schema = {
         sentenceLivstid = { type = 'boolean', required = false },
         note = { type = 'string', required = false, max = 500 },
     },
+
+    PersonnelRosterList = {
+        active = { type = 'boolean', required = false },
+        division = { type = 'string', required = false, max = 64 },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    PersonnelRosterGet = {
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
+    PersonnelRosterUpdate = {
+        id = { type = 'integer', required = true, min = 1 },
+        badgeNumber = { type = 'string', required = false, max = 16 },
+        division = { type = 'string', required = false, max = 64 },
+    },
+
+    PersonnelShiftStart = {
+
+    },
+
+    PersonnelShiftEnd = {
+
+    },
+
+    PersonnelEquipmentAssign = {
+        officerId = { type = 'integer', required = true, min = 1 },
+        itemKey = { type = 'string', required = true, min = 1, max = 64 },
+        firearmId = { type = 'integer', required = false, min = 1 },
+        serial = { type = 'string', required = false, max = 64 },
+    },
+
+    PersonnelEquipmentReturn = {
+        id = { type = 'integer', required = true, min = 1 },
+        officerId = { type = 'integer', required = true, min = 1 },
+    },
+
+    PersonnelCertificationIssue = {
+        officerId = { type = 'integer', required = true, min = 1 },
+        certKey = { type = 'string', required = true, min = 1, max = 64 },
+        expiresAt = { type = 'integer', required = false, min = 0 },
+    },
+
+    PersonnelCertificationRevoke = {
+        id = { type = 'integer', required = true, min = 1 },
+        officerId = { type = 'integer', required = true, min = 1 },
+    },
+
+    PersonnelDisciplineList = {
+        officerId = { type = 'integer', required = true, min = 1 },
+    },
+
+    PersonnelDisciplineOpen = {
+        officerId = { type = 'integer', required = true, min = 1 },
+        category = { type = 'string', required = true, min = 1, max = 64 },
+        summary = { type = 'string', required = true, min = 1, max = 2000 },
+    },
+
+    PersonnelDisciplineClose = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        outcomeKey = { type = 'string', required = true, min = 1, max = 64 },
+    },
+
+    BookingList = {
+        open = { type = 'boolean', required = false },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    BookingGet = {
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
+    BookingBook = {
+        frihetId = { type = 'integer', required = true, min = 1 },
+        cell = { type = 'string', required = false, max = 32 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    BookingPropertyAdd = {
+        bookingId = { type = 'integer', required = true, min = 1 },
+        itemLabel = { type = 'string', required = true, min = 1, max = 191 },
+        quantity = { type = 'integer', required = false, min = 1 },
+    },
+
+    BookingPropertyRelease = {
+        id = { type = 'integer', required = true, min = 1 },
+        bookingId = { type = 'integer', required = true, min = 1 },
+    },
+
+    BookingRelease = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        releaseReasonKey = { type = 'string', required = true, min = 1, max = 64 },
+    },
+
+    ImpoundList = {
+        held = { type = 'boolean', required = false },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    ImpoundGet = {
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
+    ImpoundCreate = {
+        plate = { type = 'string', required = true, min = 1, max = 16 },
+        model = { type = 'string', required = false, max = 191 },
+        heldReasonKey = { type = 'enum', required = true, values = { 'investigative', 'evidence', 'abandoned', 'dui', 'unregistered', 'other' } },
+        feePerDay = { type = 'integer', required = false, min = 0 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    ImpoundAuthorize = {
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
+    ImpoundRelease = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        feePaid = { type = 'boolean', required = true },
+    },
+
+    OrdningsbotTariffList = {
+
+    },
+
+    OrdningsbotList = {
+        status = { type = 'enum', required = false, values = { 'issued', 'paid', 'contested', 'void' } },
+        limit = { type = 'integer', required = false, min = 1, max = 200 },
+    },
+
+    OrdningsbotGet = {
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
+    OrdningsbotIssue = {
+        tariffId = { type = 'integer', required = true, min = 1 },
+        personId = { type = 'integer', required = false, min = 1 },
+        vehicleId = { type = 'integer', required = false, min = 1 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    OrdningsbotVoid = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        voidReasonKey = { type = 'string', required = true, min = 1, max = 64 },
+    },
+
+    OrdningsbotContest = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+    },
+
+    OrdningsbotPay = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+    },
 }
