@@ -52,6 +52,48 @@ local EFTER_SELECT <const> = [[
       JOIN fpd_persons p ON p.id = e.person_id
 ]]
 
+--- The same columns, minus `scope` and `verkstalld_note`.
+---
+--- A tvångsmedel list row is a line in a table: kind, target, ground and
+--- validity. Neither field is drawn there -- `Tvang.svelte` reads both only
+--- from `tvang.get`'s detail view -- so `tvang.list` fetching them is bytes
+--- read from every row in the agency's history to draw fifty that never show
+--- them, the same waste 0013 measured and fixed for `handelseforlopp`.
+local TVANG_LIST_SELECT <const> = [[
+    SELECT id, agency_id AS agencyId, number, kind,
+           target_kind AS targetKind, target_id AS targetId,
+           target_label AS targetLabel, fu_id AS fuId,
+           decided_by AS decidedBy, decider_kind AS deciderKind,
+           grund,
+           UNIX_TIMESTAMP(valid_from)    AS validFrom,
+           UNIX_TIMESTAMP(valid_until)   AS validUntil,
+           UNIX_TIMESTAMP(verkstalld_at) AS verkstalldAt,
+           verkstalld_by AS verkstalldBy,
+           UNIX_TIMESTAMP(upphavd_at)    AS upphavdAt,
+           upphavd_by AS upphavdBy,
+           classification, version
+      FROM fpd_tvangsmedel
+]]
+
+--- The same columns, minus `note`.
+---
+--- Mirrors `TVANG_LIST_SELECT` for the same reason: `Efterlysning.svelte`
+--- reads `note` only from the create form and the detail view, never a row.
+local EFTER_LIST_SELECT <const> = [[
+    SELECT e.id, e.agency_id AS agencyId, e.number, e.person_id AS personId,
+           e.grund, e.frihet_id AS frihetId, e.fu_id AS fuId,
+           e.priority,
+           e.issued_by AS issuedBy,
+           UNIX_TIMESTAMP(e.issued_at)    AS issuedAt,
+           UNIX_TIMESTAMP(e.expires_at)   AS expiresAt,
+           UNIX_TIMESTAMP(e.cancelled_at) AS cancelledAt,
+           e.cancelled_by AS cancelledBy, e.cancelled_grund AS cancelledGrund,
+           e.classification, e.version,
+           p.person_number AS personNumber
+      FROM fpd_efterlysning e
+      JOIN fpd_persons p ON p.id = e.person_id
+]]
+
 -- -----------------------------------------------------------------------------
 -- Tvångsmedel
 -- -----------------------------------------------------------------------------
@@ -111,7 +153,7 @@ function Repo.list(agencyId, filter, limit)
     values[#values + 1] = limit
 
     return FredPD.Core.db.query(
-        TVANG_SELECT .. ' WHERE ' .. table.concat(clauses, ' AND ')
+        TVANG_LIST_SELECT .. ' WHERE ' .. table.concat(clauses, ' AND ')
             .. ' ORDER BY created_at DESC LIMIT ?',
         values)
 end
@@ -236,7 +278,7 @@ function Repo.efterlysningList(agencyId, filter, limit)
     values[#values + 1] = limit
 
     return FredPD.Core.db.query(
-        EFTER_SELECT .. ' WHERE ' .. table.concat(clauses, ' AND ')
+        EFTER_LIST_SELECT .. ' WHERE ' .. table.concat(clauses, ' AND ')
             .. ' ORDER BY e.priority, e.issued_at DESC LIMIT ?',
         values)
 end
