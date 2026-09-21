@@ -76,6 +76,37 @@ export function isRefusal(value: unknown): value is FixtureRefusal {
   return typeof value === 'object' && value !== null && REFUSAL in value;
 }
 
+/**
+ * The mock's own cursor (spec 12.2) -- a plain offset into an already-sorted
+ * array, opaque to the NUI exactly the way the server's own keyset cursor is:
+ * the screen only ever sends back what it was given, never parses it. The
+ * server's cursor encodes sort-key values because it cannot re-run "the
+ * fiftieth row" without them; the mock holds the whole array already sorted,
+ * so an offset says the same thing with far less code.
+ *
+ * `?pageSize=` overrides the requested page size, so a Playwright test can
+ * walk a genuine multi-page "load more" flow without the fixture arrays
+ * needing 50+ rows each.
+ */
+function pageSizeOverride(): number | null {
+  if (typeof window === 'undefined') return null;
+
+  const raw = new URLSearchParams(window.location.search).get('pageSize');
+  if (raw === null) return null;
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function paginate<T>(all: T[], cursor: string | undefined, pageSize: number): { page: T[]; nextCursor: string | null } {
+  const effectivePageSize = pageSizeOverride() ?? pageSize;
+  const start = cursor ? Number.parseInt(cursor, 10) || 0 : 0;
+  const page = all.slice(start, start + effectivePageSize);
+  const nextCursor = start + effectivePageSize < all.length ? String(start + effectivePageSize) : null;
+
+  return { page, nextCursor };
+}
+
 export interface FixtureSet {
   ok: Record<string, Fixture>;
   fail: Record<string, FixtureFailure>;
@@ -3836,7 +3867,7 @@ export const fixtures: FixtureSet = {
     // ------------------------------------------------------ förundersökning
 
     'fu.list': (input) => {
-      const filter = (input ?? {}) as { status?: string; mine?: boolean };
+      const filter = (input ?? {}) as { status?: string; mine?: boolean; limit?: number; cursor?: string };
 
       const found = forundersokningar.filter(
         (row) =>
@@ -3844,7 +3875,12 @@ export const fixtures: FixtureSet = {
           (!filter.mine || row.fuLedare === FIXTURE_VIEWER),
       );
 
-      return { forundersokningar: [...found.map(fuRow), ...restrictedFu] };
+      const { page, nextCursor } = paginate(found, filter.cursor, filter.limit ?? 50);
+
+      return {
+        forundersokningar: [...page.map(fuRow), ...(filter.cursor ? [] : restrictedFu)],
+        nextCursor,
+      };
     },
 
     'fu.get': (input) => {
@@ -4054,18 +4090,25 @@ export const fixtures: FixtureSet = {
     },
 
     'query.log': (input) => {
-      const { limit } = (input ?? {}) as { mine?: boolean; limit?: number };
+      const { limit, cursor } = (input ?? {}) as { mine?: boolean; limit?: number; cursor?: string };
 
       // `mine` is decided on the server from the session and never from the
       // input, so the fixture has one officer's log and no way to ask for
       // somebody else's.
-      return { entries: queryLog.slice(0, limit ?? 50) };
+      const { page, nextCursor } = paginate(queryLog, cursor, limit ?? 50);
+
+      return { entries: page, nextCursor };
     },
 
     // --------------------------------------------------------- tvångsmedel
 
     'tvang.list': (input) => {
-      const filter = (input ?? {}) as { kind?: string; liveOnly?: boolean };
+      const filter = (input ?? {}) as {
+        kind?: string;
+        liveOnly?: boolean;
+        limit?: number;
+        cursor?: string;
+      };
 
       const found = tvangsmedel.filter(
         (row) =>
@@ -4073,8 +4116,11 @@ export const fixtures: FixtureSet = {
           (!filter.liveOnly || tvangLiveness(row).live),
       );
 
+      const { page, nextCursor } = paginate(found, filter.cursor, filter.limit ?? 50);
+
       return {
-        tvangsmedel: [...found.map((row) => tvangRow(row, false)), ...restrictedTvang],
+        tvangsmedel: [...page.map((row) => tvangRow(row, false)), ...(filter.cursor ? [] : restrictedTvang)],
+        nextCursor,
       };
     },
 
@@ -4183,7 +4229,12 @@ export const fixtures: FixtureSet = {
     // -------------------------------------------------------- efterlysning
 
     'efterlysning.list': (input) => {
-      const filter = (input ?? {}) as { grund?: string; includeCancelled?: boolean };
+      const filter = (input ?? {}) as {
+        grund?: string;
+        includeCancelled?: boolean;
+        limit?: number;
+        cursor?: string;
+      };
 
       const found = efterlysningar.filter(
         (row) =>
@@ -4191,8 +4242,11 @@ export const fixtures: FixtureSet = {
           (filter.includeCancelled || row.cancelledAgo === undefined),
       );
 
+      const { page, nextCursor } = paginate(found, filter.cursor, filter.limit ?? 50);
+
       return {
-        efterlysningar: [...found.map(efterlysningRow), ...restrictedEfterlysning],
+        efterlysningar: [...page.map(efterlysningRow), ...(filter.cursor ? [] : restrictedEfterlysning)],
+        nextCursor,
       };
     },
 
@@ -4256,7 +4310,12 @@ export const fixtures: FixtureSet = {
     // ------------------------------------------------------------- spaning
 
     'spaning.list': (input) => {
-      const filter = (input ?? {}) as { targetKind?: string; includeResolved?: boolean };
+      const filter = (input ?? {}) as {
+        targetKind?: string;
+        includeResolved?: boolean;
+        limit?: number;
+        cursor?: string;
+      };
 
       const found = spaningsuppdrag.filter(
         (row) =>
@@ -4264,8 +4323,11 @@ export const fixtures: FixtureSet = {
           (filter.includeResolved || (row.resolvedAgo === undefined && row.expiresAgo < 0)),
       );
 
+      const { page, nextCursor } = paginate(found, filter.cursor, filter.limit ?? 50);
+
       return {
-        spaningsuppdrag: [...found.map(spaningRow), ...restrictedSpaning],
+        spaningsuppdrag: [...page.map(spaningRow), ...(filter.cursor ? [] : restrictedSpaning)],
+        nextCursor,
       };
     },
 
@@ -5083,7 +5145,12 @@ export const fixtures: FixtureSet = {
      * pressed rather than after.
      */
     'anmalan.list': (input) => {
-      const filter = (input ?? {}) as { status?: string; mine?: boolean };
+      const filter = (input ?? {}) as {
+        status?: string;
+        mine?: boolean;
+        limit?: number;
+        cursor?: string;
+      };
 
       const found = anmalningar.filter(
         (row) =>
@@ -5091,13 +5158,16 @@ export const fixtures: FixtureSet = {
           (!filter.mine || row.createdBy === FIXTURE_VIEWER),
       );
 
+      const { page, nextCursor } = paginate(found, filter.cursor, filter.limit ?? 50);
+
       return {
         anmalningar: [
-          ...found.map(({ brott: _brott, personer: _personer, ...row }) => row),
+          ...page.map(({ brott: _brott, personer: _personer, ...row }) => row),
           // Appended rather than interleaved so the readable rows keep stable
           // positions in the tests that click them.
-          ...restrictedAnmalningar,
+          ...(filter.cursor ? [] : restrictedAnmalningar),
         ],
+        nextCursor,
       };
     },
 

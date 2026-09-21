@@ -63,7 +63,8 @@
     "cancel": "Cancel",
     "any": "Any",
     "search": "Search",
-    "save": "Save"
+    "save": "Save",
+    "loadMore": "Load more"
   },
   "fieldError": {
     "type": "the wrong kind of value",

@@ -103,19 +103,19 @@ route.define({
     perm = 'rms.anmalan.view',
     schema = 'AnmalanList',
     handler = function(session, input)
-        local rows = repo.list(session.agencyId, {
+        local rows, nextCursor = repo.list(session.agencyId, {
             status = input.status,
             -- `mine` is a filter the client asks for; the *identity* it filters
             -- on is the session's, never a field the client sent (invariant 1).
             createdBy = input.mine and session.discordId or nil,
             fuId = input.fuId,
             includeSupplements = input.includeSupplements,
-        }, input.limit or 50)
+        }, input.limit or 50, input.cursor)
 
         -- The access filter runs after the query and before the answer, which
         -- is invariant 4's order. A record above the reader's clearance is
         -- dropped or stubbed here, not hidden in the UI.
-        return { anmalningar = access.filterSearch(session, ANMALAN, rows) }
+        return { anmalningar = access.filterSearch(session, ANMALAN, rows), nextCursor = nextCursor }
     end,
 })
 
@@ -503,12 +503,12 @@ route.define({
     perm = 'inv.fu.view',
     schema = 'FuList',
     handler = function(session, input)
-        local rows = repo.fuList(session.agencyId, {
+        local rows, nextCursor = repo.fuList(session.agencyId, {
             status = input.status,
             fuLedare = input.mine and session.discordId or nil,
-        }, input.limit or 50)
+        }, input.limit or 50, input.cursor)
 
-        return { forundersokningar = access.filterSearch(session, FU, rows) }
+        return { forundersokningar = access.filterSearch(session, FU, rows), nextCursor = nextCursor }
     end,
 })
 
@@ -520,10 +520,15 @@ route.define({
         local allowed, refusal = readableFu(session, input.id)
         if not allowed then return refusal end
 
+        -- Parenthesized: `repo.list` now returns `rows, nextCursor`, and this
+        -- call site sits as `filterSearch`'s last argument, where Lua expands
+        -- every return value -- unparenthesized, `nextCursor` would land in
+        -- `filterSearch`'s own optional fourth parameter, `sharedAgencies`.
+        local underFu = (repo.list(session.agencyId, { fuId = allowed.id, includeSupplements = true }, 100))
+
         return {
             fu = allowed,
-            anmalningar = access.filterSearch(session, ANMALAN,
-                repo.list(session.agencyId, { fuId = allowed.id, includeSupplements = true }, 100)),
+            anmalningar = access.filterSearch(session, ANMALAN, underFu),
         }
     end,
 })

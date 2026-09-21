@@ -4,6 +4,7 @@
   import { formatMoment } from '../../lib/time';
   import { fieldList, type Failure } from '../shared/failure';
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
+  import LoadMore from '../shared/LoadMore.svelte';
   import { isStub, type Maybe, type Moment, type Restricted } from './types';
 
   /**
@@ -113,6 +114,11 @@
   let authority = $state({ reason: '', caseNumber: '' });
   let response = $state<QueryResponse | null>(null);
   let log = $state<LogEntry[]>([]);
+  let logCursor = $state<string | null>(null);
+
+  function loadMoreLog(): void {
+    void loadLog(false);
+  }
   let showLog = $state(false);
   let failure = $state<Failure | null>(null);
   let busy = $state(false);
@@ -226,16 +232,22 @@
     }
   }
 
-  async function loadLog(): Promise<void> {
+  async function loadLog(reset = true): Promise<void> {
     busy = true;
 
     // `mine` only. The agency-wide view is the misuse-investigation read and
     // sits behind `query.log.view`; asking for it here would refuse for most
     // officers and teach them the button is broken.
-    const answer = await nui.call<{ entries: LogEntry[] }>('query.log', { mine: true, limit: 25 });
+    const answer = await nui.call<{ entries: LogEntry[]; nextCursor?: string | null }>('query.log', {
+      mine: true,
+      limit: 25,
+      cursor: reset ? undefined : (logCursor ?? undefined),
+    });
 
     if (answer.ok) {
-      log = answer.data.entries ?? [];
+      const page = answer.data.entries ?? [];
+      log = reset ? page : [...log, ...page];
+      logCursor = answer.data.nextCursor ?? null;
       showLog = true;
       failure = null;
     } else {
@@ -567,6 +579,7 @@
             </tbody>
           </table>
         </div>
+        <LoadMore nextCursor={logCursor} {busy} loadMore={loadMoreLog} />
       {/if}
     </section>
   {/if}

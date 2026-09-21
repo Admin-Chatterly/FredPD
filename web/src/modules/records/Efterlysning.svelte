@@ -5,6 +5,7 @@
   import { EFTERLYSNING_GRUNDER } from '@fredpd/schema';
   import { fieldList, type Failure } from '../shared/failure';
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
+  import LoadMore from '../shared/LoadMore.svelte';
   import { isStub, type Maybe, type Restricted } from './types';
 
   /**
@@ -66,6 +67,7 @@
   const DAY = 86400;
 
   let rows = $state<Maybe<EfterlysningRow>[]>([]);
+  let nextCursor = $state<string | null>(null);
   let failure = $state<Failure | null>(null);
   let busy = $state(false);
   let includeCancelled = $state(false);
@@ -109,26 +111,33 @@
     trigger?.focus();
   }
 
-  async function load(): Promise<void> {
+  async function load(reset = true): Promise<void> {
     busy = true;
 
-    const response = await nui.call<{ efterlysningar: Maybe<EfterlysningRow>[] }>(
-      'efterlysning.list',
-      {
-        grund: grundFilter || undefined,
-        includeCancelled: includeCancelled || undefined,
-        limit: 50,
-      },
-    );
+    const response = await nui.call<{
+      efterlysningar: Maybe<EfterlysningRow>[];
+      nextCursor?: string | null;
+    }>('efterlysning.list', {
+      grund: grundFilter || undefined,
+      includeCancelled: includeCancelled || undefined,
+      limit: 50,
+      cursor: reset ? undefined : (nextCursor ?? undefined),
+    });
 
     if (response.ok) {
-      rows = response.data.efterlysningar ?? [];
+      const page = response.data.efterlysningar ?? [];
+      rows = reset ? page : [...rows, ...page];
+      nextCursor = response.data.nextCursor ?? null;
       failure = null;
     } else {
       failure = response;
     }
 
     busy = false;
+  }
+
+  function loadMore(): void {
+    void load(false);
   }
 
   async function issue(event: SubmitEvent): Promise<void> {
@@ -452,6 +461,7 @@
           </tbody>
         </table>
       </div>
+      <LoadMore {nextCursor} {busy} {loadMore} />
     {/if}
   </div>
 </div>

@@ -63,7 +63,8 @@
     "cancel": "Avbryt",
     "any": "Alla",
     "search": "Sök",
-    "save": "Spara"
+    "save": "Spara",
+    "loadMore": "Visa fler"
   },
   "fieldError": {
     "type": "fel typ av värde",

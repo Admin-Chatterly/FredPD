@@ -59,6 +59,7 @@ server_scripts {
     'server/core/push.lua',
     'server/core/placements.lua',
     'server/core/counters.lua',
+    'server/core/pagination.lua',
     'server/core/route.lua',
     -- The gateway outbox (spec 3.7). After `core/db.lua`, which it reads;
     -- physically under `server/bridges/gateway/` alongside the rest of the

@@ -852,6 +852,7 @@ FredPD.Schema = {
         discordId = { type = 'string', required = false, max = 32 },
         queryType = { type = 'string', required = false, max = 16 },
         limit = { type = 'integer', required = false, min = 1, max = 200 },
+        cursor = { type = 'string', required = false, max = 64 },
     },
 
     ForensicsObserve = {
@@ -1043,6 +1044,7 @@ FredPD.Schema = {
         fuId = { type = 'integer', required = false, min = 1 },
         includeSupplements = { type = 'boolean', required = false },
         limit = { type = 'integer', required = false, min = 1, max = 200 },
+        cursor = { type = 'string', required = false, max = 64 },
     },
 
     AnmalanGet = {
@@ -1096,6 +1098,7 @@ FredPD.Schema = {
         status = { type = 'enum', required = false, values = { 'inledd', 'slutdelgiven', 'redovisad', 'nedlagd' } },
         mine = { type = 'boolean', required = false },
         limit = { type = 'integer', required = false, min = 1, max = 200 },
+        cursor = { type = 'string', required = false, max = 64 },
     },
 
     FuGet = {
@@ -1170,6 +1173,7 @@ FredPD.Schema = {
         fuId = { type = 'integer', required = false, min = 1 },
         liveOnly = { type = 'boolean', required = false },
         limit = { type = 'integer', required = false, min = 1, max = 200 },
+        cursor = { type = 'string', required = false, max = 64 },
     },
 
     TvangGet = {
@@ -1202,6 +1206,7 @@ FredPD.Schema = {
         grund = { type = 'enum', required = false, values = { 'anhallen_i_franvaro', 'haktad_i_franvaro', 'delgivning', 'forsvunnen', 'oidentifierad', 'annan' } },
         includeCancelled = { type = 'boolean', required = false },
         limit = { type = 'integer', required = false, min = 1, max = 200 },
+        cursor = { type = 'string', required = false, max = 64 },
     },
 
     EfterlysningCreate = {
@@ -1226,6 +1231,7 @@ FredPD.Schema = {
         priority = { type = 'integer', required = false, min = 1, max = 4 },
         includeResolved = { type = 'boolean', required = false },
         limit = { type = 'integer', required = false, min = 1, max = 200 },
+        cursor = { type = 'string', required = false, max = 64 },
     },
 
     SpaningGet = {

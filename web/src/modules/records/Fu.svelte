@@ -5,6 +5,7 @@
   import { FU_STATUSES, FU_LEDARE_KINDS } from '@fredpd/schema';
   import { fieldList, type Failure } from '../shared/failure';
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
+  import LoadMore from '../shared/LoadMore.svelte';
   import { isStub, type Maybe, type Moment, type Restricted } from './types';
 
   /**
@@ -85,6 +86,7 @@
   ];
 
   let rows = $state<Maybe<FuRow>[]>([]);
+  let nextCursor = $state<string | null>(null);
   let detail = $state<{ fu: FuRow; anmalningar: Maybe<AnmalanRow>[] } | null>(null);
   let failure = $state<Failure | null>(null);
   let busy = $state(false);
@@ -128,23 +130,33 @@
     trigger?.focus();
   }
 
-  async function load(): Promise<void> {
+  async function load(reset = true): Promise<void> {
     busy = true;
 
-    const response = await nui.call<{ forundersokningar: Maybe<FuRow>[] }>('fu.list', {
-      status: statusFilter || undefined,
-      mine: mine || undefined,
-      limit: 50,
-    });
+    const response = await nui.call<{ forundersokningar: Maybe<FuRow>[]; nextCursor?: string | null }>(
+      'fu.list',
+      {
+        status: statusFilter || undefined,
+        mine: mine || undefined,
+        limit: 50,
+        cursor: reset ? undefined : (nextCursor ?? undefined),
+      },
+    );
 
     if (response.ok) {
-      rows = response.data.forundersokningar ?? [];
+      const page = response.data.forundersokningar ?? [];
+      rows = reset ? page : [...rows, ...page];
+      nextCursor = response.data.nextCursor ?? null;
       failure = null;
     } else {
       failure = response;
     }
 
     busy = false;
+  }
+
+  function loadMore(): void {
+    void load(false);
   }
 
   async function open(id: number): Promise<void> {
@@ -408,6 +420,7 @@
             </tbody>
           </table>
         </div>
+        <LoadMore {nextCursor} {busy} {loadMore} />
       {/if}
     </div>
 

@@ -76,7 +76,12 @@ local ANMALAN_LIST_SELECT <const> = [[
            returned_by AS returnedBy, returned_at AS returnedAt,
            returned_note AS returnedNote,
            approved_by AS approvedBy, approved_at AS approvedAt,
-           classification, version, updated_at AS updatedAt
+           classification, version, updated_at AS updatedAt,
+           -- Cursor-only. `created_at` above is a DATETIME string, the shape
+           -- this list has always sent; the keyset comparison needs a plain
+           -- integer, and this column exists for that alone -- stripped off
+           -- every row before it leaves `Repo.list` (spec 12.2).
+           UNIX_TIMESTAMP(created_at) AS createdAtEpoch
       FROM fpd_anmalan
 ]]
 
@@ -87,7 +92,12 @@ local FU_SELECT <const> = [[
            opened_by AS openedBy, opened_at AS openedAt,
            closed_by AS closedBy, closed_at AS closedAt,
            closed_reason AS closedReason, closed_note AS closedNote,
-           classification, version, updated_at AS updatedAt
+           classification, version, updated_at AS updatedAt,
+           -- Cursor-only, for `Repo.fuList`'s keyset WHERE and nothing else
+           -- (spec 12.2) -- the same reasoning `ANMALAN_LIST_SELECT`'s own
+           -- `createdAtEpoch` gives, except FU has no separate list SELECT to
+           -- keep it off of `fu.get`'s response, so it rides along there too.
+           UNIX_TIMESTAMP(opened_at) AS openedAtEpoch
       FROM fpd_forundersokning
 ]]
 
@@ -124,7 +134,12 @@ end
 --- route, through `access.filterSearch` -- which is invariant 4's order, not a
 --- convenience: a LIMIT applied before the access filter would return a short
 --- page and tell the reader there was no more.
-function Repo.list(agencyId, filter, limit)
+--- Keyset-paginated on `(created_at, id)` descending (spec 12.2).
+---
+--- @param cursor string|nil the previous page's `nextCursor`
+--- @return table rows
+--- @return string|nil nextCursor set only when a further page exists
+function Repo.list(agencyId, filter, limit, cursor)
     local clauses = { 'agency_id = ?' }
     local values = { agencyId }
 
@@ -150,12 +165,31 @@ function Repo.list(agencyId, filter, limit)
         clauses[#clauses + 1] = 'parent_id IS NULL'
     end
 
-    values[#values + 1] = limit
+    local after = FredPD.Core.pagination.decode(cursor, 2)
+    if after then
+        clauses[#clauses + 1] =
+            '(UNIX_TIMESTAMP(created_at) < ? OR (UNIX_TIMESTAMP(created_at) = ? AND id < ?))'
+        values[#values + 1], values[#values + 1], values[#values + 1] = after[1], after[1], after[2]
+    end
 
-    return FredPD.Core.db.query(
+    values[#values + 1] = limit + 1
+
+    local rows = FredPD.Core.db.query(
         ANMALAN_LIST_SELECT .. ' WHERE ' .. table.concat(clauses, ' AND ')
-            .. ' ORDER BY created_at DESC LIMIT ?',
+            .. ' ORDER BY created_at DESC, id DESC LIMIT ?',
         values)
+
+    local nextCursor = nil
+    if #rows > limit then
+        rows[limit + 1] = nil
+        local last = rows[limit]
+        nextCursor = FredPD.Core.pagination.encode({ last.createdAtEpoch, last.id })
+    end
+
+    -- `createdAtEpoch` was only ever for the line above.
+    for index = 1, #rows do rows[index].createdAtEpoch = nil end
+
+    return rows, nextCursor
 end
 
 --- The tilläggsuppgifter under one anmälan.
@@ -465,7 +499,12 @@ function Repo.fuById(id, agencyId)
         FU_SELECT .. ' WHERE id = ? AND agency_id = ?', { id, agencyId })
 end
 
-function Repo.fuList(agencyId, filter, limit)
+--- Keyset-paginated on `(opened_at, id)` descending (spec 12.2).
+---
+--- @param cursor string|nil the previous page's `nextCursor`
+--- @return table rows
+--- @return string|nil nextCursor set only when a further page exists
+function Repo.fuList(agencyId, filter, limit, cursor)
     local clauses = { 'agency_id = ?' }
     local values = { agencyId }
 
@@ -479,12 +518,28 @@ function Repo.fuList(agencyId, filter, limit)
         values[#values + 1] = filter.fuLedare
     end
 
-    values[#values + 1] = limit
+    local after = FredPD.Core.pagination.decode(cursor, 2)
+    if after then
+        clauses[#clauses + 1] =
+            '(UNIX_TIMESTAMP(opened_at) < ? OR (UNIX_TIMESTAMP(opened_at) = ? AND id < ?))'
+        values[#values + 1], values[#values + 1], values[#values + 1] = after[1], after[1], after[2]
+    end
 
-    return FredPD.Core.db.query(
+    values[#values + 1] = limit + 1
+
+    local rows = FredPD.Core.db.query(
         FU_SELECT .. ' WHERE ' .. table.concat(clauses, ' AND ')
-            .. ' ORDER BY opened_at DESC LIMIT ?',
+            .. ' ORDER BY opened_at DESC, id DESC LIMIT ?',
         values)
+
+    local nextCursor = nil
+    if #rows > limit then
+        rows[limit + 1] = nil
+        local last = rows[limit]
+        nextCursor = FredPD.Core.pagination.encode({ last.openedAtEpoch, last.id })
+    end
+
+    return rows, nextCursor
 end
 
 --- Opens a förundersökning, number allocated under the counter lock.

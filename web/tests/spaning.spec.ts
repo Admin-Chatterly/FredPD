@@ -159,6 +159,40 @@ test('draws a lookout it may not open as a restricted row', async ({ page }) => 
   await expect(page.getByText('Restricted record — Contact Homicide')).toBeVisible();
 });
 
+test('loads the next page of lookouts with the load-more control', async ({ page }) => {
+  // `?pageSize=1` walks a genuine multi-page flow off the two live fixture
+  // rows without needing fifty of them (spec 12.2).
+  await page.goto('/?pageSize=1');
+  await page.locator('nav').first().getByRole('button', { name: 'Records' }).click();
+  await page.getByRole('button', { name: 'Lookouts', exact: true }).click();
+
+  await expect(page.getByRole('button', { name: 'S26-00042' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'S26-00041' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Load more' }).click();
+
+  await expect(page.getByRole('button', { name: 'S26-00041' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Load more' })).toHaveCount(0);
+});
+
+test('searching again drops the pages already loaded', async ({ page }) => {
+  await page.goto('/?pageSize=1');
+  await page.locator('nav').first().getByRole('button', { name: 'Records' }).click();
+  await page.getByRole('button', { name: 'Lookouts', exact: true }).click();
+
+  await page.getByRole('button', { name: 'Load more' }).click();
+  await expect(page.getByRole('button', { name: 'S26-00041' })).toBeVisible();
+
+  // Widening the filter and searching again is a fresh first page, not a
+  // third page appended to what load-more already fetched.
+  await page.getByLabel('Include closed lookouts').check();
+  await page.getByRole('button', { name: 'Search' }).click();
+
+  await expect(page.getByRole('button', { name: 'S26-00042' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'S26-00041' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'S26-00033' })).toHaveCount(0);
+});
+
 test('renders the lookout tab in Swedish', async ({ page }) => {
   await page.goto('/?locale=sv');
 
