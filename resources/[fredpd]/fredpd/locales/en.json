@@ -690,7 +690,7 @@
     "flag": {
       "stolen": "Stolen",
       "wanted": "Wanted",
-      "bolo": "BOLO",
+      "bolo": "Lookout notice",
       "impounded": "Impounded",
       "evidence_hold": "Evidence hold",
       "uninsured": "Uninsured"
@@ -1480,7 +1480,7 @@
       "fromCall": "From call {number}"
     },
     "broadcastKind": {
-      "bolo": "BOLO",
+      "bolo": "Lookout notice",
       "attempt_to_locate": "Attempt to locate",
       "all_units": "All units",
       "information": "Information"
@@ -1581,7 +1581,7 @@
       "stolen_vehicle": "Stolen vehicle",
       "wanted_person": "Wanted person",
       "warrant": "Warrant",
-      "bolo": "BOLO",
+      "bolo": "Lookout notice",
       "investigation": "Investigation",
       "other": "Other"
     }
@@ -2162,7 +2162,7 @@
       "annan": "Other"
     },
     "column": {
-      "number": "Diarienummer",
+      "number": "Reference",
       "target": "Directed at",
       "method": "Method",
       "status": "Status",
@@ -2239,7 +2239,7 @@
       "pending": "Awaiting disposition"
     },
     "column": {
-      "number": "Diarienummer",
+      "number": "Reference",
       "fu": "Investigation",
       "beslut": "Decision",
       "disposition": "Disposition",

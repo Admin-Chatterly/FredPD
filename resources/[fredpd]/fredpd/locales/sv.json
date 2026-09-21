@@ -1480,7 +1480,7 @@
       "fromCall": "Från händelse {number}"
     },
     "broadcastKind": {
-      "bolo": "Spaningsuppdrag",
+      "bolo": "Spaningsmeddelande",
       "attempt_to_locate": "Eftersök",
       "all_units": "Till alla enheter",
       "information": "Information"
@@ -1581,7 +1581,7 @@
       "stolen_vehicle": "Stulet fordon",
       "wanted_person": "Efterlyst person",
       "warrant": "Efterlysning",
-      "bolo": "Spaningsuppdrag",
+      "bolo": "Spaningsmeddelande",
       "investigation": "Utredning",
       "other": "Övrigt"
     }
