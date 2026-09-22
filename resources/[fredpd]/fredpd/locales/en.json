@@ -46,7 +46,7 @@
     "internal": "Something went wrong on the server. The error has been logged."
   },
   "setup": {
-    "done": "FredPD is set up. {agency} created; the Discord role {role} now grants administration.",
+    "done": "FredPD is set up. {agency} created; the Discord role {role} now grants administration and basic officer access.",
     "alreadyDone": "FredPD is already set up. Manage permissions from Administration in the MDT.",
     "busy": "Setup is already running. Wait a moment and try again.",
     "badCode": "Wrong setup code. It is printed in the server console when the resource starts.",

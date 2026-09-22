@@ -52,7 +52,20 @@ function Admin.codeMatches(given, expected)
 end
 
 --- The statements first-run setup writes: the agency, the first officer, and
---- that officer's Discord roles mapped to `admin`.
+--- that officer's Discord roles mapped to `admin` -- and, on the same roles,
+--- to `patrol_basic`.
+---
+--- The second mapping is load-bearing, not a convenience. `admin` deliberately
+--- does not inherit `patrol_basic` (spec 4.3: administering the system is not
+--- the same as being cleared to read records), and every route that maps a
+--- Discord role to a group refuses to grant more than the caller already
+--- holds (`admin.rolemap.create`'s escalation check, and the same guard on the
+--- group editor). Without this, the very first administrator -- the only
+--- account that exists yet -- could never grant `patrol_basic` to anyone,
+--- themselves included: there would be no in-game path to it at all, only a
+--- direct SQL insert. Bootstrap is the one moment that check does not apply
+--- (there is nothing yet to escalate past), so it is the one place this can be
+--- fixed for good.
 ---
 --- Returns statements rather than running them, so what setup would write can
 --- be asserted on without a database.
@@ -65,7 +78,7 @@ end
 ---
 --- @param agency table { id, name, shortName, accentColor }
 --- @param officer table { discordId, identifier, callsign, name }
---- @param roleIds table Discord role ids to map to `admin`
+--- @param roleIds table Discord role ids to map to `admin` and `patrol_basic`
 --- @return table list of { query, values }
 function Admin.bootstrapStatements(agency, officer, roleIds)
     local statements = {
@@ -97,6 +110,15 @@ function Admin.bootstrapStatements(agency, officer, roleIds)
             query = [[INSERT IGNORE INTO fpd_role_map
                           (discord_role_id, discord_role_name, group_key, agency_id, created_by)
                       VALUES (?, NULL, 'admin', ?, ?)]],
+            values = { roleIds[index], agency.id, officer.discordId },
+        }
+
+        -- Same role, same agency, `patrol_basic` instead of `admin` -- see the
+        -- function comment for why this has to happen here.
+        statements[#statements + 1] = {
+            query = [[INSERT IGNORE INTO fpd_role_map
+                          (discord_role_id, discord_role_name, group_key, agency_id, created_by)
+                      VALUES (?, NULL, 'patrol_basic', ?, ?)]],
             values = { roleIds[index], agency.id, officer.discordId },
         }
     end

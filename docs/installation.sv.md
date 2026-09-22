@@ -215,7 +215,17 @@ Välj **en** roll och kör `fredpd_setup <spelar-id> 1284…0021`, eller i spele
 
 Då skapas myndigheten, du läggs in i personalregistret med det Discord-ID FiveM
 redan känner dig som, knuten till den karaktär du står på, och den valda rollen
-kopplas till `admin`-gruppen.
+kopplas till **både** `admin`-gruppen och `patrol_basic`.
+
+Den andra kopplingen är inte en bonus — den är nödvändig. `admin` ärver
+medvetet inte `patrol_basic` (avsnitt 3, "att administrera är inte samma sak
+som att vara behörig att läsa register"), och varje vanlig koppling som görs
+sedan (från Administration i MDT:n) vägrar ge bort mer än den som kopplar
+redan själv har. Utan den här andra raden skulle den första administratören
+aldrig kunna nå `patrol_basic` i spelet — inte åt sig själv och inte åt någon
+annan — utan att gå via SQL. Nu kan du öppna MDT:n direkt efter uppstarten och
+dela ut `patrol_basic` (eller vad du vill) till fler roller från Administration
+själv.
 
 Koden skrivs bara ut i serverkonsolen. Det är hela poängen: på en publik server
 ska inte den första som gissar kommandot bli administratör.

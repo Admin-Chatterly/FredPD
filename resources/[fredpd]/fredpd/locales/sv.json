@@ -46,7 +46,7 @@
     "internal": "Något gick fel på servern. Felet har loggats."
   },
   "setup": {
-    "done": "FredPD är klart. {agency} skapad; Discord-rollen {role} ger nu administration.",
+    "done": "FredPD är klart. {agency} skapad; Discord-rollen {role} ger nu administration och grundläggande polisbehörighet.",
     "alreadyDone": "FredPD är redan uppsatt. Hantera behörigheter under Administration i MDT:n.",
     "busy": "Uppstarten pågår redan. Vänta ett ögonblick och försök igen.",
     "badCode": "Fel uppstartskod. Den skrivs ut i serverkonsolen när resursen startar.",

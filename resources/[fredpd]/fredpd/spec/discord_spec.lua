@@ -198,13 +198,22 @@ describe('setup', function()
             name = 'A. Lindqvist',
         }
 
-        it('creates the agency, the officer, and one mapping per role', function()
+        it('creates the agency, the officer, and two mappings per role', function()
             local statements = admin.bootstrapStatements(agency, officer, { '111' })
 
-            assert.are.equal(3, #statements)
+            assert.are.equal(4, #statements)
             assert.is_truthy(statements[1].query:find('fpd_agencies'))
             assert.is_truthy(statements[2].query:find('fpd_officers'))
             assert.is_truthy(statements[3].query:find('fpd_role_map'))
+            assert.is_truthy(statements[4].query:find('fpd_role_map'))
+        end)
+
+        it('maps a second role to both groups too', function()
+            -- Two roles, two groups each: the agency and officer rows are
+            -- still written once, and every role gets both mappings.
+            local statements = admin.bootstrapStatements(agency, officer, { '111', '222' })
+
+            assert.are.equal(6, #statements)
         end)
 
         it('binds the officer to the character they are on', function()
@@ -227,9 +236,21 @@ describe('setup', function()
             assert.is_truthy(statements[3].query:find("'admin'"))
         end)
 
+        it('maps the same role to patrol_basic right after', function()
+            -- Spec 4.3: `admin` does not inherit `patrol_basic`, and every
+            -- ordinary rolemap write refuses to grant more than the caller
+            -- already holds -- so the very first administrator could never
+            -- reach `patrol_basic` in game without this second mapping.
+            local statements = admin.bootstrapStatements(agency, officer, { '111' })
+
+            assert.are.same({ '111', 'lspd', '900' }, statements[4].values)
+            assert.is_truthy(statements[4].query:find("'patrol_basic'"))
+        end)
+
         it('is parameterized throughout', function()
-            -- Invariant 8. The only literal in these statements is the group
-            -- key 'admin', which is a constant and never comes from input.
+            -- Invariant 8. The only literals in these statements are the group
+            -- keys 'admin' and 'patrol_basic', both constants and never from
+            -- input.
             local statements = admin.bootstrapStatements(agency, officer, { '111' })
 
             for index = 1, #statements do

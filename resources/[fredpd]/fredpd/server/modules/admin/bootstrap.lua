@@ -75,6 +75,8 @@ end
 
 --- @param src number server id of the player who will become the administrator
 --- @param roleId string the one Discord role that will grant administration
+---   and, on the same role, basic officer access (patrol_basic; see
+---   `Admin.bootstrapStatements`)
 local function perform(src, roleId)
     local discordId = FredPD.Bridge.framework.getDiscordId(src)
 
@@ -169,7 +171,7 @@ local function perform(src, roleId)
 
     setupCode = nil
 
-    print(('[fredpd] setup complete: agency %s, first administrator %s, Discord role %s grants admin')
+    print(('[fredpd] setup complete: agency %s, first administrator %s, Discord role %s grants admin and patrol_basic')
         :format(agency.id, discordId, roleId))
 
     return true, 'setup.done', { agency = agency.name, role = roleId }
@@ -183,6 +185,8 @@ end
 ---
 --- @param src number server id of the player who will become the administrator
 --- @param roleId string the one Discord role that will grant administration
+---   and, on the same role, basic officer access (patrol_basic; see
+---   `Admin.bootstrapStatements`)
 --- @return boolean ok
 --- @return string localeKey describing what happened
 --- @return table|nil params for the locale string
