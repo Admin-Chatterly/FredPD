@@ -14,6 +14,35 @@ finns i [`handbok.sv.md`](handbok.sv.md).
 
 ---
 
+## 0. Snabblista
+
+Den korta versionen, om du bara vill ha ordningen på stegen. Varje punkt
+länkar till sitt eget avsnitt nedan.
+
+1. **Kopiera** `resources/[fredpd]/fredpd` till servern och bygg gränssnittet
+   ([avsnitt 2](#2-steg-1--hämta-och-bygg)).
+2. **Köra SQL:en** — `database/combined/fredpd_all.sql` i ett svep, eller
+   migrationerna en och en ([avsnitt 3](#3-steg-2--databas)).
+3. **Lägg till resursen** i `server.cfg` ([avsnitt 4](#4-steg-3--servercfg)).
+4. **Fyll i `config/server.lua`** — Discord-token, guild-ID, myndighet
+   ([avsnitt 5](#5-steg-4--konfigurationsfilen)). Testar du bara lokalt kan du
+   hoppa över Discord helt just nu — se rutan om jobb-fallbacken i samma
+   avsnitt.
+5. **Starta resursen och kör uppstartskommandot** i spelet eller konsolen
+   ([avsnitt 6](#6-steg-5--uppstart)). Det gör dig till första administratör.
+6. **Lägg in fordon i fordonsdepån** ([avsnitt 7](#7-steg-6--fordonsflottan))
+   och **placera ut terminaler i världen**
+   ([avsnitt 8](#8-steg-7--placera-ut-systemet-i-världen)).
+7. **Koppla resten av rollerna** till behörighetsgrupper från
+   Administration → Discord-roller ([avsnitt 9](#9-steg-8--resten-av-rollerna)).
+
+Kör du fast — session öppnas inte, MDT:n visar fel, en roll ger inte det den
+ska — gå direkt till [avsnitt 10, Felsökning](#10-felsökning), eller kör
+`fredpd_superuser <spelar-id>` i konsolen för att alltid komma in
+([avsnitt 9b](#9b-nödåtkomst--superuser-från-konsolen)).
+
+---
+
 ## 1. Krav
 
 ### På spelservern
@@ -179,6 +208,18 @@ en server som inte startar.
 anropar den aldrig. Rollsynken sköts numera av resursen själv (ADR-010). Node
 behövs bara för att *bygga* gränssnittet, inte för att köra det.
 
+### Testa lokalt utan Discord ännu
+
+Har du inte satt upp Discord-botten än — vanligast på en lokal testserver —
+lämna `discord.token`/`discord.guildId` tomma. FredPD:s behörigheter kommer
+fortfarande bara från Discord-roller (invariant 2) i alla andra lägen, men så
+länge Discord *inte* är ifyllt alls faller `discord.localJobFallback` in:
+håller karaktären ESX-jobbet där (`'police'` som standard) får den samma
+behörigheter som gruppen `patrol_basic` — nog för att öppna register och se
+gränssnittet fungera, aldrig Administration. Sätt värdet till `''` för att
+stänga av det helt. Fyll i Discord-uppgifterna senare och fallbacken
+försvinner av sig själv.
+
 ---
 
 ## 6. Steg 5 — Uppstart
@@ -336,19 +377,28 @@ som inte beror på att MDT:n fungerar: `fredpd_superuser`, körd i
 **serverkonsolen** — ingenting i spelet kan nå den, med avsikt.
 
 ```
-fredpd_superuser <spelar-id>                  -- listar spelarens Discord-roller
-fredpd_superuser <spelar-id> <roll-id>         -- ger rollen gruppen superuser
-fredpd_superuser_list                          -- visar vilka roller som har superuser
-fredpd_superuser_revoke <roll-id>               -- tar bort superuser från rollen
+fredpd_superuser <spelar-id>                    -- ger superuser direkt och permanent, ingen Discord krävs
+fredpd_superuser <spelar-id> <roll-id>           -- ger även rollen gruppen superuser (kräver Discord)
+fredpd_superuser_roles <spelar-id>               -- listar spelarens Discord-roller, för att välja ett roll-ID
+fredpd_superuser_list                            -- visar vilka som har superuser just nu
+fredpd_superuser_revoke <spelar-id | discord-id>  -- tar bort superuser
 ```
 
+`superuser` sätts som en flagga på personalraden (`fpd_officers.superuser`),
+inte som en Discord-roll — det är skillnaden mot tidigare version av det här
+kommandot. Den håller därför **permanent**, oavsett om Discord-botten senare
+går ner, tappar sin token, eller aldrig konfigureras alls: `Session.open`
+läser flaggan direkt och behöver ingen Discord-rollsnapshot för den. Det andra
+formet (med ett roll-ID) fungerar bara när Discord är konfigurerat och verifierar
+rollen live innan den kopplas — men den permanenta flaggan sätts ändå, så att
+tappa eller ta bort den rollen i efterhand ändrar inte grantet.
+
 `superuser` är inte ett steg ovanför `command` eller `admin` i den vanliga
-behörighetstrappan — det är en enda grupp med ett enda tillstånd, det
-bokstavliga jokertecknet `*`, som `Perms.satisfies` känner igen som "vad som än
-frågas efter". Den kan bara nås via den här kommandot: att koppla en roll till
-`superuser` via Administration eller gruppredigeraren vägras av samma skäl som
-allt annat man inte redan själv har (se steg 9 ovan) — ingen kommer åt den utan
-att redan ha den, förutom via konsolen.
+behörighetstrappan — det är ett enda jokertecken, `*`, som `Perms.satisfies`
+känner igen som "vad som än frågas efter". Att koppla en roll till `superuser`
+via Administration eller gruppredigeraren vägras av samma skäl som allt annat
+man inte redan själv har (se steg 9 ovan) — ingen kommer åt den utan att redan
+ha den, förutom via konsolen.
 
 Precis som `fredpd_setup` slår `fredpd_superuser` igenom omedelbart: ingen
 omstart, ingen omanslutning krävs.

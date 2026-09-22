@@ -780,7 +780,7 @@
     },
     "field": {
       "term": "Sök",
-      "termPlaceholder": "Namn, regnummer, chassinummer, vapennummer, telefon eller adress",
+      "termPlaceholder": "Namn, regnummer, chassinummer, vapennummer, telefon eller adress — eller lämna tomt och välj register nedan",
       "type": "Register",
       "typeDerive": "Avgör utifrån söktermen",
       "hit": "Träff",
@@ -906,7 +906,7 @@
       },
       "search": {
         "term": "Serienummer",
-        "termPlaceholder": "Ett serienummer eller början av ett"
+        "termPlaceholder": "Valfri del av serienumret, eller lämna tomt för att lista alla"
       },
       "status": {
         "submit": "Registrera status",
@@ -1013,7 +1013,7 @@
       "photos": "Fotografier",
       "search": {
         "term": "Namn, alias eller registernummer",
-        "termPlaceholder": "Minst två tecken"
+        "termPlaceholder": "Minst två tecken, eller lämna tomt för att lista alla"
       },
       "unnamed": "Inget namn registrerat",
       "vehicle": {
@@ -1111,7 +1111,7 @@
       },
       "search": {
         "term": "Registreringsnummer eller chassinummer",
-        "termPlaceholder": "Ett registreringsnummer eller början av ett"
+        "termPlaceholder": "Valfri del av registreringsnumret, eller lämna tomt för att lista alla"
       }
     },
     "withheld": {

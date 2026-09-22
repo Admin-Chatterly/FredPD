@@ -61,6 +61,22 @@ FredPD.Config.server = {
         sensitiveStaleAfterSeconds = 15 * 60,
         --- Past this, the session is read-only: nothing that changes state.
         readOnlyAfterSeconds = 6 * 60 * 60,
+
+        --- A fallback for a server that has not filled in `token`/`guildId`
+        --- above yet -- most often one being tried out locally before Discord
+        --- is ever set up. FredPD's access model is Discord roles and nothing
+        --- else (invariant 2), and this does not change that: it activates
+        --- only when Discord is *not configured*, which is also the one case
+        --- invariant 2 has nothing to check a role against. Without it, such
+        --- a server has no way into the MDT at all short of running
+        --- `fredpd_superuser` from the console for every officer by hand.
+        ---
+        --- While it is active, holding this ESX job grants exactly the
+        --- `patrol_basic` group's permissions and nothing more -- enough to
+        --- open records and see the interface work, never Administration.
+        --- Set to `''` to turn it off and keep the old behaviour: an
+        --- unconfigured server refuses everyone.
+        localJobFallback = setting('fredpd:local_job_fallback', 'police'),
     },
 
     -- -------------------------------------------------------------------------

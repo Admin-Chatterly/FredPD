@@ -89,6 +89,17 @@ describe('query', function()
             assert.are.equal('5550134', query.digits('555-0134'))
             assert.are.equal('', query.digits('johansson'))
         end)
+
+        it('tells a blank box apart from a term too short to search', function()
+            -- `isBlank` is what the route asks before `normalizeTerm`, so an
+            -- empty box can become a browse rather than a refusal (7.2) while
+            -- a one-character term stays a refusal either way.
+            assert.is_true(query.isBlank(nil))
+            assert.is_true(query.isBlank(''))
+            assert.is_true(query.isBlank('   '))
+            assert.is_false(query.isBlank('a'))
+            assert.is_false(query.isBlank('ab'))
+        end)
     end)
 
     -- -------------------------------------------------------------------------

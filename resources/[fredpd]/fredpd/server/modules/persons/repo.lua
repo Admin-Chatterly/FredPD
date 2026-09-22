@@ -335,42 +335,69 @@ local OVERFETCH_CEILING <const> = 300
 --- Runs a person search and applies record-level access to the result set.
 ---
 --- @param session table the session, never input (invariant 1)
---- @param params table { terms (from `parseTerm`), dateOfBirth, limit, allowRestricted }
+--- @param params table { terms (from `parseTerm`, or nil to browse), dateOfBirth, limit, allowRestricted }
 --- @return table { persons, restrictedWithheld, restrictedIncluded }
 function Repo.searchPersons(session, params)
     local terms = params.terms
     local limit = math.min(math.max(tonumber(params.limit) or 25, 1), MAX_LIMIT)
 
-    local score, values = scoreFragment(terms)
-    local matchSql, matchValues = matchFragment(terms)
+    local rows
 
-    -- The matched-alias column sits between the score and the WHERE clause, so
-    -- its two values go between theirs. Order of placeholders is order of
-    -- values, and there is no second chance to get it right.
-    values[#values + 1] = '%' .. terms.full .. '%'
-    values[#values + 1] = terms.full
+    if terms == nil then
+        -- An empty box browsing the roster rather than searching it (7.2).
+        -- `scoreFragment`/`matchFragment` cannot express that -- every branch
+        -- they build is written so an empty term matches nothing, on
+        -- purpose, so a cleared box never becomes a search for every blank
+        -- phone number -- so this is its own query with no match clause and
+        -- no score to rank by.
+        local values = { session.agencyId }
+        local dobClause = ''
 
-    values[#values + 1] = session.agencyId
+        if params.dateOfBirth then
+            dobClause = ' AND p.date_of_birth = ?'
+            values[#values + 1] = params.dateOfBirth
+        end
 
-    for index = 1, #matchValues do values[#values + 1] = matchValues[index] end
+        values[#values + 1] = math.min(limit * OVERFETCH, OVERFETCH_CEILING)
 
-    local dobClause = ''
-    if params.dateOfBirth then
-        dobClause = ' AND p.date_of_birth = ?'
-        values[#values + 1] = params.dateOfBirth
+        rows = db().query(([[
+            SELECT %s, 0 AS matchScore, NULL AS matchedAlias
+              FROM fpd_persons p
+             WHERE p.agency_id = ?%s
+             ORDER BY p.last_name, p.first_name, p.id
+             LIMIT ?]]):format(PERSON_COLUMNS, dobClause), values)
+    else
+        local score, values = scoreFragment(terms)
+        local matchSql, matchValues = matchFragment(terms)
+
+        -- The matched-alias column sits between the score and the WHERE
+        -- clause, so its two values go between theirs. Order of placeholders
+        -- is order of values, and there is no second chance to get it right.
+        values[#values + 1] = '%' .. terms.full .. '%'
+        values[#values + 1] = terms.full
+
+        values[#values + 1] = session.agencyId
+
+        for index = 1, #matchValues do values[#values + 1] = matchValues[index] end
+
+        local dobClause = ''
+        if params.dateOfBirth then
+            dobClause = ' AND p.date_of_birth = ?'
+            values[#values + 1] = params.dateOfBirth
+        end
+
+        values[#values + 1] = math.min(limit * OVERFETCH, OVERFETCH_CEILING)
+
+        rows = db().query(([[
+            SELECT %s,
+                   %s AS matchScore,
+                   %s AS matchedAlias
+              FROM fpd_persons p
+             WHERE p.agency_id = ?
+               AND %s%s
+             ORDER BY matchScore DESC, p.last_name, p.first_name, p.id
+             LIMIT ?]]):format(PERSON_COLUMNS, score, MATCHED_ALIAS, matchSql, dobClause), values)
     end
-
-    values[#values + 1] = math.min(limit * OVERFETCH, OVERFETCH_CEILING)
-
-    local rows = db().query(([[
-        SELECT %s,
-               %s AS matchScore,
-               %s AS matchedAlias
-          FROM fpd_persons p
-         WHERE p.agency_id = ?
-           AND %s%s
-         ORDER BY matchScore DESC, p.last_name, p.first_name, p.id
-         LIMIT ?]]):format(PERSON_COLUMNS, score, MATCHED_ALIAS, matchSql, dobClause), values)
 
     for index = 1, #rows do
         -- What a stub says it is standing in for. Set here rather than selected

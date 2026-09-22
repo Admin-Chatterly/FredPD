@@ -650,7 +650,7 @@ FredPD.Schema = {
     },
 
     PersonSearch = {
-        term = { type = 'string', required = true, min = 2, max = 191 },
+        term = { type = 'string', required = false, max = 191 },
         dateOfBirth = { type = 'string', required = false, max = 10 },
         limit = { type = 'integer', required = false, min = 1, max = 50 },
         reason = { type = 'string', required = false, max = 255 },
@@ -831,7 +831,7 @@ FredPD.Schema = {
     },
 
     QueryRun = {
-        term = { type = 'string', required = true, min = 2, max = 191 },
+        term = { type = 'string', required = false, max = 191 },
         type = { type = 'string', required = false, max = 16 },
         limit = { type = 'integer', required = false, min = 1, max = 50 },
         reason = { type = 'string', required = false, max = 255 },

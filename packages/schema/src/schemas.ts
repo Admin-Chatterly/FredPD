@@ -591,14 +591,17 @@ export const schemas = {
   // ------------------------------------------------------ records (M2)
   // The master name index (spec 7.2, 7.3).
   PersonSearch: {
-    // What the officer typed. The floor is `Repo.MIN_TERM` (persons/repo.lua:142):
-    // one character matches a third of the index and answers nothing, and the
-    // handler refuses a shorter term anyway. The ceiling is the column the
-    // search is logged into -- `fpd_query_log.term VARCHAR(191) NOT NULL`
+    // What the officer typed. No `min`, deliberately: an empty box is a
+    // request to browse the roster rather than search it (7.2, the same
+    // rule `QueryRun.term` follows), and it has to reach the handler rather
+    // than being refused here as too short. The handler still refuses
+    // anything from one character up to `Repo.MIN_TERM` (persons/repo.lua:142)
+    // -- only nothing at all is not "too short". The ceiling is the column
+    // the search is logged into -- `fpd_query_log.term VARCHAR(191) NOT NULL`
     // (0005:892) -- because 7.2 logs every query verbatim, including one that
     // found nothing, and a term the log cannot hold is a search that cannot be
     // logged. `Repo.normalize` only ever shortens, so 191 in is 191 stored.
-    term: { type: 'string', required: true, min: 2, max: 191 },
+    term: { type: 'string', required: false, max: 191 },
     // `fpd_persons.date_of_birth` is a DATE (0005:416), so this is `YYYY-MM-DD`
     // and nothing else. There is no pattern type here, so the width is all the
     // schema can say; the handler checks the shape and answers `format` rather
@@ -1021,15 +1024,18 @@ export const schemas = {
 
   // The unified query and hot-file hits (spec 7.2).
   QueryRun: {
-    // What the officer typed, before the service normalises it. The floor is
-    // `MIN_TERM` (query/service.lua): one character matches most of every
-    // register and answers nothing, and the handler refuses a shorter term
-    // anyway. The ceiling is the column every query is logged into --
-    // `fpd_query_log.term VARCHAR(191) NOT NULL` (0005:892) -- because 7.2 logs
-    // every query verbatim, including one that found nothing, and a term the
-    // log cannot hold is a query that cannot be logged. `normalizeTerm` only
-    // ever shortens, so 191 in is 191 stored.
-    term: { type: 'string', required: true, min: 2, max: 191 },
+    // What the officer typed, before the service normalises it. No `min`,
+    // deliberately: an empty box is how an officer asks to browse a whole
+    // register (7.2, "not by default, but on an empty box with a register
+    // chosen") and it has to reach the handler rather than being refused here
+    // as too short. `Query.normalizeTerm` still refuses anything from one
+    // character up to `MIN_TERM` (query/service.lua) -- only nothing at all
+    // is not "too short". The ceiling is the column every query is logged
+    // into -- `fpd_query_log.term VARCHAR(191) NOT NULL` (0005:892) -- because
+    // 7.2 logs every query verbatim, including one that found nothing, and a
+    // term the log cannot hold is a query that cannot be logged.
+    // `normalizeTerm` only ever shortens, so 191 in is 191 stored.
+    term: { type: 'string', required: false, max: 191 },
     // The six names of 7.2, plus `serial`, which is what 7.2 calls a firearm
     // query. A bounded string rather than an enum on purpose: the stored value
     // is fixed by `ck_fpd_query_log_type` (0005:911, shipped) and spells a

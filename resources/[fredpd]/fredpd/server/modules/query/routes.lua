@@ -246,11 +246,6 @@ route.define({
         }
     end,
     handler = function(session, input)
-        local term = service.normalizeTerm(input.term)
-        if not term then
-            return route.refuse(FredPD.ErrorCode.INVALID, { term = 'too_short' })
-        end
-
         -- An explicit type disambiguates what the term cannot say for itself
         -- (7.2). The schema bounds the string; this decides whether it is one
         -- of the six names, `serial` included as 7.2 spells it.
@@ -260,6 +255,27 @@ route.define({
 
             if not explicit then
                 return route.refuse(FredPD.ErrorCode.INVALID, { type = 'not_allowed' })
+            end
+        end
+
+        -- An empty box is a deliberate request to browse a register rather
+        -- than search it (7.2) -- but only when the officer has said which
+        -- register, by choosing an explicit type. A blank box with no type
+        -- has nothing to derive from, so it stays a refusal rather than
+        -- silently reading all three registers at once.
+        local blank = service.isBlank(input.term)
+
+        if blank and not explicit then
+            return route.refuse(FredPD.ErrorCode.INVALID, { term = 'required' })
+        end
+
+        local term
+        if blank then
+            term = ''
+        else
+            term = service.normalizeTerm(input.term)
+            if not term then
+                return route.refuse(FredPD.ErrorCode.INVALID, { term = 'too_short' })
             end
         end
 

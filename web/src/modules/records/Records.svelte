@@ -1177,7 +1177,6 @@
           class="w-72 border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1"
           bind:value={personQuery.term}
           maxlength="191"
-          required
           placeholder={t('records.person.search.termPlaceholder')}
         />
       </label>

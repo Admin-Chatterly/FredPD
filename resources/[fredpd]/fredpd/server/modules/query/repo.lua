@@ -109,6 +109,24 @@ local ALIAS_MATCH <const> = [[EXISTS (SELECT 1 FROM fpd_person_aliases a
 --- @param params table { mode, term, tokens, digits, limit }
 --- @return table rows
 function Repo.searchPersons(agencyId, params)
+    -- An empty term is a deliberate request to browse the roster rather than
+    -- search it (7.2, blank box + an explicit type). None of the three modes'
+    -- branches below can express that -- every one of them is written so an
+    -- empty term matches nothing, on purpose, so a cleared box never becomes
+    -- a search for everyone with an empty phone number -- so browsing is its
+    -- own query with no content filter at all, decided here rather than by
+    -- coaxing the branches below into agreeing on what "no term" means.
+    if params.term == '' then
+        return db().query(
+            ([[SELECT %s
+                 FROM fpd_persons p
+                WHERE p.agency_id = ?
+                ORDER BY p.last_name, p.first_name, p.id
+                LIMIT ?]]):format(PERSON_COLUMNS),
+            { agencyId, params.limit or 75 }
+        )
+    end
+
     local values = { agencyId }
     local clause
 
@@ -169,13 +187,18 @@ function Repo.searchPersons(agencyId, params)
     )
 end
 
---- The vehicle register: a plate prefix or a whole VIN.
+--- The vehicle register: a plate fragment anywhere in the plate, or a whole
+--- VIN.
 ---
---- A prefix rather than `%term%` for the reason the register itself gives:
---- `uq_fpd_vehicles_plate` can serve a leading-anchored LIKE and cannot serve a
---- leading wildcard, and a full scan on every partial plate is the difference
---- between the 150 ms budget of section 12 and a query that gets slower every
---- day the server runs.
+--- `%term%` rather than a leading-anchored prefix. `uq_fpd_vehicles_plate`
+--- can serve `plate LIKE 'term%'` as an index seek and cannot serve a leading
+--- wildcard, so this trades that seek for a full scan on every plate search --
+--- deliberately, because an officer who only remembers a few characters from
+--- the middle of a plate is common enough that "no results" for a real plate
+--- is a worse outcome than a slower query. `fpd_vehicles` is small enough per
+--- agency that the scan still sits inside the 150 ms budget of section 12; an
+--- agency large enough to notice is the one to add a fulltext index for, not
+--- a reason to take the fragment search away from everyone.
 function Repo.searchVehicles(agencyId, term, limit)
     return db().query(
         [[SELECT v.id, v.agency_id AS agencyId, v.plate, v.vin, v.model, v.colour,
@@ -186,11 +209,12 @@ function Repo.searchVehicles(agencyId, term, limit)
            WHERE v.agency_id = ? AND (v.plate LIKE ? OR v.vin = ?)
            ORDER BY v.plate
            LIMIT ?]],
-        { agencyId, term:upper() .. '%', term:upper(), limit or 75 }
+        { agencyId, '%' .. term:upper() .. '%', term:upper(), limit or 75 }
     )
 end
 
---- The firearm register: a serial prefix, same index reasoning.
+--- The firearm register: a serial fragment anywhere in the serial, same
+--- trade as the plate above.
 function Repo.searchFirearms(agencyId, term, limit)
     return db().query(
         [[SELECT f.id, f.agency_id AS agencyId, f.serial, f.make, f.model, f.type,
@@ -199,7 +223,7 @@ function Repo.searchFirearms(agencyId, term, limit)
            WHERE f.agency_id = ? AND f.serial LIKE ?
            ORDER BY f.serial
            LIMIT ?]],
-        { agencyId, term:upper() .. '%', limit or 75 }
+        { agencyId, '%' .. term:upper() .. '%', limit or 75 }
     )
 end
 

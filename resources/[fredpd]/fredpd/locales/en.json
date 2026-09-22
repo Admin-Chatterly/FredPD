@@ -780,7 +780,7 @@
     },
     "field": {
       "term": "Search",
-      "termPlaceholder": "Name, plate, VIN, serial, phone or address",
+      "termPlaceholder": "Name, plate, VIN, serial, phone or address — or leave blank and pick a register below",
       "type": "Register",
       "typeDerive": "Work it out from the term",
       "hit": "Hot-file hit",
@@ -906,7 +906,7 @@
       },
       "search": {
         "term": "Serial number",
-        "termPlaceholder": "A serial number, or the start of one"
+        "termPlaceholder": "Any part of the serial number, or leave blank to list all"
       },
       "status": {
         "submit": "Record status",
@@ -1013,7 +1013,7 @@
       "photos": "Photographs",
       "search": {
         "term": "Name, alias or record number",
-        "termPlaceholder": "At least two characters"
+        "termPlaceholder": "At least two characters, or leave blank to list everyone"
       },
       "unnamed": "No name on record",
       "vehicle": {
@@ -1111,7 +1111,7 @@
       },
       "search": {
         "term": "Plate or VIN",
-        "termPlaceholder": "A plate, or the start of one"
+        "termPlaceholder": "Any part of the plate, or leave blank to list all"
       }
     },
     "withheld": {

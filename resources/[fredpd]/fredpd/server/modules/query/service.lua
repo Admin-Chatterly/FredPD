@@ -132,6 +132,11 @@ local MAX_TOKENS <const> = 4
 --- server running `NO_BACKSLASH_ESCAPES` refuses, and a search for `%` that
 --- matched every record is the failure this avoids.
 ---
+--- An empty result is not, on its own, "too short" -- `Query.isBlank` is what
+--- tells those two apart, and the route asks that first. A caller that skips
+--- straight to this function still gets the old behaviour: an empty string
+--- normalizes to `nil` exactly as one character does.
+---
 --- @param value any
 --- @return string|nil
 function Query.normalizeTerm(value)
@@ -141,6 +146,21 @@ function Query.normalizeTerm(value)
     if #text < MIN_TERM then return nil end
 
     return text
+end
+
+--- True for a term that is absent or nothing but whitespace -- the shape an
+--- officer's box sends when it was left empty on purpose (7.2: browse a
+--- register rather than search it). Distinct from a term that normalizes to
+--- `nil` because it is one character: that is a mistake worth refusing, and
+--- this is not.
+---
+--- @param value any
+--- @return boolean
+function Query.isBlank(value)
+    if value == nil then return true end
+    if type(value) ~= 'string' then return false end
+
+    return value:match('^%s*$') ~= nil
 end
 
 --- The digits in a term, for the phone branch. `''` when it has none.

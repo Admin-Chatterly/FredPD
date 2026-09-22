@@ -178,11 +178,14 @@ end
 
 --- Vehicles matching a term, before access filtering.
 ---
---- The term is a plate prefix or a whole VIN. A prefix rather than
---- `%term%`: `uq_fpd_vehicles_plate` can serve a leading-anchored LIKE and
---- cannot serve a leading wildcard, and a full scan of the vehicle register on
---- every partial plate is the difference between the 150 ms budget in section 12
---- and a query that gets slower every day the server runs.
+--- The term is a plate fragment or a whole VIN. `%term%` rather than a
+--- leading-anchored prefix: `uq_fpd_vehicles_plate` can serve
+--- `plate LIKE 'term%'` as an index seek and cannot serve a leading
+--- wildcard, so this trades that seek for a full scan on every plate search --
+--- deliberately, because an officer who only remembers a few characters from
+--- the middle of a plate is common enough that "no results" for a real plate
+--- is worse than a slower query. `fpd_vehicles` is small enough per agency
+--- that the scan still sits inside the 150 ms budget of section 12.
 ---
 --- @param filter table { term, ownerPersonId, ownerIdentifier, limit }
 --- @return table rows
@@ -192,7 +195,7 @@ function Repo.searchVehicles(agencyId, filter)
 
     if filter.term then
         where[#where + 1] = '(v.plate LIKE ? OR v.vin = ?)'
-        values[#values + 1] = filter.term .. '%'
+        values[#values + 1] = '%' .. filter.term .. '%'
         values[#values + 1] = filter.term
     end
 
@@ -590,7 +593,7 @@ end
 
 --- Firearms matching a term, before access filtering.
 ---
---- Serial prefix, for the same index reason as the plate search above.
+--- Serial fragment, for the same trade as the plate search above.
 ---
 --- @param filter table { term, ownerPersonId, status, assignedOfficer, limit }
 function Repo.searchFirearms(agencyId, filter)
@@ -599,7 +602,7 @@ function Repo.searchFirearms(agencyId, filter)
 
     if filter.term then
         where[#where + 1] = 'f.serial LIKE ?'
-        values[#values + 1] = filter.term .. '%'
+        values[#values + 1] = '%' .. filter.term .. '%'
     end
 
     if filter.ownerPersonId then

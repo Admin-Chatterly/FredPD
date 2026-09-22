@@ -212,9 +212,17 @@ route.define({
         }
     end,
     handler = function(session, input)
-        local terms = repo.parseTerm(input.term)
-        if not terms then
-            return route.refuse(FredPD.ErrorCode.INVALID, { term = 'too_short' })
+        -- An empty box is a deliberate request to browse the roster rather
+        -- than search it (7.2) -- `terms = nil` says so to `repo.searchPersons`,
+        -- which reads it as "everyone" rather than as a fragment nothing can
+        -- match. A term that is not blank but is still too short to search
+        -- stays a refusal: one stray character is a mistake, not a browse.
+        local terms
+        if blank(input.term) ~= nil then
+            terms = repo.parseTerm(input.term)
+            if not terms then
+                return route.refuse(FredPD.ErrorCode.INVALID, { term = 'too_short' })
+            end
         end
 
         -- `DATE` column, so the term has to be a date. The schema layer has no
@@ -271,7 +279,9 @@ route.define({
         -- misuse investigation as one that did.
         repo.logQuery(session, {
             queryType = 'person',
-            term = terms.full,
+            -- `''` for a browse: there is no term to log, and `fpd_query_log.term`
+            -- is `NOT NULL` (0005:892).
+            term = terms and terms.full or '',
             restricted = found.restrictedIncluded,
             reason = reason,
             caseNumber = caseNumber,
