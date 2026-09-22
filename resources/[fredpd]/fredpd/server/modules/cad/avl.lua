@@ -377,6 +377,16 @@ end
 --- Agencies with no subscriber are not swept at all. FredPD is multi-agency and
 --- a sheriff's dispatcher opening their map must not make the city pay for it.
 function Avl.sweep()
+    -- `sessions`/`perms` are cached above at file load. Refreshed here rather
+    -- than trusted, because this runs unconditionally from resource start on
+    -- a timer, and around a restart or a mid-session script refresh there is
+    -- a window where the module they point at is momentarily unset -- a stale
+    -- or nil copy would otherwise stay wrong for as long as the sweep keeps
+    -- ticking, instead of healing on the next one.
+    sessions = FredPD.Core.session
+    perms = FredPD.Core.perms
+    if not sessions or not perms then return end
+
     sweepCount = sweepCount + 1
 
     local wanted = {}
@@ -493,6 +503,12 @@ local prompted = {}
 --- status and the minutes reach every holder of the key; only the call comes
 --- off, and only for the readers who were refused it anyway.
 function Avl.welfarePass()
+    -- Same self-heal as `Avl.sweep`, and for the same reason: this also runs
+    -- unconditionally from a timer, from resource start.
+    sessions = FredPD.Core.session
+    perms = FredPD.Core.perms
+    if not sessions or not perms then return end
+
     local watching = {}
 
     for _, session in pairs(sessions.all()) do

@@ -326,6 +326,35 @@ antecknas i loggboken.
 
 ---
 
+## 9b. Nödåtkomst — superuser från konsolen
+
+Uppstarten (steg 5) ger den första administratören både `admin` och
+`patrol_basic` — tillräckligt för att öppna MDT:n och komma åt Administration
+själv. Men om en rollkoppling ändå går fel, en grupp blir felkonfigurerad, eller
+en administratör låser ut sig själv från Administration, finns nu en väg in
+som inte beror på att MDT:n fungerar: `fredpd_superuser`, körd i
+**serverkonsolen** — ingenting i spelet kan nå den, med avsikt.
+
+```
+fredpd_superuser <spelar-id>                  -- listar spelarens Discord-roller
+fredpd_superuser <spelar-id> <roll-id>         -- ger rollen gruppen superuser
+fredpd_superuser_list                          -- visar vilka roller som har superuser
+fredpd_superuser_revoke <roll-id>               -- tar bort superuser från rollen
+```
+
+`superuser` är inte ett steg ovanför `command` eller `admin` i den vanliga
+behörighetstrappan — det är en enda grupp med ett enda tillstånd, det
+bokstavliga jokertecknet `*`, som `Perms.satisfies` känner igen som "vad som än
+frågas efter". Den kan bara nås via den här kommandot: att koppla en roll till
+`superuser` via Administration eller gruppredigeraren vägras av samma skäl som
+allt annat man inte redan själv har (se steg 9 ovan) — ingen kommer åt den utan
+att redan ha den, förutom via konsolen.
+
+Precis som `fredpd_setup` slår `fredpd_superuser` igenom omedelbart: ingen
+omstart, ingen omanslutning krävs.
+
+---
+
 ## 10. Felsökning
 
 | Symptom | Orsak |

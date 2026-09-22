@@ -216,6 +216,7 @@ server_scripts {
     'server/modules/admin/service.lua',
     'server/modules/admin/routes.lua',
     'server/modules/admin/bootstrap.lua',
+    'server/modules/admin/superuser.lua',
 
     'server/main.lua',
 }

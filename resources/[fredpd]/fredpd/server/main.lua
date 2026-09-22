@@ -273,7 +273,13 @@ RegisterNetEvent('fredpd:requestPlacements', function()
         return
     end
 
-    if not FredPD.Core.session.get(src) then return end
+    -- `FredPD.Core.session` can be momentarily unset around a resource
+    -- restart or a mid-session script refresh, and this event fires from
+    -- whatever the client already has queued the instant its own scripts come
+    -- back up -- exactly the moment that window is open. Doing nothing is the
+    -- safe direction: the client asks again once it reconnects to a session
+    -- that exists, and pushing nothing is a no-op, never a leak.
+    if not FredPD.Core.session or not FredPD.Core.session.get(src) then return end
 
     FredPD.Core.placements.pushTo(src)
 end)
@@ -285,6 +291,14 @@ end)
 --- the admin screen after the role map is edited. Not a route: no client is
 --- involved, and nothing here takes input.
 function FredPD.onDiscordChange()
+    -- Called from the sync loop's own timer (`core/discord.lua`), which ticks
+    -- for as long as the resource runs and does not know or care whether
+    -- `Core` has fully come back up around a restart. Skipping this pass
+    -- rather than throwing costs nothing: the next successful sync calls it
+    -- again `refreshMinutes` later, and until then sessions keep the
+    -- permissions they already had.
+    if not FredPD.Core.perms or not FredPD.Core.session then return end
+
     FredPD.Core.perms.reload()
     FredPD.Core.session.refreshAll()
 end

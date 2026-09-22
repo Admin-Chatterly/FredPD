@@ -120,7 +120,17 @@ end
 --- A wildcard in the *grant* (`records.person.*`) matches any key beneath it.
 --- Wildcards are deliberately not honoured in the *requirement*: a route asks
 --- for exactly one permission, so that reading the route tells you what it needs.
+---
+--- The bare `'*'` is the same idea taken one level further: everything,
+--- regardless of namespace. It exists for exactly one group, `superuser`
+--- (`database/seeds/0003_superuser.sql`), granted only by the console command
+--- `fredpd_superuser` -- never enumerated as a list of every key that exists,
+--- because that list has already drifted once in this codebase (the group
+--- editor's own `PERMISSION_CATALOGUE` is missing whole modules' worth of real
+--- keys and offers several nothing checks any more). A wildcard cannot go
+--- stale the way a list can.
 function Perms.satisfies(effective, required)
+    if effective['*'] then return true end
     if effective[required] then return true end
 
     -- Walk up the key: records.person.view -> records.person.* -> records.*

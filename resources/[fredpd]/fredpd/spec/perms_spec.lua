@@ -208,5 +208,23 @@ describe('perms', function()
             -- it actually needs.
             assert.is_false(perms.satisfies({ ['rms.person.view'] = true }, 'rms.person.*'))
         end)
+
+        it('honours the bare wildcard for absolutely anything', function()
+            -- `superuser`'s one grant (0003_superuser.sql). Deliberately not a
+            -- namespaced wildcard: it has to keep matching a permission nobody
+            -- has written yet, which an enumerated list never could.
+            local granted = { ['*'] = true }
+
+            assert.is_true(perms.satisfies(granted, 'page.records'))
+            assert.is_true(perms.satisfies(granted, 'admin.permissions.edit'))
+            assert.is_true(perms.satisfies(granted, 'a.module.that.does.not.exist.yet'))
+        end)
+
+        it('does not let a namespaced wildcard reach the bare one', function()
+            -- 'rms.*' must not accidentally satisfy something outside 'rms.',
+            -- and the walk must terminate at the top-level segment rather than
+            -- treating a single-word key as reachable by any '*'.
+            assert.is_false(perms.satisfies({ ['rms.*'] = true }, 'page.records'))
+        end)
     end)
 end)

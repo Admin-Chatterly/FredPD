@@ -586,6 +586,16 @@ end
 function Events.pass()
     if not booted then return end
 
+    -- `sessions`/`perms` are cached above at file load. Refreshed here rather
+    -- than trusted, for the same reason `Avl.sweep` refreshes its own copies:
+    -- this runs unconditionally from a timer, and around a restart or a
+    -- mid-session script refresh there is a window where the module they
+    -- point at is momentarily unset. Healing here means the very next tick is
+    -- correct instead of every tick staying wrong until a manual restart.
+    sessions = FredPD.Core.session
+    perms = FredPD.Core.perms
+    if not sessions or not perms then return end
+
     local now = os.time()
 
     local observed, seen = {}, 0
@@ -827,7 +837,13 @@ CreateThread(function()
     while true do
         Wait(interval)
 
-        if booted and (next(sessions.all()) ~= nil or next(dropped) ~= nil) then
+        -- Refreshed before the early-out reads it, not just inside
+        -- `Events.pass`: a `sessions` that is nil here would otherwise skip
+        -- the call forever, and `Events.pass`'s own refresh would never get a
+        -- turn to run.
+        sessions = FredPD.Core.session
+
+        if booted and sessions and (next(sessions.all()) ~= nil or next(dropped) ~= nil) then
             Events.pass()
         end
     end

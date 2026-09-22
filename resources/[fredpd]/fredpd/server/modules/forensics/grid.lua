@@ -877,7 +877,17 @@ end
 --- in the city -- still sees casings and blood, because 8.10 is built on their
 --- being able to walk back and pick them up.
 local function isPrivileged(src)
-    local session = FredPD.Core.session.all()[src]
+    -- `FredPD.Core.session` can be momentarily unset around a resource
+    -- restart or a mid-session script refresh -- this runs from a sweep that
+    -- starts ticking as soon as this file loads, for every connected player,
+    -- criminal and officer alike, so it is the one place in this module most
+    -- exposed to that window. Failing to "not privileged" is the safe
+    -- direction: a real officer briefly not shown a reveal is a redraw away,
+    -- never a permission granted that should not have been.
+    local sessions = FredPD.Core.session
+    if not sessions then return false end
+
+    local session = sessions.all()[src]
     if not session then return false end
 
     return FredPD.Core.perms.satisfies(session.permissions, 'forensics.tools.use')
