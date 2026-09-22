@@ -23,14 +23,25 @@ local sessions = {}
 function Session.open(src)
     local framework = FredPD.Bridge.framework
 
+    -- The client sees one generic "not signed on" message whatever the reason
+    -- (invariant 6 -- the four internal reasons below are not user-facing
+    -- text). Without this, "no session" was undiagnosable from the console:
+    -- an operator watching a player fail to open FredPD had no way to tell
+    -- "no discord identifier" apart from "not in the roster" apart from "on
+    -- the wrong character" -- three different fixes, one silent nil.
+    local function refuse(reason)
+        print(('[fredpd] session refused for %s: %s'):format(GetPlayerName(src) or tostring(src), reason))
+        return nil, reason
+    end
+
     local discordId = framework.getDiscordId(src)
     if not discordId then
-        return nil, 'no_discord'
+        return refuse('no_discord: no "discord" identifier on this connection -- Discord Rich Presence/Game Activity must be on and linked')
     end
 
     local character = framework.getCharacter(src)
     if not character then
-        return nil, 'no_character'
+        return refuse('no_character: the framework has no character loaded for this player yet')
     end
 
     -- The roster decides which character may open FredPD for which agency. A
@@ -45,11 +56,12 @@ function Session.open(src)
     )
 
     if not officer then
-        return nil, 'not_personnel'
+        return refuse(('not_personnel: discord_id %s has no active row in fpd_officers'):format(discordId))
     end
 
     if officer.identifier and officer.identifier ~= character.identifier then
-        return nil, 'wrong_character'
+        return refuse(('wrong_character: fpd_officers is bound to %s, this character is %s')
+            :format(officer.identifier, character.identifier))
     end
 
     local roles, snapshotAge = FredPD.Core.perms.memberRoles(discordId)
