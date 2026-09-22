@@ -7,6 +7,8 @@
   "shell": {
     "close": "Stäng",
     "back": "Tillbaka",
+    "expand": "Förstora",
+    "collapse": "Visa som surfplatta",
     "commandPlaceholder": "Kommando eller sökning",
     "module": {
       "records": "Register",

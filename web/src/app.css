@@ -30,6 +30,16 @@
 
   --font-sans: 'Segoe UI', 'Inter', system-ui, sans-serif;
   --font-mono: 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
+
+  /*
+   * The device frame's own depth (`.fredpd-device` below). Not a themed
+   * colour: it reads the same over a bright daylight scene and a dark
+   * garage, because it is standing in for the physical edge of a tablet
+   * casing rather than for anything the agency branding overrides. No blur,
+   * no colour tint -- a plain shadow is not the glass/glow invariant 12
+   * forbids.
+   */
+  --shadow-device: 0 24px 60px -12px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
 }
 
 /* Night mode is the default in a vehicle; the shell sets data-theme. */
@@ -79,4 +89,56 @@ body {
 /* In-game the page floats over the world; in a browser it needs a backdrop. */
 body[data-standalone='true'] {
   background: var(--color-surface);
+}
+
+/*
+ * The stage: App.svelte's outermost element, the full transparent viewport
+ * the tablet sits in. Centring here rather than on the device itself keeps
+ * the device's own box a plain, fixed-proportioned frame -- easier to reason
+ * about than a centred-and-sized element in one rule.
+ */
+.fredpd-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: clamp(12px, 3vh, 40px);
+}
+
+/*
+ * The device: a bounded, tablet-proportioned frame rather than a window
+ * filling the screen. Spec 1.4 already draws this distinction -- the vehicle
+ * MDC is "compact", a station terminal is a full desk unit -- this is that
+ * reading carried into the shell itself. `clamp()` holds it in tablet
+ * proportions from a 1280x720 in-vehicle resolution through 4K (spec 6.7)
+ * without a media query per step.
+ */
+.fredpd-device {
+  width: clamp(760px, 78vw, 1180px);
+  height: clamp(540px, 82vh, 760px);
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-device);
+  overflow: hidden;
+  transition: width 120ms ease, height 120ms ease;
+}
+
+/*
+ * The one deliberate break from tablet proportions: a dense grid, the CAD
+ * map, or a long custody chain earns the room, one click away (the header's
+ * expand toggle) -- never the default a non-technical officer opens into.
+ */
+.fredpd-device--expanded {
+  width: clamp(760px, 96vw, 1800px);
+  height: clamp(540px, 94vh, 1100px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fredpd-device {
+    transition: none;
+  }
 }

@@ -29,6 +29,21 @@
   let loading = $state(true);
   let current = $state<string | null>(null);
 
+  /**
+   * The shell renders as a bounded, tablet-proportioned frame by default
+   * (`.fredpd-device` in app.css) rather than a window filling the screen --
+   * closer to the physical MDC the spec's access points describe than to a
+   * desktop application. A dense screen (a long grid, the CAD map) is one
+   * click from the extra room; it is never where an officer opens into.
+   * Reset on every open rather than persisted, so the shell is predictable
+   * the same way a real device waking up is.
+   */
+  let expanded = $state(false);
+
+  function toggleExpanded(): void {
+    expanded = !expanded;
+  }
+
   $effect(() => {
     let cancelled = false;
 
@@ -123,7 +138,11 @@
   ]);
 </script>
 
-<div class="flex h-full flex-col bg-[var(--color-panel)] text-[var(--color-ink)]">
+<div class="fredpd-stage">
+<div
+  class="fredpd-device flex flex-col bg-[var(--color-panel)] text-[var(--color-ink)]"
+  class:fredpd-device--expanded={expanded}
+>
   <!-- Title bar -->
   <header
     class="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2"
@@ -135,24 +154,70 @@
       {/if}
     </div>
 
-    <button
-      type="button"
-      class="border border-[var(--color-border)] px-3 py-1 text-xs hover:bg-[var(--color-surface)]"
-      onclick={close}
-    >
-      {t('shell.close')}
-    </button>
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        class="flex items-center justify-center border border-[var(--color-border)] p-1.5 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-ink)]"
+        title={expanded ? t('shell.collapse') : t('shell.expand')}
+        aria-label={expanded ? t('shell.collapse') : t('shell.expand')}
+        onclick={toggleExpanded}
+      >
+        {#if expanded}
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect x="3" y="2" width="10" height="12" rx="1.5" />
+            <line x1="6" y1="12.5" x2="10" y2="12.5" />
+          </svg>
+        {:else}
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M2 6V2h4" />
+            <path d="M10 2h4v4" />
+            <path d="M14 10v4h-4" />
+            <path d="M6 14H2v-4" />
+          </svg>
+        {/if}
+      </button>
+
+      <button
+        type="button"
+        class="border border-[var(--color-border)] px-3 py-1 text-xs hover:bg-[var(--color-surface)]"
+        onclick={close}
+      >
+        {t('shell.close')}
+      </button>
+    </div>
   </header>
 
   <div class="flex min-h-0 flex-1">
     <!-- Module rail: only what this session is permitted to open. The server
-         decides the list; the UI just draws it (invariant 4). -->
-    <nav class="w-44 shrink-0 border-r border-[var(--color-border)] p-2">
+         decides the list; the UI just draws it (invariant 4). Sized and
+         weighted for a reader who has never used this screen before: a
+         visible left bar and tint mark where you are, not font-weight alone. -->
+    <nav class="w-48 shrink-0 border-r border-[var(--color-border)] p-2">
       {#each session?.modules ?? [] as module (module)}
         <button
           type="button"
-          class="block w-full px-2 py-1.5 text-left text-xs hover:bg-[var(--color-surface)]"
+          class="mb-0.5 block w-full border-l-2 border-transparent px-3 py-2.5 text-left text-sm hover:bg-[var(--color-surface)]"
           class:font-semibold={current === module}
+          class:border-[var(--color-accent)]={current === module}
+          class:bg-[var(--color-surface)]={current === module}
           onclick={() => (current = module)}
         >
           {t(`shell.module.${module}`)}
@@ -161,6 +226,12 @@
     </nav>
 
     <main class="min-w-0 flex-1 overflow-y-auto p-4">
+      {#if !loading && !error && current !== null}
+        <!-- One consistent answer to "where am I", above every module's own
+             content, so the active rail entry is never the only confirmation. -->
+        <h1 class="mb-3 text-base font-semibold">{t(`shell.module.${current}`)}</h1>
+      {/if}
+
       {#if loading}
         <p class="text-sm text-[var(--color-ink-muted)]">{t('app.loading')}</p>
       {:else if error}
@@ -214,8 +285,7 @@
              intact and the text has to make that difference plain, because the
              two look identical from an empty panel (spec 6.6). -->
         <section class="max-w-prose border border-[var(--color-border)] p-4">
-          <h2 class="text-sm font-semibold">{t(`shell.module.${current}`)}</h2>
-          <p class="mt-2 text-xs font-semibold text-[var(--color-ink-muted)]">
+          <p class="text-xs font-semibold text-[var(--color-ink-muted)]">
             {t('shell.unbuilt.title')}
           </p>
           <p class="mt-1 text-xs text-[var(--color-ink-muted)]">{t('shell.unbuilt.body')}</p>
@@ -237,4 +307,5 @@
       {/if}
     {/if}
   </footer>
+</div>
 </div>
