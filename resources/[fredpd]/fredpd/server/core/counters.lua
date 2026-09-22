@@ -75,6 +75,11 @@ local KINDS <const> = {
     person = true,
     report = true,
     case = true,
+    -- An intelligence case's own sequence (0023, Appendix D). Distinct from
+    -- `case`, which is the förundersökning's kind: two record types sharing
+    -- one counter would put both numbers in a sequence unreadable back to
+    -- either.
+    intel_case = true,
     warrant = true,
     bolo = true,
     arrest = true,

@@ -310,4 +310,44 @@ FredPD.Config.server = {
         --- How long a signed request stays valid, in seconds (spec 3.7).
         replayWindow = 30,
     },
+
+    --- Suggesting real citizens and vehicles while an officer is registering
+    --- one, read straight from ESX's own tables (`server/bridges/framework.lua`
+    --- explains why this is the one place FredPD reads another resource's
+    --- schema directly instead of calling its exported API).
+    ---
+    --- The column names below are es_extended / ESX Legacy's -- the same
+    --- framework every other bridge in this resource already assumes. If your
+    --- server runs a fork that renamed one of these columns, change the name
+    --- here; nothing else needs to know. Set `enabled = false` to turn the
+    --- suggestions off everywhere and fall back to typing everything by hand,
+    --- which is what FredPD did before this existed.
+    esxData = {
+        enabled = true,
+
+        --- `users`, or whatever your fork calls the character table.
+        characters = {
+            table = 'users',
+            identifier = 'identifier',
+            firstName = 'firstname',
+            lastName = 'lastname',
+            dateOfBirth = 'dateofbirth',
+            phone = 'phone_number',
+        },
+
+        --- `owned_vehicles`, or whatever your fork calls it.
+        vehicles = {
+            table = 'owned_vehicles',
+            owner = 'owner',
+            plate = 'plate',
+            --- The column a vehicle's properties are stored in. On es_extended
+            --- this is a JSON blob (`vehicleJson = true`) and the model comes
+            --- out of it as whatever ESX itself stored -- usually a hash
+            --- number, not a name (`Framework.searchOwnedVehicles` explains
+            --- why FredPD does not try to resolve that further). A fork with
+            --- a plain `model` column instead should set `vehicleJson = false`.
+            vehicleColumn = 'vehicle',
+            vehicleJson = true,
+        },
+    },
 }

@@ -110,6 +110,8 @@ export interface IntelOrg {
 
 export interface IntelCase {
   id: number;
+  /** Appendix D: `{AGENCY}-IC{YY}-{#####}`. Null on a case opened before the column existed. */
+  number: string | null;
   title: string;
   description: string | null;
   status: string;

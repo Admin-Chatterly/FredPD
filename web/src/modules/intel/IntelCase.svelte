@@ -6,6 +6,7 @@
   import type { IntelCase, IntelNote } from '../../lib/types';
   import { fieldList, type Failure } from '../shared/failure';
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
+  import EntityPicker from '../shared/EntityPicker.svelte';
 
   /**
    * Cases (spec 10): everyone and everything linked to an investigation, in
@@ -42,6 +43,7 @@
 
   interface CaseRecord {
     id: number;
+    number: string | null;
     title: string;
     description: string | null;
     status: string;
@@ -246,7 +248,45 @@
 
   const LINK_KINDS = ['person', 'org'] as const;
 
-  let linkForm = $state({ kind: 'person' as 'person' | 'org', targetId: '', role: '' });
+  interface LinkTarget {
+    id: number;
+    label: string;
+  }
+
+  /** Both lists already browse everything when the box is empty (the same
+   *  `Intel.searchTerm` rule `searchOrgs`/`searchAssociateCandidates` in
+   *  IntelPerson.svelte lean on), normalized to one shape so the picker below
+   *  does not need to know which kind it is showing. */
+  async function searchLinkTargets(term: string): Promise<LinkTarget[]> {
+    if (linkForm.kind === 'org') {
+      const response = await nui.call<{ orgs: { id: number; name: string }[] }>('intel.org.list', {
+        search: term || undefined,
+        limit: 8,
+      });
+
+      return response.ok ? response.data.orgs.map((org) => ({ id: org.id, label: org.name })) : [];
+    }
+
+    const response = await nui.call<{
+      persons: { id: number; name: string | null; alias: string | null }[];
+    }>('intel.person.list', { search: term || undefined, limit: 8 });
+
+    if (!response.ok) return [];
+
+    return response.data.persons.map((person) => ({
+      id: person.id,
+      label: person.name ?? person.alias ?? t('intel.person.unknown'),
+    }));
+  }
+
+  let linkForm = $state({ kind: 'person' as 'person' | 'org', targetId: '', targetName: '', role: '' });
+
+  /** Switching kind mid-pick would otherwise leave a person's id sitting
+   *  under a selection drawn from the organization list, or the reverse. */
+  function onLinkKindChange(): void {
+    linkForm.targetId = '';
+    linkForm.targetName = '';
+  }
 
   async function addLink(event: SubmitEvent): Promise<void> {
     event.preventDefault();
@@ -263,7 +303,7 @@
 
     if (response.ok) {
       failure = null;
-      linkForm = { kind: 'person', targetId: '', role: '' };
+      linkForm = { kind: 'person', targetId: '', targetName: '', role: '' };
       await open(detail.case.id);
     } else {
       failure = response;
@@ -449,7 +489,14 @@
               onclick={() => void open(record.id)}
             >
               <span class="flex items-baseline justify-between gap-3 text-sm">
-                {record.title}
+                <span>
+                  {#if record.number}
+                    <span class="font-[family-name:var(--font-mono)] text-xs text-[var(--color-ink-muted)]">
+                      {record.number}
+                    </span>
+                  {/if}
+                  {record.title}
+                </span>
                 <span class="text-xs font-normal text-[var(--color-ink-muted)]">
                   {t(`intel.caseStatus.${record.status}`)}
                 </span>
@@ -473,7 +520,14 @@
       {@const record = detail.case}
 
       <div class="flex items-start justify-between gap-3">
-        <h2 class="text-sm font-semibold">{record.title}</h2>
+        <div>
+          {#if record.number}
+            <p class="font-[family-name:var(--font-mono)] text-xs text-[var(--color-ink-muted)]">
+              {record.number}
+            </p>
+          {/if}
+          <h2 class="text-sm font-semibold">{record.title}</h2>
+        </div>
         <div class="flex gap-2">
           <button
             type="button"
@@ -607,20 +661,32 @@
           <select
             class="border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1"
             bind:value={linkForm.kind}
+            onchange={onLinkKindChange}
           >
             {#each LINK_KINDS as kind (kind)}
               <option value={kind}>{t(kind === 'person' ? 'intel.case.linkPerson' : 'intel.case.linkOrg')}</option>
             {/each}
           </select>
         </label>
-        <label class="flex flex-col gap-1">
+        <label class="flex w-56 flex-col gap-1">
           <span class="text-[var(--color-ink-muted)]">{t('intel.case.linkId')}</span>
-          <input
-            type="number"
-            min="1"
-            class="w-24 border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1"
-            bind:value={linkForm.targetId}
-          />
+          {#key linkForm.kind}
+            <EntityPicker
+              placeholder={t('intel.case.linkSearchPlaceholder')}
+              search={searchLinkTargets}
+              label={(target) => target.label}
+              getKey={(target) => target.id}
+              selectedLabel={linkForm.targetName || null}
+              onSelect={(target) => {
+                linkForm.targetId = String(target.id);
+                linkForm.targetName = target.label;
+              }}
+              onClear={() => {
+                linkForm.targetId = '';
+                linkForm.targetName = '';
+              }}
+            />
+          {/key}
         </label>
         <label class="flex flex-col gap-1">
           <span class="text-[var(--color-ink-muted)]">{t('intel.case.linkRole')}</span>

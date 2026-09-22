@@ -23,6 +23,7 @@
     VEHICLE_REGISTRATION_STATUSES,
   } from '@fredpd/schema';
   import { fieldList, type Failure } from '../shared/failure';
+  import EntityPicker from '../shared/EntityPicker.svelte';
   import {
     isStub,
     type FirearmDetail,
@@ -282,6 +283,91 @@
     personApplied = { ...personQuery, ...authority };
   }
 
+  // ------------------------------------------------------ creating a person
+
+  interface EsxCharacterOption {
+    identifier: string;
+    firstName: string | null;
+    lastName: string | null;
+    dateOfBirth: string | null;
+    phone: string | null;
+  }
+
+  /**
+   * "Citizens fetched from the character database", in practice: the master
+   * index had a working `Repo.createPerson` since 7.3 was written and no
+   * route that ever called it, because identity was meant to come from
+   * whichever path first meets a person rather than from typing a new file
+   * into existence by hand. Picking a real ESX character here is that path.
+   */
+  async function searchEsxCharacters(term: string): Promise<EsxCharacterOption[]> {
+    const response = await nui.call<{ characters: EsxCharacterOption[] }>('esx.character.search', {
+      term,
+      limit: 8,
+    });
+
+    return response.ok ? response.data.characters : [];
+  }
+
+  let createPersonOpen = $state(false);
+  let createPersonForm = $state({
+    identifier: '',
+    firstName: '',
+    middleName: '',
+    lastName: '',
+    dateOfBirth: '',
+    sex: '',
+    phone: '',
+    address: '',
+    classification: '',
+  });
+
+  function applyEsxCharacter(character: EsxCharacterOption): void {
+    createPersonForm.identifier = character.identifier;
+    if (character.firstName) createPersonForm.firstName = character.firstName;
+    if (character.lastName) createPersonForm.lastName = character.lastName;
+    if (character.dateOfBirth) createPersonForm.dateOfBirth = character.dateOfBirth;
+    if (character.phone) createPersonForm.phone = character.phone;
+  }
+
+  async function createPerson(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    busy = true;
+
+    const response = await nui.call<{ id: number }>('person.create', {
+      identifier: createPersonForm.identifier || undefined,
+      firstName: createPersonForm.firstName.trim() || undefined,
+      middleName: createPersonForm.middleName.trim() || undefined,
+      lastName: createPersonForm.lastName.trim() || undefined,
+      dateOfBirth: createPersonForm.dateOfBirth || undefined,
+      sex: createPersonForm.sex || undefined,
+      phone: createPersonForm.phone.trim() || undefined,
+      address: createPersonForm.address.trim() || undefined,
+      classification: createPersonForm.classification || undefined,
+    });
+
+    if (response.ok) {
+      failure = null;
+      createPersonForm = {
+        identifier: '',
+        firstName: '',
+        middleName: '',
+        lastName: '',
+        dateOfBirth: '',
+        sex: '',
+        phone: '',
+        address: '',
+        classification: '',
+      };
+      createPersonOpen = false;
+      selectedPersonId = response.data.id;
+    } else {
+      failure = response;
+    }
+
+    busy = false;
+  }
+
   async function loadPersons(applied: NonNullable<typeof personApplied>): Promise<void> {
     personLoading = true;
 
@@ -521,6 +607,39 @@
     classification: '',
     reason: '',
   });
+
+  interface OwnedVehicleOption {
+    plate: string;
+    owner: string | null;
+    model: string | null;
+  }
+
+  /**
+   * Suggests a vehicle ESX already knows about while an officer is filling in
+   * a registration -- "fetched from the vehicle's own database" in practice:
+   * the plate and the owner's ESX identifier come from `owned_vehicles`
+   * itself rather than being retyped from memory.
+   *
+   * `model` is drawn exactly as ESX stored it, which on most servers is a
+   * hash number rather than a name (`Framework.searchOwnedVehicles` explains
+   * why FredPD does not try to resolve it) -- shown anyway, because a hash an
+   * officer recognises from the vehicle they are looking at is still useful,
+   * and a blank field would hide that this suggestion came from a real row.
+   */
+  async function searchOwnedVehicles(term: string): Promise<OwnedVehicleOption[]> {
+    const response = await nui.call<{ vehicles: OwnedVehicleOption[] }>('esx.vehicle.search', {
+      term,
+      limit: 8,
+    });
+
+    return response.ok ? response.data.vehicles : [];
+  }
+
+  function applyOwnedVehicle(vehicle: OwnedVehicleOption): void {
+    registerVehicleForm.plate = vehicle.plate;
+    if (vehicle.owner) registerVehicleForm.ownerIdentifier = vehicle.owner;
+    if (vehicle.model) registerVehicleForm.model = vehicle.model;
+  }
 
   function runVehicleSearch(event: SubmitEvent): void {
     event.preventDefault();
@@ -1730,6 +1849,129 @@
     {:else if personApplied !== null && personRows.length > 0}
       <p class="text-sm text-[var(--color-ink-muted)]">{t('records.person.detail.none')}</p>
     {/if}
+
+    <div class="mt-3 border-t border-[var(--color-border)] pt-3">
+      <button
+        type="button"
+        class="border border-[var(--color-border)] px-3 py-1.5 text-xs hover:bg-[var(--color-surface)]"
+        onclick={() => (createPersonOpen = !createPersonOpen)}
+      >
+        {createPersonOpen ? t('records.person.create.hide') : t('records.person.create.show')}
+      </button>
+
+      {#if createPersonOpen}
+        <form class="mt-3 flex flex-wrap items-end gap-3" onsubmit={createPerson}>
+          <p class="w-full text-xs font-semibold">{t('records.person.create.title')}</p>
+          <p class="w-full text-xs text-[var(--color-ink-muted)]">
+            {t('records.person.create.intro')}
+          </p>
+
+          <label class="flex w-72 flex-col gap-1 text-xs">
+            <span>{t('records.person.create.esxSearch')}</span>
+            <EntityPicker
+              placeholder={t('records.person.create.esxSearchPlaceholder')}
+              search={searchEsxCharacters}
+              label={(character) =>
+                [character.firstName, character.lastName].filter(Boolean).join(' ') ||
+                character.identifier}
+              detail={(character) => character.dateOfBirth}
+              getKey={(character) => character.identifier}
+              selectedLabel={createPersonForm.identifier || null}
+              onSelect={applyEsxCharacter}
+              onClear={() => (createPersonForm.identifier = '')}
+            />
+          </label>
+
+          <label class="flex flex-col gap-1 text-xs">
+            <span>{t('records.person.field.firstName')}</span>
+            <input
+              class="border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1"
+              bind:value={createPersonForm.firstName}
+              maxlength="96"
+            />
+          </label>
+
+          <label class="flex flex-col gap-1 text-xs">
+            <span>{t('records.person.field.middleName')}</span>
+            <input
+              class="border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1"
+              bind:value={createPersonForm.middleName}
+              maxlength="96"
+            />
+          </label>
+
+          <label class="flex flex-col gap-1 text-xs">
+            <span>{t('records.person.field.lastName')}</span>
+            <input
+              class="border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1"
+              bind:value={createPersonForm.lastName}
+              maxlength="96"
+            />
+          </label>
+
+          <label class="flex flex-col gap-1 text-xs">
+            <span>{t('records.person.field.dateOfBirth')}</span>
+            <input
+              class="border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1 font-[family-name:var(--font-mono)]"
+              type="date"
+              bind:value={createPersonForm.dateOfBirth}
+            />
+          </label>
+
+          <label class="flex flex-col gap-1 text-xs">
+            <span>{t('records.person.field.sex')}</span>
+            <select
+              class="border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1"
+              bind:value={createPersonForm.sex}
+            >
+              <option value="">{t('records.form.serverDefault')}</option>
+              {#each PERSON_SEXES as value (value)}
+                <option {value}>{t(`records.person.sex.${value}`)}</option>
+              {/each}
+            </select>
+          </label>
+
+          <label class="flex flex-col gap-1 text-xs">
+            <span>{t('records.person.field.phone')}</span>
+            <input
+              class="border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1 font-[family-name:var(--font-mono)]"
+              bind:value={createPersonForm.phone}
+              maxlength="32"
+            />
+          </label>
+
+          <label class="flex flex-col gap-1 text-xs">
+            <span>{t('records.person.field.address')}</span>
+            <input
+              class="w-56 border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1"
+              bind:value={createPersonForm.address}
+              maxlength="191"
+            />
+          </label>
+
+          <label class="flex flex-col gap-1 text-xs">
+            <span>{t('records.person.field.classification')}</span>
+            <select
+              class="border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1"
+              bind:value={createPersonForm.classification}
+            >
+              <option value="">{t('records.form.serverDefault')}</option>
+              {#each CLASSIFICATIONS as value (value)}
+                <option {value}>{t(`records.classification.${value}`)}</option>
+              {/each}
+            </select>
+          </label>
+
+          <button
+            type="submit"
+            class="border border-[var(--color-border)] px-3 py-1.5 text-xs hover:bg-[var(--color-surface)]"
+            disabled={busy}
+          >
+            {t('records.person.create.submit')}
+          </button>
+        </form>
+      {/if}
+    </div>
   {:else if tab === 'vehicles'}
     <!-- ------------------------------------------------------ vehicles -->
     <form class="flex flex-wrap items-end gap-3" onsubmit={runVehicleSearch}>
@@ -2190,6 +2432,18 @@
       <p class="w-full text-xs text-[var(--color-ink-muted)]">
         {t('records.vehicle.register.intro')}
       </p>
+
+      <label class="flex w-72 flex-col gap-1 text-xs">
+        <span>{t('records.vehicle.register.esxSearch')}</span>
+        <EntityPicker
+          placeholder={t('records.vehicle.register.esxSearchPlaceholder')}
+          search={searchOwnedVehicles}
+          label={(vehicle) => vehicle.plate}
+          detail={(vehicle) => [vehicle.model, vehicle.owner].filter(Boolean).join(' · ')}
+          getKey={(vehicle) => vehicle.plate}
+          onSelect={applyOwnedVehicle}
+        />
+      </label>
 
       <label class="flex flex-col gap-1 text-xs">
         <span>{t('records.vehicle.field.plate')}</span>

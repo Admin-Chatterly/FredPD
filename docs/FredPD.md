@@ -1840,7 +1840,8 @@ row it came from.
 |---|---|---|---|---|
 | Person (master) | `person` | `0` — never restarts | `P-{######}` | P-000431 |
 | Report | `report` | `YYYY` | `{AGENCY}-{YY}-{######}` | LSPD-26-000123 |
-| Case | `case` | `YYYY` | `{AGENCY}-C{YY}-{#####}` | LSPD-C26-00045 |
+| Förundersökning (FU) | `case` | `YYYY` | `{AGENCY}-C{YY}-{#####}` | LSPD-C26-00045 |
+| Intelligence case | `intel_case` | `YYYY` | `{AGENCY}-IC{YY}-{#####}` | LSPD-IC26-00007 |
 | Call | `call` | `YYMMDD` — restarts daily | `{YYMMDD}-{####}` | 260917-0042 |
 | Scene | `scene` | `YYYY` | `{AGENCY}-S-{YYYY}-{####}` | LSPD-S-2026-0017 |
 | Evidence | `evidence` | `YYYY` | `{AGENCY}-{YYYY}-{######}` (Code 128 barcode) | LSPD-2026-001234 |

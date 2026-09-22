@@ -263,6 +263,7 @@ interface FixtureIntelOrg {
 
 interface FixtureIntelCase {
   id: number;
+  number: string | null;
   title: string;
   description: string | null;
   status: string;
@@ -401,6 +402,7 @@ let intelOrgsFull: FixtureIntelOrg[] = [
 let intelCasesFull: FixtureIntelCase[] = [
   {
     id: 1,
+    number: 'LSPD-IC26-00001',
     title: 'Operation Kvarnen',
     description: 'Narcotics distribution around Alta Street.',
     status: 'open',
@@ -461,6 +463,33 @@ let nextIntelVehicleId = 2;
 let nextIntelCaseLinkId = 4;
 let nextIntelEvidenceId = 2;
 
+/** Ids `person.create` hands back. Not a real register -- see its handler. */
+let nextMasterPersonId = 900;
+
+/** Standing in for ESX's `users` table (`esx.character.search`). */
+const ESX_CHARACTERS = [
+  {
+    identifier: 'char1:license:esx-demo-01',
+    firstName: 'Elin',
+    lastName: 'Karlsson',
+    dateOfBirth: '1994-03-11',
+    phone: '555-0110',
+  },
+  {
+    identifier: 'char1:license:esx-demo-02',
+    firstName: 'Johan',
+    lastName: 'Berg',
+    dateOfBirth: '1988-07-22',
+    phone: '555-0142',
+  },
+];
+
+/** Standing in for ESX's `owned_vehicles` table (`esx.vehicle.search`). */
+const ESX_OWNED_VEHICLES = [
+  { plate: '7KLM209', owner: 'char1:license:esx-demo-01', model: 'sultan' },
+  { plate: '4XYZ123', owner: 'char1:license:esx-demo-02', model: 'police' },
+];
+
 function personListRow(person: FixtureIntelPerson): IntelPerson {
   const notes = intelNotes.filter((note) => note.personId === person.id);
   const plates = intelVehicles
@@ -502,6 +531,7 @@ function caseListRow(record: FixtureIntelCase): IntelCase {
 
   return {
     id: record.id,
+    number: record.number,
     title: record.title,
     description: record.description,
     status: record.status,
@@ -6139,13 +6169,14 @@ export const fixtures: FixtureSet = {
         caseNumber?: string;
       };
 
-      // `Repo.parseTerm` refuses a term under two characters before it reaches
-      // the database, and the card reads the field code out rather than leaving
-      // a button that does nothing.
-      if ((term ?? '').trim().length < 2) return refuse('invalid', { term: 'too_short' });
+      // A blank box browses the whole roster (7.2); anything else has to
+      // clear `Repo.MIN_TERM`, and the card reads the field code out rather
+      // than leaving a button that does nothing.
+      const trimmed = (term ?? '').trim();
+      if (trimmed !== '' && trimmed.length < 2) return refuse('invalid', { term: 'too_short' });
 
       const authorized = Boolean(reason?.trim() || caseNumber?.trim());
-      const found = matches(registerPersons, term ?? '');
+      const found = trimmed === '' ? registerPersons : matches(registerPersons, trimmed);
 
       return {
         persons: found.filter((entry) => authorized || !entry.breakGlass).map((entry) => entry.row),
@@ -6163,10 +6194,11 @@ export const fixtures: FixtureSet = {
       };
 
       const authorized = Boolean(reason?.trim() || caseNumber?.trim());
-      // `Registry.searchTerm` answers nil for anything under two characters and
-      // the handler then searches without one, so a short term is a wide search
-      // here rather than a refusal — the opposite of `person.search` above, and
-      // the difference is the server's, not this file's.
+      // `Registry.searchTerm` answers nil for anything under two characters
+      // and the handler then searches without one, so a short or blank term
+      // is a wide search here rather than a refusal -- the same rule
+      // `person.search` above now follows too, since both browse the whole
+      // register on an empty box (7.2).
       const found =
         (term ?? '').trim().length < 2
           ? registerVehicles
@@ -6182,6 +6214,50 @@ export const fixtures: FixtureSet = {
         // draws what it is told.
         hits: vehicles.filter((row) => !isStub(row) && row.hits.length > 0).length,
       };
+    },
+
+    // ------------------------------------------------------------ ESX data
+
+    'esx.character.search': (input) => {
+      const { term } = (input ?? {}) as { term?: string };
+      const needle = (term ?? '').trim().toLowerCase();
+
+      return {
+        characters: ESX_CHARACTERS.filter((character) =>
+          `${character.firstName} ${character.lastName} ${character.identifier}`
+            .toLowerCase()
+            .includes(needle),
+        ),
+      };
+    },
+
+    'esx.vehicle.search': (input) => {
+      const { term } = (input ?? {}) as { term?: string };
+      const needle = (term ?? '').trim().toLowerCase();
+
+      return {
+        vehicles: ESX_OWNED_VEHICLES.filter((vehicle) =>
+          `${vehicle.plate} ${vehicle.owner ?? ''}`.toLowerCase().includes(needle),
+        ),
+      };
+    },
+
+    'person.create': (input) => {
+      const body = (input ?? {}) as {
+        identifier?: string;
+        firstName?: string;
+        lastName?: string;
+      };
+
+      if (!body.identifier && !body.firstName && !body.lastName) {
+        return refuse('invalid', { lastName: 'required' });
+      }
+
+      // The master register's own `person.get`/`person.update` have no
+      // fixture yet (a pre-existing gap, not one this route introduces), so
+      // this stops at handing back a plausible id rather than pretending the
+      // record can be reopened afterward.
+      return { id: nextMasterPersonId++ };
     },
 
     'unit.list': () => ({ units: cadUnits.filter((unit) => unit.status !== 'off_duty') }),
@@ -7131,6 +7207,7 @@ export const fixtures: FixtureSet = {
       intelCasesFull = [
         {
           id,
+          number: `LSPD-IC26-${String(id).padStart(5, '0')}`,
           title: body.title,
           description: body.description ?? null,
           status: body.status ?? 'open',

@@ -113,6 +113,7 @@ local NUI_ROUTES <const> = {
     'intel.evidence.delete',
 
     -- The master name index (spec 7.2, 7.3).
+    'person.create',
     'person.search',
     'person.get',
     'person.update',
@@ -134,6 +135,11 @@ local NUI_ROUTES <const> = {
     'firearm.status',
     'firearm.assign',
     'firearm.trace',
+
+    -- Suggesting real citizens and vehicles from ESX's own tables
+    -- (server/modules/esxdata/routes.lua).
+    'esx.character.search',
+    'esx.vehicle.search',
 
     -- The unified query and hot-file hits (spec 7.2).
     'query.run',

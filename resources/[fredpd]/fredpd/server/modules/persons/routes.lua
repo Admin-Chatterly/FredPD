@@ -357,6 +357,57 @@ route.define({
 -- =============================================================================
 
 route.define({
+    name = 'person.create',
+    perm = 'rms.person.edit',
+    schema = 'PersonCreate',
+    writes = true,
+    audit = 'person.created',
+    subjectType = RECORD_TYPE,
+    handler = function(session, input)
+        -- `Repo.createPerson` has sat unused since 7.3 was written: identity
+        -- was meant to come from the framework, from whichever path first
+        -- meets a person (booking, an arrest), not from an officer typing a
+        -- new file into existence. This is the first such path -- an
+        -- identifier picked from `esx.character.search`, or a name given by
+        -- hand for someone not yet identified -- and it keeps that rule: a
+        -- call naming neither is refused rather than writing an empty row
+        -- nothing distinguishes from any other.
+        local identifier = blank(input.identifier)
+        local firstName = blank(input.firstName)
+        local lastName = blank(input.lastName)
+
+        if not identifier and not firstName and not lastName then
+            return route.refuse(FredPD.ErrorCode.INVALID, { lastName = 'required' })
+        end
+
+        -- Same shape check `person.search` applies, for the same reason: no
+        -- pattern type at the schema layer, so a malformed date is caught
+        -- here rather than handed to MariaDB to reject with a warning and a
+        -- silent zero date.
+        local dateOfBirth = blank(input.dateOfBirth)
+        if dateOfBirth and not dateOfBirth:match('^%d%d%d%d%-%d%d%-%d%d$') then
+            return route.refuse(FredPD.ErrorCode.INVALID, { dateOfBirth = 'format' })
+        end
+
+        local id = repo.createPerson(session.agencyId, {
+            identifier = identifier,
+            firstName = firstName,
+            middleName = blank(input.middleName),
+            lastName = lastName,
+            dateOfBirth = dateOfBirth,
+            sex = input.sex,
+            phone = blank(input.phone),
+            address = blank(input.address),
+            classification = input.classification,
+        }, session.discordId)
+
+        if not id then return route.refuse(FredPD.ErrorCode.INTERNAL) end
+
+        return { id = id }
+    end,
+})
+
+route.define({
     name = 'person.update',
     perm = 'rms.person.edit',
     schema = 'PersonUpdate',

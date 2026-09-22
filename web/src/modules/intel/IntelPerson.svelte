@@ -6,6 +6,7 @@
   import type { IntelNote, IntelPerson } from '../../lib/types';
   import { fieldList, type Failure } from '../shared/failure';
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
+  import EntityPicker from '../shared/EntityPicker.svelte';
 
   /**
    * People (spec 10): the register's own person, alias or description.
@@ -339,7 +340,43 @@
 
   // -------------------------------------------------------------- vehicles
 
+  interface RegisteredVehicleOption {
+    plate: string;
+    model: string | null;
+    colour: string | null;
+    ownerIdentifier: string | null;
+  }
+
+  /**
+   * Suggests a real vehicle from the register while the officer is still
+   * typing a plate, model or colour here -- the example this screen was
+   * missing: adding a vehicle to a person previously meant typing all three
+   * from memory, with nothing to say whether the plate typed was even real.
+   *
+   * `vehicle.search` (registry module) is a *different* register from this
+   * one -- intel's own `fpd_intel_vehicles` is a lightweight "seen driving
+   * this" note, not the registration record -- so a result here is a
+   * suggestion to copy from, never a link: picking one prefills the boxes
+   * below and the officer can still edit or clear them before submitting.
+   * An officer without `rms.vehicle.view` gets an empty list rather than a
+   * refusal, the same as any other register this session cannot read.
+   */
+  async function searchRegisteredVehicles(term: string): Promise<RegisteredVehicleOption[]> {
+    const response = await nui.call<{ vehicles: RegisteredVehicleOption[] }>('vehicle.search', {
+      term: term || undefined,
+      limit: 8,
+    });
+
+    return response.ok ? response.data.vehicles : [];
+  }
+
   let vehicleForm = $state({ plate: '', model: '', color: '', notes: '' });
+
+  function applyRegisteredVehicle(vehicle: RegisteredVehicleOption): void {
+    vehicleForm.plate = vehicle.plate;
+    vehicleForm.model = vehicle.model ?? vehicleForm.model;
+    vehicleForm.color = vehicle.colour ?? vehicleForm.color;
+  }
 
   async function addVehicle(event: SubmitEvent): Promise<void> {
     event.preventDefault();
@@ -385,7 +422,26 @@
 
   // ---------------------------------------------------------- memberships
 
-  let membershipForm = $state({ orgId: '', role: '', isConfirmed: false });
+  interface OrgOption {
+    id: number;
+    name: string;
+    type: string | null;
+  }
+
+  /** `intel.org.list` already lists everything when `search` is left out
+   *  (`Intel.searchTerm` turns a blank box into "no filter", the same way
+   *  every other browse-when-empty search in the suite does), so a picker
+   *  opened with nothing typed still offers something to pick from. */
+  async function searchOrgs(term: string): Promise<OrgOption[]> {
+    const response = await nui.call<{ orgs: OrgOption[] }>('intel.org.list', {
+      search: term || undefined,
+      limit: 8,
+    });
+
+    return response.ok ? response.data.orgs : [];
+  }
+
+  let membershipForm = $state({ orgId: '', orgName: '', role: '', isConfirmed: false });
 
   async function addMembership(event: SubmitEvent): Promise<void> {
     event.preventDefault();
@@ -402,7 +458,7 @@
 
     if (response.ok) {
       failure = null;
-      membershipForm = { orgId: '', role: '', isConfirmed: false };
+      membershipForm = { orgId: '', orgName: '', role: '', isConfirmed: false };
       await open(detail.person.id);
     } else {
       failure = response;
@@ -433,7 +489,28 @@
 
   // ------------------------------------------------------------ associates
 
-  let associateForm = $state({ associateId: '', relationship: '', isConfirmed: false });
+  interface PersonOption {
+    id: number;
+    name: string | null;
+    alias: string | null;
+  }
+
+  /** Same browse-when-empty list as `searchOrgs`, minus the person's own
+   *  record: the database refuses a self-association anyway
+   *  (`ck_fpd_intel_associates_ordered`), so offering it in the dropdown
+   *  would only be a result that always fails to submit. */
+  async function searchAssociateCandidates(term: string): Promise<PersonOption[]> {
+    const response = await nui.call<{ persons: PersonOption[] }>('intel.person.list', {
+      search: term || undefined,
+      limit: 8,
+    });
+
+    if (!response.ok) return [];
+
+    return response.data.persons.filter((person) => person.id !== detail?.person.id);
+  }
+
+  let associateForm = $state({ associateId: '', associateName: '', relationship: '', isConfirmed: false });
 
   async function addAssociate(event: SubmitEvent): Promise<void> {
     event.preventDefault();
@@ -450,7 +527,7 @@
 
     if (response.ok) {
       failure = null;
-      associateForm = { associateId: '', relationship: '', isConfirmed: false };
+      associateForm = { associateId: '', associateName: '', relationship: '', isConfirmed: false };
       await open(detail.person.id);
     } else {
       failure = response;
@@ -857,6 +934,18 @@
           {/each}
         </ul>
       {/if}
+      <label class="mt-1 flex w-72 flex-col gap-1">
+        <span class="text-[var(--color-ink-muted)]">{t('intel.person.vehicleSearch')}</span>
+        <EntityPicker
+          placeholder={t('intel.person.vehicleSearchPlaceholder')}
+          search={searchRegisteredVehicles}
+          label={(vehicle) => vehicle.plate}
+          detail={(vehicle) =>
+            [vehicle.model, vehicle.colour, vehicle.ownerIdentifier].filter(Boolean).join(' · ')}
+          getKey={(vehicle) => vehicle.plate}
+          onSelect={applyRegisteredVehicle}
+        />
+      </label>
       <form class="mt-1 flex flex-wrap items-end gap-2" onsubmit={addVehicle}>
         <label class="flex flex-col gap-1">
           <span class="text-[var(--color-ink-muted)]">{t('intel.person.plate')}</span>
@@ -916,13 +1005,23 @@
         </ul>
       {/if}
       <form class="mt-1 flex flex-wrap items-end gap-2" onsubmit={addMembership}>
-        <label class="flex flex-col gap-1">
+        <label class="flex w-56 flex-col gap-1">
           <span class="text-[var(--color-ink-muted)]">{t('intel.person.orgId')}</span>
-          <input
-            type="number"
-            min="1"
-            class="w-24 border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1"
-            bind:value={membershipForm.orgId}
+          <EntityPicker
+            placeholder={t('intel.person.orgSearchPlaceholder')}
+            search={searchOrgs}
+            label={(org) => org.name}
+            detail={(org) => org.type}
+            getKey={(org) => org.id}
+            selectedLabel={membershipForm.orgName || null}
+            onSelect={(org) => {
+              membershipForm.orgId = String(org.id);
+              membershipForm.orgName = org.name;
+            }}
+            onClear={() => {
+              membershipForm.orgId = '';
+              membershipForm.orgName = '';
+            }}
           />
         </label>
         <label class="flex flex-col gap-1">
@@ -971,13 +1070,23 @@
         </ul>
       {/if}
       <form class="mt-1 flex flex-wrap items-end gap-2" onsubmit={addAssociate}>
-        <label class="flex flex-col gap-1">
+        <label class="flex w-56 flex-col gap-1">
           <span class="text-[var(--color-ink-muted)]">{t('intel.person.associateId')}</span>
-          <input
-            type="number"
-            min="1"
-            class="w-24 border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1"
-            bind:value={associateForm.associateId}
+          <EntityPicker
+            placeholder={t('intel.person.associateSearchPlaceholder')}
+            search={searchAssociateCandidates}
+            label={(person) => person.name ?? person.alias ?? t('intel.person.unknown')}
+            detail={(person) => (person.name ? person.alias : null)}
+            getKey={(person) => person.id}
+            selectedLabel={associateForm.associateName || null}
+            onSelect={(person) => {
+              associateForm.associateId = String(person.id);
+              associateForm.associateName = person.name ?? person.alias ?? t('intel.person.unknown');
+            }}
+            onClear={() => {
+              associateForm.associateId = '';
+              associateForm.associateName = '';
+            }}
           />
         </label>
         <label class="flex flex-col gap-1">

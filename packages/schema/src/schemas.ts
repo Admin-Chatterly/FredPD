@@ -627,6 +627,28 @@ export const schemas = {
     // comes from the session and the access tables.
     id: { type: 'integer', required: true, min: 1 },
   },
+
+  // Puts a person in the master index (7.3). Every field is optional at this
+  // layer -- the handler is what refuses a call naming neither an identifier
+  // nor a name at all -- because which combination is known varies by how the
+  // person was first met, and a schema-level `required` could only pick one.
+  PersonCreate: {
+    // An ESX character identifier, usually picked from `esx.character.search`
+    // rather than typed: this is what "identity comes from the framework"
+    // (persons/repo.lua's `Repo.createPerson` doc comment) means once there is
+    // finally a route that calls it. Left absent for someone not yet
+    // identified -- `fpd_persons.identifier` is nullable for exactly that.
+    identifier: { type: 'string', required: false, max: 191 },
+    firstName: { type: 'string', required: false, max: 96 },
+    middleName: { type: 'string', required: false, max: 96 },
+    lastName: { type: 'string', required: false, max: 96 },
+    dateOfBirth: { type: 'string', required: false, max: 10 },
+    sex: { type: 'enum', required: false, values: PERSON_SEXES },
+    phone: { type: 'string', required: false, max: 32 },
+    address: { type: 'string', required: false, max: 191 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
   PersonUpdate: {
     id: { type: 'integer', required: true, min: 1 },
     // Optimistic locking (spec 13.1): the version the editor was shown goes
@@ -903,6 +925,22 @@ export const schemas = {
     reason: { type: 'string', required: false, max: 255 },
     caseNumber: { type: 'string', required: false, max: 32 },
   },
+
+  // Suggesting real citizens and vehicles from ESX's own tables
+  // (server/modules/esxdata/routes.lua). Unlike the registers above, these
+  // tables carry no agency scope of their own, so an empty term is refused
+  // rather than read as "browse everything on the whole server" -- `min: 2`
+  // is the floor the handler enforces too, restated here as the schema's own
+  // bound the way every other search in this file names its floor twice.
+  EsxCharacterSearch: {
+    term: { type: 'string', required: true, min: 2, max: 128 },
+    limit: { type: 'integer', required: false, min: 1, max: 20 },
+  },
+  EsxVehicleSearch: {
+    term: { type: 'string', required: true, min: 2, max: 32 },
+    limit: { type: 'integer', required: false, min: 1, max: 20 },
+  },
+
   FirearmGet: {
     // Either one. The handler refuses a call carrying neither, because a
     // schema cannot say "one of these two" (routes.lua: `id = 'required'`).

@@ -487,14 +487,16 @@ route.define({
         local title = service.blankToNull(input.title)
         if not title then return route.refuse(FredPD.ErrorCode.INVALID, { title = 'required' }) end
 
-        return {
-            id = repo.createCase(session.agencyId, {
-                title = title,
-                description = service.blankToNull(input.description),
-                status = input.status,
-                classification = input.classification,
-            }, session.discordId),
-        }
+        local case = repo.createCase(session.agencyId, {
+            title = title,
+            description = service.blankToNull(input.description),
+            status = input.status,
+            classification = input.classification,
+        }, session.discordId)
+
+        if not case then return route.refuse(FredPD.ErrorCode.INTERNAL) end
+
+        return { id = case.id, number = case.number, case = case }
     end,
 })
 

@@ -661,6 +661,18 @@ FredPD.Schema = {
         id = { type = 'integer', required = true, min = 1 },
     },
 
+    PersonCreate = {
+        identifier = { type = 'string', required = false, max = 191 },
+        firstName = { type = 'string', required = false, max = 96 },
+        middleName = { type = 'string', required = false, max = 96 },
+        lastName = { type = 'string', required = false, max = 96 },
+        dateOfBirth = { type = 'string', required = false, max = 10 },
+        sex = { type = 'enum', required = false, values = { 'male', 'female', 'other', 'unknown' } },
+        phone = { type = 'string', required = false, max = 32 },
+        address = { type = 'string', required = false, max = 191 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
     PersonUpdate = {
         id = { type = 'integer', required = true, min = 1 },
         version = { type = 'integer', required = true, min = 1 },
@@ -763,6 +775,16 @@ FredPD.Schema = {
         limit = { type = 'integer', required = false, min = 1, max = 100 },
         reason = { type = 'string', required = false, max = 255 },
         caseNumber = { type = 'string', required = false, max = 32 },
+    },
+
+    EsxCharacterSearch = {
+        term = { type = 'string', required = true, min = 2, max = 128 },
+        limit = { type = 'integer', required = false, min = 1, max = 20 },
+    },
+
+    EsxVehicleSearch = {
+        term = { type = 'string', required = true, min = 2, max = 32 },
+        limit = { type = 'integer', required = false, min = 1, max = 20 },
     },
 
     FirearmGet = {

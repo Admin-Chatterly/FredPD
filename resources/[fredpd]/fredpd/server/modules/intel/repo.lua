@@ -433,9 +433,17 @@ end
 -- -----------------------------------------------------------------------------
 
 local CASE_COLUMNS <const> = [[
-    c.id, c.title, c.description, c.status, c.classification, c.version,
+    c.id, c.number, c.title, c.description, c.status, c.classification, c.version,
     c.created_by AS createdBy, c.created_at AS createdAt, c.updated_at AS updatedAt
 ]]
+
+--- Appendix D: `{AGENCY}-IC{YY}-{#####}`. Distinct from the FU's `{AGENCY}-C{YY}-`
+--- (`Repo.fuPrefix`, anmalan/repo.lua) on sight -- the `IC` is the whole point,
+--- the same way a citation's `-T` and impound's bare `I` stay apart from
+--- everything else in Appendix D.
+local function intelCasePrefix(agencyId)
+    return ('%s-IC%s-'):format(agencyId, os.date('%y')), 5
+end
 
 function Repo.listCases(agencyId, filter)
     local where = { 'c.agency_id = ?' }
@@ -473,14 +481,42 @@ function Repo.getCase(agencyId, id)
          WHERE c.agency_id = ? AND c.id = ?]]):format(CASE_COLUMNS), { agencyId, id })
 end
 
+--- Opens an intel case, number allocated under the counter lock (spec 10,
+--- Appendix D), the same pattern `Repo.fuCreate` (anmalan/repo.lua) uses.
 function Repo.createCase(agencyId, input, discordId)
-    return db().insert(
-        [[INSERT INTO fpd_intel_cases (agency_id, title, description, status, classification, created_by)
-          VALUES (?, ?, ?, ?, ?, ?)]],
-        {
-            agencyId, input.title, input.description, input.status or 'open',
-            input.classification or 'internal', discordId,
-        }
+    local prefix, width = intelCasePrefix(agencyId)
+    local counters = FredPD.Core.counters
+
+    local values = counters.numberValues(prefix, width, 'intel_case', agencyId)
+    local base = #values
+
+    values[base + 1] = agencyId
+    values[base + 2] = input.title
+    values[base + 3] = input.description
+    values[base + 4] = input.status or 'open'
+    values[base + 5] = input.classification or 'internal'
+    values[base + 6] = discordId
+
+    local committed = FredPD.Core.db.transaction(counters.transaction(
+        'intel_case', agencyId, nil, {
+            {
+                query = [[INSERT INTO fpd_intel_cases
+                              (number, agency_id, title, description, status, classification, created_by)
+                          VALUES (]] .. counters.numberSql() .. [[, ?, ?, ?, ?, ?, ?)]],
+                values = values,
+            },
+        }))
+
+    if not committed then return nil end
+
+    -- The same imprecise-under-heavy-concurrency lookup `Repo.fuCreate` uses:
+    -- there is no column here to bind the row back to more tightly than
+    -- "this agency's newest case this officer opened".
+    return db().single(
+        ([[SELECT %s FROM fpd_intel_cases c
+            WHERE c.agency_id = ? AND c.created_by = ? ORDER BY c.id DESC LIMIT 1]])
+            :format(CASE_COLUMNS),
+        { agencyId, discordId }
     )
 end
 

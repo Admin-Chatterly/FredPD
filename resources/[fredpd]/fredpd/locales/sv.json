@@ -66,7 +66,11 @@
     "any": "Alla",
     "search": "Sök",
     "save": "Spara",
-    "loadMore": "Visa fler"
+    "loadMore": "Visa fler",
+    "searching": "Söker…",
+    "noMatches": "Inga träffar",
+    "selected": "Vald: {value}",
+    "clearSelection": "Byt"
   },
   "fieldError": {
     "type": "fel typ av värde",
@@ -485,17 +489,21 @@
       "mergeKeepId": "Behåll denna post",
       "mergeDropId": "Slå ihop in post-id",
       "deleteConfirm": "Ta bort {name}? Detta kan inte ångras.",
+      "vehicleSearch": "Sök i fordonsregistret",
+      "vehicleSearchPlaceholder": "Sök på registreringsnummer, modell eller ägare",
       "plate": "Registreringsnummer",
       "model": "Modell",
       "color": "Färg",
       "vehicleNotes": "Anteckning",
       "addVehicle": "Lägg till fordon",
       "noVehicles": "Inga fordon registrerade.",
-      "orgId": "Organisations-id",
+      "orgId": "Organisation",
+      "orgSearchPlaceholder": "Skriv ett namn för att söka",
       "role": "Roll",
       "addMembership": "Lägg till i organisation",
       "noMemberships": "Inte känd medlem i någon organisation.",
-      "associateId": "Person-id",
+      "associateId": "Person",
+      "associateSearchPlaceholder": "Skriv ett namn för att söka",
       "relationship": "Relation",
       "addAssociate": "Lägg till kontakt",
       "noAssociates": "Inga kontakter registrerade.",
@@ -550,7 +558,8 @@
       "linkKind": "Typ",
       "linkPerson": "Person",
       "linkOrg": "Organisation",
-      "linkId": "Post-id",
+      "linkId": "Post",
+      "linkSearchPlaceholder": "Skriv ett namn för att söka",
       "linkRole": "Roll",
       "addLink": "Koppla en post",
       "noLinks": "Inget kopplat till detta ärende ännu."
@@ -980,6 +989,15 @@
       "detail": {
         "none": "Välj ett registernummer för att öppna personen."
       },
+      "create": {
+        "esxSearch": "Hitta en invånare",
+        "esxSearchPlaceholder": "Sök på namn",
+        "hide": "Dölj ny person",
+        "intro": "Väljer du en invånare fylls det som ESX redan vet i automatiskt; varje fält nedan går fortfarande att ändra innan du sparar.",
+        "show": "Ny person",
+        "submit": "Skapa post",
+        "title": "Ny person"
+      },
       "edit": {
         "submit": "Spara post",
         "title": "Redigera post"
@@ -1105,6 +1123,8 @@
       "plates": "Registreringshistorik",
       "register": {
         "intro": "Chassinumret genereras av registret och kan inte anges här.",
+        "esxSearch": "Hitta ett befintligt fordon",
+        "esxSearchPlaceholder": "Sök på registreringsnummer eller ägare",
         "reason": "Skäl",
         "submit": "Registrera fordon",
         "title": "Registrera ett fordon"

@@ -83,6 +83,12 @@ server_scripts {
     'server/modules/registry/repo.lua',
     'server/modules/registry/routes.lua',
 
+    -- Suggests real citizens and vehicles from ESX's own tables while
+    -- registering one (server/bridges/framework.lua). Routes only: the SQL
+    -- lives in the bridge, because it is the bridge's schema to know, not a
+    -- FredPD-owned table this module would otherwise keep a repo.lua for.
+    'server/modules/esxdata/routes.lua',
+
     -- The unified query (spec 7.2) reads all three registers, so it loads last.
     'server/modules/query/service.lua',
     'server/modules/query/repo.lua',

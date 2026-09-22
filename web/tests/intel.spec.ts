@@ -114,7 +114,8 @@ test('adds and removes an associate on a person', async ({ page }) => {
   await page.getByRole('button', { name: 'Dean Ashworth', exact: false }).first().click();
 
   const associateForm = page.locator('form').filter({ hasText: 'Relationship' });
-  await associateForm.getByLabel('Person id').fill('5');
+  await associateForm.getByLabel('Person').fill('Ivy');
+  await page.getByRole('option', { name: /Ivy Turner/ }).click();
   await associateForm.getByLabel('Relationship').fill('Cousin');
   await associateForm.getByRole('button', { name: 'Add associate' }).click();
 
@@ -166,7 +167,8 @@ test('creates a case, links a person and unlinks them', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Operation Foxglove' })).toBeVisible();
 
   const linkForm = page.locator('form').filter({ hasText: 'Kind' });
-  await linkForm.getByLabel('Record id').fill('5');
+  await linkForm.getByLabel('Record').fill('Ivy');
+  await page.getByRole('option', { name: /Ivy Turner/ }).click();
   await linkForm.getByRole('button', { name: 'Link a record' }).click();
 
   const linked = page.getByText('Ivy Turner', { exact: false }).last();

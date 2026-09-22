@@ -80,6 +80,129 @@ function Framework.getDiscordId(src)
     return (identifier:gsub('^discord:', ''))
 end
 
+-- -----------------------------------------------------------------------------
+-- Reading ESX's own tables directly
+-- -----------------------------------------------------------------------------
+--
+-- Everything above calls only ESX's exported API -- `esx.GetPlayerFromId`, a
+-- player's own `.get`/`.getJob()` -- because a resource's schema is a property
+-- of which fork a server runs and not of FredPD (the same reason
+-- `appearance.gloves`, config/server.lua, ships empty rather than guessed).
+-- That holds for the *currently connected* player. It has no answer for "does
+-- this citizen already exist" or "what vehicles does ESX already know about",
+-- because ESX exports nothing for an offline character or the vehicle table
+-- as a whole -- there is no API call these two functions could make instead.
+--
+-- So they read the tables directly, and the column names are
+-- `config.server.esxData`'s to say, not this file's: the defaults match
+-- es_extended / ESX Legacy, which is what `framework.lua` already assumes
+-- everywhere else, and a fork that renamed a column changes the setting
+-- rather than this code. `esxData.enabled = false` turns both functions into
+-- an empty result, never an error -- a server whose columns do not match yet
+-- should see no suggestions, not a broken query.
+--
+-- Invariant 8 still holds: every *value* a term can influence travels as a
+-- `?` placeholder, exactly as everywhere else. What is interpolated with
+-- `%s` below is table and column *names*, which SQL has no placeholder for
+-- at all -- and which come only from `config/server.lua`, a file the
+-- operator edits, never from a client or from the searched term.
+
+local function esxData()
+    return FredPD.Config.server.esxData or {}
+end
+
+--- Citizens matching a name fragment, read straight from ESX's character
+--- table -- online or not, which `Framework.getCharacter` cannot answer since
+--- it only knows the currently connected player.
+---
+--- Prefilling a new person record from this is what "citizens fetched from
+--- the character database" means in practice: the officer picks the real
+--- character instead of retyping a name FredPD has no way to check against
+--- anything.
+---
+--- @param term string already trimmed and at least two characters
+--- @param limit number
+--- @return table rows: { identifier, firstName, lastName, dateOfBirth, phone }
+function Framework.searchCharacters(term, limit)
+    local config = esxData().characters
+    if not config or esxData().enabled == false then return {} end
+
+    local likeTerm = '%' .. term .. '%'
+
+    local ok, rows = pcall(function()
+        return FredPD.Core.db.query(
+            ([[SELECT `%s` AS identifier, `%s` AS firstName, `%s` AS lastName,
+                      `%s` AS dateOfBirth, `%s` AS phone
+                 FROM `%s`
+                WHERE `%s` LIKE ? OR `%s` LIKE ? OR `%s` LIKE ?
+                ORDER BY `%s`, `%s`
+                LIMIT ?]]):format(
+                config.identifier, config.firstName, config.lastName,
+                config.dateOfBirth, config.phone, config.table,
+                config.firstName, config.lastName, config.identifier,
+                config.lastName, config.firstName
+            ),
+            { likeTerm, likeTerm, likeTerm, limit or 8 }
+        )
+    end)
+
+    if not ok then
+        print(('[fredpd] esxData.characters: query failed against `%s` -- check the column names in config/server.lua match your framework fork. (%s)')
+            :format(config.table, tostring(rows)))
+        return {}
+    end
+
+    return rows
+end
+
+--- Vehicles matching a plate or owner fragment, read straight from ESX's
+--- vehicle-ownership table.
+---
+--- `model` comes back exactly as that table stores it -- a hash number on
+--- most modern ESX forks, since a vehicle's properties are stored as ESX
+--- itself serialised them, not as the human-readable spawn name `fpd_fleet`
+--- and `vehicle.register` use. That is not resolved here: turning a model
+--- hash back into a display name needs a hash-to-name table this server's
+--- own vehicle pool defines, which is exactly the kind of guess
+--- `appearance.gloves` explains why FredPD does not make. The plate and the
+--- owner are read plainly either way, which is most of what a registration
+--- prefill needs.
+---
+--- @param term string already trimmed and at least two characters
+--- @param limit number
+--- @return table rows: { plate, owner, model }
+function Framework.searchOwnedVehicles(term, limit)
+    local config = esxData().vehicles
+    if not config or esxData().enabled == false then return {} end
+
+    local likeTerm = '%' .. term .. '%'
+    local modelExpr = config.vehicleJson
+        and ('JSON_UNQUOTE(JSON_EXTRACT(`%s`, \'$.model\'))'):format(config.vehicleColumn)
+        or ('`%s`'):format(config.vehicleColumn)
+
+    local ok, rows = pcall(function()
+        return FredPD.Core.db.query(
+            ([[SELECT `%s` AS plate, `%s` AS owner, %s AS model
+                 FROM `%s`
+                WHERE `%s` LIKE ? OR `%s` LIKE ?
+                ORDER BY `%s`
+                LIMIT ?]]):format(
+                config.plate, config.owner, modelExpr, config.table,
+                config.plate, config.owner, config.plate
+            ),
+            { likeTerm, likeTerm, limit or 8 }
+        )
+    end)
+
+    if not ok then
+        print(('[fredpd] esxData.vehicles: query failed against `%s` -- check the column names in config/server.lua match your framework fork. (%s)')
+            :format(config.table, tostring(rows)))
+        return {}
+    end
+
+    return rows
+end
+
 --- Startup check (spec 3.8): fail loudly and early, not on first use.
 function Framework.verify()
     if GetResourceState('es_extended') ~= 'started' then
