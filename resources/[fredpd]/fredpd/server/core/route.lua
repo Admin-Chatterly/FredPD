@@ -24,6 +24,18 @@ FredPD.Core = FredPD.Core or {}
 
 local Route = {}
 
+--- Sentinel `perm` for a route that needs nothing beyond a valid session.
+---
+--- `Route.define` requires every route to name a permission (invariant 3/4:
+--- nothing is reachable by "just being signed in" by accident). `session.get`
+--- is the one legitimate exception -- it is how the shell learns which
+--- modules to draw at all, so it has to answer for *every* officer, including
+--- one who holds only `admin` or only `dispatch`, neither of which happens to
+--- include `page.records`. Naming a real permission there instead (as it did
+--- before) locks out any account whose groups don't happen to include that
+--- one page -- an `admin`-only officer could not open the interface at all.
+Route.ANY_SESSION = '__any_session__'
+
 local registered = {}
 
 --- Context conditions (spec 4.3). These *restrict* a granted permission; none
@@ -129,7 +141,9 @@ function Route.define(definition)
         end
 
         -- 3. Permission
-        if not FredPD.Core.perms.satisfies(session.permissions, definition.perm) then
+        if definition.perm ~= Route.ANY_SESSION
+            and not FredPD.Core.perms.satisfies(session.permissions, definition.perm)
+        then
             audit.denied(session, definition.name, 'forbidden')
             return { ok = false, err = FredPD.ErrorCode.FORBIDDEN }
         end

@@ -217,9 +217,17 @@ route.define({
 })
 
 --- The session's own view of itself, for the NUI shell.
+---
+--- `route.ANY_SESSION`, not a page permission: this is how the shell learns
+--- which modules it may draw, so it has to answer for every signed-in
+--- officer, including one who holds nothing but `admin` -- who does not
+--- themselves hold `page.records` and would otherwise never get past the
+--- sign-on screen at all (module-level access is still enforced normally:
+--- `allowedModules` below only lists what `session.permissions` actually
+--- satisfies).
 route.define({
     name = 'session.get',
-    perm = 'page.records',
+    perm = route.ANY_SESSION,
     handler = function(session, _input)
         return {
             callsign = session.callsign,
