@@ -36,7 +36,6 @@
   import { t } from '../../lib/i18n';
   import {
     EVIDENCE_DESTINATIONS,
-    EVIDENCE_PACKAGING,
     EVIDENCE_STATUSES,
     EVIDENCE_TYPES,
     LAB_ANALYSES,
@@ -44,7 +43,7 @@
     SCENE_STATUSES,
   } from '@fredpd/schema';
   import { fieldList, type Failure } from '../shared/failure';
-  import type { CustodyEntry, EvidenceItem, PendingTrace, Scene } from './types';
+  import type { CustodyEntry, EvidenceItem, Scene } from './types';
   import type { LabAnalysis } from '../lab/types';
 
   /**
@@ -71,14 +70,10 @@
     // at when it happens.
     placementId: 'placement.property_terminal',
     search: 'evidence.filter.search',
-    traceKey: 'evidence.collect.trace',
     storageLocation: 'evidence.intake.storage',
     reason: 'evidence.transfer.reason',
     destination: 'evidence.transfer.destination',
     toParty: 'evidence.transfer.toParty',
-    packaging: 'evidence.collect.packaging',
-    markerNumber: 'evidence.collect.marker',
-    description: 'evidence.column.description',
     caseNumber: 'evidence.column.case',
     sceneId: 'evidence.scene.number',
     analyses: 'evidence.labRequest.analyses',
@@ -134,29 +129,13 @@
   let confirmRelease = $state<number | null>(null);
 
   /**
-   * A trace the officer is standing at, pushed by the client when they target
-   * one. There is no route that lists traces: the world holds them, the grid
-   * holds their truth, and neither is readable from the terminal (8.11). So the
-   * collection form exists only while the game says there is something to
-   * collect.
+   * Collection itself has no place on this screen and never has, in play: the
+   * world holds a trace and the grid holds its truth, neither readable from a
+   * terminal (8.11), so `fredpd_forensics`'s in-world ox_target prompt is the
+   * only way an officer ever collects one -- position and progress belong at
+   * the scene, not behind a desk. What lives here is everything downstream of
+   * that: the item it became, its custody, its lab requests.
    */
-  let trace = $state<PendingTrace | null>(null);
-  let collectPackaging = $state<string>(EVIDENCE_PACKAGING[0]);
-  let markerNumber = $state('');
-  let collectDescription = $state('');
-
-  $effect(() =>
-    nui.on('fredpd:evidence.trace', (message) => {
-      const key = message['traceKey'];
-      if (typeof key !== 'string') return;
-
-      trace = {
-        traceKey: key,
-        type: typeof message['type'] === 'string' && message['type'] !== '' ? message['type'] : null,
-        sceneId: typeof message['sceneId'] === 'number' ? message['sceneId'] : null,
-      };
-    }),
-  );
 
   async function loadItems(): Promise<void> {
     const response = await nui.call<{ items: EvidenceItem[] }>('evidence.list', {
@@ -370,32 +349,6 @@
     await submit('scene.release', { id }, loadScenes);
   }
 
-  async function collect(event: SubmitEvent): Promise<void> {
-    event.preventDefault();
-    if (!trace) return;
-
-    const marker = Number.parseInt(markerNumber, 10);
-
-    const done = await submit(
-      'evidence.collect',
-      {
-        traceKey: trace.traceKey,
-        sceneId: trace.sceneId ?? undefined,
-        packaging: collectPackaging,
-        markerNumber: Number.isFinite(marker) ? marker : undefined,
-        description: collectDescription.trim() || undefined,
-      },
-      refreshItem,
-    );
-
-    if (done) {
-      // The grid gave the trace up, so there is nothing left to collect.
-      trace = null;
-      markerNumber = '';
-      collectDescription = '';
-    }
-  }
-
   /** Server timestamps arrive as ISO strings; the grid wants minutes. */
   function when(value: string | null): string {
     return value ? value.replace('T', ' ').slice(0, 16) : '';
@@ -430,56 +383,6 @@
         </ul>
       {/if}
     </div>
-  {/if}
-
-  <!-- Collection (8.4). Only here while the game says the officer is standing
-       at a revealed trace: the terminal cannot list what is in the world. -->
-  {#if trace}
-    <form class="flex flex-wrap items-end gap-3 border border-[var(--color-border)] p-3" onsubmit={collect}>
-      <p class="w-full text-xs">
-        {t('evidence.collect.title')}
-        {#if trace.type}
-          <span class="text-[var(--color-ink-muted)]">{t(`evidence.type.${trace.type}`)}</span>
-        {/if}
-      </p>
-
-      <label class="flex flex-col gap-1 text-xs">
-        <span>{t('evidence.collect.packaging')}</span>
-        <select
-          class="border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1"
-          bind:value={collectPackaging}
-        >
-          {#each EVIDENCE_PACKAGING as value (value)}
-            <option {value}>{t(`evidence.packaging.${value}`)}</option>
-          {/each}
-        </select>
-      </label>
-
-      <label class="flex flex-col gap-1 text-xs">
-        <span>{t('evidence.collect.marker')}</span>
-        <input
-          class="w-20 border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1 font-[family-name:var(--font-mono)]"
-          bind:value={markerNumber}
-          inputmode="numeric"
-        />
-      </label>
-
-      <label class="flex flex-col gap-1 text-xs">
-        <span>{t('evidence.column.description')}</span>
-        <input
-          class="border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1"
-          bind:value={collectDescription}
-        />
-      </label>
-
-      <button
-        type="submit"
-        class="border border-[var(--color-border)] px-3 py-1.5 text-xs hover:bg-[var(--color-surface)]"
-        disabled={busy}
-      >
-        {t('evidence.collect.submit')}
-      </button>
-    </form>
   {/if}
 
   {#if tab === 'items'}

@@ -198,6 +198,15 @@ Forensics.defaults = {
         clean = 'cleaning_chemicals',
     },
 
+    --- Item names that leave drug residue rather than touch DNA when handled
+    --- (8.2). Read by `RULES.item_use` (forensics/routes.lua) once
+    --- `fredpd_forensics/client/bridges/inventory.lua` reports a use at all --
+    --- which item names count as drugs is a property of your item list, not of
+    --- FredPD, so this ships empty. An item not named here still leaves touch
+    --- DNA, which is everything `item_use` produced before this setting
+    --- existed, so an unconfigured server sees no change at all.
+    drugItems = {},
+
     --- Damage above which a hit leaves blood (8.2).
     bloodDamageThreshold = 12,
 
@@ -224,6 +233,43 @@ Forensics.defaults = {
     --- weapon permanently swabbable, which would make "washing at sinks and
     --- showers" (8.10) the only way residue ever ended.
     gsrLifetimeSeconds = 4 * 3600,
+
+    --- Whether each of the twelve evidence types in 8.2 is generated at all.
+    ---
+    --- Checked in exactly one place for every type that reaches the grid --
+    --- `Grid.place`, which every generation path already calls -- and separately
+    --- for GSR, the one type 8.2 says is not in the grid at all (it is a level
+    --- on the shooter, not a position). A type turned off here is never placed
+    --- and never marked: nothing is generated and quietly discarded somewhere
+    --- else, because a trace an agency does not want a hint that it existed
+    --- either (8.11 applies to a server's own choices, not only to a client's).
+    ---
+    --- Every type defaults to on, which is today's behaviour with nothing
+    --- turned off. An agency that wants a lighter or heavier scene -- no glove
+    --- marks, no drug residue, GSR off entirely -- sets one key to `false` in
+    --- `config/server.lua`; the rest are untouched by `settings`'s per-key
+    --- merge, the same as every other table here.
+    ---
+    --- Three of the twelve have no generation code yet regardless of this
+    --- setting (`digital`, and `tool_mark` until a break-in script's bridge
+    --- calls `fredpd_forensics`'s `toolUsed` export -- see that file). Turning
+    --- either on here changes nothing until that code exists; turning either
+    --- off is still worth doing; it is what a server that never intends to
+    --- write that bridge sets to say so.
+    enabled = {
+        print = true,
+        glove_mark = true,
+        blood = true,
+        casing = true,
+        bullet = true,
+        magazine = true,
+        gsr = true,
+        dna_touch = true,
+        drug_residue = true,
+        footwear = true,
+        tool_mark = true,
+        digital = true,
+    },
 }
 
 --- Merges a server's overrides onto the defaults.

@@ -294,10 +294,8 @@
     },
     "collect": {
       "title": "Säkra spår",
-      "trace": "Spår",
       "packaging": "Förpackning",
-      "marker": "Markörnummer",
-      "submit": "Säkra"
+      "marker": "Markörnummer"
     },
     "intake": {
       "title": "Mottagning i beslagsrum",

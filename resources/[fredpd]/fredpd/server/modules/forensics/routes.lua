@@ -309,16 +309,29 @@ local RULES <const> = {
         end,
     },
 
-    --- Drinking, eating, smoking: touch DNA on the thing they handled (8.2).
-    --- Gloves do not help here -- saliva is not a fingerprint.
+    --- Drinking, eating, smoking, handling drugs: touch DNA on the thing they
+    --- handled, or drug residue when the item was one (8.2). Gloves do not help
+    --- against either -- saliva is not a fingerprint and residue is not a print
+    --- either.
+    ---
+    --- The item name is the client's word, same as a door index is, and is
+    --- worth exactly as little: it decides which of the two labels this trace
+    --- gets, both of which the server would have created from the fact of the
+    --- call alone. Its own list of drug items -- `config.drugItems`, empty by
+    --- default -- is what a name is checked against, and anything else,
+    --- including no name at all, is touch DNA, which is what this rule always
+    --- produced before drug residue existed as an outcome.
     item_use = {
         limit = { per = 15, window = 30 },
-        make = function(src, _input, position)
+        make = function(src, input, position)
             local identifier = identifierOf(src)
             if not identifier then return nil end
 
+            local drugItems = config.drugItems or {}
+            local isDrug = type(input.itemName) == 'string' and drugItems[input.itemName] == true
+
             return {
-                type = 'dna_touch',
+                type = isDrug and 'drug_residue' or 'dna_touch',
                 x = position.x,
                 y = position.y,
                 z = position.z,
@@ -469,6 +482,25 @@ route.public({
 --- map.
 local MAX_HIT_METRES <const> = 250.0
 
+--- How close the attacker has to be standing to the blood they just drew for
+--- it to be plausible that they stepped in it (8.2, "footwear... through
+--- blood").
+---
+--- This is the one footwear trigger this file implements, and it is
+--- deliberately narrower than 8.2's full list. "Walking on soft ground or
+--- snow" needs the server to know what a player is standing on, which nothing
+--- server-side can answer without either trusting a client's word for its own
+--- material or polling every connected player's position against the world
+--- forever -- the first is the class of claim 11.3 bans and the second is the
+--- always-running cost 12.1's "0.00 ms with the MDT closed" budget exists to
+--- refuse. "Through blood" is different: the server already knows exactly
+--- where blood was just placed, from its own event, so checking who was close
+--- enough to have stepped in it costs one distance check on a hit that was
+--- going to run anyway. A melee attacker or a close-range shooter is inside
+--- this; a sniper forty metres off is not, correctly -- they were never near
+--- the blood to walk through it.
+local FOOTWEAR_RANGE_METRES <const> = 2.0
+
 --- Blood, and the bullet that drew it, from `weaponDamageEvent`.
 ---
 --- 8.3.3 is explicit that this pair may never come from a *sensor* claim, and it
@@ -568,6 +600,28 @@ AddEventHandler('weaponDamageEvent', function(sender, data)
                         owner = { weaponSerial = weapon.serial },
                         sourceKey = sourceKeyFor(attacker),
                     })
+                end
+
+                -- Footwear, when the attacker was close enough to the blood
+                -- to have stepped in it (see `FOOTWEAR_RANGE_METRES`). The
+                -- attacker's own identifier, not the victim's: this is a
+                -- print of whoever was standing there, and that is the
+                -- person who just landed the hit.
+                local attackerIdentifier = identifierOf(attacker)
+
+                if attackerIdentifier then
+                    local fx, fy, fz = at.x - from.x, at.y - from.y, at.z - from.z
+
+                    if (fx * fx + fy * fy + fz * fz) <= (FOOTWEAR_RANGE_METRES * FOOTWEAR_RANGE_METRES) then
+                        grid.place({
+                            type = 'footwear',
+                            x = at.x,
+                            y = at.y,
+                            z = at.z,
+                            owner = { identifier = attackerIdentifier },
+                            sourceKey = sourceKeyFor(attacker),
+                        })
+                    end
                 end
             end
         end
@@ -1350,15 +1404,13 @@ end
 --- taking a `targetId` where a swab has no `traceKey` to give it (spec 8.2: "the
 --- swab has no route of its own").
 ---
---- **Nothing calls that route with a `targetId` yet, so on today's server this
---- function is still unreachable and residue is still write-only.** The missing
---- piece is entirely in the satellite: `fredpd_forensics` registers ox_target
---- options on vehicles, objects and models and none on a player or a ped, and
---- the MDT's collect form posts a `traceKey` only. Until a swab prompt exists
---- that sends the swabbed player's server id, `gsr.present` has no caller, the
---- decay curve is unobservable and washing clears a state nobody can ask about.
---- That is a wiring gap and not a decision -- everything on this side of it, the
---- schema field, the permission grant and the spec paragraph, is already here.
+--- `fredpd_forensics/client/collect.lua` is what calls this route with a
+--- `targetId`: an ox_target option registered on every other player
+--- (`addGlobalPlayer`, not the sphere zones a streamed trace gets, because
+--- residue is never in the grid), which runs a swab action and posts the
+--- swabbed player's server id. That is the only caller `gsr.present` has, and
+--- it is the whole of what makes residue readable, decay observable and a
+--- wash meaningful to check afterward.
 ---
 --- The shape is `claimTrace`'s, exactly, because the route that writes the item
 --- is the same one and it must not learn where its claim came from. What differs

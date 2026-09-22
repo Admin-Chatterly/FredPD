@@ -294,10 +294,8 @@
     },
     "collect": {
       "title": "Collect trace",
-      "trace": "Trace",
       "packaging": "Packaging",
-      "marker": "Marker number",
-      "submit": "Collect"
+      "marker": "Marker number"
     },
     "intake": {
       "title": "Property room intake",

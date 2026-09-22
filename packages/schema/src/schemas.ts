@@ -1173,6 +1173,12 @@ export const schemas = {
     // A vehicle has eight door indices; which one a print is on is part of the
     // record, because it is what a defence asks about.
     doorIndex: { type: 'integer', required: false, min: 0, max: 7 },
+    // `item_use` only. Picks between `dna_touch` and `drug_residue`
+    // (`RULES.item_use`, forensics/routes.lua) against an operator-configured
+    // list and changes nothing else: the position and the owner are still the
+    // server's own, exactly as every other sensor call. Bounded to an
+    // ox_inventory item name's realistic width, not trusted as one.
+    itemName: { type: 'string', required: false, max: 64 },
   },
 
   /** Powder, luminol or a forensic light, worked over a surface (8.4). */

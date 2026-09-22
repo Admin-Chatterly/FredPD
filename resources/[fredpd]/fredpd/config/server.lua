@@ -205,9 +205,47 @@ FredPD.Config.server = {
     --- An action whose item your server does not have is refused every time, and
     --- the officer is told they have no item. If destruction never works, check
     --- those three names against your item list before overriding anything.
+    ---
+    --- `enabled` turns individual evidence types off (spec 8.2). Every type
+    --- defaults to on; write only the ones you want off, and the rest are
+    --- untouched by the same per-key merge as everything else here. A type
+    --- turned off is never generated at all -- not created and hidden, not
+    --- created and discarded, simply never written -- so a lighter or heavier
+    --- scene is a config choice, not a code change:
+    ---
+    ---   print, glove_mark  -- fingerprints and the marks gloves leave instead
+    ---   blood, bullet      -- from the server's own damage event, never a client claim
+    ---   casing, magazine   -- from firing and reloading
+    ---   gsr                -- gunshot residue on the shooter's hands
+    ---   dna_touch          -- saliva/touch DNA from handling or consuming an item
+    ---   drug_residue       -- from handling an item named in `drugItems` below
+    ---   footwear           -- from walking through a blood trace already in the grid
+    ---   tool_mark          -- from lockpicking or a forced entry
+    ---   digital            -- reserved; nothing generates this yet in any FredPD release
+    ---
+    --- `tool_mark` needs a break-in or lockpicking script to call
+    --- `fredpd_forensics`'s `toolUsed` export before it generates anything,
+    --- whatever this says -- see `client/sensors.lua` in that resource. Turning
+    --- it off is still worth doing if you never intend to write that bridge.
     forensics = {
         -- destroyItems = {
         --     clean = 'my_cleaning_chemicals',
+        -- },
+        -- enabled = {
+        --     drug_residue = false,
+        --     footwear = false,
+        -- },
+
+        --- Item names that leave drug residue rather than touch DNA when
+        --- handled (spec 8.2) -- read by the `item_use` sensor once an
+        --- ox_inventory bridge reports a use at all (`fredpd_forensics/client/
+        --- bridges/inventory.lua`). Empty by default: which of your items are
+        --- drugs is a property of your item list, and an item not named here
+        --- still leaves touch DNA, which was the only outcome before this
+        --- setting existed.
+        -- drugItems = {
+        --     ['baggie_cocaine'] = true,
+        --     ['weed_bag'] = true,
         -- },
     },
 

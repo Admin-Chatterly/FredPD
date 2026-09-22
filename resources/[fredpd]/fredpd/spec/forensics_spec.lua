@@ -1429,6 +1429,30 @@ describe('forensics grid, in memory', function()
             assert.are.equal(0, grid.stats().destroyed)
         end)
 
+        it('generates nothing for a type an agency turned off', function()
+            load({ enabled = { print = false } })
+
+            local stored, merged = grid.place({
+                type = 'print', x = 1.0, y = 10.0, z = 30.0, owner = { identifier = 'someone' },
+            })
+
+            assert.is_nil(stored)
+            assert.is_false(merged)
+            assert.are.equal(0, grid.stats().items)
+            assert.are.equal(1, grid.stats().disabled)
+            assert.are.equal(0, grid.stats().refused)
+
+            -- A sibling type not named in the override is untouched: turning
+            -- one type off must not silently disable the rest (settings' own
+            -- per-key merge, exercised here rather than only in service_spec).
+            local other = grid.place({
+                type = 'casing', x = 1.0, y = 10.0, z = 30.0, owner = { weaponSerial = 'SN-1' },
+            })
+
+            assert.is_not_nil(other)
+            assert.are.equal(1, grid.stats().items)
+        end)
+
         it('answers a refused placement the way it answers one that merged away', function()
             -- 8.11: a call that creates nothing must look exactly like one that
             -- does. `Grid.place` answers nil and the route above it returns the
@@ -1899,6 +1923,17 @@ describe('gunshot residue', function()
 
         assert.is_true(present)
         assert.are.equal(100, level)
+    end)
+
+    it('never marks a shooter when an agency has turned GSR off', function()
+        load({ enabled = { gsr = false } })
+
+        gsr.mark(7)
+
+        local present, level = gsr.present(7)
+
+        assert.is_false(present)
+        assert.are.equal(0, level)
     end)
 
     it('fades with time rather than at a cliff edge', function()

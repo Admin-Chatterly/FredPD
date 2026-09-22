@@ -73,4 +73,5 @@ client_scripts {
     -- defines nothing -- so the bridge indexes nil and takes the resource down
     -- before a single sensor is armed.
     'client/bridges/doorlock.lua',
+    'client/bridges/inventory.lua',
 }

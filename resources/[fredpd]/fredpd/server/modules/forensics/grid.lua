@@ -182,7 +182,7 @@ local itemCount = 0
 --- destruction by an *officer* is additionally audited as `forensics.destroyed`
 --- on the route's own side, so for that half the counter is a summary and the
 --- audit log is the record.
-local stats = { placed = 0, merged = 0, evicted = 0, refused = 0, collected = 0, destroyed = 0 }
+local stats = { placed = 0, merged = 0, evicted = 0, refused = 0, collected = 0, destroyed = 0, disabled = 0 }
 
 --- Trace keys are unique for the life of the resource and mean nothing.
 ---
@@ -312,6 +312,16 @@ end
 ---   none of what is in it belongs to this trace's owner
 --- @return boolean merged
 function Grid.place(trace)
+    -- Per-type configuration (8.2), checked first and cheaply: a type an
+    -- agency turned off costs nothing else here, not a cap check, not a
+    -- sweep, not a cell walk. `config.enabled` is a plain table read rather
+    -- than a call, because every caller of this function already reaches it
+    -- through `Grid.settings()`'s merge and there is nothing left to decide.
+    if config.enabled and config.enabled[trace.type] == false then
+        stats.disabled = stats.disabled + 1
+        return nil, false
+    end
+
     -- The global cap (12.2). Rate limits bound how fast one player can generate;
     -- this bounds every player at once. Sweeping first means a full world that
     -- is merely stale empties itself instead of refusing.
@@ -1080,6 +1090,7 @@ function Grid.stats()
         refused = stats.refused,
         collected = stats.collected,
         destroyed = stats.destroyed,
+        disabled = stats.disabled,
     }
 end
 

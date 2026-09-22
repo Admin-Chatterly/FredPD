@@ -231,15 +231,19 @@ exports('surfaceTouched', surfaceTouched)
 -- -----------------------------------------------------------------------------
 
 --- Reports that this player consumed or handled something: a bottle, a
---- cigarette, a mask (8.2, "Saliva / touch DNA").
+--- cigarette, a mask, a baggie (8.2, "Saliva / touch DNA" and "Drug residue").
 ---
---- There is no context at all. The route's `item_use` rule reads nothing from
---- the call but the fact of it: the position is the server's own copy of where
---- the player is standing, the owner is their hidden identifier, and what the
---- item *was* is not sent, because the trace is touch DNA either way and gloves
---- do not help against saliva.
-local function itemUsed()
-    report.observe('item_use')
+--- Almost no context: the position is the server's own copy of where the
+--- player is standing and the owner is their hidden identifier, exactly as
+--- before this took a name at all. The one thing the name decides is which of
+--- those two outcomes this is -- the route checks it against
+--- `config.drugItems`, an operator-configured list, and falls back to touch
+--- DNA for anything not on it (including a name this call omits), so a client
+--- that sends nothing or sends nonsense gets the same trace it always did.
+---
+--- @param name string|nil the item used, if the caller knows it
+local function itemUsed(name)
+    report.observe('item_use', { itemName = type(name) == 'string' and name or nil })
 end
 
 --- Reports that this player worked a lock or forced a vehicle (8.2, "Tool marks
@@ -258,15 +262,28 @@ local function toolUsed(netId)
     report.observe('tool', { netId = type(netId) == 'number' and netId or nil })
 end
 
---- Both of these are exports and nothing else.
+--- Both of these are exports and nothing else in this file fires them, because
+--- neither moment belongs to `fredpd_forensics` itself: using an item is
+--- ox_inventory's event and picking a lock or forcing a vehicle is whatever
+--- break-in or lockpicking script a server runs. They are reached the way a
+--- door is -- from a bridge file beside `client/bridges/doorlock.lua`, which is
+--- the only kind of file in here allowed to name another resource.
 ---
---- Nothing in `fredpd_forensics` fires them, because neither moment belongs to
---- this resource: using an item is ox_inventory's event and picking a lock is
---- the break-in script's. They are reached the way a door is -- from a bridge
---- file beside `client/bridges/doorlock.lua`, which is the only kind of file in
---- here allowed to name another resource. **No such bridge ships yet**, so on a
---- server that adds none, `dna_touch` and `tool_mark` are never created and the
---- forensic light and the powder's tool-mark entry have nothing to reveal.
+--- `itemUsed` now has one: `client/bridges/inventory.lua` listens for
+--- ox_inventory's `usedItem` event and calls this for every item a player
+--- consumes, which is what makes `dna_touch` (and, for an item an operator
+--- names in `config/server.lua`'s `forensics.drugItems`, `drug_residue`)
+--- reachable in play at all.
+---
+--- `toolUsed` has no bridge and cannot ship one FredPD owns: unlike
+--- ox_inventory, there is no one break-in or lockpicking resource every server
+--- runs, so guessing at one here would be exactly the mistake
+--- `appearance.gloves` (config/server.lua) explains why FredPD does not make
+--- elsewhere. A server running such a script calls
+--- `exports.fredpd_forensics:toolUsed(netId)` from it -- the same shape
+--- `client/bridges/doorlock.lua` calls `surfaceTouched` from -- and until one
+--- does, `tool_mark` is never created and the forensic light and the powder's
+--- tool-mark entry have nothing to reveal.
 exports('itemUsed', itemUsed)
 exports('toolUsed', toolUsed)
 

@@ -55,23 +55,3 @@ export interface Scene {
   evidenceCount?: number;
   entryCount?: number;
 }
-
-/**
- * A trace the officer is standing at, pushed by the client (8.3.6).
- *
- * The key is opaque and the type comes from the render data the client already
- * holds. Neither is a claim the interface makes: `evidence.collect` reads the
- * real type and the owner from the server's own grid and ignores anything the
- * call says about them.
- */
-export interface PendingTrace {
-  traceKey: string;
-  /**
-   * Null when the client's push carried no type. That is a legitimate state,
-   * not a defect to paper over with an empty string: the server reads the real
-   * type from its own grid, so a trace the client cannot name is still
-   * collectable. The form simply says nothing about what it is.
-   */
-  type: string | null;
-  sceneId: number | null;
-}

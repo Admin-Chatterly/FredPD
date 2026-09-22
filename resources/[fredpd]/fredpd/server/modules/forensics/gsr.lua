@@ -55,8 +55,16 @@ local marks = {}
 --- puts fresh residue on hands that already had some; it does not make the
 --- residue twice as strong, and a level that climbed with every shot would make
 --- an emptied magazine readable hours after a single shot was not.
+---
+--- GSR is the one type in 8.2 the grid's own `enabled` check (`Grid.place`)
+--- never sees, because it never reaches `Grid.place` at all -- the whole point
+--- of this file is that residue is not a position. So it is checked here
+--- instead, against the same `config.enabled` table `Grid.settings()` already
+--- resolved: an agency that turns GSR off gets a shooter who never marks,
+--- rather than a mark nothing ever reads.
 function GSR.mark(src)
     if not src then return end
+    if config.enabled and config.enabled.gsr == false then return end
 
     marks[src] = os.time()
 end
