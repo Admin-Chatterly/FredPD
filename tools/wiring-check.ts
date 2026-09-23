@@ -88,6 +88,14 @@ const SERVER_CALLED: Record<string, string> = {
     'ox_target prompts in fredpd_forensics call it — wiping, cleaning, washing ' +
     'and picking up are actions in the world that every player may take, and ' +
     'the MDT is police software (spec 8.10, ADR-013)',
+  'forensics.identity.scan':
+    'client/fingerprint_scanner.lua calls it from the world, at the scanner ' +
+    "placement, the same as the trace it collects (spec 8.8) — there is no MDT " +
+    'screen for it',
+  'booking.tenPrint.capture':
+    'client/fingerprint_scanner.lua calls it from the world, standing at the ' +
+    "arrestee, the same as forensics.identity.scan — there is no MDT screen for " +
+    'it either',
 };
 
 /**

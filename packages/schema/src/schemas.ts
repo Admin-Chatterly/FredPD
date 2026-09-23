@@ -1197,6 +1197,18 @@ export const schemas = {
   },
 
   /**
+   * The live fingerprint scanner's identity action (8.8): who is the person
+   * standing at this scanner, if their prints are already on file.
+   *
+   * `targetId` is resolved and range-checked exactly as `EvidenceCollect`'s
+   * own `targetId` is -- a server id, never a position, and never trusted as
+   * a claim about who it names.
+   */
+  ForensicsIdentityScan: {
+    targetId: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
    * Wiping, cleaning, washing and picking up (8.10).
    *
    * The narrowest of the three, because it is the one every player reaches --
@@ -2602,6 +2614,23 @@ export const schemas = {
   BookingPropertyRelease: {
     id: { type: 'integer', required: true, min: 1 },
     bookingId: { type: 'integer', required: true, min: 1 },
+  },
+
+  // `targetId` is the live server id of the ped being printed, resolved and
+  // range-checked against the officer server-side (8.3.2) -- never trusted
+  // as a claim about identity. `number` (Appendix D's `B{YY}-{#####}`) says
+  // which open booking this print is filed under -- the same field an officer
+  // standing at the terminal actually has to hand, rather than a row id they
+  // would have to look up first; the person it belongs to is the booking's
+  // own, never the client's (invariant 1). `placementId` is for the
+  // `accessPoint` context condition (spec 1.4, 3.10): ten-print capture is
+  // limited to the booking terminal, the same as intake and lab work are to
+  // theirs, and the server checks the player is genuinely standing at it
+  // rather than taking the client's word.
+  BookingTenPrintCapture: {
+    number: { type: 'string', required: true, min: 1, max: 32 },
+    targetId: { type: 'integer', required: true, min: 1 },
+    placementId: { type: 'integer', required: true, min: 1 },
   },
 
   BookingRelease: {

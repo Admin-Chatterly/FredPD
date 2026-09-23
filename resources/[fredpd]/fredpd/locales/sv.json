@@ -1167,7 +1167,15 @@
   },
   "fingerprintScanner": {
     "noPrint": "Inget avtryck inom räckhåll för skannern.",
-    "scanned": "Avtryck insamlat som {number}."
+    "scanned": "Avtryck insamlat som {number}.",
+    "identified": "Träff: {name} ({number}).",
+    "noMatch": "Inget avtryck registrerat för denna person.",
+    "tenPrint": {
+      "title": "Ta tio-fingeravtryck",
+      "numberLabel": "Inskrivningsnummer",
+      "captured": "Tio-fingeravtryck registrerat mot {number}.",
+      "noTerminal": "Inte vid en inskrivningsterminal."
+    }
   },
   "forensics": {
     "busy": "Du håller redan på med något",

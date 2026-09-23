@@ -674,6 +674,11 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('evidence_tech', 'forensics.evidence.collect'),
     ('evidence_tech', 'forensics.tools.use'),
     ('evidence_tech', 'evidence.item.view'),
+    -- The live scanner (8.8): a separate grant from `forensics.evidence.collect`
+    -- because it discloses a detained person's identity rather than collecting
+    -- a sample, the same reasoning that keeps property intake and disposal
+    -- apart below.
+    ('evidence_tech', 'forensics.identity.scan'),
 
     -- The property room (8.6). Note what is separate: intake and disposal are
     -- not the same grant, because destroying evidence should be a decision

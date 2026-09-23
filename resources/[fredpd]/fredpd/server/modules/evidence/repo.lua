@@ -753,6 +753,66 @@ function Repo.indexTraceProfile(agencyId, evidenceId, indexKind, discordId)
     )
 end
 
+--- Files a ten-print reference for this identifier (8.8's fingerprint index).
+---
+--- `fpd_biometrics` has no writer anywhere else in this suite yet -- 8.1's
+--- "written once, when the character is first seen" was never given a first
+--- writer for any character. Rather than build that seeding generally here,
+--- this creates the row the first time this one identifier is ever printed,
+--- with `INSERT IGNORE` making a second capture of the same character a
+--- no-op rather than a duplicate-key error. `dna_profile` has to be filled in
+--- too -- the column is `NOT NULL` -- so a character seeded this way gets a
+--- real, stable, opaque DNA value from the moment of their first print, the
+--- same as if something had seeded it on connect; nothing yet seeds one for
+--- a character who is only ever DNA-sampled and never printed, which is the
+--- same pre-existing gap, only still open on that side.
+---
+--- Both statements compute their values from SQL expressions, never a Lua
+--- variable -- the same discipline `indexTraceProfile` uses above, and for
+--- the same reason (8.1, 8.11).
+---
+--- Idempotent like `indexTraceProfile`: a character already filed is not
+--- filed twice.
+---
+--- @return boolean committed
+function Repo.fileFingerprintReference(agencyId, identifier, discordId)
+    return db().transaction({
+        {
+            query = [[INSERT IGNORE INTO fpd_biometrics (identifier, dna_profile, fingerprint)
+                      VALUES (?, SHA2(CONCAT(?, ':dna:', UUID()), 256),
+                                 SHA2(CONCAT(?, ':fingerprint:', UUID()), 256))]],
+            values = { identifier, identifier, identifier },
+        },
+        {
+            query = [[INSERT INTO fpd_forensic_index (index_kind, profile, identifier, agency_id, added_by)
+                      SELECT 'fingerprint', b.fingerprint, b.identifier, ?, ?
+                        FROM fpd_biometrics b
+                       WHERE b.identifier = ?
+                         AND NOT EXISTS (SELECT 1 FROM fpd_forensic_index x
+                                          WHERE x.identifier = b.identifier
+                                            AND x.index_kind = 'fingerprint'
+                                            AND x.removed_at IS NULL)]],
+            values = { agencyId, discordId, identifier },
+        },
+    })
+end
+
+--- Does a live ten-print reference already exist for this identifier (8.8)?
+---
+--- Equality on an opaque value, done inside the database -- the same shape
+--- `indexHits` uses -- so a live scan never holds a fingerprint value in Lua,
+--- and never needs to: the identifier itself, not the hash it maps to, is
+--- what a scan already knows (it came straight off the ped).
+function Repo.hasFingerprintReference(agencyId, identifier)
+    return db().scalar(
+        [[SELECT 1 FROM fpd_forensic_index
+           WHERE agency_id = ? AND index_kind = 'fingerprint'
+             AND identifier = ? AND removed_at IS NULL
+           LIMIT 1]],
+        { agencyId, identifier }
+    ) ~= nil
+end
+
 --- Why a completion wrote nothing.
 ---
 --- `completeAnalysis` has three conditions in one UPDATE -- the row is this

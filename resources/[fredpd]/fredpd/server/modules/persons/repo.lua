@@ -535,6 +535,65 @@ function Repo.biometrics(agencyId, personId)
     )
 end
 
+--- Upserts the "on file" flag `Repo.biometrics` reads (8.1, 8.8). Never the
+--- biometric value itself -- this table does not have a column for one.
+function Repo.markBiometricOnFile(agencyId, personId, kind, discordId)
+    return db().execute(
+        [[INSERT INTO fpd_person_biometrics_index
+              (person_id, agency_id, kind, on_file, index_name, recorded_on, recorded_by)
+          VALUES (?, ?, ?, 1, ?, CURDATE(), ?)
+          ON DUPLICATE KEY UPDATE
+              on_file = 1, index_name = VALUES(index_name),
+              recorded_on = VALUES(recorded_on), recorded_by = VALUES(recorded_by)]],
+        { personId, agencyId, kind, kind, discordId }
+    )
+end
+
+--- The person this ESX character identifier is already tied to, if any --
+--- `uq_fpd_persons_identifier` (0005) makes it at most one per agency.
+---
+--- Never returned to a client on its own: the caller resolves the id through
+--- `Repo.readPerson`, the same access-checked path every other read of a
+--- person goes through (invariant 4).
+---
+--- @return number|nil personId
+function Repo.byIdentifier(agencyId, identifier)
+    return db().scalar(
+        'SELECT id FROM fpd_persons WHERE agency_id = ? AND identifier = ?',
+        { agencyId, identifier }
+    )
+end
+
+--- True when this person already carries a *different* identifier than the
+--- one a live scan or a ten-print capture just resolved.
+---
+--- A fresh identification (`identifier` still `NULL`) is never a conflict --
+--- see `setIdentifierIfUnset`, which is what fills it in. This is only for
+--- the case that would otherwise silently overwrite one person's identity
+--- with another's live character, and it has to be checked before the write
+--- rather than after, because there is no undoing that overwrite once
+--- `uq_fpd_persons_identifier` has moved on to enforcing the wrong link.
+function Repo.identifierConflict(agencyId, personId, identifier)
+    local existing = db().scalar(
+        'SELECT identifier FROM fpd_persons WHERE agency_id = ? AND id = ?',
+        { agencyId, personId }
+    )
+
+    return existing ~= nil and existing ~= identifier
+end
+
+--- Fills in `fpd_persons.identifier` the first time this person is tied to a
+--- live character -- which is what "identified" (0005's own comment on the
+--- column) means. A no-op, not an error, once it is already this exact
+--- value: `identifierConflict` is what catches it being a *different* one.
+function Repo.setIdentifierIfUnset(agencyId, personId, identifier)
+    return db().execute(
+        [[UPDATE fpd_persons SET identifier = ?
+           WHERE agency_id = ? AND id = ? AND identifier IS NULL]],
+        { identifier, agencyId, personId }
+    )
+end
+
 --- The live cautions on a set of people, in one query (7.3, spec 12).
 ---
 --- Live means not cancelled and not expired, and expiry is evaluated by the

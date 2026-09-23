@@ -1167,7 +1167,15 @@
   },
   "fingerprintScanner": {
     "noPrint": "No print within reach of the scanner.",
-    "scanned": "Print collected as {number}."
+    "scanned": "Print collected as {number}.",
+    "identified": "Match: {name} ({number}).",
+    "noMatch": "No print on file for this person.",
+    "tenPrint": {
+      "title": "Capture ten-print",
+      "numberLabel": "Booking number",
+      "captured": "Ten-print filed against {number}.",
+      "noTerminal": "Not at a booking terminal."
+    }
   },
   "forensics": {
     "busy": "Already doing something",

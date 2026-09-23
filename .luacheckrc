@@ -160,6 +160,11 @@ files['**/client/**/*.lua'] = {
         'NetworkGetEntityIsNetworked',
         'NetworkGetNetworkIdFromEntity',
         'PlayerPedId',
+        -- The fingerprint scanner's live scan and ten-print capture resolve
+        -- the nearest other player to a server id this way, for the server
+        -- to re-resolve and re-range-check on its own (spec 8.3.2, 8.8).
+        'GetActivePlayers',
+        'GetPlayerServerId',
         -- The forensic kit opens from a key the player binds themselves; the
         -- resource ships no default binding (spec 8.4).
         'RegisterKeyMapping',

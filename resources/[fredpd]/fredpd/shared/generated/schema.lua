@@ -895,6 +895,10 @@ FredPD.Schema = {
         tool = { type = 'enum', required = true, values = { 'powder', 'luminol', 'forensic_light' } },
     },
 
+    ForensicsIdentityScan = {
+        targetId = { type = 'integer', required = true, min = 1 },
+    },
+
     ForensicsDestroy = {
         action = { type = 'enum', required = true, values = { 'wipe', 'weapon', 'clean', 'wash', 'pickup' } },
         traceKey = { type = 'string', required = false, max = 64 },
@@ -1506,6 +1510,12 @@ FredPD.Schema = {
     BookingPropertyRelease = {
         id = { type = 'integer', required = true, min = 1 },
         bookingId = { type = 'integer', required = true, min = 1 },
+    },
+
+    BookingTenPrintCapture = {
+        number = { type = 'string', required = true, min = 1, max = 32 },
+        targetId = { type = 'integer', required = true, min = 1 },
+        placementId = { type = 'integer', required = true, min = 1 },
     },
 
     BookingRelease = {

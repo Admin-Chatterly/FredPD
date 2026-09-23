@@ -30,6 +30,14 @@ function Repo.byFrihetId(frihetId, agencyId)
         BOOKING_SELECT .. ' WHERE frihet_id = ? AND agency_id = ?', { frihetId, agencyId })
 end
 
+--- The booking number an officer standing at a terminal actually has to
+--- hand, rather than the row id they would otherwise have to look up first
+--- (mirrors `anmalan/repo.lua`'s own `Repo.byNumber`).
+function Repo.byNumber(number, agencyId)
+    return FredPD.Core.db.single(
+        BOOKING_SELECT .. ' WHERE number = ? AND agency_id = ?', { number, agencyId })
+end
+
 --- @param filter table `{ open = true|nil }` -- `open` meaning still in
 ---   custody (`released_at IS NULL`)
 function Repo.list(agencyId, filter, limit)

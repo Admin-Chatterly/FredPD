@@ -274,6 +274,11 @@ end
 RegisterCommand('fredpd', function(_source, args)
     if args[1] == 'placement' then
         Editor.open()
+    elseif args[1] == 'tenprint' then
+        -- Ten-print capture (8.8): a deliberate command, not the scanner's
+        -- own interact key -- see `fingerprint_scanner.lua`'s own header for
+        -- why filing a permanent reference needs more than standing nearby.
+        FredPD.Client.fingerprintScanner.capture()
     elseif args[1] == 'setup' then
         -- First-run setup: /fredpd setup <code> <discord role id>. Both come
         -- from the server console, so this is only useful to whoever is running

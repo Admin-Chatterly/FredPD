@@ -20,6 +20,12 @@ local repo = FredPD.Repo.booking
 local service = FredPD.Modules.booking
 local access = FredPD.Repo.access
 local frihetService = FredPD.Modules.frihet
+local personsRepo = FredPD.Repo.persons
+
+--- `evidence/repo.lua` loads after this file (fxmanifest.lua), so `FredPD.
+--- Repo.evidence` is read here at call time rather than captured as a
+--- module-load local -- the same reason `config` below is read inside the
+--- handler rather than at the top of the file.
 
 --- The access record type. `arrest` is already allowlisted in
 --- `access/repo.lua`'s `RECORD_TYPES`.
@@ -33,6 +39,17 @@ local function readable(session, id)
     if not allowed then return nil, route.refuse(FredPD.ErrorCode.RESTRICTED) end
 
     return allowed
+end
+
+--- Where a player actually is, according to the server -- never a coordinate
+--- from the call. Mirrors `forensics/routes.lua`'s own `positionOf`; not
+--- shared with it, the same as neither shares it with `forensics/gsr.lua`,
+--- because each is four lines of natives with no state to hold in common.
+local function positionOf(src)
+    local ped = GetPlayerPed(src)
+    if ped == 0 then return nil end
+
+    return GetEntityCoords(ped)
 end
 
 -- -----------------------------------------------------------------------------
@@ -113,6 +130,97 @@ route.define({
         })
 
         return { id = row.id, number = row.number, booking = row }
+    end,
+})
+
+-- -----------------------------------------------------------------------------
+-- Ten-print capture (8.8's "ten-print cards from booking")
+-- -----------------------------------------------------------------------------
+
+route.define({
+    name = 'booking.tenPrint.capture',
+    perm = 'booking.intake',
+    schema = 'BookingTenPrintCapture',
+    -- Spec 1.4: ten-print capture is limited to the booking terminal, the
+    -- same access-point pattern `evidence.intake` (`property_terminal`) and
+    -- `lab.analysis.start` (`lab_terminal`) already use -- checked here, not
+    -- taken on the client's word for which placement it is using (3.10).
+    context = { onDuty = true, accessPoint = 'booking_terminal' },
+    writes = true,
+    sensitive = true,
+    audit = 'booking.tenPrint.captured',
+    subjectType = BOOKING,
+    auditDetail = function(input) return { number = input.number } end,
+    handler = function(session, input)
+        local booking = repo.byNumber(input.number, session.agencyId)
+        if not booking then return route.refuse(FredPD.ErrorCode.NOT_FOUND, { number = 'unknown' }) end
+
+        if booking.releasedAt then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { number = 'already_released' })
+        end
+
+        -- The officer's own position and the target's are both read off the
+        -- server's own peds, never off the call (8.3.2) -- the same range
+        -- check `forensics.evidence.collect`'s swab path uses for a
+        -- `targetId`, at the same distance (`collectRange`): standing at the
+        -- terminal with the arrestee is what "capture" means here, not a
+        -- claim about who the arrestee is.
+        local at = positionOf(input.targetId)
+        if not at then return route.refuse(FredPD.ErrorCode.NOT_FOUND, { targetId = 'unreachable' }) end
+
+        local here = positionOf(session.src)
+        if not here then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+
+        local range = FredPD.Forensics.grid.settings().collectRange
+        local dx, dy, dz = at.x - here.x, at.y - here.y, at.z - here.z
+
+        if (dx * dx + dy * dy + dz * dz) > (range * range) then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { targetId = 'out_of_range' })
+        end
+
+        local character = FredPD.Bridge.framework.getCharacter(input.targetId)
+        local identifier = character and character.identifier or nil
+        if not identifier then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { targetId = 'no_character' })
+        end
+
+        -- A ten-print names a person, and this booking already names one
+        -- (`frihet.personId`, carried onto the booking at `booking.book`
+        -- time, never the client's). A different live identifier at the
+        -- terminal than the one already on this person's file is a
+        -- conflict, never a silent takeover of somebody else's identity
+        -- (`Repo.identifierConflict`'s own header explains why).
+        if personsRepo.identifierConflict(session.agencyId, booking.personId, identifier) then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { targetId = 'identity_mismatch' })
+        end
+
+        -- Filling this in is what "identified" (0005's own comment on
+        -- `fpd_persons.identifier`) means; a no-op once it already matches.
+        --
+        -- `identifierConflict` above is not proof by itself: `await`ing this
+        -- statement yields, so a second call for the same booking (two
+        -- officers, or two different nearby targets resolved a moment apart)
+        -- can read `identifier IS NULL` at the same time this one did, pass
+        -- the same check, and then race on the write. Only one `UPDATE`
+        -- actually sets it; the loser matches zero rows and, unchecked,
+        -- would carry straight on to file a print under the wrong
+        -- identifier while still reporting success -- exactly the silent
+        -- takeover `identifierConflict` exists to refuse. Re-reading after a
+        -- zero-row update is the only way to tell "lost the race to a
+        -- different identifier" apart from "already exactly this one".
+        if personsRepo.setIdentifierIfUnset(session.agencyId, booking.personId, identifier) == 0
+            and personsRepo.identifierConflict(session.agencyId, booking.personId, identifier)
+        then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { targetId = 'identity_mismatch' })
+        end
+
+        if not FredPD.Repo.evidence.fileFingerprintReference(session.agencyId, identifier, session.discordId) then
+            return route.refuse(FredPD.ErrorCode.INTERNAL)
+        end
+
+        personsRepo.markBiometricOnFile(session.agencyId, booking.personId, 'fingerprint', session.discordId)
+
+        return { number = booking.number }
     end,
 })
 

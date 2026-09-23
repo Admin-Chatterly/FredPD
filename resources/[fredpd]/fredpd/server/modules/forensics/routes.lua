@@ -36,6 +36,12 @@ local service = FredPD.Modules.forensics
 local grid = FredPD.Forensics.grid
 local config = grid.settings()
 
+--- For the identity scan's custody gate (8.8). Both load before this file
+--- (`fxmanifest.lua`), so reading them once here is safe.
+local frihetService = FredPD.Modules.frihet
+local frihetRepo = FredPD.Repo.frihet
+local personsRepo = FredPD.Repo.persons
+
 --- Residue is the one trace in 8.2 that is not in the world, so it is not in the
 --- grid: it sits on the shooter and travels with them. Bound at load, which is
 --- safe because `fxmanifest.lua` loads `gsr.lua` before this file and says so --
@@ -66,6 +72,25 @@ end
 local function identifierOf(src)
     local character = FredPD.Bridge.framework.getCharacter(src)
     return character and character.identifier or nil
+end
+
+--- Is this person currently held under a live gripande/anhållande/
+--- framställande/häktning chain (8.8's gate on the identity scan)?
+---
+--- Reads `frihet` the same way `booking/routes.lua` already does -- through
+--- `FredPD.Repo.frihet` and `FredPD.Modules.frihet.isOpen`, never `frihet`'s
+--- own internals -- so this module cannot drift from what `frihet` itself
+--- considers "in custody". A handful of rows, newest first: in practice a
+--- person has at most one open chain, but nothing enforces that as a
+--- uniqueness constraint, so this checks rather than assumes it.
+local function custodyOpenFor(agencyId, personId)
+    local chains = frihetRepo.list(agencyId, { personId = personId }, 5)
+
+    for index = 1, #chains do
+        if frihetService.isOpen(chains[index]) then return true end
+    end
+
+    return false
 end
 
 --- The share of a grid cell this player's traces are counted against (12.2).
@@ -656,6 +681,96 @@ route.define({
         )
 
         return { found = found }
+    end,
+})
+
+-- -----------------------------------------------------------------------------
+-- Live identity scan (8.8) -- the fingerprint scanner's second action
+-- -----------------------------------------------------------------------------
+
+--- Who is standing at the scanner, if their prints are already on file.
+---
+--- Deliberately narrower than a database hit against a hashed profile: the
+--- server already knows exactly who this live character is (`identifierOf`
+--- reads it straight off the ped, the same as every sensor in this file), so
+--- there is no comparison to make and no fingerprint value this route ever
+--- needs to touch -- only whether a reference for that exact identifier has
+--- ever been filed (`hasFingerprintReference`, an equality check the
+--- database does).
+---
+--- Refuses on a free subject rather than answering "no match": a live scan
+--- discloses whether a specific person has a criminal fingerprint record,
+--- which is an identity disclosure, not a records search, and every other
+--- disclosure this suite makes at that level sits behind a procedural
+--- condition (a warrant, a court decision, or here, that the subject is
+--- already held under an open custody chain) rather than an on-duty
+--- officer's discretion alone.
+route.define({
+    name = 'forensics.identity.scan',
+    perm = 'forensics.identity.scan',
+    context = { onDuty = true },
+    schema = 'ForensicsIdentityScan',
+    sensitive = true,
+    audit = 'forensics.identity.scanned',
+    subjectType = 'person',
+    -- Section 11's whole point is a check on the officer, not on the person
+    -- scanned: a live scan is an identity disclosure gated on custody, and
+    -- an oversight reader has to be able to ask, from the log alone, who was
+    -- scanned and whether it was a legitimate custody -- both the target and
+    -- the match, not just whether the call happened. `targetId` is an
+    -- ephemeral session id, not stored identity, so it costs nothing extra
+    -- to keep; `personId` is only present at all once a match already
+    -- disclosed it to the officer, so this is not a second copy of anything
+    -- the officer did not already see.
+    auditDetail = function(input, result) return {
+        targetId = input.targetId,
+        match = result.match == true,
+        personId = (result.person and result.person.id) or nil,
+    } end,
+    handler = function(session, input)
+        local at = positionOf(input.targetId)
+        if not at then return route.refuse(FredPD.ErrorCode.NOT_FOUND, { targetId = 'unreachable' }) end
+
+        local here = positionOf(session.src)
+        if not here then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+
+        local dx, dy, dz = at.x - here.x, at.y - here.y, at.z - here.z
+        if (dx * dx + dy * dy + dz * dz) > (config.collectRange * config.collectRange) then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { targetId = 'out_of_range' })
+        end
+
+        local identifier = identifierOf(input.targetId)
+        if not identifier then return { match = false } end
+
+        local personId = personsRepo.byIdentifier(session.agencyId, identifier)
+        if not personId then return { match = false } end
+
+        if not custodyOpenFor(session.agencyId, personId) then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { targetId = 'not_detained' })
+        end
+
+        if not FredPD.Repo.evidence.hasFingerprintReference(session.agencyId, identifier) then
+            return { match = false }
+        end
+
+        -- The same access-checked path every other read of a person goes
+        -- through (invariant 4): a match against somebody sealed beyond this
+        -- officer's clearance answers restricted, never a name.
+        local person, visibility = personsRepo.readPerson(session, personId)
+        if not person then
+            return route.refuse(
+                visibility == 'missing' and FredPD.ErrorCode.NOT_FOUND or FredPD.ErrorCode.RESTRICTED)
+        end
+
+        return {
+            match = true,
+            person = {
+                id = person.id,
+                personNumber = person.personNumber,
+                firstName = person.firstName,
+                lastName = person.lastName,
+            },
+        }
     end,
 })
 
