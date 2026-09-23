@@ -3809,6 +3809,18 @@ interface FixtureLoadout {
 
 let loadouts: FixtureLoadout[] = [{ id: 1, name: 'Patrol Basic', itemKeys: ['vest', 'radio'] }];
 
+interface FixtureIssueGate {
+  kind: string;
+  itemKey: string;
+  requiredGroup?: string | null;
+  requiredDiscordRole?: string | null;
+}
+
+/** `less_lethal` gated behind a group this fixture's viewer does not hold --
+ *  the mock bridge has no real Discord snapshot to check, so a gate here
+ *  always fails closed, the honest answer for "cannot tell" (0027). */
+let issueGates: FixtureIssueGate[] = [{ kind: 'equipment', itemKey: 'less_lethal', requiredGroup: 'swat' }];
+
 const officers: FixtureOfficer[] = [
   {
     id: 1,
@@ -5280,6 +5292,14 @@ export const fixtures: FixtureSet = {
       if (!row) return refuse('not_found');
       if (!body.itemKey) return refuse('invalid', { itemKey: 'not_a_key' });
 
+      // No real Discord snapshot in the mock bridge to check a gate's
+      // required group or role against, so a gated item always fails
+      // closed here (0027) -- the same answer the server gives for a
+      // group or role it cannot resolve.
+      if (issueGates.some((gate) => gate.kind === 'equipment' && gate.itemKey === body.itemKey)) {
+        return refuse('forbidden', { itemKey: 'gated' });
+      }
+
       const id = row.equipment.length + 1;
       row.equipment.push({ id, itemKey: body.itemKey, serial: body.serial ?? null, assignedAgo: 0 });
 
@@ -5351,10 +5371,61 @@ export const fixtures: FixtureSet = {
       if (!row) return refuse('not_found');
       if (!body.certKey) return refuse('invalid', { certKey: 'not_a_key' });
 
+      if (issueGates.some((gate) => gate.kind === 'certification' && gate.itemKey === body.certKey)) {
+        return refuse('forbidden', { certKey: 'gated' });
+      }
+
       const id = row.certifications.length + 1;
       row.certifications.push({ id, certKey: body.certKey, issuedAgo: 0 });
 
       return { id };
+    },
+
+    'personnel.issueGate.list': () => ({ gates: issueGates.map((entry) => ({ ...entry })) }),
+
+    'personnel.issueGate.set': (input) => {
+      const body = (input ?? {}) as {
+        kind?: string;
+        itemKey?: string;
+        requiredGroup?: string;
+        requiredDiscordRole?: string;
+      };
+
+      if (body.kind !== 'equipment' && body.kind !== 'certification') {
+        return refuse('invalid', { kind: 'not_a_key' });
+      }
+      if (!body.itemKey) return refuse('invalid', { itemKey: 'not_a_key' });
+      if (!body.requiredGroup && !body.requiredDiscordRole) {
+        return refuse('invalid', { _input: 'gate_required' });
+      }
+
+      const existing = issueGates.find((gate) => gate.kind === body.kind && gate.itemKey === body.itemKey);
+      if (existing) {
+        existing.requiredGroup = body.requiredGroup ?? null;
+        existing.requiredDiscordRole = body.requiredDiscordRole ?? null;
+      } else {
+        issueGates = [
+          ...issueGates,
+          {
+            kind: body.kind,
+            itemKey: body.itemKey,
+            requiredGroup: body.requiredGroup ?? null,
+            requiredDiscordRole: body.requiredDiscordRole ?? null,
+          },
+        ];
+      }
+
+      return { kind: body.kind, itemKey: body.itemKey };
+    },
+
+    'personnel.issueGate.clear': (input) => {
+      const body = (input ?? {}) as { kind?: string; itemKey?: string };
+      const exists = issueGates.some((gate) => gate.kind === body.kind && gate.itemKey === body.itemKey);
+      if (!exists) return refuse('not_found');
+
+      issueGates = issueGates.filter((gate) => !(gate.kind === body.kind && gate.itemKey === body.itemKey));
+
+      return { kind: body.kind, itemKey: body.itemKey };
     },
 
     'personnel.certification.revoke': (input) => {

@@ -240,6 +240,72 @@ function Repo.setOfficerLoadout(officerId, agencyId, loadoutId)
 end
 
 -- -----------------------------------------------------------------------------
+-- Issue gates (0027)
+-- -----------------------------------------------------------------------------
+
+local ISSUE_GATE_SELECT <const> = [[
+    SELECT id, agency_id AS agencyId, kind, item_key AS itemKey,
+           required_group AS requiredGroup, required_discord_role AS requiredDiscordRole
+      FROM fpd_personnel_issue_gate
+]]
+
+function Repo.issueGates(agencyId)
+    return FredPD.Core.db.query(ISSUE_GATE_SELECT .. ' WHERE agency_id = ? ORDER BY kind, item_key', { agencyId })
+end
+
+function Repo.issueGateFor(agencyId, kind, itemKey)
+    return FredPD.Core.db.single(
+        ISSUE_GATE_SELECT .. ' WHERE agency_id = ? AND kind = ? AND item_key = ?',
+        { agencyId, kind, itemKey })
+end
+
+--- Upserts the gate on one key: a second call replaces the first rather
+--- than adding a competing row, since `uq_fpd_personnel_issue_gate` allows
+--- exactly one gate per (agency, kind, item key).
+function Repo.setIssueGate(agencyId, kind, itemKey, requiredGroup, requiredDiscordRole, discordId)
+    return FredPD.Core.db.execute(
+        [[INSERT INTO fpd_personnel_issue_gate
+              (agency_id, kind, item_key, required_group, required_discord_role, created_by)
+          VALUES (?, ?, ?, ?, ?, ?)
+          ON DUPLICATE KEY UPDATE required_group = VALUES(required_group),
+                                   required_discord_role = VALUES(required_discord_role),
+                                   created_by = VALUES(created_by)]],
+        { agencyId, kind, itemKey, requiredGroup, requiredDiscordRole, discordId })
+end
+
+function Repo.clearIssueGate(agencyId, kind, itemKey)
+    return FredPD.Core.db.execute(
+        'DELETE FROM fpd_personnel_issue_gate WHERE agency_id = ? AND kind = ? AND item_key = ?',
+        { agencyId, kind, itemKey })
+end
+
+--- The two predicates `Personnel.gatingSatisfied` takes for one discord id,
+--- built once per call rather than once per key -- the identical shape
+--- `garage/routes.lua`'s `gateChecks` builds for a fleet draw, kept here
+--- rather than in `routes.lua` so `applyDutyChange` below can use it too:
+--- self-issue on going on duty is still an issuance, and the officer going
+--- on duty is both the issuer and the recipient.
+---
+--- @return function(roleId): boolean, function(groupKey): boolean
+function Repo.gateChecksFor(agencyId, discordId)
+    local heldRoles = {}
+
+    local roles = FredPD.Core.perms.memberRoles(discordId)
+    for index = 1, #roles do heldRoles[tostring(roles[index])] = true end
+
+    local groupsHeld = nil
+    local function membership()
+        groupsHeld = groupsHeld or FredPD.Core.perms.groupsFor(discordId, agencyId)
+        return groupsHeld
+    end
+
+    local holdsDiscordRole = function(roleId) return heldRoles[tostring(roleId)] == true end
+    local satisfiesGroup = function(groupKey) return membership()[groupKey] == true end
+
+    return holdsDiscordRole, satisfiesGroup
+end
+
+-- -----------------------------------------------------------------------------
 -- Duty-based auto issue/return (0026)
 -- -----------------------------------------------------------------------------
 
@@ -300,7 +366,26 @@ function Repo.applyDutyChange(officerId, agencyId, discordId, working)
     if #itemKeys == 0 then return end
 
     if working then
-        local toIssue = FredPD.Modules.personnel.itemsToIssue(itemKeys, Repo.openItemKeysFor(officerId, agencyId))
+        -- Self-issue on going on duty is still an issuance (0027): the
+        -- officer going on duty is both issuer and recipient, so a gated
+        -- item they do not themselves hold the role or group for is
+        -- skipped here rather than handed to them automatically -- the
+        -- loadout is assigned to them, but that assignment does not by
+        -- itself clear a gate a supervisor set on one of its items.
+        local holdsDiscordRole, satisfiesGroup = Repo.gateChecksFor(agencyId, discordId)
+        local Personnel = FredPD.Modules.personnel
+
+        local eligible = {}
+        for index = 1, #itemKeys do
+            local key = itemKeys[index]
+            local gate = Repo.issueGateFor(agencyId, 'equipment', key)
+
+            if Personnel.gatingSatisfied(gate, holdsDiscordRole, satisfiesGroup) then
+                eligible[#eligible + 1] = key
+            end
+        end
+
+        local toIssue = Personnel.itemsToIssue(eligible, Repo.openItemKeysFor(officerId, agencyId))
         Repo.autoIssue(officerId, agencyId, discordId, toIssue)
     else
         Repo.autoReturn(officerId, agencyId, itemKeys)

@@ -69,6 +69,46 @@ test('assigns equipment to an officer', async ({ page }) => {
   await expect(page.getByRole('listitem').getByText('Taser')).toBeVisible();
 });
 
+test('refuses issuing an item gated behind a role or group the officer issuing it does not hold', async ({
+  page,
+}) => {
+  await openPersonnel(page);
+
+  await page.getByRole('button', { name: '12-41' }).click();
+
+  const form = page.locator('form').filter({ hasText: 'Assign' });
+  await form.getByLabel('Item').selectOption('less_lethal');
+  await form.getByRole('button', { name: 'Assign' }).click();
+
+  await expect(page.getByText('You do not hold the role or group this requires')).toBeVisible();
+  await expect(page.getByRole('listitem').getByText('Less-lethal')).toHaveCount(0);
+});
+
+test('sets and clears an issue gate', async ({ page }) => {
+  await openPersonnel(page);
+
+  await page.getByRole('button', { name: 'Manage issue gates' }).click();
+
+  // The fixture's own seeded gate.
+  const row = page.getByRole('listitem').filter({ hasText: 'Less-lethal' });
+  await expect(row).toContainText('swat');
+
+  const setForm = page.locator('form').filter({ hasText: 'Set gate' });
+  await setForm.getByLabel('Gates').selectOption('certification');
+  await setForm.getByLabel('Item').selectOption('swat');
+  await setForm.getByLabel('Required Discord role ID').fill('123456789012345678');
+  await setForm.getByRole('button', { name: 'Set gate' }).click();
+
+  // A case-sensitive regex, not the plain-string form of `hasText` (which
+  // matches case-insensitively): the seeded gate's own "swat" group name,
+  // lower-case, would otherwise also match "SWAT" the certification.
+  const swatRow = page.getByRole('listitem').filter({ hasText: /SWAT/ }).first();
+  await expect(swatRow).toContainText('123456789012345678');
+
+  await row.getByRole('button', { name: 'Clear' }).click();
+  await expect(page.getByRole('listitem').filter({ hasText: 'Less-lethal' })).toHaveCount(0);
+});
+
 test('shows the loadout assigned to an officer', async ({ page }) => {
   await openPersonnel(page);
 

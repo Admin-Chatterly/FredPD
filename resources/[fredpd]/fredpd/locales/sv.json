@@ -163,7 +163,10 @@
     "not_needed": "Detta beslag kräver inte godkännande",
     "already_authorized": "Redan godkänt",
     "fee_unpaid": "Avgiften är inte betald",
-    "not_authorized": "Utredares godkännande krävs"
+    "not_authorized": "Utredares godkännande krävs",
+    "already_linked": "Redan kopplad till en annan underrättelsepost",
+    "gated": "Du har inte den roll eller grupp som krävs",
+    "gate_required": "Ange en grupp eller Discord-roll som krävs"
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -2377,6 +2380,16 @@
       "choose": "Utrustningspaket",
       "create": "Skapa paket",
       "delete": "Ta bort"
+    },
+    "issueGate": {
+      "title": "Behörighetsspärrar",
+      "manage": "Hantera behörighetsspärrar",
+      "none": "Inget är spärrat utöver grundbehörigheten.",
+      "kind": "Spärrar",
+      "requiredGroup": "Krävd grupp",
+      "requiredDiscordRole": "Krävt Discord-roll-ID",
+      "set": "Ange spärr",
+      "clear": "Ta bort"
     },
     "certification": {
       "title": "Certifieringar",

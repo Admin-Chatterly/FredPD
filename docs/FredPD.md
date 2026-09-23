@@ -975,6 +975,7 @@ Built. Migration 0017, `server/modules/personnel/`.
 - [M] Shift log: start/end, self-service only (`personnel.shift.own` acts on the caller's own row, never an id in the input).
 - [M] Equipment assignment: item, optional serial, optionally linked to the firearms registry (0005) by id.
 - [M] **Equipment loadouts, issued and returned with duty** (0026). A loadout is a named set of item keys (`personnel.loadout.create`), assignable to one officer (`personnel.officer.setLoadout`). It issues nothing by itself: `server/modules/personnel/events.lua` listens for `fredpd:dutyChanged` -- fired from `cad/events.lua`'s own sign-on poll, the one place in the suite that already knows when duty changes -- and diffs the loadout against what the officer already holds, so a shift that starts with a radio already open does not get a second one. Going off duty closes every open row the loadout names.
+- [M] **Issue gates: a Discord role or permission group required for one equipment item or certification key** (0027), beyond `personnel.equipment.manage`/`personnel.certification.manage` themselves. The identical shape 0003 already gives a fleet entry (`Garage.gatingSatisfied`): one gate satisfied is enough and no gate at all means open to anyone who already holds the base permission. Checked against the *issuing* session on a hand issue, and against the officer's own roles on a duty-based auto issue (0026) -- self-issue on going on duty is still an issuance, so a loadout item nobody has cleared the officer for is skipped rather than handed to them automatically.
 - **Permissions:** `page.personnel`, `personnel.roster.view`, `personnel.shift.own` (patrol_basic); `personnel.roster.edit`, `personnel.equipment.manage`, `personnel.certification.manage` (supervisor); `personnel.discipline.view`, `personnel.discipline.manage` (command).
 
 ### 7.23 Training, field training and certifications (S, M6)
@@ -982,6 +983,7 @@ Built. Migration 0017, `server/modules/personnel/`.
 Built (certifications; not the field-training program).
 
 - [M] Certifications with expiry and revocation, from a closed list. `Repo.hasActiveCertification` is exported for other modules to use as a context condition, per the sketch above.
+- [M] Issuing a certification can be gated behind a Discord role or group (0027) -- see 7.22.
 - [S] The field training phases/observation-report program — not built; only the certification itself (`fto` is one of the closed-list keys) exists.
 
 ### 7.24 Internal affairs, use of force and early intervention (S, M6)

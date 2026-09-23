@@ -208,6 +208,116 @@ describe('personnel', function()
         end)
     end)
 
+    describe('isIssueKind', function()
+        it('accepts equipment and certification', function()
+            assert.is_true(personnel.isIssueKind('equipment'))
+            assert.is_true(personnel.isIssueKind('certification'))
+        end)
+
+        it('refuses anything else', function()
+            assert.is_false(personnel.isIssueKind('firearm'))
+            assert.is_false(personnel.isIssueKind(nil))
+        end)
+    end)
+
+    describe('isGroupKey / isDiscordRoleId', function()
+        it('accepts a lower_snake group key', function()
+            assert.is_true(personnel.isGroupKey('swat'))
+            assert.is_true(personnel.isGroupKey('air_unit'))
+        end)
+
+        it('refuses a group key that is not lower_snake', function()
+            assert.is_false(personnel.isGroupKey('SWAT'))
+            assert.is_false(personnel.isGroupKey('1swat'))
+            assert.is_false(personnel.isGroupKey(nil))
+        end)
+
+        it('accepts a snowflake', function()
+            assert.is_true(personnel.isDiscordRoleId('123456789012345678'))
+        end)
+
+        it('refuses anything that is not all digits', function()
+            assert.is_false(personnel.isDiscordRoleId('swat-role'))
+            assert.is_false(personnel.isDiscordRoleId(nil))
+        end)
+    end)
+
+    describe('validateIssueGateSet', function()
+        it('accepts a certification gated by a Discord role', function()
+            assert.is_nil(personnel.validateIssueGateSet(
+                { kind = 'certification', itemKey = 'swat', requiredDiscordRole = '123456789012345678' }))
+        end)
+
+        it('accepts an equipment item gated by a group', function()
+            assert.is_nil(personnel.validateIssueGateSet(
+                { kind = 'equipment', itemKey = 'less_lethal', requiredGroup = 'swat' }))
+        end)
+
+        it('refuses an unknown kind', function()
+            local err, fields = personnel.validateIssueGateSet(
+                { kind = 'firearm', itemKey = 'sidearm', requiredGroup = 'swat' })
+            assert.equal('invalid', err)
+            assert.equal('not_a_key', fields.kind)
+        end)
+
+        it('refuses a certification key checked against the equipment list, and vice versa', function()
+            local err, fields = personnel.validateIssueGateSet(
+                { kind = 'certification', itemKey = 'vest', requiredGroup = 'swat' })
+            assert.equal('invalid', err)
+            assert.equal('not_a_key', fields.itemKey)
+        end)
+
+        it('refuses neither requiredGroup nor requiredDiscordRole', function()
+            local err, fields = personnel.validateIssueGateSet({ kind = 'equipment', itemKey = 'vest' })
+            assert.equal('invalid', err)
+            assert.equal('gate_required', fields._input)
+        end)
+
+        it('refuses a malformed group key', function()
+            local err, fields = personnel.validateIssueGateSet(
+                { kind = 'equipment', itemKey = 'vest', requiredGroup = 'SWAT!' })
+            assert.equal('invalid', err)
+            assert.equal('not_group_key', fields.requiredGroup)
+        end)
+
+        it('refuses a malformed Discord role id', function()
+            local err, fields = personnel.validateIssueGateSet(
+                { kind = 'equipment', itemKey = 'vest', requiredDiscordRole = 'not-a-snowflake' })
+            assert.equal('invalid', err)
+            assert.equal('not_snowflake', fields.requiredDiscordRole)
+        end)
+    end)
+
+    describe('gatingSatisfied', function()
+        local function holds(held)
+            return function(roleId) return held[roleId] == true end
+        end
+
+        it('is satisfied with no gate at all', function()
+            assert.is_true(personnel.gatingSatisfied(nil, holds({}), holds({})))
+        end)
+
+        it('is satisfied by holding the required Discord role', function()
+            local gate = { requiredDiscordRole = 'r1' }
+            assert.is_true(personnel.gatingSatisfied(gate, holds({ r1 = true }), holds({})))
+        end)
+
+        it('is satisfied by being in the required group', function()
+            local gate = { requiredGroup = 'swat' }
+            assert.is_true(personnel.gatingSatisfied(gate, holds({}), holds({ swat = true })))
+        end)
+
+        it('refuses when neither predicate is satisfied', function()
+            local gate = { requiredDiscordRole = 'r1', requiredGroup = 'swat' }
+            assert.is_false(personnel.gatingSatisfied(gate, holds({}), holds({})))
+        end)
+
+        it('fails closed on an unknown group', function()
+            local gate = { requiredGroup = 'made_up' }
+            assert.is_false(personnel.gatingSatisfied(gate, holds({}), holds({})))
+        end)
+    end)
+
     describe('itemsToIssue', function()
         it('issues everything when nothing is already open', function()
             local toIssue = personnel.itemsToIssue({ 'vest', 'radio' }, {})

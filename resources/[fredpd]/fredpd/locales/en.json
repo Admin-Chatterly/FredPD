@@ -163,7 +163,10 @@
     "not_needed": "This hold does not require authorization",
     "already_authorized": "Already authorized",
     "fee_unpaid": "Fee not yet paid",
-    "not_authorized": "Investigator authorization required"
+    "not_authorized": "Investigator authorization required",
+    "already_linked": "Already tied to a different intelligence subject",
+    "gated": "You do not hold the role or group this requires",
+    "gate_required": "Set a required group or Discord role"
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -2377,6 +2380,16 @@
       "choose": "Loadout",
       "create": "Create loadout",
       "delete": "Delete"
+    },
+    "issueGate": {
+      "title": "Issue gates",
+      "manage": "Manage issue gates",
+      "none": "Nothing is gated beyond the base permission.",
+      "kind": "Gates",
+      "requiredGroup": "Required group",
+      "requiredDiscordRole": "Required Discord role ID",
+      "set": "Set gate",
+      "clear": "Clear"
     },
     "certification": {
       "title": "Certifications",

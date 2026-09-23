@@ -144,6 +144,9 @@ const PAIRED: Record<string, keyof typeof enums> = {
   // Personnel (0017, spec 7.22-7.24).
   ck_fpd_discipline_class: 'CLASSIFICATIONS',
 
+  // Personnel issue gates (0027, spec 7.22-7.23).
+  ck_fpd_personnel_issue_gate_kind: 'PERSONNEL_ISSUE_KINDS',
+
   // Booking (0018, spec 7.9).
   ck_fpd_booking_class: 'CLASSIFICATIONS',
 

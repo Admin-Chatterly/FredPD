@@ -39,6 +39,7 @@ import {
   ORDNINGSBOT_STATUSES,
   PERSON_CAUTION_KINDS,
   PERSON_SEXES,
+  PERSONNEL_ISSUE_KINDS,
   PLACEMENT_INTERACTIONS,
   PLACEMENT_KINDS,
   SCENE_STATUSES,
@@ -2498,6 +2499,22 @@ export const schemas = {
   PersonnelEquipmentReturn: {
     id: { type: 'integer', required: true, min: 1 },
     officerId: { type: 'integer', required: true, min: 1 },
+  },
+
+  PersonnelIssueGateList: {},
+
+  // Exactly one of `requiredGroup`/`requiredDiscordRole` -- the handler
+  // refuses neither being set, and the database would refuse it too.
+  PersonnelIssueGateSet: {
+    kind: { type: 'enum', required: true, values: PERSONNEL_ISSUE_KINDS },
+    itemKey: { type: 'string', required: true, min: 1, max: 64 },
+    requiredGroup: { type: 'string', required: false, max: 64 },
+    requiredDiscordRole: { type: 'string', required: false, max: 32 },
+  },
+
+  PersonnelIssueGateClear: {
+    kind: { type: 'enum', required: true, values: PERSONNEL_ISSUE_KINDS },
+    itemKey: { type: 'string', required: true, min: 1, max: 64 },
   },
 
   PersonnelLoadoutList: {},

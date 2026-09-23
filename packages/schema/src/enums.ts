@@ -1153,3 +1153,10 @@ export const IMPOUND_HELD_REASONS = [
 ] as const;
 
 export type ImpoundHeldReason = (typeof IMPOUND_HELD_REASONS)[number];
+
+/** `ck_fpd_personnel_issue_gate_kind` (spec 7.22, 0027) — which closed list
+ * an issue gate's `itemKey` is checked against, `Personnel.isEquipmentItem`
+ * or `.isCertification`. */
+export const PERSONNEL_ISSUE_KINDS = ['equipment', 'certification'] as const;
+
+export type PersonnelIssueKind = (typeof PERSONNEL_ISSUE_KINDS)[number];

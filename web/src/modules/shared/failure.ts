@@ -235,6 +235,16 @@ const REASONS = new Set([
   'already_authorized',
   'fee_unpaid',
   'not_authorized',
+
+  // Intelligence (spec 10, 0025). A master person already tied to a
+  // different intelligence subject.
+  'already_linked',
+
+  // Personnel issue gates (spec 7.22-7.23, 0027). Issuing an item or
+  // certification the session does not hold the required Discord role or
+  // group for, and a gate row set with neither one.
+  'gated',
+  'gate_required',
 ]);
 
 export interface FieldMessage {

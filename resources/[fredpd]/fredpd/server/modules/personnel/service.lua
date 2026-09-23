@@ -175,6 +175,88 @@ function Personnel.validateSetLoadout(input)
 end
 
 -- -----------------------------------------------------------------------------
+-- Issue gates (0027): a Discord role or permission group required to issue
+-- one equipment item or certification key, beyond the base
+-- `personnel.equipment.manage`/`personnel.certification.manage` grant --
+-- the identical shape `Garage.gatingSatisfied` already gives a fleet entry.
+-- -----------------------------------------------------------------------------
+
+local ISSUE_KINDS <const> = { equipment = true, certification = true }
+
+function Personnel.isIssueKind(value) return ISSUE_KINDS[value] == true end
+
+--- A permission group key, the same shape `Garage.isGroupKey` checks.
+function Personnel.isGroupKey(value)
+    return type(value) == 'string' and #value <= 64 and value:match('^[a-z][a-z0-9_]*$') ~= nil
+end
+
+--- A Discord role id (a snowflake), the same shape `Garage.isDiscordRoleId`
+--- checks -- stored and compared as text since a JSON decoder is entitled to
+--- hand a bare number back for one.
+function Personnel.isDiscordRoleId(value)
+    return type(value) == 'string' and #value <= 32 and value:match('^%d+$') ~= nil
+end
+
+--- @return string|nil code
+--- @return table|nil fields
+function Personnel.validateIssueGateSet(input)
+    if type(input) ~= 'table' then return 'invalid', { _input = 'type' } end
+
+    if not Personnel.isIssueKind(input.kind) then
+        return 'invalid', { kind = 'not_a_key' }
+    end
+
+    local knownKey = (input.kind == 'equipment' and Personnel.isEquipmentItem(input.itemKey))
+        or (input.kind == 'certification' and Personnel.isCertification(input.itemKey))
+    if not knownKey then
+        return 'invalid', { itemKey = 'not_a_key' }
+    end
+
+    -- A row with neither column set would gate nothing while still
+    -- occupying the unique slot for this key (0027's own header) -- refused
+    -- here with a field error rather than left to the database's CHECK.
+    if not input.requiredGroup and not input.requiredDiscordRole then
+        return 'invalid', { _input = 'gate_required' }
+    end
+
+    if input.requiredGroup ~= nil and not Personnel.isGroupKey(input.requiredGroup) then
+        return 'invalid', { requiredGroup = 'not_group_key' }
+    end
+
+    if input.requiredDiscordRole ~= nil and not Personnel.isDiscordRoleId(input.requiredDiscordRole) then
+        return 'invalid', { requiredDiscordRole = 'not_snowflake' }
+    end
+
+    return nil
+end
+
+--- Whether this session's gate-checking predicates satisfy a gate row.
+---
+--- One gate satisfied is enough, and no gate row at all means "open to
+--- anyone who already holds the base permission" -- the identical rule
+--- `Garage.gatingSatisfied` applies to a fleet entry, for the identical
+--- reason: requiring *both* would mean every gated key needs two pieces of
+--- configuration kept in step, and the first one to drift silently takes
+--- the item away from the officer who is supposed to have it.
+---
+--- @param gate table|nil { requiredGroup, requiredDiscordRole }
+--- @param holdsDiscordRole function(roleId) -> boolean
+--- @param satisfiesGroup function(groupKey) -> boolean
+--- @return boolean
+function Personnel.gatingSatisfied(gate, holdsDiscordRole, satisfiesGroup)
+    if not gate then return true end
+
+    local role = gate.requiredDiscordRole
+    local group = gate.requiredGroup
+
+    if not role and not group then return true end
+    if role and holdsDiscordRole(role) then return true end
+    if group and satisfiesGroup(group) then return true end
+
+    return false
+end
+
+-- -----------------------------------------------------------------------------
 -- Duty-based auto issue (0026)
 -- -----------------------------------------------------------------------------
 

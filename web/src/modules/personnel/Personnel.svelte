@@ -47,6 +47,17 @@
     itemKeys?: string[];
   }
 
+  /** A Discord role or permission group required to issue one equipment
+   *  item or certification key, beyond the base
+   *  `personnel.equipment.manage`/`personnel.certification.manage` grant
+   *  (0027). */
+  interface IssueGate {
+    kind: string;
+    itemKey: string;
+    requiredGroup?: string | null;
+    requiredDiscordRole?: string | null;
+  }
+
   interface Officer {
     id: number;
     discordId: string;
@@ -102,6 +113,9 @@
     name: 'personnel.loadout.name',
     itemKeys: 'personnel.loadout.items',
     loadoutId: 'personnel.loadout.choose',
+    kind: 'personnel.issueGate.kind',
+    requiredGroup: 'personnel.issueGate.requiredGroup',
+    requiredDiscordRole: 'personnel.issueGate.requiredDiscordRole',
   };
 
   let rows = $state<Officer[]>([]);
@@ -177,6 +191,67 @@
     if (response.ok) {
       failure = null;
       await open(detail.id);
+    } else {
+      failure = response;
+    }
+
+    busy = false;
+  }
+
+  // ----------------------------------------------------------- issue gates
+
+  let issueGates = $state<IssueGate[]>([]);
+  let managingGates = $state(false);
+  let gateForm = $state({
+    kind: 'equipment',
+    itemKey: EQUIPMENT_ITEMS[0] as string,
+    requiredGroup: '',
+    requiredDiscordRole: '',
+  });
+
+  /** `gateForm.kind` decides which closed list `itemKey` is checked
+   *  against server-side (`Personnel.isEquipmentItem`/`.isCertification`),
+   *  so the picker offers only the list that will actually validate. */
+  const gateItemOptions = $derived(gateForm.kind === 'equipment' ? EQUIPMENT_ITEMS : CERTIFICATIONS);
+
+  $effect(() => {
+    if (!gateItemOptions.includes(gateForm.itemKey)) gateForm.itemKey = gateItemOptions[0] ?? '';
+  });
+
+  async function loadIssueGates(): Promise<void> {
+    const response = await nui.call<{ gates: IssueGate[] }>('personnel.issueGate.list', {});
+    if (response.ok) issueGates = response.data.gates ?? [];
+  }
+
+  async function setIssueGate(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+
+    busy = true;
+    const response = await nui.call('personnel.issueGate.set', {
+      kind: gateForm.kind,
+      itemKey: gateForm.itemKey,
+      requiredGroup: gateForm.requiredGroup || undefined,
+      requiredDiscordRole: gateForm.requiredDiscordRole || undefined,
+    });
+
+    if (response.ok) {
+      failure = null;
+      gateForm = { ...gateForm, requiredGroup: '', requiredDiscordRole: '' };
+      await loadIssueGates();
+    } else {
+      failure = response;
+    }
+
+    busy = false;
+  }
+
+  async function clearIssueGate(gate: IssueGate): Promise<void> {
+    busy = true;
+    const response = await nui.call('personnel.issueGate.clear', { kind: gate.kind, itemKey: gate.itemKey });
+
+    if (response.ok) {
+      failure = null;
+      await loadIssueGates();
     } else {
       failure = response;
     }
@@ -410,6 +485,15 @@
     }
   }
 
+  /** An issue gate's item key, in the locale namespace its own `kind`
+   *  reads from -- equipment and certification keys are two closed lists
+   *  that happen to share a column, not one vocabulary. */
+  function gateItemLabel(gate: IssueGate): string {
+    return gate.kind === 'certification'
+      ? t(`personnel.certification.key.${gate.itemKey}`)
+      : t(`personnel.equipment.item.${gate.itemKey}`);
+  }
+
   function stubContact(row: Restricted): string {
     return t('records.restricted.contact', { unit: t(`access.unit.${row.contact}`) });
   }
@@ -422,6 +506,7 @@
   void load();
   void loadViewer();
   void loadLoadouts();
+  void loadIssueGates();
 </script>
 
 <div class="flex flex-col gap-3">
@@ -443,6 +528,14 @@
       onclick={() => (managingLoadouts = !managingLoadouts)}
     >
       {t('personnel.loadout.manage')}
+    </button>
+
+    <button
+      type="button"
+      class="border border-[var(--color-border)] px-3 py-1 text-xs"
+      onclick={() => (managingGates = !managingGates)}
+    >
+      {t('personnel.issueGate.manage')}
     </button>
   </form>
 
@@ -498,6 +591,86 @@
         </fieldset>
         <button type="submit" class="border border-[var(--color-border)] px-3 py-1 text-xs" disabled={busy}>
           {t('personnel.loadout.create')}
+        </button>
+      </form>
+    </div>
+  {/if}
+
+  {#if managingGates}
+    <div class="border border-[var(--color-border)] p-3">
+      <h3 class="mb-1 text-xs font-semibold">{t('personnel.issueGate.title')}</h3>
+      {#if issueGates.length === 0}
+        <p class="mb-2 text-xs text-[var(--color-ink-muted)]">{t('personnel.issueGate.none')}</p>
+      {:else}
+        <ul class="mb-2 text-xs">
+          {#each issueGates as gate (`${gate.kind}:${gate.itemKey}`)}
+            <li class="flex items-center justify-between border-t border-[var(--color-border)] py-1">
+              <span>
+                {gateItemLabel(gate)}
+                <span class="text-[var(--color-ink-muted)]">
+                  —
+                  {#if gate.requiredGroup}
+                    {t('personnel.issueGate.requiredGroup')}: {gate.requiredGroup}
+                  {/if}
+                  {#if gate.requiredGroup && gate.requiredDiscordRole}
+                    ·
+                  {/if}
+                  {#if gate.requiredDiscordRole}
+                    {t('personnel.issueGate.requiredDiscordRole')}: {gate.requiredDiscordRole}
+                  {/if}
+                </span>
+              </span>
+              <button
+                type="button"
+                class="border border-[var(--color-border)] px-2 py-0.5"
+                disabled={busy}
+                onclick={() => void clearIssueGate(gate)}
+              >
+                {t('personnel.issueGate.clear')}
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+      <form class="flex flex-wrap items-end gap-2" onsubmit={setIssueGate}>
+        <label class="flex flex-col gap-1 text-xs">
+          {t('personnel.issueGate.kind')}
+          <select bind:value={gateForm.kind} class="border border-[var(--color-border)] px-2 py-1">
+            <option value="equipment">{t('personnel.equipment.title')}</option>
+            <option value="certification">{t('personnel.certification.title')}</option>
+          </select>
+        </label>
+        <label class="flex flex-col gap-1 text-xs">
+          {t('personnel.equipment.itemChoose')}
+          <select bind:value={gateForm.itemKey} class="border border-[var(--color-border)] px-2 py-1">
+            {#each gateItemOptions as key (key)}
+              <option value={key}>
+                {gateForm.kind === 'certification'
+                  ? t(`personnel.certification.key.${key}`)
+                  : t(`personnel.equipment.item.${key}`)}
+              </option>
+            {/each}
+          </select>
+        </label>
+        <label class="flex flex-col gap-1 text-xs">
+          {t('personnel.issueGate.requiredGroup')}
+          <input
+            bind:value={gateForm.requiredGroup}
+            maxlength="64"
+            class="w-32 border border-[var(--color-border)] px-2 py-1"
+          />
+        </label>
+        <label class="flex flex-col gap-1 text-xs">
+          {t('personnel.issueGate.requiredDiscordRole')}
+          <input
+            bind:value={gateForm.requiredDiscordRole}
+            maxlength="32"
+            inputmode="numeric"
+            class="w-40 border border-[var(--color-border)] px-2 py-1"
+          />
+        </label>
+        <button type="submit" class="border border-[var(--color-border)] px-3 py-1 text-xs" disabled={busy}>
+          {t('personnel.issueGate.set')}
         </button>
       </form>
     </div>

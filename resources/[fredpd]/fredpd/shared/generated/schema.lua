@@ -1421,6 +1421,22 @@ FredPD.Schema = {
         officerId = { type = 'integer', required = true, min = 1 },
     },
 
+    PersonnelIssueGateList = {
+
+    },
+
+    PersonnelIssueGateSet = {
+        kind = { type = 'enum', required = true, values = { 'equipment', 'certification' } },
+        itemKey = { type = 'string', required = true, min = 1, max = 64 },
+        requiredGroup = { type = 'string', required = false, max = 64 },
+        requiredDiscordRole = { type = 'string', required = false, max = 32 },
+    },
+
+    PersonnelIssueGateClear = {
+        kind = { type = 'enum', required = true, values = { 'equipment', 'certification' } },
+        itemKey = { type = 'string', required = true, min = 1, max = 64 },
+    },
+
     PersonnelLoadoutList = {
 
     },

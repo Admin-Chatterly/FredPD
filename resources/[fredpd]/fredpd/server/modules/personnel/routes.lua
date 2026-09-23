@@ -138,6 +138,16 @@ route.define({
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
         end
 
+        -- `personnel.equipment.manage` is the base grant; some items are
+        -- gated further behind a specific Discord role or group (0027) --
+        -- checked against the *issuing* session, never the officer
+        -- receiving the item.
+        local gate = repo.issueGateFor(session.agencyId, 'equipment', input.itemKey)
+        local holdsDiscordRole, satisfiesGroup = repo.gateChecksFor(session.agencyId, session.discordId)
+        if not service.gatingSatisfied(gate, holdsDiscordRole, satisfiesGroup) then
+            return route.refuse(FredPD.ErrorCode.FORBIDDEN, { itemKey = 'gated' })
+        end
+
         local id = repo.assignEquipment(input.officerId, session, input)
 
         return { id = id }
@@ -159,6 +169,75 @@ route.define({
         end
 
         return { id = input.id }
+    end,
+})
+
+-- -----------------------------------------------------------------------------
+-- Issue gates (0027): a Discord role or permission group required to issue
+-- one equipment item or certification key, beyond `personnel.equipment.manage`/
+-- `personnel.certification.manage` themselves. Configuring a gate is gated
+-- on `personnel.equipment.manage` regardless of which kind it names -- the
+-- same supervisor tier that already hand-issues both.
+-- -----------------------------------------------------------------------------
+
+route.define({
+    name = 'personnel.issueGate.list',
+    perm = 'personnel.equipment.manage',
+    schema = 'PersonnelIssueGateList',
+    handler = function(session)
+        return { gates = repo.issueGates(session.agencyId) }
+    end,
+})
+
+route.define({
+    name = 'personnel.issueGate.set',
+    perm = 'personnel.equipment.manage',
+    schema = 'PersonnelIssueGateSet',
+    writes = true,
+    sensitive = true,
+    audit = 'personnel.issueGate.set',
+    subjectType = 'person',
+    auditDetail = function(input)
+        return {
+            kind = input.kind, itemKey = input.itemKey,
+            requiredGroup = input.requiredGroup, requiredDiscordRole = input.requiredDiscordRole,
+        }
+    end,
+    handler = function(session, input)
+        local err, fields = service.validateIssueGateSet(input)
+        if err then return route.refuse(err, fields) end
+
+        if input.requiredGroup and not FredPD.Core.perms.permissionsOf(input.requiredGroup) then
+            return route.refuse(FredPD.ErrorCode.INVALID, { requiredGroup = 'unknown' })
+        end
+
+        repo.setIssueGate(
+            session.agencyId, input.kind, input.itemKey,
+            input.requiredGroup, input.requiredDiscordRole, session.discordId)
+
+        return { kind = input.kind, itemKey = input.itemKey }
+    end,
+})
+
+route.define({
+    name = 'personnel.issueGate.clear',
+    perm = 'personnel.equipment.manage',
+    schema = 'PersonnelIssueGateClear',
+    writes = true,
+    sensitive = true,
+    audit = 'personnel.issueGate.cleared',
+    subjectType = 'person',
+    auditDetail = function(input) return { kind = input.kind, itemKey = input.itemKey } end,
+    handler = function(session, input)
+        if not service.isIssueKind(input.kind) then
+            return route.refuse(FredPD.ErrorCode.INVALID, { kind = 'not_a_key' })
+        end
+
+        if repo.clearIssueGate(session.agencyId, input.kind, input.itemKey) == 0 then
+            return route.refuse(FredPD.ErrorCode.NOT_FOUND)
+        end
+
+        return { kind = input.kind, itemKey = input.itemKey }
     end,
 })
 
@@ -275,6 +354,15 @@ route.define({
 
         if not repo.byId(input.officerId, session.agencyId) then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
+        end
+
+        -- See `personnel.equipment.assign`'s identical check: some
+        -- certifications are gated further behind a specific Discord role
+        -- or group (0027), checked against the issuer, not the recipient.
+        local gate = repo.issueGateFor(session.agencyId, 'certification', input.certKey)
+        local holdsDiscordRole, satisfiesGroup = repo.gateChecksFor(session.agencyId, session.discordId)
+        if not service.gatingSatisfied(gate, holdsDiscordRole, satisfiesGroup) then
+            return route.refuse(FredPD.ErrorCode.FORBIDDEN, { certKey = 'gated' })
         end
 
         local id = repo.issueCertification(input.officerId, session, input)
