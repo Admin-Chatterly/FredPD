@@ -2461,7 +2461,9 @@
       "tariff": "Fine",
       "person": "Person id",
       "vehicle": "Vehicle id",
-      "number": "Citation number"
+      "number": "Citation number",
+      "payment": "Payment",
+      "dueAt": "Due"
     },
     "action": {
       "issue": "Issue citation",
@@ -2482,6 +2484,10 @@
       "paid": "Paid",
       "contested": "Contested",
       "void": "Void"
+    },
+    "payment": {
+      "unpaid": "Unpaid",
+      "overdue": "Overdue"
     },
     "voidReason": {
       "label": "Reason for voiding",

@@ -58,8 +58,23 @@ route.define({
     schema = 'OrdningsbotList',
     handler = function(session, input)
         local found = repo.list(session.agencyId, { status = input.status }, input.limit or 100)
+        local citations = access.filterSearch(session, ORDNINGSBOT, found)
 
-        return { citations = access.filterSearch(session, ORDNINGSBOT, found) }
+        -- `unpaid`/`overdue` are read off `dueAt`, not stored (0024's header) --
+        -- computed once here, against the same instant, rather than in the
+        -- NUI against however stale the officer's clock happens to be.
+        local now = os.time()
+        for index = 1, #citations do
+            local row = citations[index]
+            -- A restricted row is a stub (`Access.stub`) with no `status` or
+            -- `dueAt` on it at all -- nothing here to compute a payment
+            -- status from, and nothing the reader is allowed to learn.
+            if row.restricted ~= true then
+                row.paymentStatus = service.paymentStatus(row, now)
+            end
+        end
+
+        return { citations = citations }
     end,
 })
 
@@ -75,6 +90,7 @@ route.define({
         -- screen shows what it cost then, not what the code costs now
         -- (0019's header, `Repo.tariffById` never filters on `retiredAt`).
         row.tariff = repo.tariffById(row.tariffId, session.agencyId)
+        row.paymentStatus = service.paymentStatus(row, os.time())
 
         return { citation = row }
     end,

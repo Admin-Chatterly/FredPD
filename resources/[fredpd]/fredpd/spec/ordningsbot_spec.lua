@@ -152,4 +152,33 @@ describe('ordningsbot', function()
             assert.is_false(ordningsbot.mayTransition('overdue', 'paid'))
         end)
     end)
+
+    -- -------------------------------------------------------------------------
+    describe('paymentStatus', function()
+        it('reads an issued citation before its due date as unpaid', function()
+            assert.are.equal('unpaid', ordningsbot.paymentStatus({ status = 'issued', dueAt = 200 }, 100))
+        end)
+
+        it('reads an issued citation past its due date as overdue', function()
+            assert.are.equal('overdue', ordningsbot.paymentStatus({ status = 'issued', dueAt = 100 }, 200))
+        end)
+
+        it('treats the due instant itself as overdue', function()
+            -- `now >= dueAt`, not `>`: due at noon means overdue at noon, not
+            -- one second after it.
+            assert.are.equal('overdue', ordningsbot.paymentStatus({ status = 'issued', dueAt = 100 }, 100))
+        end)
+
+        it('passes paid through unchanged', function()
+            assert.are.equal('paid', ordningsbot.paymentStatus({ status = 'paid', dueAt = 100 }, 999))
+        end)
+
+        it('passes contested through unchanged', function()
+            assert.are.equal('contested', ordningsbot.paymentStatus({ status = 'contested', dueAt = 100 }, 999))
+        end)
+
+        it('passes void through unchanged', function()
+            assert.are.equal('void', ordningsbot.paymentStatus({ status = 'void', dueAt = 100 }, 999))
+        end)
+    end)
 end)

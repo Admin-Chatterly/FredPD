@@ -32,6 +32,10 @@
     issuedAt: number;
     issuedBy: string;
     status: string;
+    dueAt: number;
+    /** Derived on the server, never stored (0024): `status` split into
+     * `unpaid`/`overdue` while it is `issued`, unchanged otherwise. */
+    paymentStatus: string;
     voidReasonKey?: string | null;
     version: number;
     tariff?: Tariff;
@@ -264,13 +268,14 @@
             <tr>
               <th class="px-2 py-1 text-left font-semibold">{t('ordningsbot.field.number')}</th>
               <th class="px-2 py-1 text-left font-semibold">{t('ordningsbot.field.status')}</th>
+              <th class="px-2 py-1 text-left font-semibold">{t('ordningsbot.field.payment')}</th>
             </tr>
           </thead>
           <tbody>
             {#each rows as row, index (index)}
               {#if isStub(row)}
                 <tr class="border-t border-[var(--color-border)]">
-                  <td class="px-2 py-1 text-[var(--color-ink-muted)]" colspan="2">
+                  <td class="px-2 py-1 text-[var(--color-ink-muted)]" colspan="3">
                     {t('records.restricted.title')} — {stubContact(row)}
                   </td>
                 </tr>
@@ -287,6 +292,16 @@
                     </button>
                   </td>
                   <td class="px-2 py-1">{t(`ordningsbot.status.${row.status}`)}</td>
+                  <td class="px-2 py-1">
+                    {#if row.paymentStatus === 'unpaid' || row.paymentStatus === 'overdue'}
+                      <span
+                        class:text-[var(--color-alert)]={row.paymentStatus === 'overdue'}
+                        class:font-semibold={row.paymentStatus === 'overdue'}
+                      >
+                        {t(`ordningsbot.payment.${row.paymentStatus}`)}
+                      </span>
+                    {/if}
+                  </td>
                 </tr>
               {/if}
             {/each}
@@ -308,6 +323,16 @@
 
         {#if detail.tariff}
           <p class="mb-3 text-xs">{t(detail.tariff.labelKey)} — {detail.tariff.amount}</p>
+        {/if}
+
+        {#if detail.status === 'issued'}
+          <p
+            class="mb-3 text-xs"
+            class:text-[var(--color-alert)]={detail.paymentStatus === 'overdue'}
+            class:font-semibold={detail.paymentStatus === 'overdue'}
+          >
+            {t(`ordningsbot.payment.${detail.paymentStatus}`)} · {t('ordningsbot.field.dueAt')}: {formatMoment(detail.dueAt)}
+          </p>
         {/if}
 
         {#if detail.status === 'void' && detail.voidReasonKey}

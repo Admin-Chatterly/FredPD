@@ -58,6 +58,26 @@ function Ordningsbot.mayTransition(fromStatus, toStatus)
 end
 
 -- -----------------------------------------------------------------------------
+-- Payment status (0024): overdue is read, never stored
+-- -----------------------------------------------------------------------------
+
+--- Splits `issued` into `unpaid` or `overdue` against `dueAt`. `paid`,
+--- `contested` and `void` are terminal (see the module header) and pass
+--- through unchanged -- there is no database column for this, and no fifth
+--- value `mayTransition` needs to know about: it is arithmetic on the two
+--- fields a row already carries, the same "computed from dates, not timers"
+--- shape `impound/service.lua`'s `Impound.feeOwed` takes for the impound fee.
+---
+--- @param row table `status`, `dueAt` (epoch seconds)
+--- @param now number epoch seconds
+--- @return string 'unpaid'|'overdue'|'paid'|'contested'|'void'
+function Ordningsbot.paymentStatus(row, now)
+    if row.status ~= 'issued' then return row.status end
+
+    return (now >= row.dueAt) and 'overdue' or 'unpaid'
+end
+
+-- -----------------------------------------------------------------------------
 -- Validation
 -- -----------------------------------------------------------------------------
 

@@ -122,7 +122,7 @@ local CITATION_SELECT <const> = [[
     SELECT id, agency_id AS agencyId, number, tariff_id AS tariffId,
            person_id AS personId, vehicle_id AS vehicleId,
            issued_by AS issuedBy, UNIX_TIMESTAMP(issued_at) AS issuedAt,
-           status,
+           status, UNIX_TIMESTAMP(due_at) AS dueAt,
            void_reason_key AS voidReasonKey, voided_by AS voidedBy,
            UNIX_TIMESTAMP(voided_at) AS voidedAt,
            UNIX_TIMESTAMP(paid_at) AS paidAt,
@@ -175,13 +175,17 @@ function Repo.issue(input, session)
     values[base + 4] = input.vehicleId
     values[base + 5] = session.discordId
     values[base + 6] = input.classification or 'internal'
+    -- The payment window as it stands right now, written onto the row -- see
+    -- 0024's migration header for why this is never re-derived later.
+    values[base + 7] = FredPD.Config.server.ordningsbot.paymentWindowDays
 
     local committed = db().transaction(counters.transaction('citation', session.agencyId, nil, {
         {
             query = [[INSERT INTO fpd_ordningsbot
                           (number, agency_id, tariff_id, person_id, vehicle_id,
-                           issued_by, classification)
-                      VALUES (]] .. counters.numberSql() .. [[, ?, ?, ?, ?, ?, ?)]],
+                           issued_by, classification, due_at)
+                      VALUES (]] .. counters.numberSql() .. [[, ?, ?, ?, ?, ?, ?,
+                              DATE_ADD(CURRENT_TIMESTAMP(3), INTERVAL ? DAY))]],
             values = values,
         },
     }))

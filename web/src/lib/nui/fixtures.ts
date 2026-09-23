@@ -3997,6 +3997,9 @@ interface FixtureCitation {
   version: number;
 }
 
+// The window `config.server.ordningsbot.paymentWindowDays` ships with (0024).
+const PAYMENT_WINDOW_DAYS = 30;
+
 const citations: FixtureCitation[] = [
   {
     id: 1,
@@ -4016,6 +4019,15 @@ const citations: FixtureCitation[] = [
     status: 'paid',
     version: 2,
   },
+  {
+    id: 3,
+    number: 'LSPD-T26-000254',
+    tariffId: 1,
+    vehicleId: 12,
+    issuedAgo: (PAYMENT_WINDOW_DAYS + 5) * DAY,
+    status: 'issued',
+    version: 1,
+  },
 ];
 
 const restrictedCitations = [
@@ -4023,15 +4035,23 @@ const restrictedCitations = [
 ];
 
 function citationRow(row: FixtureCitation, detailed: boolean): Record<string, unknown> {
+  const issuedAt = secondsAgo(row.issuedAgo);
+  const dueAt = issuedAt + PAYMENT_WINDOW_DAYS * DAY;
+  const now = secondsAgo(0);
+
   const shaped: Record<string, unknown> = {
     id: row.id,
     number: row.number,
     tariffId: row.tariffId,
     personId: row.personId ?? null,
     vehicleId: row.vehicleId ?? null,
-    issuedAt: secondsAgo(row.issuedAgo),
+    issuedAt,
     issuedBy: FIXTURE_VIEWER,
     status: row.status,
+    dueAt,
+    // Mirrors `Ordningsbot.paymentStatus` (0024): `issued` splits into
+    // `unpaid`/`overdue` against `dueAt`, everything else passes through.
+    paymentStatus: row.status === 'issued' ? (now >= dueAt ? 'overdue' : 'unpaid') : row.status,
     voidReasonKey: row.voidReasonKey ?? null,
     version: row.version,
   };

@@ -2461,7 +2461,9 @@
       "tariff": "Bot",
       "person": "Person-id",
       "vehicle": "Fordon-id",
-      "number": "Botens nummer"
+      "number": "Botens nummer",
+      "payment": "Betalning",
+      "dueAt": "Förfaller"
     },
     "action": {
       "issue": "Utfärda ordningsbot",
@@ -2482,6 +2484,10 @@
       "paid": "Betald",
       "contested": "Bestridd",
       "void": "Makulerad"
+    },
+    "payment": {
+      "unpaid": "Obetald",
+      "overdue": "Försenad"
     },
     "voidReason": {
       "label": "Grund för makulering",

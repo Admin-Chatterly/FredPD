@@ -135,6 +135,9 @@ local REQUIRED_COLUMNS <const> = {
 
     -- 0004: optimistic locking for the permission group editor.
     { table = 'fpd_permission_groups', column = 'version' },
+
+    -- 0024: the payment due date a citation's overdue state is read from.
+    { table = 'fpd_ordningsbot', column = 'due_at' },
 }
 
 --- Returns the names of any dependency that is not started.

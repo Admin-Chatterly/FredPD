@@ -336,6 +336,16 @@ FredPD.Config.server = {
         -- },
     },
 
+    --- Ordningsbot: the fixed-penalty citation (spec 7.11).
+    ---
+    --- How many days somebody has to pay before an `issued` citation reads as
+    --- overdue. Written onto the citation at issue time, so changing this
+    --- number here never moves the deadline on one already handed to
+    --- somebody -- see migration 0024's header.
+    ordningsbot = {
+        paymentWindowDays = 30,
+    },
+
     --- The gateway is a separate Node service for media, PDF rendering and
     --- scheduled jobs. None of that exists yet and FXServer never calls it, so
     --- it is off and you do not need to deploy anything (ADR-010). When it

@@ -27,7 +27,11 @@ test('shows the disposition already entered on a charged referral', async ({ pag
   await page.getByRole('button', { name: 'A26-00011' }).click();
 
   await expect(page.getByText('Guilty')).toBeVisible();
-  await expect(page.getByText('18')).toBeVisible();
+  // Exact: today's date can itself contain "18" (e.g. the 18th of a month),
+  // which turns a substring match into a strict-mode collision between the
+  // sentence length and a decided-at timestamp -- unrelated to what this
+  // test checks.
+  await expect(page.getByText('18', { exact: true })).toBeVisible();
 });
 
 test('shows the sentencing range the server computed, not one the screen adds up', async ({ page }) => {

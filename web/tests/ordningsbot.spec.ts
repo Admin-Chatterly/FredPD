@@ -59,6 +59,26 @@ test('a paid citation offers no further transition buttons', async ({ page }) =>
   await expect(page.getByRole('button', { name: 'Mark paid' })).toHaveCount(0);
 });
 
+test('an issued citation still inside its payment window reads as unpaid', async ({ page }) => {
+  await openOrdningsbot(page);
+
+  const row = page.getByRole('row').filter({ has: page.getByRole('button', { name: 'LSPD-T26-000301' }) });
+  await expect(row.getByText('Unpaid', { exact: true })).toBeVisible();
+
+  await row.getByRole('button', { name: 'LSPD-T26-000301' }).click();
+  await expect(page.getByText('Unpaid', { exact: true })).toBeVisible();
+});
+
+test('an issued citation past its payment window reads as overdue', async ({ page }) => {
+  await openOrdningsbot(page);
+
+  const row = page.getByRole('row').filter({ has: page.getByRole('button', { name: 'LSPD-T26-000254' }) });
+  await expect(row.getByText('Overdue', { exact: true })).toBeVisible();
+
+  await row.getByRole('button', { name: 'LSPD-T26-000254' }).click();
+  await expect(page.getByText('Overdue', { exact: true })).toBeVisible();
+});
+
 test('renders the tab in Swedish', async ({ page }) => {
   await page.goto('/?locale=sv');
   await page.locator('nav').first().getByRole('button', { name: 'Register' }).click();

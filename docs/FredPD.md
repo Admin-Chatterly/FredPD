@@ -773,6 +773,7 @@ Renamed from "Citations": ordningsbot is the correct Swedish term for a summary 
 
 - [M] A **versioned tariff**, the same immutable-version shape `fpd_brott` uses (7.10): a citation references one specific tariff row forever, so a later tariff change never alters what an already-issued citation says it was for.
 - [M] Lifecycle: issued → paid, contested or void, each a one-way transition out of `issued` only. Void requires a reason from a closed list.
+- [M] **A payment due date and an overdue state** (0024). `due_at` is written once at issue time from `config.server.ordningsbot.paymentWindowDays` (default 30 days), so a later change to the window never moves the deadline on a citation already issued. `overdue` is not a fifth database status — `ordningsbot/service.lua`'s `Ordningsbot.paymentStatus` reads `issued` against `dueAt` and reports `unpaid` or `overdue`, the same "computed from dates, not timers" shape `impound/service.lua`'s fee clock already uses.
 - **Not built:** points on a licence (no licence-points concept exists in this suite) and a billing-bridge integration for payment — `ordningsbot.pay` marks a citation paid directly, a deliberate scope-narrowing recorded in the migration's own header.
 - **Permissions:** `page.ordningsbot`, `ordningsbot.tariff.view`, `ordningsbot.view` (patrol_basic); `ordningsbot.issue`, `.contest`, `.pay` (patrol); `ordningsbot.void` (supervisor).
 
