@@ -900,7 +900,17 @@ local function isPrivileged(src)
     local session = sessions.all()[src]
     if not session then return false end
 
-    return FredPD.Core.perms.satisfies(session.permissions, 'forensics.tools.use')
+    if not FredPD.Core.perms.satisfies(session.permissions, 'forensics.tools.use') then
+        return false
+    end
+
+    -- The permission is a standing Discord grant (invariant 2); it says
+    -- nothing about right now. An officer clocked off is, in the fiction, a
+    -- civilian -- one who happens to hold a badge -- and a civilian does not
+    -- see a latent print somebody just powdered, or a marker nobody but a
+    -- technician placed. Duty is what tells the two apart, the same context
+    -- condition every route in this section already carries.
+    return FredPD.Bridge.policejob.isOnDuty(src)
 end
 
 --- Is there anything at all in the cells this player is standing in?

@@ -938,7 +938,7 @@ local NATIVES <const> = {
 
 describe('forensics grid, in memory', function()
     local grid
-    local pushes, positions, sessions, clock
+    local pushes, positions, sessions, onDuty, clock
     local saved, realTime
     local osLib = os
 
@@ -971,6 +971,16 @@ describe('forensics grid, in memory', function()
 
                     return false
                 end,
+            },
+        }
+
+        -- Defaults to on duty, so the existing privileged-subscriber tests --
+        -- which only ever set a permission, never a duty state -- keep
+        -- meaning what they did before duty was a second gate. A test that
+        -- cares sets `onDuty[src] = false` itself.
+        fredpd.Bridge = {
+            policejob = {
+                isOnDuty = function(src) return onDuty[src] ~= false end,
             },
         }
 
@@ -1047,7 +1057,7 @@ describe('forensics grid, in memory', function()
         clock = 1700000000
         osLib.time = function() return clock end
 
-        pushes, positions, sessions = {}, {}, {}
+        pushes, positions, sessions, onDuty = {}, {}, {}, {}
 
         _G.AddEventHandler = function() end
         _G.CreateThread = function() end
@@ -1204,6 +1214,25 @@ describe('forensics grid, in memory', function()
 
             assert.is_nil(drawing(1)[latent.key])
             assert.is_true(drawing(2)[latent.key])
+        end)
+
+        it('does not reach an officer with tools who is off duty', function()
+            -- The permission is a standing Discord grant (invariant 2); it says
+            -- nothing about right now. An officer clocked off is, in the
+            -- fiction, a civilian, and must not see what a technician just
+            -- revealed any more than the suspect standing next to them does.
+            positions[2] = { x = 10.0, y = 10.0, z = 30.0 }
+            sessions[2] = helper.session({ src = 2, permissions = { 'forensics.tools.use' } })
+            onDuty[2] = false
+
+            local latent = grid.place({
+                type = 'print', x = 10.0, y = 10.0, z = 30.0, owner = { identifier = 'char1' },
+            })
+
+            grid.reveal(10.0, 10.0, 30.0, 4.0, 'powder')
+            grid.push(2)
+
+            assert.is_nil(drawing(2)[latent.key])
         end)
 
         it('does not tell an unprivileged client that a print has been created', function()
