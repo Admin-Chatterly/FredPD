@@ -174,6 +174,7 @@
     "courthouse_terminal": "Courthouse terminal",
     "motorpool": "Motor pool",
     "evidence_bench": "Evidence bench",
+    "fingerprint_scanner": "Fingerprint scanner",
     "interaction": {
       "prop": "Bind to a prop",
       "ped": "Place a person",
@@ -1138,6 +1139,10 @@
       "title": "Records withheld"
     },
     "yes": "Yes"
+  },
+  "fingerprintScanner": {
+    "noPrint": "No print within reach of the scanner.",
+    "scanned": "Print collected as {number}."
   },
   "forensics": {
     "busy": "Already doing something",

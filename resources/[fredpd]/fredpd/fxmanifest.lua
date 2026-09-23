@@ -234,6 +234,7 @@ client_scripts {
     'client/placement-editor.lua',
     'client/chat.lua',
     'client/garage.lua',
+    'client/fingerprint_scanner.lua',
     -- Dispatch: the panic keybind and the relay that carries the server's
     -- `fredpd:cad:*` pushes into the NUI. After `client/core.lua`, whose
     -- namespace it binds at load; before `client/main.lua`, which stays last

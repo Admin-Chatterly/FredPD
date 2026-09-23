@@ -458,6 +458,35 @@ function Render.get(traceKey)
     return traces[traceKey]
 end
 
+--- The closest streamed trace of one type within a radius, or nil.
+---
+--- For the fingerprint scanner's quick-scan: it needs *a* nearby print without
+--- the officer picking one off a target menu, the same way the GSR swab needs
+--- no key at all. Only ever finds a trace this client has already been sent,
+--- so it is no more of an oracle than looking at the screen already is (8.11) --
+--- it cannot name a print the officer has not been streamed, and the server
+--- still re-measures distance itself when the collection call reaches it.
+---
+--- @param kind string trace type, e.g. 'print'
+--- @param position vector3
+--- @param radius number
+--- @return table|nil
+function Render.nearestOfType(kind, position, radius)
+    local nearest, nearestDistance = nil, radius
+
+    for _, trace in pairs(traces) do
+        if trace.type == kind then
+            local distance = #(position - vec3(trace.x, trace.y, trace.z))
+
+            if distance <= nearestDistance then
+                nearest, nearestDistance = trace, distance
+            end
+        end
+    end
+
+    return nearest
+end
+
 --- Drops a trace immediately, without waiting for the next stream tick.
 ---
 --- Used after a successful collection so the casing disappears as the officer
@@ -603,3 +632,24 @@ AddEventHandler('onResourceStop', function(resource)
 end)
 
 FredPDForensics.Client.render = Render
+
+-- -----------------------------------------------------------------------------
+-- Cross-resource exports
+-- -----------------------------------------------------------------------------
+
+--- For `fredpd`'s fingerprint scanner placement, which has no trace table of
+--- its own -- this resource owns every trace a client has been streamed
+--- (8.1.6), and a placement is a `fredpd` concept this resource never touches
+--- otherwise. Answers a key, never the trace itself: naming what to collect
+--- is all a placement needs, and the collection call still goes to
+--- `evidence.collect` exactly as it does from a target zone (8.11).
+exports('nearestPrintTraceKey', function(x, y, z, radius)
+    local trace = Render.nearestOfType('print', vec3(x, y, z), radius)
+    return trace and trace.key or nil
+end)
+
+--- So a successful scan drops the trace immediately, the same as bagging one
+--- from a target zone does (`Render.forget`).
+exports('forgetTrace', function(traceKey)
+    Render.forget(traceKey)
+end)

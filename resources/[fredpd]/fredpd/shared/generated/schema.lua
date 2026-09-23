@@ -55,6 +55,7 @@ FredPD.PlacementKind = {
     COURTHOUSE_TERMINAL = 'courthouse_terminal',
     MOTORPOOL = 'motorpool',
     EVIDENCE_BENCH = 'evidence_bench',
+    FINGERPRINT_SCANNER = 'fingerprint_scanner',
 }
 
 --- How a placement is reached in the world (spec 3.10).
@@ -268,7 +269,7 @@ FredPD.Schema = {
     },
 
     PlacementCreate = {
-        kind = { type = 'enum', required = true, values = { 'station_terminal', 'property_terminal', 'lab_terminal', 'booking_terminal', 'dispatch_console', 'courthouse_terminal', 'motorpool', 'evidence_bench' } },
+        kind = { type = 'enum', required = true, values = { 'station_terminal', 'property_terminal', 'lab_terminal', 'booking_terminal', 'dispatch_console', 'courthouse_terminal', 'motorpool', 'evidence_bench', 'fingerprint_scanner' } },
         interaction = { type = 'enum', required = true, values = { 'prop', 'ped', 'zone' } },
         agencyId = { type = 'string', required = false, max = 32 },
         model = { type = 'string', required = false, max = 64 },
@@ -282,7 +283,7 @@ FredPD.Schema = {
 
     PlacementUpdate = {
         id = { type = 'integer', required = true, min = 1 },
-        kind = { type = 'enum', required = false, values = { 'station_terminal', 'property_terminal', 'lab_terminal', 'booking_terminal', 'dispatch_console', 'courthouse_terminal', 'motorpool', 'evidence_bench' } },
+        kind = { type = 'enum', required = false, values = { 'station_terminal', 'property_terminal', 'lab_terminal', 'booking_terminal', 'dispatch_console', 'courthouse_terminal', 'motorpool', 'evidence_bench', 'fingerprint_scanner' } },
         interaction = { type = 'enum', required = false, values = { 'prop', 'ped', 'zone' } },
         model = { type = 'string', required = false, max = 64 },
         x = { type = 'number', required = false },

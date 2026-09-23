@@ -147,6 +147,7 @@ export const PLACEMENT_KINDS = [
   'courthouse_terminal',
   'motorpool',
   'evidence_bench',
+  'fingerprint_scanner',
 ] as const;
 
 export type PlacementKind = (typeof PLACEMENT_KINDS)[number];
