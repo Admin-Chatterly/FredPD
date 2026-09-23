@@ -1517,6 +1517,10 @@
       "all_units": "Till alla enheter",
       "information": "Information"
     },
+    "garageAlert": {
+      "store": "Efterlyst registreringsnummer {plate} parkerades i ett garage ({case}).",
+      "takeout": "Efterlyst registreringsnummer {plate} lämnade nyss ett garage ({case})."
+    },
     "map": {
       "title": "Karta",
       "units": "Enheter",

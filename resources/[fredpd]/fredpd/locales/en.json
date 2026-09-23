@@ -1517,6 +1517,10 @@
       "all_units": "All units",
       "information": "Information"
     },
+    "garageAlert": {
+      "store": "BOLO plate {plate} put away in a garage ({case}).",
+      "takeout": "BOLO plate {plate} just left a garage ({case})."
+    },
     "map": {
       "title": "Map",
       "units": "Units",

@@ -980,6 +980,11 @@ FredPD.Schema = {
 
     },
 
+    GarageVehicleEvent = {
+        plate = { type = 'string', required = true, min = 1, max = 16 },
+        action = { type = 'enum', required = true, values = { 'store', 'takeout' } },
+    },
+
     BroadcastCreate = {
         kind = { type = 'enum', required = true, values = { 'bolo', 'attempt_to_locate', 'all_units', 'information' } },
         priority = { type = 'integer', required = false, min = 1, max = 4 },

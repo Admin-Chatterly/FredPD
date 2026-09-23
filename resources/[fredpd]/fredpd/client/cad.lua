@@ -80,6 +80,7 @@ local PUSHES <const> = {
     'fredpd:cad:emergency',
     'fredpd:cad:avl',
     'fredpd:cad:welfare',
+    'fredpd:cad:garageAlert',
 }
 
 --- Hands one push to the interface.
@@ -431,6 +432,27 @@ local function broadcastAlert(payload)
     })
 end
 
+-- -----------------------------------------------------------------------------
+-- A BOLO'd plate going into or out of a garage (spec 3.8, 7.16)
+-- -----------------------------------------------------------------------------
+
+--- `garage.plateEvent`'s alert has no board of its own -- there is no record
+--- behind it, only a plate, an action and whichever case the flag names -- so
+--- it is a toast and nothing more, the same as a BOLO going out is.
+local function garageAlert(payload)
+    if not (payload and payload.plate) then return end
+
+    lib.notify({
+        title = FredPD.t('cad.broadcastKind.bolo'),
+        description = FredPD.t('cad.garageAlert.' .. payload.action, {
+            plate = payload.plate,
+            case = payload.caseNumber or '',
+        }),
+        type = 'inform',
+        duration = BROADCAST_NOTIFY_MS,
+    })
+end
+
 --- The pushes that mean something to this file as well as to the interface.
 ---
 --- Everything else is relayed and nothing more: the client renders what the
@@ -440,6 +462,7 @@ local WATCHED <const> = {
     ['fredpd:cad:call'] = forgetClosedEmergency,
     ['fredpd:cad:avl'] = syncBlips,
     ['fredpd:cad:broadcast'] = broadcastAlert,
+    ['fredpd:cad:garageAlert'] = garageAlert,
 }
 
 for _, event in ipairs(PUSHES) do

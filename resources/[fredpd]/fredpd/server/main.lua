@@ -228,6 +228,18 @@ AddEventHandler('onResourceStart', function(resource)
     FredPD.Core.perms.reload()
     FredPD.Core.placements.reload()
 
+    -- The BOLO cache `garage.plateEvent` reads (spec 3.5.1, ADR-013): seeded
+    -- here from the database once, the same way the three reloads above are,
+    -- because `cad/service.lua` holds no natives and no database on purpose
+    -- and a public route may never reach a record directly.
+    do
+        local flags = FredPD.Repo.cad.liveBoloFlags()
+
+        for index = 1, #flags do
+            FredPD.Modules.cad.boloMark(flags[index].plate, flags[index])
+        end
+    end
+
     print(('[fredpd] %s started (env=%s, locale=%s, routes=%d)'):format(
         FredPD.version, FredPD.env(), FredPD.lang, #FredPD.Core.route.names()
     ))

@@ -1088,4 +1088,73 @@ function Cad.logMessageKey(entryType, options)
     return 'cad.log.' .. entryType
 end
 
+-- -----------------------------------------------------------------------------
+-- The live BOLO cache (spec 3.5.1, ADR-013)
+-- -----------------------------------------------------------------------------
+
+--- plate -> { agencyId, classification, caseNumber, expiresAt }
+---
+--- In memory, and for one reason: `garage.plateEvent` is public (spec 3.8) --
+--- the player storing or taking a car out of a civilian garage is very
+--- often somebody with no FredPD session at all -- and a public handler may
+--- never reach a database record (ADR-013, spec 3.5.1; `wiring-check`
+--- enforces it). So the check that route makes has to be against something
+--- that is not one, the same way the forensics grid and the residue table
+--- are not: each is written by an authenticated route and read by a public
+--- one.
+---
+--- Kept current by `registry`'s flag routes calling `Cad.boloMark` /
+--- `Cad.boloClear` after their own write commits, and seeded once at boot
+--- from the same table (`server/main.lua`, the same way `agencies.reload()`
+--- and `perms.reload()` seed theirs) -- this file holds no natives and no
+--- database on purpose, so the boot read happens where one is allowed to.
+local bolo = {}
+
+--- A vehicle was flagged `kind = 'bolo'` (7.4), or its existing flag changed.
+---
+--- @param plate string
+--- @param flag table { agencyId, classification, caseNumber, expiresAt }
+---   `expiresAt` is `os.time()` seconds, computed by the caller -- this file
+---   never reads a clock either, so busted can drive `boloCheck` with
+---   whatever `now` a test wants without a real one moving underneath it.
+function Cad.boloMark(plate, flag)
+    if type(plate) ~= 'string' or plate == '' then return end
+
+    bolo[plate] = {
+        agencyId = flag.agencyId,
+        classification = flag.classification,
+        caseNumber = flag.caseNumber,
+        expiresAt = flag.expiresAt,
+    }
+end
+
+--- The flag was cleared, expired, or replaced by a flag of a different kind:
+--- either way there is nothing left on this plate to alert on until it is
+--- marked again.
+function Cad.boloClear(plate)
+    bolo[plate] = nil
+end
+
+--- Is this plate under a live BOLO right now?
+---
+--- Expiry is read here rather than swept on a timer, for the reason
+--- `GSR.present` gives for residue: a full server holds at most a handful of
+--- live flags, and a timer that exists to expire a few table entries costs
+--- more than checking the one that is actually asked about.
+---
+--- @param plate string
+--- @param now number os.time(), injected so busted can move the clock
+--- @return table|nil { agencyId, classification, caseNumber }
+function Cad.boloCheck(plate, now)
+    local flag = bolo[plate]
+    if not flag then return nil end
+
+    if flag.expiresAt and flag.expiresAt <= now then
+        bolo[plate] = nil
+        return nil
+    end
+
+    return { agencyId = flag.agencyId, classification = flag.classification, caseNumber = flag.caseNumber }
+end
+
 FredPD.Modules.cad = Cad

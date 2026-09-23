@@ -1609,6 +1609,16 @@ export const schemas = {
    * Not pinned: a field supervisor puts out a lookout from the car as readily
    * as dispatch does from the console.
    */
+  // Fired by a garage bridge's client listener when a vehicle is stored or
+  // taken out (spec 3.8, 7.16). Public: the acting player is often a
+  // civilian with no FredPD session at all, and this route decides nothing
+  // more sensitive than whether to alert dispatch about a plate already on
+  // the BOLO list.
+  GarageVehicleEvent: {
+    plate: { type: 'string', required: true, min: 1, max: 16 },
+    action: { type: 'enum', required: true, values: ['store', 'takeout'] },
+  },
+
   BroadcastCreate: {
     kind: { type: 'enum', required: true, values: BROADCAST_KINDS },
     /**

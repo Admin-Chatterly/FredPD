@@ -1722,4 +1722,63 @@ describe('cad', function()
             end)
         end)
     end)
+
+    -- -------------------------------------------------------------------------
+    -- The live BOLO cache (spec 3.5.1, ADR-013)
+    -- -------------------------------------------------------------------------
+
+    describe('boloCache', function()
+        it('answers nil for a plate nobody has marked', function()
+            assert.is_nil(cad.boloCheck('ABC123', 1000))
+        end)
+
+        it('answers a marked plate with what was marked', function()
+            cad.boloMark('ABC123', {
+                agencyId = 'lspd', classification = 'internal', caseNumber = 'LSPD-26-000001',
+            })
+
+            local flag = cad.boloCheck('ABC123', 1000)
+
+            assert.are.equal('lspd', flag.agencyId)
+            assert.are.equal('internal', flag.classification)
+            assert.are.equal('LSPD-26-000001', flag.caseNumber)
+        end)
+
+        it('treats a plate with no expiry as never expiring', function()
+            cad.boloMark('ABC123', { agencyId = 'lspd', classification = 'internal' })
+
+            assert.is_not_nil(cad.boloCheck('ABC123', 1000000000))
+        end)
+
+        it('stops answering once the clock passes expiresAt', function()
+            cad.boloMark('ABC123', { agencyId = 'lspd', classification = 'internal', expiresAt = 1500 })
+
+            assert.is_not_nil(cad.boloCheck('ABC123', 1499))
+            assert.is_nil(cad.boloCheck('ABC123', 1500))
+        end)
+
+        it('clears a plate outright', function()
+            cad.boloMark('ABC123', { agencyId = 'lspd', classification = 'internal' })
+            cad.boloClear('ABC123')
+
+            assert.is_nil(cad.boloCheck('ABC123', 1000))
+        end)
+
+        it('marking again replaces what was there, not adds to it', function()
+            cad.boloMark('ABC123', { agencyId = 'lspd', classification = 'internal', caseNumber = 'first' })
+            cad.boloMark('ABC123', { agencyId = 'lspd', classification = 'restricted', caseNumber = 'second' })
+
+            local flag = cad.boloCheck('ABC123', 1000)
+
+            assert.are.equal('restricted', flag.classification)
+            assert.are.equal('second', flag.caseNumber)
+        end)
+
+        it('ignores a call with no plate to mark', function()
+            cad.boloMark(nil, { agencyId = 'lspd', classification = 'internal' })
+            cad.boloMark('', { agencyId = 'lspd', classification = 'internal' })
+
+            assert.is_nil(cad.boloCheck('', 1000))
+        end)
+    end)
 end)

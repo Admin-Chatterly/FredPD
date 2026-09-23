@@ -229,6 +229,7 @@ server_scripts {
 
 client_scripts {
     'client/bridges/ui.lua',
+    'client/bridges/garage.lua',
     'client/core.lua',
     'client/placements.lua',
     'client/placement-editor.lua',

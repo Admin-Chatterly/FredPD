@@ -1923,6 +1923,53 @@ route.define({
 })
 
 -- =============================================================================
+-- A civilian garage's own client telling dispatch about a flagged plate
+-- (spec 3.8, 7.16)
+-- =============================================================================
+
+--- Public, and it has to be, the same way `forensics.observe` is (8.3.1):
+--- the player storing or taking out a vehicle is very often a civilian with
+--- no FredPD session at all, and the criminal driving the flagged car is the
+--- whole point of this route existing. What that costs is every check
+--- `route.define` performs for a session route -- no permission, no session,
+--- no staleness tier, no audit row -- leaving only the rate limit and
+--- `liveBoloFlagByPlate` as what stands between a client and an alert.
+---
+--- The plate is trusted the same way a sensor observation is: this route
+--- decides nothing sensitive with it beyond "does a BOLO already exist for
+--- this string", so a client that lies about which plate it just stored
+--- can, at worst, cause its own plate to be checked -- it cannot make one
+--- exist that was not already flagged, and it cannot read back whether the
+--- check hit.
+route.public({
+    name = 'garage.plateEvent',
+    schema = 'GarageVehicleEvent',
+    limit = { per = 20, window = 60 },
+    handler = function(_src, input)
+        -- `service.boloCheck`, never `repo`: a public handler holds a
+        -- server id and no identity, so it may never reach a database
+        -- record (ADR-013, spec 3.5.1) -- only the in-memory cache
+        -- `registry`'s flag routes keep current.
+        local flagged = service.boloCheck(plate(input.plate), os.time())
+
+        if flagged then
+            board.toDispatch(flagged.agencyId, 'fredpd:cad:garageAlert', {
+                plate = plate(input.plate),
+                action = input.action,
+                caseNumber = flagged.caseNumber,
+            }, function(session)
+                return accessRules.canRead(accessRules.reader(session), flagged)
+            end)
+        end
+
+        -- Deliberately empty either way (8.11's own rule, applied here): a
+        -- civilian's client must not learn from the response whether the
+        -- plate it just reported is wanted.
+        return {}
+    end,
+})
+
+-- =============================================================================
 -- Broadcasts (7.16 [S], 7.26)
 -- =============================================================================
 

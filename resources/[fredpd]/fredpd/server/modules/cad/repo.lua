@@ -2145,4 +2145,30 @@ function Repo.purgeReads(agencyId, days, batch)
     )
 end
 
+--- Every live BOLO flag, across every agency, plate included (spec 7.16,
+--- 0005) -- for seeding `service.lua`'s in-memory cache once at boot
+--- (`server/main.lua`), the same way `agencies.reload()` and
+--- `perms.reload()` seed theirs. Nothing else may call this: a route
+--- reaching for it on every request is the database read the cache exists
+--- to replace.
+---
+--- `query/repo.lua` and `registry/repo.lua` each read `fpd_vehicle_flags`
+--- directly for their own purpose too -- it is a shared record like
+--- `fpd_vehicles` itself, not a table this file is reaching into another
+--- module's business logic to reach.
+---
+--- @return table rows { plate, agencyId, classification, caseNumber,
+---   expiresAt } -- `expiresAt` as epoch seconds, matching what
+---   `service.boloCheck` compares `os.time()` against.
+function Repo.liveBoloFlags()
+    return db().query(
+        [[SELECT v.plate, f.agency_id AS agencyId, f.classification,
+                 f.case_number AS caseNumber, UNIX_TIMESTAMP(f.expires_at) AS expiresAt
+            FROM fpd_vehicles v
+            JOIN fpd_vehicle_flags f ON f.vehicle_id = v.id
+           WHERE f.kind = 'bolo'
+             AND f.cleared_at IS NULL AND (f.expires_at IS NULL OR f.expires_at > NOW(3))]]
+    )
+end
+
 FredPD.Repo.cad = Repo

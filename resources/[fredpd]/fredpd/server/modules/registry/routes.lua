@@ -459,7 +459,8 @@ route.define({
         local err, fields = service.validateFlag(input)
         if err then return route.refuse(err, fields) end
 
-        if not readVehicle(session, { id = input.vehicleId }) then
+        local vehicle = readVehicle(session, { id = input.vehicleId })
+        if not vehicle then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
         end
 
@@ -473,6 +474,20 @@ route.define({
             classification = input.classification,
             expiresIn = input.expiresIn,
         }, session.discordId)
+
+        -- `cad`'s in-memory BOLO cache, which `garage.plateEvent` reads
+        -- because it may never reach a database record (ADR-013, spec
+        -- 3.5.1). `expiresAt` is computed here rather than read back from
+        -- the row just written, so this needs no second query and no
+        -- opinion about how oxmysql hands back a DATETIME.
+        if input.kind == 'bolo' and vehicle.plate then
+            FredPD.Modules.cad.boloMark(vehicle.plate, {
+                agencyId = session.agencyId,
+                classification = input.classification,
+                caseNumber = service.blankToNull(input.caseNumber),
+                expiresAt = input.expiresIn and (os.time() + input.expiresIn) or nil,
+            })
+        end
 
         return { id = input.vehicleId, flagId = id }
     end,
@@ -493,7 +508,8 @@ route.define({
         -- classification governs the flag: an officer who cannot read the
         -- record cannot clear what is on it, and neither can one who cannot
         -- read the flag they are clearing.
-        if not readVehicle(session, { id = flag.vehicleId }) then
+        local vehicle = readVehicle(session, { id = flag.vehicleId })
+        if not vehicle then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
         end
 
@@ -503,6 +519,15 @@ route.define({
 
         if repo.clearFlag(session.agencyId, input.flagId, session.discordId) == 0 then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
+        end
+
+        -- See `vehicle.flag`. A cleared bolo flag is one this plate no
+        -- longer alerts on -- unless another live bolo flag still sits on
+        -- the same vehicle, which this route has no way to know without a
+        -- second query the cache is not worth one for; a vehicle carrying
+        -- two live bolo flags at once is not a case this suite creates.
+        if flag.kind == 'bolo' and vehicle.plate then
+            FredPD.Modules.cad.boloClear(vehicle.plate)
         end
 
         return { id = flag.vehicleId, flagId = input.flagId }
