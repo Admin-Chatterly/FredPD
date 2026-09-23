@@ -20,7 +20,23 @@ local function client()
     return call
 end
 
---- Placement kinds offered in the editor, each with the locale key for its label.
+--- Icon shown beside each kind in the picker (FontAwesome, ox_lib context
+--- menus). Purely presentational: never sent to the server, and not itself
+--- user-facing text -- invariant 6 governs strings, not an icon name.
+local KIND_ICONS <const> = {
+    station_terminal = 'desktop',
+    property_terminal = 'box-archive',
+    lab_terminal = 'flask',
+    booking_terminal = 'clipboard-list',
+    dispatch_console = 'headset',
+    courthouse_terminal = 'gavel',
+    motorpool = 'car',
+    evidence_bench = 'magnifying-glass',
+    fingerprint_scanner = 'fingerprint',
+}
+
+--- Placement kinds offered in the editor, each with its label, a one-line
+--- description of what standing here actually gates, and an icon.
 ---
 --- Built from the generated enum so the editor can never offer a kind the
 --- server would reject.
@@ -28,11 +44,53 @@ local function kindOptions()
     local options = {}
 
     for _, kind in pairs(FredPD.PlacementKind) do
-        options[#options + 1] = { value = kind, label = FredPD.t('placement.' .. kind) }
+        options[#options + 1] = {
+            kind = kind,
+            title = FredPD.t('placement.' .. kind),
+            description = FredPD.t('placement.editor.description.' .. kind),
+            icon = KIND_ICONS[kind],
+        }
     end
 
-    table.sort(options, function(a, b) return a.label < b.label end)
+    table.sort(options, function(a, b) return a.title < b.title end)
     return options
+end
+
+--- Asks which kind this placement should be, through ox_lib's own context
+--- menu rather than the generic `Ui.showMenu` bridge -- which only ever
+--- carries a label, never an icon or a description.
+---
+--- An officer choosing between nine kinds by name alone, with nothing said
+--- about what each one actually does, was the whole reason this needed
+--- improving: `station_terminal` and `booking_terminal` read as
+--- near-synonyms without the sentence that tells them apart. ox_lib is a
+--- hard dependency of this resource (`fxmanifest.lua`'s `REQUIRED_RESOURCES`),
+--- not a bridge target that might be swapped out, so calling it directly
+--- here is the same thing `lib.inputDialog` and `lib.alertDialog` already do
+--- elsewhere in this file.
+---
+--- @param onPick function(kind)
+local function pickKind(onPick)
+    local options = kindOptions()
+    local contextOptions = {}
+
+    for index = 1, #options do
+        local option = options[index]
+
+        contextOptions[index] = {
+            title = option.title,
+            description = option.description,
+            icon = option.icon,
+            onSelect = function() onPick(option.kind) end,
+        }
+    end
+
+    lib.registerContext({
+        id = 'fredpd_placement_kind',
+        title = FredPD.t('placement.editor.pickKind'),
+        options = contextOptions,
+    })
+    lib.showContext('fredpd_placement_kind')
 end
 
 --- The placement nearest the player, from what the server pushed.
@@ -101,7 +159,7 @@ local function create(interaction)
         model = input[1]
     end
 
-    FredPD.Bridge.ui.showMenu(FredPD.t('placement.editor.pickKind'), kindOptions(), function(kind)
+    pickKind(function(kind)
         local response = client().call('placement.create', {
             kind = kind,
             interaction = interaction,

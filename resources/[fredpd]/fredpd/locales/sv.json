@@ -185,6 +185,17 @@
     },
     "editor": {
       "title": "Placeringar",
+      "description": {
+        "station_terminal": "Full MDT-åtkomst, vid ett skrivbord.",
+        "property_terminal": "Beviseftertagning, utlämning och granskning.",
+        "lab_terminal": "Laboratorieanalys och teknisk granskning.",
+        "booking_terminal": "Inskrivning, foto och tio-fingeravtryck.",
+        "dispatch_console": "Larmmottagning och ledningsverktyg.",
+        "courthouse_terminal": "Domstolskalender och domar.",
+        "motorpool": "Där en officer går fram för att kvittera ut ett fordon.",
+        "evidence_bench": "Markerar en plats för bevishantering. Ingen klientfunktion är kopplad till den ännu.",
+        "fingerprint_scanner": "Tar ett fingeravtryck från den som använder den."
+      },
       "newZone": "Ny här — område",
       "newProp": "Ny här — koppla till föremålet jag tittar på",
       "newPed": "Ny här — placera en person",

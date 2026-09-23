@@ -185,6 +185,17 @@
     },
     "editor": {
       "title": "Placements",
+      "description": {
+        "station_terminal": "Full MDT access, at a desk.",
+        "property_terminal": "Evidence intake, release and audits.",
+        "lab_terminal": "Lab analysis and technical review.",
+        "booking_terminal": "Booking, mugshot and ten-print capture.",
+        "dispatch_console": "Call intake and dispatcher tools.",
+        "courthouse_terminal": "Court calendar and dispositions.",
+        "motorpool": "Where an officer walks up to draw a fleet vehicle.",
+        "evidence_bench": "Marks a location for evidence work. No client action is wired to it yet.",
+        "fingerprint_scanner": "Collects a fingerprint from whoever uses it."
+      },
       "newZone": "New here — area",
       "newProp": "New here — bind to the prop I am looking at",
       "newPed": "New here — place a person",

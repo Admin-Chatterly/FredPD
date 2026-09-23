@@ -382,7 +382,10 @@ A placement carries:
 | `enabled` | Off without deleting, so a station can be closed for an event |
 
 **The editor.** `/fredpd placement` opens placement mode: aim at a prop to bind
-it, or place a ped with a live preview, then pick the `kind` from a menu. Move,
+it, or place a ped with a live preview, then pick the `kind` from a menu that
+names, for each kind, the one line of what standing there actually gates —
+`station_terminal` and `booking_terminal` read as near-synonyms by name alone,
+so the picker carries a description and an icon, not just a label. Move,
 rotate, disable and delete are the same mode. Every write goes through a route
 with `admin.placement.edit` and is audited like any other change (invariant 11).
 
