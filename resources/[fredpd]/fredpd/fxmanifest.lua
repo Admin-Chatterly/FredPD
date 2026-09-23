@@ -148,6 +148,7 @@ server_scripts {
     'server/modules/personnel/service.lua',
     'server/modules/personnel/repo.lua',
     'server/modules/personnel/routes.lua',
+    'server/modules/personnel/events.lua',
 
     -- Booking (spec 7.9, M6). After frihet, whose gripande and häktning rows
     -- it reads.

@@ -1421,6 +1421,24 @@ FredPD.Schema = {
         officerId = { type = 'integer', required = true, min = 1 },
     },
 
+    PersonnelLoadoutList = {
+
+    },
+
+    PersonnelLoadoutCreate = {
+        name = { type = 'string', required = true, min = 1, max = 191 },
+        itemKeys = { type = 'string[]', required = true, maxItems = 12, maxLength = 64 },
+    },
+
+    PersonnelLoadoutDelete = {
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
+    PersonnelOfficerSetLoadout = {
+        officerId = { type = 'integer', required = true, min = 1 },
+        loadoutId = { type = 'integer', required = false, min = 1 },
+    },
+
     PersonnelCertificationIssue = {
         officerId = { type = 'integer', required = true, min = 1 },
         certKey = { type = 'string', required = true, min = 1, max = 64 },

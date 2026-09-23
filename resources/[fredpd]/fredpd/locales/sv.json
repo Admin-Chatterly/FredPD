@@ -2368,6 +2368,16 @@
         "other": "Övrigt"
       }
     },
+    "loadout": {
+      "title": "Utrustningspaket",
+      "manage": "Hantera utrustningspaket",
+      "none": "Inget utrustningspaket tilldelat.",
+      "name": "Paketets namn",
+      "items": "Föremål",
+      "choose": "Utrustningspaket",
+      "create": "Skapa paket",
+      "delete": "Ta bort"
+    },
     "certification": {
       "title": "Certifieringar",
       "choose": "Certifiering",

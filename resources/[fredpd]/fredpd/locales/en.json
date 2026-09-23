@@ -2368,6 +2368,16 @@
         "other": "Other"
       }
     },
+    "loadout": {
+      "title": "Loadout",
+      "manage": "Manage loadouts",
+      "none": "No loadout assigned.",
+      "name": "Loadout name",
+      "items": "Items",
+      "choose": "Loadout",
+      "create": "Create loadout",
+      "delete": "Delete"
+    },
     "certification": {
       "title": "Certifications",
       "choose": "Certification",

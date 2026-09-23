@@ -153,6 +153,161 @@ function Repo.equipmentFor(officerId, agencyId)
 end
 
 -- -----------------------------------------------------------------------------
+-- Loadouts (0026): a named equipment set, assignable to an officer
+-- -----------------------------------------------------------------------------
+
+local LOADOUT_SELECT <const> = [[
+    SELECT id, agency_id AS agencyId, name, created_by AS createdBy,
+           UNIX_TIMESTAMP(created_at) AS createdAt, version
+      FROM fpd_personnel_loadout
+]]
+
+function Repo.loadouts(agencyId)
+    return FredPD.Core.db.query(LOADOUT_SELECT .. ' WHERE agency_id = ? ORDER BY name', { agencyId })
+end
+
+function Repo.loadoutById(id, agencyId)
+    return FredPD.Core.db.single(LOADOUT_SELECT .. ' WHERE id = ? AND agency_id = ?', { id, agencyId })
+end
+
+function Repo.loadoutItemKeys(loadoutId)
+    local rows = FredPD.Core.db.query(
+        'SELECT item_key AS itemKey FROM fpd_personnel_loadout_item WHERE loadout_id = ? ORDER BY item_key',
+        { loadoutId })
+
+    local out = {}
+    for index = 1, #rows do out[index] = rows[index].itemKey end
+
+    return out
+end
+
+--- The loadout assigned to this officer, if any -- read through the officer
+--- row rather than a reverse lookup, since `fpd_officers.loadout_id` is
+--- where the assignment actually lives.
+function Repo.officerLoadout(officerId, agencyId)
+    return FredPD.Core.db.single(
+        [[SELECT l.id, l.name FROM fpd_officers o
+            JOIN fpd_personnel_loadout l ON l.id = o.loadout_id
+           WHERE o.id = ? AND o.agency_id = ?]],
+        { officerId, agencyId })
+end
+
+--- Creates a loadout and its items in one transaction (spec 11.2: more than
+--- one table changes) -- a loadout committed with no items would issue
+--- nothing at all, which is worse than the create simply failing.
+---
+--- @return number|nil id
+function Repo.createLoadout(agencyId, name, itemKeys, discordId)
+    if #itemKeys == 0 then return nil end
+
+    local rows, values = {}, {}
+    for index = 1, #itemKeys do
+        rows[index] = '(LAST_INSERT_ID(), ?)'
+        values[#values + 1] = itemKeys[index]
+    end
+
+    local committed = FredPD.Core.db.transaction({
+        {
+            query = 'INSERT INTO fpd_personnel_loadout (agency_id, name, created_by) VALUES (?, ?, ?)',
+            values = { agencyId, name, discordId },
+        },
+        {
+            query = ('INSERT INTO fpd_personnel_loadout_item (loadout_id, item_key) VALUES %s')
+                :format(table.concat(rows, ', ')),
+            values = values,
+        },
+    })
+
+    if not committed then return nil end
+
+    -- `name` is unique per agency, so this is the row this call just wrote.
+    return FredPD.Core.db.scalar(
+        'SELECT id FROM fpd_personnel_loadout WHERE agency_id = ? AND name = ?', { agencyId, name })
+end
+
+--- Deleting a loadout leaves the officers who were wearing it alone
+--- (`ON DELETE SET NULL`) and their equipment history untouched -- see the
+--- migration header.
+function Repo.deleteLoadout(id, agencyId)
+    return FredPD.Core.db.execute(
+        'DELETE FROM fpd_personnel_loadout WHERE id = ? AND agency_id = ?', { id, agencyId })
+end
+
+function Repo.setOfficerLoadout(officerId, agencyId, loadoutId)
+    return FredPD.Core.db.execute(
+        'UPDATE fpd_officers SET loadout_id = ? WHERE id = ? AND agency_id = ?',
+        { loadoutId, officerId, agencyId })
+end
+
+-- -----------------------------------------------------------------------------
+-- Duty-based auto issue/return (0026)
+-- -----------------------------------------------------------------------------
+
+function Repo.openItemKeysFor(officerId, agencyId)
+    local rows = FredPD.Core.db.query(
+        [[SELECT item_key AS itemKey FROM fpd_personnel_equipment
+           WHERE officer_id = ? AND agency_id = ? AND returned_at IS NULL]],
+        { officerId, agencyId })
+
+    local out = {}
+    for index = 1, #rows do out[index] = rows[index].itemKey end
+
+    return out
+end
+
+--- One INSERT per item: a loadout is a handful of keys, never a bulk write,
+--- and each row needs its own `assigned_by` -- the officer's own discord id,
+--- because going on duty is their own act (the same reasoning
+--- `personnel.shift.start` gives for reading `session.officerId` rather than
+--- trusting an id in input).
+function Repo.autoIssue(officerId, agencyId, discordId, itemKeys)
+    for index = 1, #itemKeys do
+        FredPD.Core.db.insert(
+            [[INSERT INTO fpd_personnel_equipment (agency_id, officer_id, item_key, assigned_by)
+              VALUES (?, ?, ?, ?)]],
+            { agencyId, officerId, itemKeys[index], discordId })
+    end
+end
+
+--- Closes every open row for these item keys -- every one the loadout
+--- carries, not only the ones this module itself opened, because a supervisor
+--- who hand-assigned the same item key while the officer was on duty meant it
+--- to come back with the rest of the kit.
+function Repo.autoReturn(officerId, agencyId, itemKeys)
+    if #itemKeys == 0 then return end
+
+    local placeholders, values = {}, { officerId, agencyId }
+    for index = 1, #itemKeys do
+        placeholders[index] = '?'
+        values[#values + 1] = itemKeys[index]
+    end
+
+    FredPD.Core.db.execute(
+        ([[UPDATE fpd_personnel_equipment SET returned_at = CURRENT_TIMESTAMP(3)
+            WHERE officer_id = ? AND agency_id = ? AND returned_at IS NULL AND item_key IN (%s)]])
+            :format(table.concat(placeholders, ', ')),
+        values)
+end
+
+--- What `fredpd:dutyChanged` (`server/modules/personnel/events.lua`, fired
+--- from `cad/events.lua`'s sign-on poll) resolves to. An officer with no
+--- assigned loadout, or a loadout with no items, is untouched.
+function Repo.applyDutyChange(officerId, agencyId, discordId, working)
+    local loadout = Repo.officerLoadout(officerId, agencyId)
+    if not loadout then return end
+
+    local itemKeys = Repo.loadoutItemKeys(loadout.id)
+    if #itemKeys == 0 then return end
+
+    if working then
+        local toIssue = FredPD.Modules.personnel.itemsToIssue(itemKeys, Repo.openItemKeysFor(officerId, agencyId))
+        Repo.autoIssue(officerId, agencyId, discordId, toIssue)
+    else
+        Repo.autoReturn(officerId, agencyId, itemKeys)
+    end
+end
+
+-- -----------------------------------------------------------------------------
 -- Certifications
 -- -----------------------------------------------------------------------------
 

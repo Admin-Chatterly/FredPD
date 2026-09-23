@@ -386,6 +386,23 @@ end
 ---
 --- @param entry table { officerId, agencyId, discordId, callsign }
 local function signOn(entry)
+    -- Fired unconditionally, ahead of the callsign check below: this
+    -- function only runs once the loop above has already established the
+    -- officer is genuinely on duty per the job bridge, and a personnel
+    -- loadout (spec 7.22) is personal gear, not a fact about the dispatch
+    -- board -- an officer with no callsign yet still gets issued theirs. A
+    -- server-local event (spec 14) rather than a call into `personnel`'s
+    -- repo, because this resource's rule is that a module talks to another
+    -- through its service and never its repo (the same reasoning
+    -- `frihet/routes.lua`'s `fredpd:gripande` gives): the module that owns
+    -- equipment listens for this and decides for itself what it means.
+    TriggerEvent('fredpd:dutyChanged', {
+        officerId = entry.officerId,
+        agencyId = entry.agencyId,
+        discordId = entry.discordId,
+        working = true,
+    })
+
     -- `fpd_units.callsign` is NOT NULL with a non-blank CHECK and
     -- `fpd_officers.callsign` is nullable, so an officer nobody has given a
     -- callsign cannot be a unit. Refusing here turns that into one console line
@@ -420,6 +437,18 @@ end
 ---
 --- @param entry table { officerId, agencyId, discordId, callsign }
 local function signOff(entry)
+    -- Fired from both call sites this has: the ordinary off-duty transition
+    -- and the grace-period expiry below, which is the crash/drop case that
+    -- never came back. Both are "this officer is no longer working" the same
+    -- way `signOn`'s event is "now working" -- see its own comment for why
+    -- this is a server-local event rather than a call into `personnel`.
+    TriggerEvent('fredpd:dutyChanged', {
+        officerId = entry.officerId,
+        agencyId = entry.agencyId,
+        discordId = entry.discordId,
+        working = false,
+    })
+
     -- The call first. If this stopped half way the board would still show them,
     -- which is the state a dispatcher can act on; the other order leaves a call
     -- held by a unit nobody can see (see the header).

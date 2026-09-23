@@ -3797,7 +3797,17 @@ interface FixtureOfficer {
   equipment: FixtureEquipment[];
   certifications: FixtureCertification[];
   openShiftAgo?: number;
+  /** `fpd_officers.loadout_id` (0026). */
+  loadoutId?: number | null;
 }
+
+interface FixtureLoadout {
+  id: number;
+  name: string;
+  itemKeys: string[];
+}
+
+let loadouts: FixtureLoadout[] = [{ id: 1, name: 'Patrol Basic', itemKeys: ['vest', 'radio'] }];
 
 const officers: FixtureOfficer[] = [
   {
@@ -3818,6 +3828,7 @@ const officers: FixtureOfficer[] = [
       { id: 2, certKey: 'evoc', issuedAgo: 400 * DAY, revokedAgo: 10 * DAY },
     ],
     openShiftAgo: 2 * HOUR,
+    loadoutId: 1,
   },
   {
     id: 2,
@@ -3895,6 +3906,9 @@ function officerRow(row: FixtureOfficer, detailed: boolean): Record<string, unkn
     shaped.shiftLog = shaped.openShift
       ? [{ id: 1, startedAt: secondsAgo(row.openShiftAgo ?? 0), endedAt: null }]
       : [];
+
+    const loadout = row.loadoutId ? loadouts.find((entry) => entry.id === row.loadoutId) : undefined;
+    shaped.loadout = loadout ? { id: loadout.id, name: loadout.name } : null;
   }
 
   return shaped;
@@ -5283,6 +5297,51 @@ export const fixtures: FixtureSet = {
       item.returnedAgo = 0;
 
       return { id: item.id };
+    },
+
+    'personnel.loadout.list': () => ({ loadouts: loadouts.map((entry) => ({ ...entry })) }),
+
+    'personnel.loadout.create': (input) => {
+      const body = (input ?? {}) as { name?: string; itemKeys?: string[] };
+
+      if (!body.name || body.name.trim() === '') return refuse('invalid', { name: 'required' });
+      if (!body.itemKeys || body.itemKeys.length === 0) return refuse('invalid', { itemKeys: 'required' });
+      if (loadouts.some((entry) => entry.name === body.name)) return refuse('conflict', { name: 'exists' });
+
+      const id = loadouts.length > 0 ? Math.max(...loadouts.map((entry) => entry.id)) + 1 : 1;
+      loadouts = [...loadouts, { id, name: body.name, itemKeys: body.itemKeys }];
+
+      return { id };
+    },
+
+    'personnel.loadout.delete': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const exists = loadouts.some((entry) => entry.id === id);
+      if (!exists) return refuse('not_found');
+
+      loadouts = loadouts.filter((entry) => entry.id !== id);
+      // The same `ON DELETE SET NULL` the migration gives an officer wearing
+      // a loadout that is retired: nothing about the officer or their
+      // equipment history changes, only the assignment clears.
+      for (const officer of officers) {
+        if (officer.loadoutId === id) officer.loadoutId = null;
+      }
+
+      return { id };
+    },
+
+    'personnel.officer.setLoadout': (input) => {
+      const body = (input ?? {}) as { officerId?: number; loadoutId?: number };
+      const row = officers.find((entry) => entry.id === body.officerId);
+      if (!row) return refuse('not_found');
+
+      if (body.loadoutId !== undefined && !loadouts.some((entry) => entry.id === body.loadoutId)) {
+        return refuse('not_found', { loadoutId: 'unknown' });
+      }
+
+      row.loadoutId = body.loadoutId ?? null;
+
+      return { officerId: row.id };
     },
 
     'personnel.certification.issue': (input) => {

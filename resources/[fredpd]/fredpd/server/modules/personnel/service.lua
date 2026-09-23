@@ -130,6 +130,81 @@ end
 
 --- @return string|nil code
 --- @return table|nil fields
+function Personnel.validateLoadoutCreate(input)
+    if type(input) ~= 'table' then return 'invalid', { _input = 'type' } end
+
+    if type(input.name) ~= 'string' or input.name:gsub('%s', '') == '' or #input.name > 191 then
+        return 'invalid', { name = 'required' }
+    end
+
+    if type(input.itemKeys) ~= 'table' or #input.itemKeys == 0 then
+        return 'invalid', { itemKeys = 'required' }
+    end
+
+    local seen = {}
+    for index = 1, #input.itemKeys do
+        local key = input.itemKeys[index]
+
+        if not Personnel.isEquipmentItem(key) then
+            return 'invalid', { itemKeys = 'not_a_key' }
+        end
+
+        if seen[key] then return 'invalid', { itemKeys = 'duplicate' } end
+        seen[key] = true
+    end
+
+    return nil
+end
+
+--- @return string|nil code
+--- @return table|nil fields
+function Personnel.validateSetLoadout(input)
+    if type(input) ~= 'table' then return 'invalid', { _input = 'type' } end
+
+    if type(input.officerId) ~= 'number' or input.officerId < 1 then
+        return 'invalid', { officerId = 'required' }
+    end
+
+    -- `loadoutId` absent means "unassign"; the value itself is checked
+    -- against the catalogue by the route, the same way a tariff id is.
+    if input.loadoutId ~= nil and (type(input.loadoutId) ~= 'number' or input.loadoutId < 1) then
+        return 'invalid', { loadoutId = 'invalid' }
+    end
+
+    return nil
+end
+
+-- -----------------------------------------------------------------------------
+-- Duty-based auto issue (0026)
+-- -----------------------------------------------------------------------------
+
+--- Which of a loadout's items are not already open on this officer -- the
+--- arithmetic behind auto-issue on duty-on, kept pure so busted can pin it
+--- without a database (`Repo.applyDutyChange` is the caller).
+---
+--- A shift that starts with a radio already open (never returned from the
+--- one before, or issued by hand) gets one radio, not two: the diff is
+--- against what is actually open, never against what was auto-issued last
+--- time.
+---
+--- @param loadoutItemKeys table item_key strings the loadout carries
+--- @param openItemKeys table item_key strings already open on the officer
+--- @return table item_key strings still to issue
+function Personnel.itemsToIssue(loadoutItemKeys, openItemKeys)
+    local open = {}
+    for index = 1, #openItemKeys do open[openItemKeys[index]] = true end
+
+    local out = {}
+    for index = 1, #loadoutItemKeys do
+        local key = loadoutItemKeys[index]
+        if not open[key] then out[#out + 1] = key end
+    end
+
+    return out
+end
+
+--- @return string|nil code
+--- @return table|nil fields
 function Personnel.validateDisciplineOpen(input)
     if type(input) ~= 'table' then return 'invalid', { _input = 'type' } end
 

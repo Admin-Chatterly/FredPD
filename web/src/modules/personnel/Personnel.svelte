@@ -39,6 +39,14 @@
     endedAt?: number | null;
   }
 
+  /** A named, catalogue-level equipment set (0026) -- distinct from
+   *  `Equipment`, which is one physical item actually issued. */
+  interface Loadout {
+    id: number;
+    name: string;
+    itemKeys?: string[];
+  }
+
   interface Officer {
     id: number;
     discordId: string;
@@ -52,6 +60,9 @@
     certifications?: Certification[];
     shiftLog?: ShiftEntry[];
     openShift?: ShiftEntry | null;
+    /** Resolved server-side from `loadout_id` (0026) -- never a name to
+     *  trust from the client, only one to display. */
+    loadout?: { id: number; name: string } | null;
   }
 
   interface DisciplineCase {
@@ -88,6 +99,9 @@
     category: 'personnel.discipline.categoryChoose',
     summary: 'personnel.discipline.summary',
     outcomeKey: 'personnel.discipline.outcomeChoose',
+    name: 'personnel.loadout.name',
+    itemKeys: 'personnel.loadout.items',
+    loadoutId: 'personnel.loadout.choose',
   };
 
   let rows = $state<Officer[]>([]);
@@ -102,6 +116,73 @@
   let equipmentForm = $state({ itemKey: EQUIPMENT_ITEMS[0], serial: '' });
   let certForm = $state({ certKey: CERTIFICATIONS[0] });
   let disciplineForm = $state({ category: DISCIPLINE_CATEGORIES[0], summary: '' });
+
+  // -------------------------------------------------------------- loadouts
+
+  let loadouts = $state<Loadout[]>([]);
+  let managingLoadouts = $state(false);
+  let loadoutForm = $state({ name: '', itemKeys: [] as string[] });
+  let assignLoadoutId = $state('');
+
+  async function loadLoadouts(): Promise<void> {
+    const response = await nui.call<{ loadouts: Loadout[] }>('personnel.loadout.list', {});
+    if (response.ok) loadouts = response.data.loadouts ?? [];
+  }
+
+  async function createLoadout(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    if (loadoutForm.itemKeys.length === 0) return;
+
+    busy = true;
+    const response = await nui.call('personnel.loadout.create', {
+      name: loadoutForm.name,
+      itemKeys: loadoutForm.itemKeys,
+    });
+
+    if (response.ok) {
+      failure = null;
+      loadoutForm = { name: '', itemKeys: [] };
+      await loadLoadouts();
+    } else {
+      failure = response;
+    }
+
+    busy = false;
+  }
+
+  async function deleteLoadout(id: number): Promise<void> {
+    busy = true;
+    const response = await nui.call('personnel.loadout.delete', { id });
+
+    if (response.ok) {
+      failure = null;
+      await Promise.all([loadLoadouts(), detail ? open(detail.id) : Promise.resolve()]);
+    } else {
+      failure = response;
+    }
+
+    busy = false;
+  }
+
+  async function assignLoadout(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    if (!detail) return;
+
+    busy = true;
+    const response = await nui.call('personnel.officer.setLoadout', {
+      officerId: detail.id,
+      loadoutId: assignLoadoutId ? Number(assignLoadoutId) : undefined,
+    });
+
+    if (response.ok) {
+      failure = null;
+      await open(detail.id);
+    } else {
+      failure = response;
+    }
+
+    busy = false;
+  }
 
   let confirmingDiscipline = $state(false);
   let closingCase = $state<DisciplineCase | null>(null);
@@ -153,6 +234,7 @@
     if (response.ok) {
       detail = response.data.officer;
       editForm = { badgeNumber: detail.badgeNumber ?? '', division: detail.division ?? '' };
+      assignLoadoutId = detail.loadout ? String(detail.loadout.id) : '';
       failure = null;
     } else {
       detail = null;
@@ -339,6 +421,7 @@
 
   void load();
   void loadViewer();
+  void loadLoadouts();
 </script>
 
 <div class="flex flex-col gap-3">
@@ -353,7 +436,72 @@
       <input type="checkbox" bind:checked={activeOnly} onchange={() => void load()} />
       {t('personnel.filter.activeOnly')}
     </label>
+
+    <button
+      type="button"
+      class="border border-[var(--color-border)] px-3 py-1 text-xs"
+      onclick={() => (managingLoadouts = !managingLoadouts)}
+    >
+      {t('personnel.loadout.manage')}
+    </button>
   </form>
+
+  {#if managingLoadouts}
+    <div class="border border-[var(--color-border)] p-3">
+      <h3 class="mb-1 text-xs font-semibold">{t('personnel.loadout.title')}</h3>
+      {#if loadouts.length === 0}
+        <p class="mb-2 text-xs text-[var(--color-ink-muted)]">{t('personnel.loadout.none')}</p>
+      {:else}
+        <ul class="mb-2 text-xs">
+          {#each loadouts as loadout (loadout.id)}
+            <li class="flex items-center justify-between border-t border-[var(--color-border)] py-1">
+              <span>
+                {loadout.name}
+                {#if loadout.itemKeys}
+                  <span class="text-[var(--color-ink-muted)]">
+                    — {loadout.itemKeys.map((key) => t(`personnel.equipment.item.${key}`)).join(', ')}
+                  </span>
+                {/if}
+              </span>
+              <button
+                type="button"
+                class="border border-[var(--color-border)] px-2 py-0.5"
+                disabled={busy}
+                onclick={() => void deleteLoadout(loadout.id)}
+              >
+                {t('personnel.loadout.delete')}
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+      <form class="flex flex-wrap items-end gap-3" onsubmit={createLoadout}>
+        <label class="flex flex-col gap-1 text-xs">
+          {t('personnel.loadout.name')}
+          <input
+            bind:value={loadoutForm.name}
+            required
+            maxlength="191"
+            class="border border-[var(--color-border)] px-2 py-1"
+          />
+        </label>
+        <fieldset class="flex flex-col gap-1 text-xs">
+          <legend>{t('personnel.loadout.items')}</legend>
+          <div class="flex flex-wrap gap-2">
+            {#each EQUIPMENT_ITEMS as key (key)}
+              <label class="flex items-center gap-1">
+                <input type="checkbox" bind:group={loadoutForm.itemKeys} value={key} />
+                {t(`personnel.equipment.item.${key}`)}
+              </label>
+            {/each}
+          </div>
+        </fieldset>
+        <button type="submit" class="border border-[var(--color-border)] px-3 py-1 text-xs" disabled={busy}>
+          {t('personnel.loadout.create')}
+        </button>
+      </form>
+    </div>
+  {/if}
 
   {#if failure}
     <div class="border border-[var(--color-alert)] px-3 py-2 text-sm" role="alert">
@@ -449,6 +597,34 @@
             {t('form.save')}
           </button>
         </form>
+
+        <section class="mb-4">
+          <h3 class="mb-1 text-xs font-semibold">{t('personnel.loadout.title')}</h3>
+          <p class="mb-2 text-xs text-[var(--color-ink-muted)]">
+            {detail.loadout ? detail.loadout.name : t('personnel.loadout.none')}
+          </p>
+          <!--
+            Assigning a loadout here does not issue anything by itself
+            (0026): the kit is applied the next time this officer's duty
+            state changes, off `fredpd:dutyChanged` -- an officer already on
+            duty when their loadout is set or swapped keeps whatever they are
+            currently holding until they cycle duty.
+          -->
+          <form class="flex flex-wrap items-end gap-2" onsubmit={assignLoadout}>
+            <label class="flex flex-col gap-1 text-xs">
+              {t('personnel.loadout.choose')}
+              <select bind:value={assignLoadoutId} class="border border-[var(--color-border)] px-2 py-1">
+                <option value="">{t('personnel.loadout.none')}</option>
+                {#each loadouts as loadout (loadout.id)}
+                  <option value={String(loadout.id)}>{loadout.name}</option>
+                {/each}
+              </select>
+            </label>
+            <button type="submit" class="border border-[var(--color-border)] px-3 py-1 text-xs" disabled={busy}>
+              {t('form.save')}
+            </button>
+          </form>
+        </section>
 
         <section class="mb-4">
           <h3 class="mb-1 text-xs font-semibold">{t('personnel.equipment.title')}</h3>

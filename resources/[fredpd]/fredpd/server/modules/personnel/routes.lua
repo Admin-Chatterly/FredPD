@@ -46,6 +46,10 @@ route.define({
         row.certifications = repo.certificationsFor(row.id, session.agencyId)
         row.shiftLog = repo.shiftLog(row.id, session.agencyId, 20)
         row.openShift = repo.openShift(row.id, session.agencyId)
+        -- Resolved for display, the same reason `ordningsbot.get` attaches
+        -- the tariff a citation cites rather than leaving the NUI to
+        -- re-fetch a bare id.
+        row.loadout = repo.officerLoadout(row.id, session.agencyId)
 
         return { officer = row }
     end,
@@ -155,6 +159,100 @@ route.define({
         end
 
         return { id = input.id }
+    end,
+})
+
+-- -----------------------------------------------------------------------------
+-- Loadouts (0026): a named equipment set, and duty-based auto issue/return
+--
+-- Assignment and issuing are the same gate that already covers hand-issuing
+-- one item (`personnel.equipment.manage`): defining a kit and handing it out
+-- one radio at a time are the same authority. Issuing and returning the
+-- items themselves happen off `fredpd:dutyChanged`
+-- (`server/modules/personnel/events.lua`), never a route -- an officer's own
+-- duty state is a fact the server observes, not one a client asserts.
+-- -----------------------------------------------------------------------------
+
+route.define({
+    name = 'personnel.loadout.list',
+    perm = 'personnel.equipment.manage',
+    schema = 'PersonnelLoadoutList',
+    handler = function(session)
+        local loadouts = repo.loadouts(session.agencyId)
+
+        for index = 1, #loadouts do
+            loadouts[index].itemKeys = repo.loadoutItemKeys(loadouts[index].id)
+        end
+
+        return { loadouts = loadouts }
+    end,
+})
+
+route.define({
+    name = 'personnel.loadout.create',
+    perm = 'personnel.equipment.manage',
+    schema = 'PersonnelLoadoutCreate',
+    writes = true,
+    sensitive = true,
+    audit = 'personnel.loadout.created',
+    subjectType = 'person',
+    auditDetail = function(input) return { name = input.name, itemKeys = input.itemKeys } end,
+    handler = function(session, input)
+        local err, fields = service.validateLoadoutCreate(input)
+        if err then return route.refuse(err, fields) end
+
+        local id = repo.createLoadout(session.agencyId, input.name, input.itemKeys, session.discordId)
+        if not id then return route.refuse(FredPD.ErrorCode.CONFLICT, { name = 'exists' }) end
+
+        return { id = id }
+    end,
+})
+
+route.define({
+    name = 'personnel.loadout.delete',
+    perm = 'personnel.equipment.manage',
+    schema = 'PersonnelLoadoutDelete',
+    writes = true,
+    sensitive = true,
+    audit = 'personnel.loadout.deleted',
+    subjectType = 'person',
+    auditDetail = function(input) return { id = input.id } end,
+    handler = function(session, input)
+        if repo.deleteLoadout(input.id, session.agencyId) == 0 then
+            return route.refuse(FredPD.ErrorCode.NOT_FOUND)
+        end
+
+        return { id = input.id }
+    end,
+})
+
+route.define({
+    name = 'personnel.officer.setLoadout',
+    perm = 'personnel.equipment.manage',
+    schema = 'PersonnelOfficerSetLoadout',
+    writes = true,
+    sensitive = true,
+    audit = 'personnel.officer.loadoutSet',
+    subjectType = 'person',
+    auditDetail = function(input) return { officerId = input.officerId, loadoutId = input.loadoutId } end,
+    handler = function(session, input)
+        local err, fields = service.validateSetLoadout(input)
+        if err then return route.refuse(err, fields) end
+
+        if not repo.byId(input.officerId, session.agencyId) then
+            return route.refuse(FredPD.ErrorCode.NOT_FOUND)
+        end
+
+        if input.loadoutId and not repo.loadoutById(input.loadoutId, session.agencyId) then
+            return route.refuse(FredPD.ErrorCode.NOT_FOUND, { loadoutId = 'unknown' })
+        end
+
+        -- Existence is already checked above, so an affected count of zero
+        -- here means only "already set to this", the same no-op
+        -- `Repo.updateRoster` accepts as success rather than a conflict.
+        repo.setOfficerLoadout(input.officerId, session.agencyId, input.loadoutId)
+
+        return { officerId = input.officerId }
     end,
 })
 

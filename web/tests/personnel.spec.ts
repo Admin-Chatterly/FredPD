@@ -69,6 +69,52 @@ test('assigns equipment to an officer', async ({ page }) => {
   await expect(page.getByRole('listitem').getByText('Taser')).toBeVisible();
 });
 
+test('shows the loadout assigned to an officer', async ({ page }) => {
+  await openPersonnel(page);
+
+  await page.getByRole('button', { name: '12-40' }).click();
+
+  await expect(page.getByRole('paragraph').filter({ hasText: 'Patrol Basic' })).toBeVisible();
+});
+
+test('creates a loadout and assigns it to an officer', async ({ page }) => {
+  await openPersonnel(page);
+
+  await page.getByRole('button', { name: 'Manage loadouts' }).click();
+
+  const createForm = page.locator('form').filter({ hasText: 'Create loadout' });
+  await createForm.getByLabel('Loadout name').fill('SWAT Kit');
+  await createForm.getByLabel('Taser', { exact: true }).check();
+  await createForm.getByLabel('Less-lethal', { exact: true }).check();
+  await createForm.getByRole('button', { name: 'Create loadout' }).click();
+
+  await expect(page.getByText('SWAT Kit')).toBeVisible();
+
+  // Closed so the create form's own "Loadout name" label does not also
+  // match the filter below.
+  await page.getByRole('button', { name: 'Manage loadouts' }).click();
+
+  await page.getByRole('button', { name: '12-41' }).click();
+  const assignForm = page.locator('form').filter({ hasText: 'Loadout' });
+  await assignForm.getByLabel('Loadout').selectOption({ label: 'SWAT Kit' });
+  await assignForm.getByRole('button', { name: 'Save' }).click();
+
+  await expect(page.getByRole('paragraph').filter({ hasText: 'SWAT Kit' })).toBeVisible();
+});
+
+test('deletes a loadout, and unassigns it from the officer wearing it', async ({ page }) => {
+  await openPersonnel(page);
+
+  await page.getByRole('button', { name: 'Manage loadouts' }).click();
+  const row = page.getByRole('listitem').filter({ hasText: 'Patrol Basic' });
+  await row.getByRole('button', { name: 'Delete' }).click();
+
+  await expect(page.getByText('Patrol Basic')).toHaveCount(0);
+
+  await page.getByRole('button', { name: '12-40' }).click();
+  await expect(page.getByText('No loadout assigned.')).toBeVisible();
+});
+
 test('renders the module in Swedish', async ({ page }) => {
   await page.goto('/?locale=sv');
   await page.locator('nav').first().getByRole('button', { name: 'Personal' }).click();
