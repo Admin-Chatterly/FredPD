@@ -1016,7 +1016,8 @@ Built (the disciplinary file only).
     to forge another officer's prefix.
   - Stored append-only in `fpd_chat_messages` and readable in the MDT comms log
     with `comms.pdchat.view`, which is what makes it evidence rather than
-    ephemeral noise.
+    ephemeral noise. The MDT's `Comms` screen (`chat.history` only — sending
+    stays in the game chat, `chat.send` has no NUI form) is the reader.
   - Agency-scoped by default; a cross-agency channel needs `comms.pdchat.all`.
 - [M] Unit-to-unit and dispatcher-to-unit messages.
 - [M] Roll-call board: daily briefing with active BOLOs, warrants, officer-safety notes and announcements.

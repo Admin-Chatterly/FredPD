@@ -2494,6 +2494,11 @@
       "release": "Frige denna person från häktet?"
     }
   },
+  "comms": {
+    "hint": "Den interna kanalen. Skicka med /pd i spelets chatt — detta är loggen över den.",
+    "refresh": "Uppdatera",
+    "empty": "Inga meddelanden ännu"
+  },
   "ordningsbot": {
     "field": {
       "status": "Status",

@@ -2494,6 +2494,11 @@
       "release": "Release this person from custody?"
     }
   },
+  "comms": {
+    "hint": "The internal channel. Send with /pd in the game chat — this is the record of it.",
+    "refresh": "Refresh",
+    "empty": "No messages yet"
+  },
   "ordningsbot": {
     "field": {
       "status": "Status",

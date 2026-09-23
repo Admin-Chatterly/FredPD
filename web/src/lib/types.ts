@@ -60,6 +60,23 @@ export interface RoleMapView {
   snapshotAgeSeconds: number | null;
 }
 
+// -------------------------------------------------------------------- comms
+
+/**
+ * A row from the internal police channel's append-only log (spec 7.26).
+ *
+ * `callsign` and `authorName` are resolved server-side from the sender's
+ * session at send time and stored on the row itself, so the transcript reads
+ * the same afterwards even if the officer's callsign has since changed.
+ */
+export interface ChatMessage {
+  id: number;
+  sentAt: Moment;
+  callsign: string | null;
+  authorName: string | null;
+  body: string;
+}
+
 // ------------------------------------------------------------- intelligence
 
 export interface IntelNote {

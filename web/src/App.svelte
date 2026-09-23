@@ -17,6 +17,7 @@
   import Court from './modules/court/Court.svelte';
   import Personnel from './modules/personnel/Personnel.svelte';
   import Booking from './modules/booking/Booking.svelte';
+  import Comms from './modules/comms/Comms.svelte';
 
   /**
    * The application shell (spec 6.3). M1 fills in the command line, tabs and
@@ -144,6 +145,7 @@
     'admin',
     'personnel',
     'booking',
+    'comms',
   ]);
 </script>
 
@@ -263,6 +265,8 @@
         <Personnel />
       {:else if current === 'booking'}
         <Booking />
+      {:else if current === 'comms'}
+        <Comms />
       {:else if session && current === 'admin'}
         <nav class="mb-4 flex gap-1 border-b border-[var(--color-border)]">
           {#each ADMIN_TABS as tab (tab)}

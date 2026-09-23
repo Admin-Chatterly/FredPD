@@ -1,6 +1,6 @@
 import type { ErrorCode } from '@fredpd/schema';
 
-import type { IntelCase, IntelNote, IntelOrg, IntelPerson, IntelTag, PermissionGroup, RoleMapping } from '../types';
+import type { ChatMessage, IntelCase, IntelNote, IntelOrg, IntelPerson, IntelTag, PermissionGroup, RoleMapping } from '../types';
 import type { FleetEntry, GroupRow, PermissionRow } from '../../modules/admin/types';
 import type { CustodyEntry, EvidenceItem, Scene } from '../../modules/evidence/types';
 import type { LabAnalysis } from '../../modules/lab/types';
@@ -168,6 +168,35 @@ let mappings: RoleMapping[] = [
 ];
 
 let nextId = 3;
+
+/**
+ * The internal channel's comms log (spec 7.26). Sent through `/pd` in the
+ * game chat, never from the NUI -- `chat.send` has no fixture because the
+ * screen never calls it.
+ */
+const chatMessages: ChatMessage[] = [
+  {
+    id: 1,
+    sentAt: '2026-09-23T20:41:00.000Z',
+    callsign: '12-40',
+    authorName: 'A. Lindqvist',
+    body: 'Requesting backup, Alta Street, black van no plates.',
+  },
+  {
+    id: 2,
+    sentAt: '2026-09-23T20:42:30.000Z',
+    callsign: '14-02',
+    authorName: 'M. Bergström',
+    body: 'En route, two minutes out.',
+  },
+  {
+    id: 3,
+    sentAt: '2026-09-23T20:47:10.000Z',
+    callsign: '12-40',
+    authorName: 'A. Lindqvist',
+    body: 'Stand down, van gone before you got here. Logging it.',
+  },
+];
 
 /**
  * Intelligence fixtures.
@@ -6898,6 +6927,13 @@ export const fixtures: FixtureSet = {
       ];
 
       return { id: nextId++ };
+    },
+
+    'chat.history': (input) => {
+      const { limit } = (input ?? {}) as { limit?: number };
+      const effectiveLimit = limit ?? 50;
+
+      return { messages: chatMessages.slice(-effectiveLimit) };
     },
 
     'intel.note.list': (input) => {
