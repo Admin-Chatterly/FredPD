@@ -523,6 +523,16 @@
 
   // ------------------------------------------------------------ vehicles
 
+  /** A plate read, as far as this screen needs it (mirrors `Alpr.svelte`'s own). */
+  interface VehicleAlprRead {
+    id: number;
+    readAt: string;
+    camera: string;
+    hit: boolean;
+    x: number;
+    y: number;
+  }
+
   interface VehicleForm {
     model: string;
     colour: string;
@@ -571,6 +581,7 @@
 
   let selectedVehicleId = $state<number | null>(null);
   let vehicleDetail = $state<VehicleDetail | null>(null);
+  let vehicleAlprReads = $state<VehicleAlprRead[]>([]);
   let vehicleForm = $state<VehicleForm>({ ...EMPTY_VEHICLE });
   let vehicleBase = $state<VehicleForm>({ ...EMPTY_VEHICLE });
 
@@ -690,6 +701,15 @@
     failure = null;
     vehicleDetail = response.data;
     confirmedVehicleHit = null;
+
+    // Best-effort, the same way the FU screen's linked evidence is: a reader
+    // who may open the vehicle but not `alpr.read.view` simply sees no recent
+    // reads, rather than the whole record failing to open over it.
+    const readsResponse = await nui.call<{ reads: VehicleAlprRead[] }>('alpr.read.list', {
+      plate: response.data.vehicle.plate,
+      limit: 5,
+    });
+    vehicleAlprReads = readsResponse.ok ? readsResponse.data.reads : [];
 
     const vehicle = response.data.vehicle;
     const seeded: VehicleForm = {
@@ -2123,6 +2143,30 @@
           <dt class="text-[var(--color-ink-muted)]">{t('records.person.field.classification')}</dt>
           <dd>{t(`records.classification.${openVehicleRecord.classification}`)}</dd>
         </dl>
+
+        <!-- Recent plate reads (7.18), surfaced on the vehicle itself so an
+             officer sees where it was last seen without a separate trip to
+             the ALPR screen. Best-effort: a reader without `alpr.read.view`
+             simply sees none, the same way a refused read draws as nothing
+             rather than an error (4.5). -->
+        <div>
+          <h3 class="text-xs font-semibold">{t('records.vehicle.section.alpr')}</h3>
+          {#if vehicleAlprReads.length === 0}
+            <p class="mt-1 text-xs text-[var(--color-ink-muted)]">{t('records.vehicle.alpr.empty')}</p>
+          {:else}
+            <ul class="mt-1 text-xs">
+              {#each vehicleAlprReads as read (read.id)}
+                <li class="flex justify-between border-t border-[var(--color-border)] py-1">
+                  <span class="font-[family-name:var(--font-mono)]">{formatMoment(read.readAt)}</span>
+                  <span class="text-[var(--color-ink-muted)]">
+                    {Math.round(read.x)}, {Math.round(read.y)}
+                    {#if read.hit}· {t('records.vehicle.alpr.hit')}{/if}
+                  </span>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
 
         <!-- Flags. A flag can be more sensitive than the vehicle it sits on, so
              this list carries stubs of its own (4.5). -->

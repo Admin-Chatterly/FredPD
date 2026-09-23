@@ -1076,6 +1076,10 @@
       "impound": "Impound"
     },
     "vehicle": {
+      "alpr": {
+        "empty": "No plate reads in the last 24 hours.",
+        "hit": "hotlist hit"
+      },
       "column": {
         "plate": "Plate"
       },
@@ -1087,6 +1091,9 @@
         "title": "Edit vehicle"
       },
       "empty": "No vehicle matches.",
+      "section": {
+        "alpr": "Recent plate reads"
+      },
       "field": {
         "colour": "Colour",
         "colourSecondary": "Second colour",

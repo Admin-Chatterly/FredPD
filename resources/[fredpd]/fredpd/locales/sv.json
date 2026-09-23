@@ -1076,6 +1076,10 @@
       "impound": "Beslag"
     },
     "vehicle": {
+      "alpr": {
+        "empty": "Inga registreringsläsningar de senaste 24 timmarna.",
+        "hit": "träff på spaningslistan"
+      },
       "column": {
         "plate": "Registreringsnummer"
       },
@@ -1087,6 +1091,9 @@
         "title": "Redigera fordon"
       },
       "empty": "Inget fordon matchar.",
+      "section": {
+        "alpr": "Senaste registreringsläsningar"
+      },
       "field": {
         "colour": "Färg",
         "colourSecondary": "Andra färg",
