@@ -419,9 +419,16 @@ local function writeCollected(session, input, scene, trace)
         contaminated = contaminated,
     })
 
+    -- Named by the call, then the scene, then whatever case this officer's own
+    -- last piece of evidence was under -- so a trace picked up mid-investigation
+    -- lands on the same case without being typed in again each time.
+    local caseNumber = text(input.caseNumber)
+        or (scene and scene.caseNumber)
+        or repo.latestCaseNumberFor(session.agencyId, session.discordId)
+
     local item, committed = repo.insertEvidence(session.agencyId, {
         sceneId = input.sceneId,
-        caseNumber = text(input.caseNumber) or (scene and scene.caseNumber),
+        caseNumber = caseNumber,
         -- From the grid, never from the call.
         type = trace.type,
         packaging = input.packaging,
@@ -718,17 +725,51 @@ route.define({
     end,
     handler = function(session, input)
         local search = text(input.search)
+        local caseNumber = text(input.caseNumber)
 
-        return {
-            items = publicAll(repo.listEvidence(session.agencyId, {
-                status = input.status,
-                type = input.type,
-                sceneId = input.sceneId,
-                caseNumber = text(input.caseNumber),
-                search = search and search:lower() or nil,
-                limit = input.limit,
-            })),
-        }
+        local items = publicAll(repo.listEvidence(session.agencyId, {
+            status = input.status,
+            type = input.type,
+            sceneId = input.sceneId,
+            caseNumber = caseNumber,
+            search = search and search:lower() or nil,
+            limit = input.limit,
+        }))
+
+        -- A case screen wants to show what each piece of evidence found, not
+        -- just that it exists -- the same "queue visible, conclusion gated"
+        -- shape `evidence.get` gives one item, batched over the case's whole
+        -- list in one query (spec 12) rather than one per item. Attached
+        -- after `publicAll` rather than before: `service.public` copies a
+        -- named allowlist into a fresh table, so anything set on the row
+        -- beforehand is dropped with everything else not on that list.
+        -- Only fetched when listing by case: the property room's own list is
+        -- browsed far more often and has no result to show.
+        if caseNumber then
+            local ids = {}
+            for index = 1, #items do ids[index] = items[index].id end
+
+            local byEvidence = {}
+            local analyses = repo.analysesForEvidenceIds(session.agencyId, ids)
+
+            for index = 1, #analyses do
+                local row = analyses[index]
+                local group = byEvidence[row.evidenceId]
+
+                if not group then
+                    group = {}
+                    byEvidence[row.evidenceId] = group
+                end
+
+                group[#group + 1] = row
+            end
+
+            for index = 1, #items do
+                items[index].analyses = analysesFor(byEvidence[items[index].id] or {}, session)
+            end
+        end
+
+        return { items = items }
     end,
 })
 

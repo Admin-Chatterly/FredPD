@@ -313,6 +313,30 @@ function Repo.insertEvidence(agencyId, input, owner, discordId)
     return row, true
 end
 
+--- The case number this officer put on their most recent piece of evidence.
+---
+--- `evidence.collect` falls back to this when the call names no scene and no
+--- case of its own: an officer working a scene alone, or swabbing residue off
+--- a suspect with no scene open at all, would otherwise have to type the same
+--- case number again for every trace they pick up. It reads this module's own
+--- table rather than another module's `fpd_fu` -- a module never reaches into
+--- another module's repo -- so "latest" means the officer's own most recent
+--- collection, not the agency's most recently opened investigation; the two
+--- usually agree, because an officer working a case collects for it before
+--- collecting for the next one.
+---
+--- @param agencyId string
+--- @param discordId string the collecting officer
+--- @return string|nil
+function Repo.latestCaseNumberFor(agencyId, discordId)
+    return db().scalar(
+        [[SELECT case_number FROM fpd_evidence
+          WHERE agency_id = ? AND collected_by = ? AND case_number IS NOT NULL
+          ORDER BY collected_at DESC LIMIT 1]],
+        { agencyId, discordId }
+    )
+end
+
 function Repo.getEvidence(agencyId, id)
     return db().single(
         ([[SELECT %s FROM fpd_evidence e WHERE e.agency_id = ? AND e.id = ?]])
@@ -576,6 +600,37 @@ function Repo.analysesForEvidence(agencyId, evidenceId)
             WHERE r.agency_id = ? AND a.evidence_id = ?
             ORDER BY a.id]]):format(ANALYSIS_COLUMNS),
         { agencyId, evidenceId }
+    )
+end
+
+--- The same as `analysesForEvidence`, batched over several items in one query.
+---
+--- `evidence.list` calls this when it is listing a case rather than a single
+--- item, so a case screen showing a dozen pieces of evidence costs one query
+--- for their analyses and not a dozen (spec 12).
+---
+--- @param agencyId string
+--- @param evidenceIds table list of evidence ids, all non-empty
+--- @return table rows, in no particular grouping -- the caller groups by
+---   `evidenceId`
+function Repo.analysesForEvidenceIds(agencyId, evidenceIds)
+    if #evidenceIds == 0 then return {} end
+
+    local placeholders, values = {}, { agencyId }
+
+    for index = 1, #evidenceIds do
+        placeholders[index] = '?'
+        values[#values + 1] = evidenceIds[index]
+    end
+
+    return db().query(
+        ([[SELECT %s
+             FROM fpd_lab_analyses a
+             JOIN fpd_lab_requests r ON r.id = a.request_id
+             JOIN fpd_evidence e ON e.id = a.evidence_id
+            WHERE r.agency_id = ? AND a.evidence_id IN (%s)
+            ORDER BY a.evidence_id, a.id]]):format(ANALYSIS_COLUMNS, table.concat(placeholders, ',')),
+        values
     )
 end
 

@@ -1789,10 +1789,14 @@
       "none": "Select an investigation to read it."
     },
     "section": {
-      "anmalningar": "Reports under this investigation"
+      "anmalningar": "Reports under this investigation",
+      "evidence": "Evidence collected under this investigation"
     },
     "anmalan": {
       "empty": "No reports have been gathered under it yet."
+    },
+    "evidence": {
+      "empty": "No evidence has been collected under it yet."
     },
     "field": {
       "reason": "Reason",

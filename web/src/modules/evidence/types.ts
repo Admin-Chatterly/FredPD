@@ -8,6 +8,8 @@
  * does not send, the interface is inventing it.
  */
 
+import type { LabAnalysis } from '../lab/types';
+
 export interface EvidenceItem {
   id: number;
   /** The opaque reference carried by the item in the world, never the owner. */
@@ -24,6 +26,14 @@ export interface EvidenceItem {
   /** Assigned at property room intake; null until the item is accepted (8.6). */
   storageLocation: string | null;
   status: string;
+  /**
+   * This item's lab analyses, gated the same way `evidence.get` gates them
+   * (8.11): present only when `evidence.list` was called with `caseNumber`,
+   * absent otherwise. `resultCode`/`observations` on each entry are further
+   * withheld until the analysis is finished and the reader is cleared for
+   * lab conclusions — see `LabAnalysis`.
+   */
+  analyses?: LabAnalysis[];
 }
 
 /** One link in the chain of custody (8.6). Append-only on the server. */

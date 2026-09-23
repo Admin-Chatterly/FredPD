@@ -27,7 +27,7 @@ async function openInvestigations(page: Page): Promise<void> {
 test('lists the investigations and who leads each', async ({ page }) => {
   await openInvestigations(page);
 
-  const police = page.getByRole('row').filter({ hasText: 'FU26-00031' });
+  const police = page.getByRole('row').filter({ hasText: 'LSPD-C26-00045' });
   await expect(police).toContainText('Police investigation leader');
 
   // Once somebody is anhållen the prosecutor takes it (ADR-014), and the
@@ -39,13 +39,31 @@ test('lists the investigations and who leads each', async ({ page }) => {
 test('lists the reports gathered under an investigation', async ({ page }) => {
   await openInvestigations(page);
 
-  await page.getByRole('button', { name: 'FU26-00031' }).click();
+  await page.getByRole('button', { name: 'LSPD-C26-00045' }).click();
 
   await expect(page.getByRole('heading', { name: 'Reports under this investigation' })).toBeVisible();
   // The report numbers the anmälan register issued, under the case they
   // belong to — which is what "a förundersökning gathers anmälningar" means
   // on screen.
   await expect(page.getByText(/LSPD-26-\d+/).first()).toBeVisible();
+});
+
+test('shows evidence collected for the case and what the lab found', async ({ page }) => {
+  await openInvestigations(page);
+
+  await page.getByRole('button', { name: 'LSPD-C26-00045' }).click();
+
+  await expect(
+    page.getByRole('heading', { name: 'Evidence collected under this investigation' }),
+  ).toBeVisible();
+
+  // LSPD-2026-000118 is the casing under this case, and its ballistics
+  // analysis already has a result -- shown automatically, without a second
+  // trip to the evidence or lab module to look it up.
+  const item = page.locator('li').filter({ hasText: 'LSPD-2026-000118' }).first();
+  await expect(item).toContainText('Casing');
+  await expect(item).toContainText('Collected');
+  await expect(item).toContainText('Ballistics: Candidate match, confirmation required');
 });
 
 test('opens an investigation', async ({ page }) => {
@@ -67,7 +85,7 @@ test('opens an investigation', async ({ page }) => {
 test('disclosure does not end the investigation', async ({ page }) => {
   await openInvestigations(page);
 
-  await page.getByRole('button', { name: 'FU26-00031' }).click();
+  await page.getByRole('button', { name: 'LSPD-C26-00045' }).click();
   await page.getByRole('button', { name: 'Disclose the material' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Disclose the material' }).click();
 
@@ -82,7 +100,7 @@ test('disclosure does not end the investigation', async ({ page }) => {
 test('asks why an investigation is being discontinued', async ({ page }) => {
   await openInvestigations(page);
 
-  await page.getByRole('button', { name: 'FU26-00031' }).click();
+  await page.getByRole('button', { name: 'LSPD-C26-00045' }).click();
   await page.getByRole('button', { name: 'Discontinue' }).click();
 
   const dialog = page.getByRole('dialog');
@@ -109,7 +127,7 @@ test('offers no ending for an investigation that has one', async ({ page }) => {
 test('Escape closes the dialog, not the whole interface', async ({ page }) => {
   await openInvestigations(page);
 
-  await page.getByRole('button', { name: 'FU26-00031' }).click();
+  await page.getByRole('button', { name: 'LSPD-C26-00045' }).click();
   await page.getByRole('button', { name: 'Discontinue' }).click();
 
   const dialog = page.getByRole('dialog');
@@ -118,7 +136,7 @@ test('Escape closes the dialog, not the whole interface', async ({ page }) => {
   await page.keyboard.press('Escape');
 
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: 'FU26-00031' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'LSPD-C26-00045' })).toBeVisible();
 });
 
 test('draws an investigation it may not open as a restricted row', async ({ page }) => {

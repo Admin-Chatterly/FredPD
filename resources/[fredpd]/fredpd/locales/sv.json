@@ -1789,10 +1789,14 @@
       "none": "Välj en förundersökning för att läsa den."
     },
     "section": {
-      "anmalningar": "Anmälningar i förundersökningen"
+      "anmalningar": "Anmälningar i förundersökningen",
+      "evidence": "Bevis insamlat i förundersökningen"
     },
     "anmalan": {
       "empty": "Inga anmälningar har lagts till ännu."
+    },
+    "evidence": {
+      "empty": "Inget bevis har samlats in ännu."
     },
     "field": {
       "reason": "Grund",

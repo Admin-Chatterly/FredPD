@@ -549,6 +549,9 @@ describe('evidence routes', function()
             getScene = function(_agencyId, id) return state.scenes[id] end,
             currentHolder = function() return 'A. Lindqvist' end,
             unprotectedEntries = function() return state.unprotected end,
+            latestCaseNumberFor = function() return state.latestCaseNumber end,
+            listEvidence = function() return state.listResults end,
+            analysesForEvidenceIds = function() return state.analysesForIds end,
 
             appendCustody = function(entry, discordId)
                 state.custody[#state.custody + 1] = { entry = entry, signedBy = discordId }
@@ -609,6 +612,9 @@ describe('evidence routes', function()
             inserted = {},
             indexed = {},
             unprotected = 0,
+            latestCaseNumber = nil,
+            listResults = {},
+            analysesForIds = {},
             indexHits = 0,
             completedRows = 1,
             blocker = nil,
@@ -764,6 +770,82 @@ describe('evidence routes', function()
             assert.are.equal('char1:license:abc', state.inserted[1].owner.identifier)
             -- The type comes from the grid, never from the call (8.3.6).
             assert.are.equal('blood', state.inserted[1].input.type)
+        end)
+
+        it("falls back to the officer's own latest case when the call names none", function()
+            -- So an officer working a scene alone, or swabbing residue with no
+            -- scene open at all, is not retyping the same case number for every
+            -- trace they pick up.
+            state.latestCaseNumber = 'LSPD-2026-000004'
+
+            call('evidence.collect', helper.session(), { traceKey = 'g:12:4' })
+
+            assert.are.equal('LSPD-2026-000004', state.inserted[1].input.caseNumber)
+        end)
+
+        it("prefers an explicit case number over the officer's latest", function()
+            state.latestCaseNumber = 'LSPD-2026-000004'
+
+            call('evidence.collect', helper.session(), {
+                traceKey = 'g:12:4', caseNumber = 'LSPD-2026-000009',
+            })
+
+            assert.are.equal('LSPD-2026-000009', state.inserted[1].input.caseNumber)
+        end)
+
+        it("prefers the scene's case number over the officer's latest", function()
+            state.latestCaseNumber = 'LSPD-2026-000004'
+            state.scenes[7] = { id = 7, status = 'open', caseNumber = 'LSPD-2026-000001' }
+
+            call('evidence.collect', helper.session(), { traceKey = 'g:12:4', sceneId = 7 })
+
+            assert.are.equal('LSPD-2026-000001', state.inserted[1].input.caseNumber)
+        end)
+    end)
+
+    describe('evidence.list', function()
+        before_each(function()
+            state.listResults = {
+                { id = 1, ref = 'r1', evidenceNumber = 'LSPD-2026-000001', type = 'blood', status = 'collected' },
+            }
+            state.analysesForIds = {
+                {
+                    id = 5, requestId = 1, evidenceId = 1, evidenceNumber = 'LSPD-2026-000001',
+                    analysis = 'dna', status = 'complete', assignedTo = '100000000000000009',
+                    priority = 'normal', caseNumber = 'LSPD-2026-000001',
+                    resultCode = 'profile_obtained', observations = 'Matched to reference sample',
+                },
+            }
+        end)
+
+        it('does not fetch analyses when not listing by a case', function()
+            local result = call('evidence.list', helper.session(), {})
+
+            assert.is_nil(result.items[1].analyses)
+        end)
+
+        it("attaches each item's analyses when listing by case", function()
+            local result = call('evidence.list', helper.session(), { caseNumber = 'LSPD-2026-000001' })
+
+            assert.are.equal(1, #result.items[1].analyses)
+            assert.are.equal('profile_obtained', result.items[1].analyses[1].resultCode)
+        end)
+
+        it("withholds the result from a reader without lab.queue.view, but keeps the queue entry", function()
+            FredPD.Core.perms.satisfies = function(_permissions, key) return key ~= 'lab.queue.view' end
+
+            local result = call('evidence.list', helper.session(), { caseNumber = 'LSPD-2026-000001' })
+
+            assert.are.equal('complete', result.items[1].analyses[1].status)
+            assert.is_nil(result.items[1].analyses[1].resultCode)
+        end)
+
+        it('gives an evidence item with no analyses an empty list, not nil, when listing by case', function()
+            state.analysesForIds = {}
+
+            local result = call('evidence.list', helper.session(), { caseNumber = 'LSPD-2026-000001' })
+
+            assert.are.same({}, result.items[1].analyses)
         end)
     end)
 

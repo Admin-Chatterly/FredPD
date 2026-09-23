@@ -7,6 +7,7 @@
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
   import LoadMore from '../shared/LoadMore.svelte';
   import { isStub, type Maybe, type Moment, type Restricted } from './types';
+  import type { EvidenceItem } from '../evidence/types';
 
   /**
    * Förundersökning — the investigation itself (spec 7.8).
@@ -88,6 +89,7 @@
   let rows = $state<Maybe<FuRow>[]>([]);
   let nextCursor = $state<string | null>(null);
   let detail = $state<{ fu: FuRow; anmalningar: Maybe<AnmalanRow>[] } | null>(null);
+  let evidence = $state<EvidenceItem[]>([]);
   let failure = $state<Failure | null>(null);
   let busy = $state(false);
   let statusFilter = $state('');
@@ -171,9 +173,19 @@
       detail = response.data;
       openId = id;
       failure = null;
+
+      // Best-effort: a reader who may open the case but not the evidence
+      // register simply sees no evidence section, the same way a refused
+      // read is drawn as nothing rather than as an error (4.5) -- this case
+      // detail is not wrong for lacking it.
+      const evidenceResponse = await nui.call<{ items: EvidenceItem[] }>('evidence.list', {
+        caseNumber: response.data.fu.number,
+      });
+      evidence = evidenceResponse.ok ? evidenceResponse.data.items : [];
     } else {
       detail = null;
       openId = null;
+      evidence = [];
       failure = response;
     }
 
@@ -483,6 +495,44 @@
                     <span class="text-[var(--color-ink-muted)]">
                       ({t(`anmalan.status.${report.status}`)})
                     </span>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </section>
+
+        <!-- Evidence collected for this case, and what the lab found (8.6,
+             8.11). Withheld results read as an empty cell, never a lock icon:
+             the access control is the server not sending it, drawn exactly
+             the way an unfinished analysis is (nothing to show yet). -->
+        <section class="mb-3">
+          <h3 class="mb-1 text-xs font-semibold">{t('fu.section.evidence')}</h3>
+          {#if evidence.length === 0}
+            <p class="text-xs text-[var(--color-ink-muted)]">{t('fu.evidence.empty')}</p>
+          {:else}
+            <ul class="text-xs">
+              {#each evidence as item (item.id)}
+                <li class="border-t border-[var(--color-border)] py-1">
+                  <div class="flex items-baseline justify-between gap-2">
+                    <span class="font-[family-name:var(--font-mono)]">{item.evidenceNumber}</span>
+                    <span class="text-[var(--color-ink-muted)]">
+                      {t(`evidence.type.${item.type}`)} · {t(`evidence.status.${item.status}`)}
+                    </span>
+                  </div>
+                  {#if item.analyses && item.analyses.length > 0}
+                    <ul class="mt-0.5 ml-3 text-[var(--color-ink-muted)]">
+                      {#each item.analyses as analysis (analysis.id)}
+                        <li>
+                          {t(`lab.analysis.${analysis.analysis}`)}:
+                          {#if analysis.resultCode}
+                            {t(`lab.result.${analysis.resultCode}`)}
+                          {:else}
+                            {t(`lab.status.${analysis.status}`)}
+                          {/if}
+                        </li>
+                      {/each}
+                    </ul>
                   {/if}
                 </li>
               {/each}

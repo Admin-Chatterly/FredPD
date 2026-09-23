@@ -2767,7 +2767,7 @@ const forundersokningar: FixtureFu[] = [
     // Open, led by the police. The ordinary case, and the one the three
     // endings are drawn for.
     id: 1,
-    number: 'FU26-00031',
+    number: 'LSPD-C26-00045',
     title: 'Serial burglaries, Kvarngatan',
     status: 'inledd',
     fuLedare: FIXTURE_VIEWER,
@@ -7343,19 +7343,34 @@ export const fixtures: FixtureSet = {
     // ------------------------------------------------------------- evidence
 
     'evidence.list': (input) => {
-      const filter = (input ?? {}) as { status?: string; type?: string; search?: string };
+      const filter = (input ?? {}) as {
+        status?: string;
+        type?: string;
+        caseNumber?: string;
+        search?: string;
+      };
       const search = filter.search?.toLowerCase();
 
-      return {
-        items: evidenceItems.filter((item) => {
-          if (filter.status && item.status !== filter.status) return false;
-          if (filter.type && item.type !== filter.type) return false;
-          if (!search) return true;
+      const items = evidenceItems.filter((item) => {
+        if (filter.status && item.status !== filter.status) return false;
+        if (filter.type && item.type !== filter.type) return false;
+        if (filter.caseNumber && item.caseNumber !== filter.caseNumber) return false;
+        if (!search) return true;
 
-          return [item.evidenceNumber, item.caseNumber, item.description].some((field) =>
-            field?.toLowerCase().includes(search),
-          );
-        }),
+        return [item.evidenceNumber, item.caseNumber, item.description].some((field) =>
+          field?.toLowerCase().includes(search),
+        );
+      });
+
+      // Mirrors the server: a case view gets each item's analyses batched
+      // in, an ordinary list does not.
+      if (!filter.caseNumber) return { items };
+
+      return {
+        items: items.map((item) => ({
+          ...item,
+          analyses: labQueue.filter((analysis) => analysis.evidenceId === item.id),
+        })),
       };
     },
 
