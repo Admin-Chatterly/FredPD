@@ -806,6 +806,7 @@ Built. Migration 0012, `server/modules/spaning/`.
 - [M] Priority, area (a beat, so it joins the dispatch geography rather than inventing a second one), and a **required** expiry: a lookout that never expires is a banner that stays up until somebody remembers a van from three months ago.
 - [M] **Only priority 1 raises a banner.** Everything else is a notice on the record. The expensive mistake is the loud one: an officer shown a red banner for every "have a look for this van" learns within a shift that red banners are usually nothing, and then misses the one that was a person with a knife. No priority reaches the detain-on-sight treatment, which is 7.12's alone.
 - [M] Automatic hits on queries; **auto-resolve on gripande or omhändertagande**, as a server-local event (§14) rather than a call across modules.
+- [M] **Known associates on a person-target lookout** (0025). When the target resolves to an intelligence subject linked to the master record (`intel.person.linkMaster`, spec 10.1), `spaning.get` attaches that subject's own `associatesForPerson` -- silently empty rather than refused for a reader who holds `spaning.view` but not `intel.person.view` (invariant 4).
 - **Permissions:** `spaning.view`, `spaning.create` (both patrol).
 
 ### 7.14 Field interviews and stop data (S, M6)
@@ -1237,6 +1238,8 @@ The inventory (10.5) is done: `docs/pd-span-inventory.md`. It found that PD-Span
 The register now lives in the server's own MariaDB (the `fpd_intel_*` tables in migration 0001) and persists there. The existing PD-Span data is deliberately **not** migrated: the module starts empty and the register is built up in game.
 
 That makes the bridge contract in 10.4 unnecessary — there is no second system to bridge to. It is kept below as a record of what was considered.
+
+`master_person_id` (0001's own header: "master name index record, once M2 exists") had carried no write path since M2 shipped. 0025 gives it one: `intel.person.linkMaster` ties an intelligence subject to a confirmed person in the master index (at most one subject per master person, enforced by `uq_fpd_intel_persons_master`), resolved for display on `intel.person.get`. `spaning`'s known-associates read (7.13) is the first thing built against it — a lookout naming a master person resolves to that person's analyst-mapped associates, when one has been linked.
 
 ### 10.2 What "directly integrated" means
 

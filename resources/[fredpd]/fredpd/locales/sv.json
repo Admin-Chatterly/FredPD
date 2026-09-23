@@ -507,7 +507,11 @@
       "addAssociate": "Lägg till kontakt",
       "noAssociates": "Inga kontakter registrerade.",
       "noCases": "Inte kopplad till något ärende.",
-      "noNotes": "Ingen underrättelseinformation loggad på denna post ännu."
+      "noNotes": "Ingen underrättelseinformation loggad på denna post ännu.",
+      "masterLink": "Huvudpost",
+      "noMasterLink": "Inte kopplad till en huvudpost.",
+      "masterSearch": "Sök i personregistret",
+      "masterSearchPlaceholder": "Sök på namn eller personnummer"
     },
     "personStatus": {
       "unknown": "Okänd",
@@ -2124,6 +2128,7 @@
     },
     "empty": "Inga spaningsuppdrag pågår.",
     "notAnArrest": "Spaningsuppdrag, inte efterlysning. Rapportera iakttagelsen.",
+    "knownAssociates": "Kända kontakter",
     "filter": {
       "includeResolved": "Visa även avslutade"
     },

@@ -129,6 +129,30 @@ test('adds and removes an associate on a person', async ({ page }) => {
   await expect(page.getByText('No associates recorded.')).toBeVisible();
 });
 
+test('shows the linked master record, and links a new one', async ({ page }) => {
+  await openIntel(page);
+  await page.getByRole('button', { name: 'People', exact: true }).click();
+
+  // Marko Petrov is already tied to John Doe (P-000431) in the fixture --
+  // the same link `spaning.spec.ts` reads from the other side (0025).
+  await page.getByRole('button', { name: 'Marko Petrov', exact: false }).first().click();
+  await expect(page.getByText('John Doe · P-000431')).toBeVisible();
+
+  // Dean Ashworth has none yet: the picker offers to set one.
+  await page.getByRole('button', { name: 'Dean Ashworth', exact: false }).first().click();
+  await expect(page.getByText('Not tied to a master record.')).toBeVisible();
+
+  const picker = page.locator('label').filter({ hasText: 'Find in the master index' });
+  await picker.getByPlaceholder('Search by name or record number').fill('Ellen');
+  await page.getByRole('option', { name: /Ellen Doe/ }).click();
+
+  const linked = page.locator('p').filter({ hasText: 'Ellen Doe · P-000512' });
+  await expect(linked).toBeVisible();
+
+  await linked.getByRole('button', { name: 'Remove' }).click();
+  await expect(page.getByText('Not tied to a master record.')).toBeVisible();
+});
+
 test('creates an organization and adds a member', async ({ page }) => {
   await openIntel(page);
   await page.getByRole('button', { name: 'Organizations', exact: true }).click();

@@ -58,6 +58,17 @@
     needsConfirmation?: boolean;
   }
 
+  /** `intel/repo.lua`'s `associatesForPerson`, reached through the
+   *  master-record link (0025) -- only ever attached when the target is a
+   *  person and this session can read the intel register at all. */
+  interface KnownAssociate {
+    personId: number;
+    name: string | null;
+    alias: string | null;
+    relationship: string | null;
+    isConfirmed: boolean;
+  }
+
   /** Why a lookout is raised, and why it is closed. Locale keys, never prose. */
   const GRUNDER = [
     'iakttagelse',
@@ -80,6 +91,7 @@
   let rows = $state<Maybe<SpaningRow>[]>([]);
   let nextCursor = $state<string | null>(null);
   let detail = $state<SpaningRow | null>(null);
+  let knownAssociates = $state<KnownAssociate[]>([]);
   let failure = $state<Failure | null>(null);
   let busy = $state(false);
   let includeResolved = $state(false);
@@ -171,14 +183,19 @@
   async function open(id: number): Promise<void> {
     busy = true;
 
-    const response = await nui.call<{ spaning: SpaningRow }>('spaning.get', { id });
+    const response = await nui.call<{ spaning: SpaningRow; knownAssociates?: KnownAssociate[] }>(
+      'spaning.get',
+      { id },
+    );
 
     if (response.ok) {
       detail = response.data.spaning;
+      knownAssociates = response.data.knownAssociates ?? [];
       openId = id;
       failure = null;
     } else {
       detail = null;
+      knownAssociates = [];
       openId = null;
       failure = response;
     }
@@ -581,6 +598,32 @@
           <section class="mb-3">
             <h3 class="mb-1 text-xs font-semibold">{t('spaning.column.description')}</h3>
             <p class="text-xs">{detail.description}</p>
+          </section>
+        {/if}
+
+        {#if detail.targetKind === 'person' && knownAssociates.length > 0}
+          <!--
+            Only ever populated by the server for a person target this
+            session can also read through the intel register (0025) -- an
+            empty list here means either nothing was found or this session
+            cannot see it, and the two are indistinguishable on purpose
+            (invariant 4): the section simply does not appear.
+          -->
+          <section class="mb-3">
+            <h3 class="mb-1 text-xs font-semibold">{t('spaning.knownAssociates')}</h3>
+            <ul class="text-xs">
+              {#each knownAssociates as associate (associate.personId)}
+                <li class="border-t border-[var(--color-border)] py-1">
+                  {associate.name ?? associate.alias ?? t('intel.person.unknown')}
+                  {#if associate.relationship}
+                    <span class="text-[var(--color-ink-muted)]"> — {associate.relationship}</span>
+                  {/if}
+                  <span class="text-[var(--color-ink-muted)]">
+                    ({t(associate.isConfirmed ? 'intel.person.confirmed' : 'intel.person.suspected')})
+                  </span>
+                </li>
+              {/each}
+            </ul>
           </section>
         {/if}
 

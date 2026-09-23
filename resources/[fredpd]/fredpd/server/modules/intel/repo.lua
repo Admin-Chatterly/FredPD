@@ -23,6 +23,7 @@ end
 
 local PERSON_COLUMNS <const> = [[
     p.id, p.name, p.alias, p.description, p.status, p.photo_path AS photoPath,
+    p.master_person_id AS masterPersonId,
     p.classification, p.version, p.created_by AS createdBy,
     p.created_at AS createdAt, p.updated_at AS updatedAt
 ]]
@@ -124,6 +125,28 @@ end
 
 function Repo.deletePerson(agencyId, id)
     return db().execute('DELETE FROM fpd_intel_persons WHERE agency_id = ? AND id = ?', { agencyId, id })
+end
+
+--- The intelligence subject linked to a confirmed master person record, if
+--- any -- `master_person_id` (0001's own header: "once M2 exists"), unused
+--- until this joined the two registers (0025).
+function Repo.byMasterPersonId(agencyId, masterPersonId)
+    return db().single(([[
+        SELECT %s FROM fpd_intel_persons p
+         WHERE p.agency_id = ? AND p.master_person_id = ?]]):format(PERSON_COLUMNS),
+        { agencyId, masterPersonId })
+end
+
+--- Links (`masterPersonId` given) or clears (nil) the master-record tie on
+--- one intelligence subject. Optimistic locking, the same shape every other
+--- versioned write in this module uses.
+function Repo.setMasterLink(agencyId, id, expectedVersion, masterPersonId)
+    return db().execute(
+        [[UPDATE fpd_intel_persons
+             SET master_person_id = ?, version = version + 1
+           WHERE agency_id = ? AND id = ? AND version = ?]],
+        { masterPersonId, agencyId, id, expectedVersion }
+    )
 end
 
 -- -----------------------------------------------------------------------------

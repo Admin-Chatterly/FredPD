@@ -91,6 +91,7 @@ local NUI_ROUTES <const> = {
     'intel.person.update',
     'intel.person.delete',
     'intel.person.merge',
+    'intel.person.linkMaster',
     'intel.org.list',
     'intel.org.get',
     'intel.org.create',

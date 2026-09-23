@@ -244,6 +244,8 @@ interface FixtureIntelPerson {
   description: string | null;
   status: string;
   classification: string;
+  /** The master name index record this subject is tied to, if any (0025). */
+  masterPersonId?: number | null;
   version: number;
   createdBy: string;
   createdAt: string;
@@ -329,6 +331,9 @@ let intelPersonsFull: FixtureIntelPerson[] = [
     description: 'Tall, scar on left cheek.',
     status: 'active_investigation',
     classification: 'internal',
+    // Tied to John Doe (P-000431) in the master index, so the Spaning fixture
+    // below can demonstrate 0025's known-associates read.
+    masterPersonId: 1,
     version: 1,
     createdBy: '100000000000000001',
     createdAt: '2026-09-10T14:00:00.000Z',
@@ -3382,11 +3387,13 @@ const spaningsuppdrag: FixtureSpaning[] = [
   },
   {
     // Closed, with the ground that closed it. Only reachable with the filter
-    // off.
+    // off. Names John Doe (P-000431, master id 1) -- linked in the intel
+    // register to Marko Petrov (0025), so opening this one demonstrates the
+    // known-associates read.
     id: 3,
     number: 'S26-00033',
     targetKind: 'person',
-    targetId: 3,
+    targetId: 1,
     description: null,
     grund: 'eftersokt_person',
     priority: 2,
@@ -4803,7 +4810,32 @@ export const fixtures: FixtureSet = {
 
       if (!row) return refuse('not_found');
 
-      return { spaning: spaningRow(row) };
+      // Mirrors `knownAssociatesFor` (spaning/routes.lua, 0025): a person
+      // target resolves to its linked intel subject, and that subject's own
+      // associates ride along -- empty otherwise, never a refusal.
+      let knownAssociates: unknown[] = [];
+      if (row.targetKind === 'person' && row.targetId) {
+        const subject = intelPersonsFull.find((person) => person.masterPersonId === row.targetId);
+
+        if (subject) {
+          knownAssociates = intelAssociates
+            .filter((pair) => pair.low === subject.id || pair.high === subject.id)
+            .map((pair) => {
+              const otherId = pair.low === subject.id ? pair.high : pair.low;
+              const other = intelPersonsFull.find((person) => person.id === otherId);
+
+              return {
+                personId: otherId,
+                name: other?.name ?? null,
+                alias: other?.alias ?? null,
+                relationship: pair.relationship,
+                isConfirmed: pair.isConfirmed,
+              };
+            });
+        }
+      }
+
+      return { spaning: spaningRow(row), knownAssociates };
     },
 
     'spaning.create': (input) => {
@@ -6838,7 +6870,19 @@ export const fixtures: FixtureSet = {
       const evidence = intelEvidence.filter((item) => item.personId === id);
       const notes = intelNotes.filter((note) => note.personId === id);
 
-      return { person, memberships, associates, vehicles, cases, evidence, notes };
+      const master = person.masterPersonId
+        ? registerPersons.find((entry) => !isStub(entry.row) && entry.row.id === person.masterPersonId)?.row
+        : undefined;
+      const masterPerson = master && !isStub(master)
+        ? {
+            id: master.id,
+            firstName: master.firstName,
+            lastName: master.lastName,
+            personNumber: master.personNumber,
+          }
+        : undefined;
+
+      return { person, masterPerson, memberships, associates, vehicles, cases, evidence, notes };
     },
 
     'intel.person.create': (input) => {
@@ -6951,6 +6995,30 @@ export const fixtures: FixtureSet = {
       keep.version += 1;
 
       return { id: keepId };
+    },
+
+    'intel.person.linkMaster': (input) => {
+      const body = (input ?? {}) as { id?: number; version?: number; masterPersonId?: number };
+      const person = intelPersonsFull.find((row) => row.id === body.id);
+      if (!person) return refuse('not_found');
+      if (person.version !== body.version) return refuse('conflict');
+
+      if (body.masterPersonId !== undefined) {
+        const master = registerPersons.find(
+          (entry) => !isStub(entry.row) && entry.row.id === body.masterPersonId,
+        );
+        if (!master) return refuse('not_found', { masterPersonId: 'unknown' });
+
+        const already = intelPersonsFull.find(
+          (row) => row.masterPersonId === body.masterPersonId && row.id !== person.id,
+        );
+        if (already) return refuse('conflict', { masterPersonId: 'already_linked' });
+      }
+
+      person.masterPersonId = body.masterPersonId ?? null;
+      person.version += 1;
+
+      return { id: person.id };
     },
 
     'intel.vehicle.create': (input) => {

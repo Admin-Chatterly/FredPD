@@ -76,8 +76,27 @@ route.define({
         local person = repo.getPerson(session.agencyId, input.id)
         if not person then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
 
+        -- Resolved for display, once, here -- the same reason `ordningsbot.get`
+        -- attaches the tariff a citation cites rather than leaving the NUI to
+        -- re-fetch a bare id. `readPerson` re-checks this session's clearance
+        -- on every read: a master link to a record since sealed or moved out
+        -- of reach shows as unresolved rather than a name nobody may see.
+        local masterPerson
+        if person.masterPersonId then
+            local master = FredPD.Repo.persons.readPerson(session, person.masterPersonId)
+            if master then
+                masterPerson = {
+                    id = master.id,
+                    firstName = master.firstName,
+                    lastName = master.lastName,
+                    personNumber = master.personNumber,
+                }
+            end
+        end
+
         return {
             person = person,
+            masterPerson = masterPerson,
             memberships = repo.membershipsForPerson(input.id),
             associates = repo.associatesForPerson(input.id),
             vehicles = repo.vehiclesForPerson(input.id),
@@ -179,6 +198,52 @@ route.define({
         end
 
         return { id = input.keepId }
+    end,
+})
+
+--- Ties (or, with no `masterPersonId`, clears) this subject to a confirmed
+--- person in the master index (spec 10, 0025) -- the bridge `spaning`'s
+--- known-associates read (`server/modules/spaning/routes.lua`) crosses to
+--- reach an intelligence subject's associates from a lookout naming a
+--- master person.
+route.define({
+    name = 'intel.person.linkMaster',
+    perm = 'intel.person.edit',
+    schema = 'IntelPersonLinkMaster',
+    writes = true,
+    audit = 'intel.person.linkedMaster',
+    subjectType = 'intel_person',
+    auditDetail = function(input) return { masterPersonId = input.masterPersonId } end,
+    handler = function(session, input)
+        if input.masterPersonId then
+            -- `Repo.readPerson` is the persons module's own entry point: it
+            -- scopes to the agency, runs the access check and audits a
+            -- restricted read (invariant 11) -- the same reuse
+            -- `frihet/routes.lua`'s gripande handler relies on, and for the
+            -- same reason: an unchecked id would let an analyst confirm the
+            -- existence of a person outside their own clearance.
+            local person, visibility = FredPD.Repo.persons.readPerson(session, input.masterPersonId)
+
+            if not person then
+                return route.refuse(
+                    visibility == 'missing' and FredPD.ErrorCode.NOT_FOUND or FredPD.ErrorCode.RESTRICTED,
+                    { masterPersonId = visibility == 'missing' and 'unknown' or 'restricted' })
+            end
+
+            -- `uq_fpd_intel_persons_master` (0025) allows this master person
+            -- exactly one linked subject; a second attempt is a conflict, not
+            -- a silent takeover of the first analyst's file.
+            local existing = repo.byMasterPersonId(session.agencyId, input.masterPersonId)
+            if existing and existing.id ~= input.id then
+                return route.refuse(FredPD.ErrorCode.CONFLICT, { masterPersonId = 'already_linked' })
+            end
+        end
+
+        local affected = repo.setMasterLink(session.agencyId, input.id, input.version, input.masterPersonId)
+        local err = updateOutcome(affected, repo.getPerson(session.agencyId, input.id) ~= nil)
+        if err then return route.refuse(err) end
+
+        return { id = input.id }
     end,
 })
 

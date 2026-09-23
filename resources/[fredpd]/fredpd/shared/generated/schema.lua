@@ -522,6 +522,12 @@ FredPD.Schema = {
         dropId = { type = 'integer', required = true, min = 1 },
     },
 
+    IntelPersonLinkMaster = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        masterPersonId = { type = 'integer', required = false, min = 1 },
+    },
+
     IntelOrgList = {
         search = { type = 'string', required = false, max = 128 },
         tag = { type = 'string', required = false, max = 64 },

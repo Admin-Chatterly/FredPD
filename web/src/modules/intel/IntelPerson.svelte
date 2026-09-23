@@ -7,6 +7,7 @@
   import { fieldList, type Failure } from '../shared/failure';
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
   import EntityPicker from '../shared/EntityPicker.svelte';
+  import { isStub, type Maybe, type PersonResult } from '../records/types';
 
   /**
    * People (spec 10): the register's own person, alias or description.
@@ -70,11 +71,22 @@
     description: string | null;
     status: string;
     classification: string;
+    /** The master name index record this subject is tied to, if any (0025). */
+    masterPersonId: number | null;
     version: number;
+  }
+
+  /** The master record's own fields, resolved server-side for display. */
+  interface MasterPerson {
+    id: number;
+    firstName: string | null;
+    lastName: string | null;
+    personNumber: string;
   }
 
   interface Detail {
     person: PersonRecord;
+    masterPerson?: MasterPerson;
     memberships: Membership[];
     associates: Associate[];
     vehicles: Vehicle[];
@@ -99,6 +111,7 @@
     role: 'intel.person.role',
     associateId: 'intel.person.associateId',
     relationship: 'intel.person.relationship',
+    masterPersonId: 'intel.person.masterLink',
     url: 'intel.evidence.url',
     caption: 'intel.evidence.caption',
     body: 'intel.log.body',
@@ -556,6 +569,71 @@
     busy = false;
   }
 
+  // ---------------------------------------------------------- master record
+
+  /** Written the same two ways `CallCard.svelte`'s `personLabel` picks
+   *  between: a name when there is one, the record number always. */
+  function masterLabel(person: { firstName: string | null; lastName: string | null; personNumber: string }): string {
+    const name = [person.firstName, person.lastName].filter(Boolean).join(' ').trim();
+
+    return name ? `${name} · ${person.personNumber}` : person.personNumber;
+  }
+
+  /** Same "empty list, not a refusal" shape `searchRegisteredVehicles` above
+   *  takes when this session cannot read the register at all -- a stub
+   *  carries no id, so it is dropped rather than offered as a pick that
+   *  could never actually link. */
+  async function searchMasterPersons(term: string): Promise<PersonResult[]> {
+    const response = await nui.call<{ persons: Maybe<PersonResult>[] }>('person.search', {
+      term: term || undefined,
+    });
+
+    if (!response.ok) return [];
+
+    return response.data.persons.filter((row): row is PersonResult => !isStub(row));
+  }
+
+  async function linkMaster(master: PersonResult): Promise<void> {
+    if (!detail) return;
+
+    busy = true;
+
+    const response = await nui.call('intel.person.linkMaster', {
+      id: detail.person.id,
+      version: detail.person.version,
+      masterPersonId: master.id,
+    });
+
+    if (response.ok) {
+      failure = null;
+      await Promise.all([open(detail.person.id), loadList()]);
+    } else {
+      failure = response;
+    }
+
+    busy = false;
+  }
+
+  async function unlinkMaster(): Promise<void> {
+    if (!detail) return;
+
+    busy = true;
+
+    const response = await nui.call('intel.person.linkMaster', {
+      id: detail.person.id,
+      version: detail.person.version,
+    });
+
+    if (response.ok) {
+      failure = null;
+      await Promise.all([open(detail.person.id), loadList()]);
+    } else {
+      failure = response;
+    }
+
+    busy = false;
+  }
+
   // -------------------------------------------------------------- case links
 
   async function unlinkCase(id: number): Promise<void> {
@@ -867,6 +945,34 @@
         {#if person.description}
           <p class="mt-2">{person.description}</p>
         {/if}
+      {/if}
+
+      <!-- Master record -->
+      <h3 class="mt-4 font-semibold">{t('intel.person.masterLink')}</h3>
+      {#if detail.masterPerson}
+        <p class="mt-1 flex items-center justify-between gap-2">
+          <span>{masterLabel(detail.masterPerson)}</span>
+          <button
+            type="button"
+            class="border border-[var(--color-border)] px-2 py-0.5 hover:bg-[var(--color-surface)]"
+            disabled={busy}
+            onclick={() => void unlinkMaster()}
+          >
+            {t('intel.action.remove')}
+          </button>
+        </p>
+      {:else}
+        <p class="mt-1 text-[var(--color-ink-muted)]">{t('intel.person.noMasterLink')}</p>
+        <label class="mt-1 flex w-72 flex-col gap-1">
+          <span class="text-[var(--color-ink-muted)]">{t('intel.person.masterSearch')}</span>
+          <EntityPicker
+            placeholder={t('intel.person.masterSearchPlaceholder')}
+            search={searchMasterPersons}
+            label={masterLabel}
+            getKey={(candidate) => candidate.id}
+            onSelect={(candidate) => void linkMaster(candidate)}
+          />
+        </label>
       {/if}
 
       {#if confirmingDelete}

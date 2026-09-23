@@ -507,7 +507,11 @@
       "addAssociate": "Add associate",
       "noAssociates": "No associates recorded.",
       "noCases": "Not linked to any case.",
-      "noNotes": "No intelligence logged against this record yet."
+      "noNotes": "No intelligence logged against this record yet.",
+      "masterLink": "Master record",
+      "noMasterLink": "Not tied to a master record.",
+      "masterSearch": "Find in the master index",
+      "masterSearchPlaceholder": "Search by name or record number"
     },
     "personStatus": {
       "unknown": "Unknown",
@@ -2124,6 +2128,7 @@
     },
     "empty": "No lookouts are running.",
     "notAnArrest": "A lookout, not a wanted notice. Report the sighting.",
+    "knownAssociates": "Known associates",
     "filter": {
       "includeResolved": "Include closed lookouts"
     },

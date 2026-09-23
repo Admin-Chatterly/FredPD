@@ -193,6 +193,18 @@ test('searching again drops the pages already loaded', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'S26-00033' })).toHaveCount(0);
 });
 
+test('shows known associates on a person-target lookout, through the intel register', async ({ page }) => {
+  await openLookouts(page);
+
+  await page.getByLabel('Include closed lookouts').check();
+  await page.getByRole('button', { name: 'Search' }).click();
+  await page.getByRole('button', { name: 'S26-00033' }).click();
+
+  const section = page.getByRole('heading', { name: 'Known associates' }).locator('..');
+  await expect(section).toContainText('Unknown person');
+  await expect(section).toContainText('Seen together on Alta Street');
+});
+
 test('renders the lookout tab in Swedish', async ({ page }) => {
   await page.goto('/?locale=sv');
 

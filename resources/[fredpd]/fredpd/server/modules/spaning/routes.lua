@@ -35,6 +35,31 @@ local function decorate(row, now)
     return row
 end
 
+--- Known associates of a spaning's person target, through the intel
+--- module's own association mapping (spec 10, 0025) -- the same tie
+--- `IntelPerson.svelte` shows on the subject's own record, surfaced here so
+--- an officer reading a lookout for "this person" is told who else to
+--- expect without opening a second screen.
+---
+--- Silently empty rather than refused when the session cannot read the
+--- intel register at all: this is *extra* context on a record the officer
+--- is already cleared to read via `spaning.view`, not a promise that every
+--- person-target lookout has one, and it must never surface intelligence a
+--- reader who lacks `intel.person.view` could not otherwise open (invariant
+--- 4) -- the same "empty list, not a refusal" the vehicle-registry search on
+--- `IntelPerson.svelte` already takes when the reverse permission is
+--- missing.
+local function knownAssociatesFor(session, row)
+    if row.targetKind ~= 'person' or not row.targetId then return {} end
+    if not FredPD.Core.perms.satisfies(session.permissions, 'intel.person.view') then return {} end
+
+    local intel = FredPD.Repo.intel
+    local subject = intel.byMasterPersonId(session.agencyId, row.targetId)
+    if not subject then return {} end
+
+    return intel.associatesForPerson(subject.id)
+end
+
 route.define({
     name = 'spaning.list',
     perm = 'spaning.view',
@@ -72,7 +97,10 @@ route.define({
         local allowed = access.read(session, SPANING, row)
         if not allowed then return route.refuse(FredPD.ErrorCode.RESTRICTED) end
 
-        return { spaning = decorate(allowed, os.time()) }
+        return {
+            spaning = decorate(allowed, os.time()),
+            knownAssociates = knownAssociatesFor(session, allowed),
+        }
     end,
 })
 
