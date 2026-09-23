@@ -27,7 +27,7 @@ import type { Page } from '@playwright/test';
 
 /** Opens Records and switches to the custody tab. */
 async function openCustody(page: Page): Promise<void> {
-  await page.goto('/');
+  await page.goto('/?locale=en');
 
   await page.locator('nav').first().getByRole('button', { name: 'Records' }).click();
   await page.getByRole('button', { name: 'Custody', exact: true }).click();
@@ -316,7 +316,7 @@ test('records a gripande, which is how a chain starts at all', async ({ page }) 
 });
 
 test('an arrest takes down the wanted notice that asked for it', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?locale=en');
   await page.locator('nav').first().getByRole('button', { name: 'Records' }).click();
 
   // John Doe (person 1) is anhållen i sin frånvaro.

@@ -33,6 +33,8 @@ export interface Session {
    * deadline is a *local* noon in that same zone.
    */
   timezone?: string;
+  /** The department's configured interface language ('sv' or 'en'). */
+  locale?: string;
 }
 
 export interface PermissionGroup {

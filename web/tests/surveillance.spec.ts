@@ -19,7 +19,7 @@ import type { Page } from '@playwright/test';
  */
 
 async function openSurveillance(page: Page): Promise<void> {
-  await page.goto('/');
+  await page.goto('/?locale=en');
   await page.locator('nav').first().getByRole('button', { name: 'Surveillance' }).click();
 }
 

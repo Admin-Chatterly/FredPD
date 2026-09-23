@@ -20,7 +20,7 @@ import type { Page } from '@playwright/test';
  */
 
 async function openMeasures(page: Page): Promise<void> {
-  await page.goto('/');
+  await page.goto('/?locale=en');
 
   await page.locator('nav').first().getByRole('button', { name: 'Records' }).click();
   await page.getByRole('button', { name: 'Coercive measures', exact: true }).click();
@@ -173,7 +173,7 @@ test('draws a measure it may not open as a restricted row', async ({ page }) => 
 });
 
 test('does not ask for a query reason on a workflow tab', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?locale=en');
   await page.locator('nav').first().getByRole('button', { name: 'Records' }).click();
 
   // The registers do take one (7.2) …

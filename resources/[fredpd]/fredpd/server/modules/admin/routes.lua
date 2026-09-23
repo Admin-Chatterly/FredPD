@@ -242,6 +242,11 @@ route.define({
             -- written in the zone the department works in, and RB 24:12's
             -- deadline is a local noon in that same zone.
             timezone = FredPD.Config.shared.timezone,
+            -- The department's configured interface language. The NUI applies
+            -- it unless a `?locale=` override is already in effect (the
+            -- dev/test escape hatch), so a fresh officer sees the department's
+            -- language rather than the interface's own English fallback.
+            locale = FredPD.Config.shared.locale,
         }
     end,
 })

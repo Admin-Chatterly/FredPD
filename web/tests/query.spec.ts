@@ -24,7 +24,7 @@ import type { Page } from '@playwright/test';
  */
 
 async function openQuery(page: Page): Promise<void> {
-  await page.goto('/');
+  await page.goto('/?locale=en');
 
   await page.locator('nav').first().getByRole('button', { name: 'Records' }).click();
 }

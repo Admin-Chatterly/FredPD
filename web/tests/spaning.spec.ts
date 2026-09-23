@@ -20,7 +20,7 @@ import type { Page } from '@playwright/test';
  */
 
 async function openLookouts(page: Page): Promise<void> {
-  await page.goto('/');
+  await page.goto('/?locale=en');
 
   await page.locator('nav').first().getByRole('button', { name: 'Records' }).click();
   await page.getByRole('button', { name: 'Lookouts', exact: true }).click();
@@ -162,7 +162,7 @@ test('draws a lookout it may not open as a restricted row', async ({ page }) => 
 test('loads the next page of lookouts with the load-more control', async ({ page }) => {
   // `?pageSize=1` walks a genuine multi-page flow off the two live fixture
   // rows without needing fifty of them (spec 12.2).
-  await page.goto('/?pageSize=1');
+  await page.goto('/?pageSize=1&locale=en');
   await page.locator('nav').first().getByRole('button', { name: 'Records' }).click();
   await page.getByRole('button', { name: 'Lookouts', exact: true }).click();
 
@@ -176,7 +176,7 @@ test('loads the next page of lookouts with the load-more control', async ({ page
 });
 
 test('searching again drops the pages already loaded', async ({ page }) => {
-  await page.goto('/?pageSize=1');
+  await page.goto('/?pageSize=1&locale=en');
   await page.locator('nav').first().getByRole('button', { name: 'Records' }).click();
   await page.getByRole('button', { name: 'Lookouts', exact: true }).click();
 

@@ -13,7 +13,7 @@ import type { Page } from '@playwright/test';
  */
 
 async function openCatalogue(page: Page): Promise<void> {
-  await page.goto('/');
+  await page.goto('/?locale=en');
 
   await page.locator('nav').first().getByRole('button', { name: 'Records' }).click();
   await page.getByRole('button', { name: 'Offences', exact: true }).click();

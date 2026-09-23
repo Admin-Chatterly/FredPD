@@ -21,7 +21,7 @@ import type { Page } from '@playwright/test';
 
 /** Opens Records and switches to the reports tab. */
 async function openReports(page: Page): Promise<void> {
-  await page.goto('/');
+  await page.goto('/?locale=en');
 
   await page.locator('nav').first().getByRole('button', { name: 'Records' }).click();
   await page.getByRole('button', { name: 'Reports', exact: true }).click();

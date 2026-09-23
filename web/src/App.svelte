@@ -1,6 +1,6 @@
 <script lang="ts">
   import { nui } from './lib/nui';
-  import { t } from './lib/i18n';
+  import { t, isLocale, setLocale } from './lib/i18n';
   import { setDepartmentTimezone } from './lib/time';
   import type { ErrorCode } from '@fredpd/schema';
   import type { Session } from './lib/types';
@@ -57,6 +57,15 @@
         // Before anything renders a timestamp: every screen formats in the
         // department's zone, not in the one the player's machine is set to.
         setDepartmentTimezone(response.data.timezone);
+
+        // The department's configured language, unless `main.ts` already
+        // applied an explicit `?locale=` override (the dev/test escape
+        // hatch) — that override must win even after this resolves.
+        const explicit = new URLSearchParams(window.location.search).get('locale');
+        if (explicit === null && response.data.locale && isLocale(response.data.locale)) {
+          setLocale(response.data.locale);
+        }
+
         current ??= response.data.modules[0] ?? null;
       } else {
         error = response.err;

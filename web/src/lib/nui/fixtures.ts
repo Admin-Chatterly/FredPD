@@ -124,6 +124,9 @@ const session = {
   // this zone rather than in the one the player's machine is set to, so the
   // fixture sends it exactly as `session.get` does.
   timezone: 'Europe/Stockholm',
+  // The department's configured language — matches config/shared.lua's
+  // default, so the fixture-driven console behaves like a real one.
+  locale: 'sv',
   // Only what this fake session may open. The real list is derived from
   // Discord roles on the server (invariant 2).
   modules: [

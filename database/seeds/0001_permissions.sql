@@ -99,6 +99,21 @@ ON DUPLICATE KEY UPDATE
     `inherits`    = VALUES(`inherits`),
     `description` = VALUES(`description`);
 
+-- Utredare (investigator): the M3 lab work modelled it as a Discord role
+-- separate from patrol, held by a dedicated forensic analyst. In practice an
+-- investigating officer needs to start and read back their own analyses
+-- without waiting on somebody mapped to `lab_analyst`, so this group carries
+-- the same three lab grants on its own -- not inheriting `lab_analyst`,
+-- because a department may map the two to different Discord roles and an
+-- inheritance edge would tie their escalation checks together for no reason.
+INSERT INTO `fpd_permission_groups` (`key`, `name`, `inherits`, `description`) VALUES
+    ('utredare', 'Utredare', NULL,
+     'An investigator: may submit, work and read the lab queue without a separate analyst role.')
+ON DUPLICATE KEY UPDATE
+    `name`        = VALUES(`name`),
+    `inherits`    = VALUES(`inherits`),
+    `description` = VALUES(`description`);
+
 -- -----------------------------------------------------------------------------
 -- DOJ groups (spec 7.9, 7.12)
 --
@@ -586,6 +601,7 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('property_officer', 'clearance.internal'),
     ('lab_analyst', 'clearance.internal'),
     ('lab_supervisor', 'clearance.restricted'),
+    ('utredare', 'clearance.internal'),
 
     -- Intelligence reads what the rest of the department may not (spec 10), so
     -- it starts a rung higher and its command tier is the only group seeded at
@@ -676,6 +692,14 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('lab_analyst', 'lab.request.create'),
     ('lab_analyst', 'lab.queue.view'),
     ('lab_analyst', 'lab.analysis.perform'),
+
+    -- An investigator, same three lab grants as an analyst, held without the
+    -- separate role (see the group definition above).
+    ('utredare', 'page.lab'),
+    ('utredare', 'evidence.item.view'),
+    ('utredare', 'lab.request.create'),
+    ('utredare', 'lab.queue.view'),
+    ('utredare', 'lab.analysis.perform'),
 
     -- Technical review by a second analyst before release (8.7). Held apart
     -- from performing the analysis on purpose: reviewing your own work is not

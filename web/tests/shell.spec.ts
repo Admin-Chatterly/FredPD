@@ -11,7 +11,7 @@ import type { Page } from '@playwright/test';
  */
 
 test('renders the shell from fixture data', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?locale=en');
 
   await expect(page.getByText('Los Santos Police Department')).toBeVisible();
   await expect(page.getByText('Unit 12-40')).toBeVisible();
@@ -20,7 +20,7 @@ test('renders the shell from fixture data', async ({ page }) => {
 });
 
 test('draws only the modules the session is permitted to open', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?locale=en');
 
   const rail = page.locator('nav').first();
   await expect(rail.getByRole('button', { name: 'Records' })).toBeVisible();
@@ -46,7 +46,7 @@ test('draws only the modules the session is permitted to open', async ({ page })
 });
 
 test('shows a translated message when a route refuses', async ({ page }) => {
-  await page.goto('/?fail=forbidden');
+  await page.goto('/?fail=forbidden&locale=en');
 
   await expect(page.getByText('Your Discord roles do not grant access to this.')).toBeVisible();
 });
@@ -59,9 +59,20 @@ test('renders in Swedish', async ({ page }) => {
   await expect(page.locator('nav').first().getByRole('button', { name: 'Register' })).toBeVisible();
 });
 
+test('defaults to the session\'s configured language with no override', async ({ page }) => {
+  // No `?locale=` at all: the shell starts in English (main.ts's fallback,
+  // matching `en.json` never having missing keys), then session.get resolves
+  // and switches it to the department's configured language — Swedish here,
+  // matching the fixture and config/shared.lua's own default.
+  await page.goto('/');
+
+  await expect(page.getByText('Enhet 12-40')).toBeVisible();
+  await expect(page.getByText('I tjänst')).toBeVisible();
+});
+
 test.describe('Discord role mapping', () => {
   test('lists the mappings and how fresh the Discord sync is', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?locale=en');
     await page.locator('nav').getByRole('button', { name: 'Administration' }).click();
 
     await expect(page.getByRole('heading', { name: 'Discord roles' })).toBeVisible();
@@ -73,7 +84,7 @@ test.describe('Discord role mapping', () => {
   });
 
   test('adds a mapping and shows it in the table', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?locale=en');
     await page.locator('nav').getByRole('button', { name: 'Administration' }).click();
 
     await page.getByLabel('Discord role ID').fill('100000000000000009');
@@ -86,7 +97,7 @@ test.describe('Discord role mapping', () => {
   });
 
   test('removes a mapping', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?locale=en');
     await page.locator('nav').getByRole('button', { name: 'Administration' }).click();
 
     const row = page.getByRole('row').filter({ hasText: '100000000000000002' });
@@ -100,7 +111,7 @@ test.describe('Discord role mapping', () => {
 
 test.describe('Intelligence', () => {
   async function openIntel(page: Page): Promise<void> {
-    await page.goto('/');
+    await page.goto('/?locale=en');
     await page.locator('nav').first().getByRole('button', { name: 'Intelligence' }).click();
   }
 

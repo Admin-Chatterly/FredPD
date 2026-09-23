@@ -8,7 +8,7 @@ import type { Page } from '@playwright/test';
  */
 
 async function openImpound(page: Page): Promise<void> {
-  await page.goto('/');
+  await page.goto('/?locale=en');
   await page.locator('nav').first().getByRole('button', { name: 'Records' }).click();
   await page.getByRole('button', { name: 'Impound', exact: true }).click();
 }

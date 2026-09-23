@@ -52,7 +52,10 @@ interface BannerOptions {
 async function openConsole(page: Page, locale?: string): Promise<void> {
   const swedish = locale === 'sv';
 
-  await page.goto(locale ? `/?locale=${locale}` : '/');
+  // No `locale` argument still exercises English explicitly. The bare
+  // default (no `?locale=` at all) now resolves from the session's
+  // configured language, which the shell tests cover.
+  await page.goto(`/?locale=${locale ?? 'en'}`);
   await page
     .locator('nav')
     .first()

@@ -11,7 +11,7 @@ import type { Page } from '@playwright/test';
  */
 
 async function openCourt(page: Page): Promise<void> {
-  await page.goto('/');
+  await page.goto('/?locale=en');
   await page.locator('nav').first().getByRole('button', { name: 'Court' }).click();
 }
 
