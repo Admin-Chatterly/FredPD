@@ -399,6 +399,38 @@ local function clearBlips()
     end
 end
 
+-- -----------------------------------------------------------------------------
+-- A BOLO going out (7.16 [S])
+-- -----------------------------------------------------------------------------
+
+--- How long a broadcast's toast stays up, in milliseconds. Shorter than the
+--- emergency banner: this is a heads-up, not a call this officer is expected
+--- to act on immediately, and `Broadcasts.svelte` keeps the message on the
+--- board for as long as the broadcast itself stands.
+local BROADCAST_NOTIFY_MS <const> = 8000
+
+--- A broadcast reaching this client is `board.toDispatch`'s doing -- every
+--- session with `page.dispatch`, not everyone (invariant 5) -- so nothing
+--- here decides who hears it, only how. Before this there was no reason to
+--- have the MDT open, let alone the Broadcasts tab, to learn a BOLO just went
+--- out; now every subscribed officer gets a toast the moment one does,
+--- whether the console is open or not, the same way an emergency already
+--- reaches them without it.
+---
+--- Cancellation pushes `{ cancelledId }` and nothing else (`Broadcasts.svelte`
+--- reads it the same way), so this only fires on the broadcast itself.
+local function broadcastAlert(payload)
+    local broadcast = payload and payload.broadcast
+    if not broadcast then return end
+
+    lib.notify({
+        title = FredPD.t('cad.broadcastKind.' .. broadcast.kind),
+        description = broadcast.title,
+        type = 'inform',
+        duration = BROADCAST_NOTIFY_MS,
+    })
+end
+
 --- The pushes that mean something to this file as well as to the interface.
 ---
 --- Everything else is relayed and nothing more: the client renders what the
@@ -407,6 +439,7 @@ local WATCHED <const> = {
     ['fredpd:cad:emergency'] = emergencyAlert,
     ['fredpd:cad:call'] = forgetClosedEmergency,
     ['fredpd:cad:avl'] = syncBlips,
+    ['fredpd:cad:broadcast'] = broadcastAlert,
 }
 
 for _, event in ipairs(PUSHES) do
