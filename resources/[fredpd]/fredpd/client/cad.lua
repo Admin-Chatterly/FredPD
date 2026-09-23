@@ -332,13 +332,81 @@ local function forgetClosedEmergency(payload)
     end
 end
 
---- The two pushes that mean something to this file as well as to the interface.
+-- -----------------------------------------------------------------------------
+-- World map blips, alongside the NUI's own (7.17)
+-- -----------------------------------------------------------------------------
+
+--- A plain, flat dot (invariant 12's own agency-software rule applies to the
+--- world map too) in the same blue the NUI already reads as "police unit".
+local BLIP_SPRITE <const> = 1
+local BLIP_COLOUR <const> = 3
+
+--- officerId -> blip handle, for every unit this client currently has a
+--- position for. Only ever populated while the map is open: it is built
+--- entirely from `fredpd:cad:avl`, which the server pushes only to a session
+--- that has called `map.view` (3.6), so a closed map means no deltas arrive
+--- and this stays empty on its own.
+local blips = {}
+
+local function upsertBlip(unit)
+    local handle = blips[unit.officerId]
+
+    if handle and DoesBlipExist(handle) then
+        SetBlipCoords(handle, unit.x, unit.y, unit.z)
+        return
+    end
+
+    handle = AddBlipForCoord(unit.x, unit.y, unit.z)
+    SetBlipSprite(handle, BLIP_SPRITE)
+    SetBlipColour(handle, BLIP_COLOUR)
+    SetBlipScale(handle, 0.8)
+    SetBlipAsShortRange(handle, true)
+
+    blips[unit.officerId] = handle
+end
+
+local function removeBlip(officerId)
+    local handle = blips[officerId]
+    if not handle then return end
+
+    if DoesBlipExist(handle) then RemoveBlip(handle) end
+    blips[officerId] = nil
+end
+
+--- Applied to the same delta the NUI map draws from, so the two never
+--- disagree about where a unit is -- there is only the one feed.
+local function syncBlips(payload)
+    local units = payload and payload.units
+    if not units then return end
+
+    for index = 1, #units do
+        local unit = units[index]
+
+        if unit.gone then
+            removeBlip(unit.officerId)
+        else
+            upsertBlip(unit)
+        end
+    end
+end
+
+--- Drops every blip this client is holding. Called alongside the NUI
+--- unsubscribe below, for the same reason: a blip nobody asked about any more
+--- is a blip that should not still be on the map.
+local function clearBlips()
+    for officerId in pairs(blips) do
+        removeBlip(officerId)
+    end
+end
+
+--- The pushes that mean something to this file as well as to the interface.
 ---
 --- Everything else is relayed and nothing more: the client renders what the
 --- server sent and decides nothing about it (invariant 4).
 local WATCHED <const> = {
     ['fredpd:cad:emergency'] = emergencyAlert,
     ['fredpd:cad:call'] = forgetClosedEmergency,
+    ['fredpd:cad:avl'] = syncBlips,
 }
 
 for _, event in ipairs(PUSHES) do
@@ -362,6 +430,8 @@ end
 --- unsubscribing again is a no-op on the server, and a close must never wait on
 --- a round trip.
 function Cad.unsubscribeMap()
+    clearBlips()
+
     CreateThread(function()
         FredPD.Client.core.call('map.view', { subscribe = false })
     end)

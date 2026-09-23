@@ -163,6 +163,15 @@ files['**/client/**/*.lua'] = {
         -- The forensic kit opens from a key the player binds themselves; the
         -- resource ships no default binding (spec 8.4).
         'RegisterKeyMapping',
+        -- Unit blips on the world map, alongside the NUI's own (spec 7.17).
+        'AddBlipForCoord',
+        'DoesBlipExist',
+        'RemoveBlip',
+        'SetBlipAsShortRange',
+        'SetBlipColour',
+        'SetBlipCoords',
+        'SetBlipScale',
+        'SetBlipSprite',
         'SetBlockingOfNonTemporaryEvents',
         'SetDrawOrigin',
         'SetEntityAsMissionEntity',
