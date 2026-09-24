@@ -35,7 +35,12 @@
         type="button"
         class="px-3 py-1.5 text-xs hover:bg-[var(--color-surface)]"
         class:font-semibold={tab === name}
-        onclick={() => (tab = name)}
+        onclick={() => {
+          // A record the diagram opened is not reopened on every later visit.
+          openPersonId = null;
+          openOrgId = null;
+          tab = name;
+        }}
       >
         {t(`intel.tab.${name}`)}
       </button>

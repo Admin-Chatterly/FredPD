@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { layoutGraph, seededRandom } from './graphLayout';
+import { BOX_H, BOX_W, layoutGraph, seededRandom } from './graphLayout';
 
 describe('graph layout', () => {
   it('opens the same board the same way every time', () => {
@@ -42,6 +42,21 @@ describe('graph layout', () => {
       const value = random();
       expect(value).toBeGreaterThanOrEqual(0);
       expect(value).toBeLessThan(1);
+    }
+  });
+
+  it('never draws one node box over another, even on a crowded board', () => {
+    const nodes = Array.from({ length: 120 }, (_, i) => ({ id: String(i) }));
+    const links = Array.from({ length: 160 }, (_, i) => ({ source: String(i % 120), target: String((i * 7) % 120) }));
+    const positions = [...layoutGraph(nodes, links).values()];
+
+    for (let a = 0; a < positions.length; a += 1) {
+      for (let b = a + 1; b < positions.length; b += 1) {
+        const p = positions[a]!;
+        const q = positions[b]!;
+        const overlaps = Math.abs(p.x - q.x) < BOX_W && Math.abs(p.y - q.y) < BOX_H;
+        expect(overlaps).toBe(false);
+      }
     }
   });
 });

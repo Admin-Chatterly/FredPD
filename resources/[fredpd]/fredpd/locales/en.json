@@ -670,13 +670,13 @@
     "board": {
       "title": "Link diagram",
       "scope": "Show",
-      "everything": "Everyone (newest first)",
-      "counts": "{nodes} on the diagram, {links} links. Select one to open its file.",
+      "everything": "Everyone (most recently active first)",
+      "counts": "{nodes} records and {links} links on the diagram. Select a record to open its file.",
       "truncated": "only the 300 most recently active people are drawn",
       "empty": "Nothing to draw here.",
       "zoomIn": "Zoom in",
       "zoomOut": "Zoom out",
-      "reset": "Fit",
+      "reset": "Reset view",
       "openPerson": "Open {name}",
       "openOrg": "Open {name}",
       "legend": "Legend",
@@ -684,7 +684,9 @@
       "org": "Organization",
       "membership": "Member of",
       "associate": "Associate",
-      "unconfirmed": "Not confirmed"
+      "unconfirmed": "Not confirmed",
+      "linkUnconfirmed": "{label} (not confirmed)",
+      "keys": "Tab moves between records, Enter opens one. Arrow keys move the view, + and − zoom, Ctrl and the wheel zoom too."
     }
   },
   "admin": {

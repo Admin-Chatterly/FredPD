@@ -111,5 +111,49 @@ export function layoutGraph(nodes: LayoutNode[], links: LayoutLink[]): LayoutPos
     }
   }
 
+  separate(points, BOX_W + BOX_GAP, BOX_H + BOX_GAP);
+
   return new Map(points.map((point) => [point.id, { x: point.x, y: point.y }]));
+}
+
+/** The size a node is drawn at (`IntelBoard.svelte`), and the space between two. */
+export const BOX_W = 150;
+export const BOX_H = 40;
+const BOX_GAP = 12;
+
+/**
+ * The forces treat nodes as points; the board draws them as boxes. This pushes
+ * any two boxes that still overlap apart along the axis where they overlap
+ * least, until none do (or a bound on passes is reached on a pathological
+ * board).
+ */
+function separate(points: { x: number; y: number }[], width: number, height: number): void {
+  for (let pass = 0; pass < 200; pass += 1) {
+    let moved = false;
+
+    for (let a = 0; a < points.length; a += 1) {
+      const p = points[a]!;
+      for (let b = a + 1; b < points.length; b += 1) {
+        const q = points[b]!;
+        const overlapX = width - Math.abs(p.x - q.x);
+        const overlapY = height - Math.abs(p.y - q.y);
+        if (overlapX <= 0 || overlapY <= 0) continue;
+
+        moved = true;
+        if (overlapX < overlapY) {
+          const push = overlapX / 2 + 0.5;
+          const sign = p.x < q.x || (p.x === q.x && a < b) ? -1 : 1;
+          p.x += sign * push;
+          q.x -= sign * push;
+        } else {
+          const push = overlapY / 2 + 0.5;
+          const sign = p.y < q.y || (p.y === q.y && a < b) ? -1 : 1;
+          p.y += sign * push;
+          q.y -= sign * push;
+        }
+      }
+    }
+
+    if (!moved) return;
+  }
 }

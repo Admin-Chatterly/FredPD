@@ -511,6 +511,11 @@ route.define({
 --- goes through the same access filter a search does, and a node this reader
 --- would only see as a stub is left off entirely: a stub on a diagram, with
 --- its edges, would say who it is connected to (4.5).
+--- How many pages the everyone board reads, at most, to find a full board
+--- of people this reader may see. Past that it says "cut", which is also
+--- what a genuinely large register says -- the two are not told apart.
+local BOARD_PAGES <const> = 4
+
 route.define({
     name = 'intel.board',
     perm = 'intel.person.view',
@@ -522,27 +527,9 @@ route.define({
     end,
     handler = function(session, input)
         local access = FredPD.Repo.access
+        local perms = FredPD.Core.perms
         local cap = service.BOARD_PERSON_CAP
-        local personIds, orgIds
-
-        if input.scope == 'case' then
-            if not input.id then return route.refuse(FredPD.ErrorCode.INVALID, { id = 'required' }) end
-            local record = repo.getCase(session.agencyId, input.id)
-            if not record or not access.read(session, 'intel_case', record) then
-                return route.refuse(FredPD.ErrorCode.NOT_FOUND)
-            end
-            personIds, orgIds = {}, {}
-            for _, link in ipairs(repo.caseLinks(input.id)) do
-                if link.personId then personIds[#personIds + 1] = link.personId end
-                if link.orgId then orgIds[#orgIds + 1] = link.orgId end
-            end
-        elseif input.scope == 'org' then
-            if not input.id then return route.refuse(FredPD.ErrorCode.INVALID, { id = 'required' }) end
-            personIds, orgIds = {}, { input.id }
-            for _, member in ipairs(repo.rosterForOrg(input.id)) do personIds[#personIds + 1] = member.personId end
-        end
-
-        local canOrgs = FredPD.Core.perms.satisfies(session.permissions, 'intel.org.view')
+        local ORG_CAP <const> = 200
 
         local function visible(recordType, rows)
             local out = {}
@@ -552,18 +539,69 @@ route.define({
             return out
         end
 
-        local persons = visible('intel_person', repo.boardPersons(session.agencyId, personIds, cap))
-        local orgs = canOrgs and visible('intel_org', repo.boardOrgs(session.agencyId, orgIds, 200)) or {}
+        --- Up to `limit` + 1 visible rows, a page at a time.
+        local function fill(recordType, page, limit)
+            local out, offset = {}, 0
+            for _ = 1, BOARD_PAGES do
+                local rows = page(session.agencyId, limit + 1, offset)
+                for _, row in ipairs(visible(recordType, rows)) do out[#out + 1] = row end
+                if #out > limit or #rows < limit + 1 then return out, #out > limit end
+                offset = offset + #rows
+            end
+            return out, true
+        end
 
-        -- An organisation board whose organisation this reader may not see is
-        -- not a board of its members: it is not found.
-        if input.scope == 'org' and #orgs == 0 then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+        local canOrgs = perms.satisfies(session.permissions, 'intel.org.view')
+        local persons, truncated
+        local orgs = {}
 
-        local ids = {}
-        for index = 1, math.min(#persons, cap) do ids[index] = persons[index].id end
-        local memberships, associates = repo.boardEdges(ids)
+        if input.scope == 'case' then
+            -- A case's board is the case's links: the case permission, as
+            -- `intel.case.get` asks, and the case itself readable.
+            if not input.id or not perms.satisfies(session.permissions, 'intel.case.view') then
+                return route.refuse(FredPD.ErrorCode.NOT_FOUND)
+            end
+            local record = repo.getCase(session.agencyId, input.id)
+            if not record or not access.read(session, 'intel_case', record) then
+                return route.refuse(FredPD.ErrorCode.NOT_FOUND)
+            end
 
-        return service.boardGraph(persons, orgs, memberships, associates)
+            local personIds, orgIds = {}, {}
+            for _, link in ipairs(repo.caseLinks(input.id)) do
+                if link.personId and #personIds <= cap then personIds[#personIds + 1] = link.personId end
+                if link.orgId and #orgIds < ORG_CAP then orgIds[#orgIds + 1] = link.orgId end
+            end
+            truncated = #personIds > cap
+            persons = visible('intel_person', repo.boardPersonsById(session.agencyId, personIds))
+            orgs = canOrgs and visible('intel_org', repo.boardOrgsById(session.agencyId, orgIds)) or {}
+        elseif input.scope == 'org' then
+            -- The organisation first: one this reader may not see has no
+            -- board, and its roster is never read for it.
+            if not input.id or not canOrgs then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+            orgs = visible('intel_org', repo.boardOrgsById(session.agencyId, { input.id }))
+            if #orgs == 0 then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+
+            local personIds = {}
+            for _, member in ipairs(repo.rosterForOrg(input.id)) do
+                if #personIds > cap then break end
+                personIds[#personIds + 1] = member.personId
+            end
+            truncated = #personIds > cap
+            persons = visible('intel_person', repo.boardPersonsById(session.agencyId, personIds))
+        else
+            persons, truncated = fill('intel_person', repo.boardPersonsPage, cap)
+            if canOrgs then orgs = fill('intel_org', repo.boardOrgsPage, ORG_CAP) end
+        end
+
+        local personIds, orgIds = {}, {}
+        for index = 1, math.min(#persons, cap) do personIds[index] = persons[index].id end
+        for index = 1, math.min(#orgs, ORG_CAP) do orgIds[index] = orgs[index].id end
+        local memberships, associates = repo.boardEdges(personIds, orgIds)
+
+        local board = service.boardGraph(persons, { table.unpack(orgs, 1, math.min(#orgs, ORG_CAP)) },
+            memberships, associates)
+        board.truncated = board.truncated or truncated
+        return board
     end,
 })
 

@@ -871,52 +871,67 @@ local function marks(count)
     return table.concat(out, ', ')
 end
 
---- People for a board, newest activity first, one more than asked so the
---- caller can tell it was cut.
-function Repo.boardPersons(agencyId, ids, limit)
-    if ids then
-        if #ids == 0 then return {} end
-        local values = { agencyId }
-        for _, id in ipairs(ids) do values[#values + 1] = id end
-        return db().query(
-            ('SELECT id, agency_id AS agencyId, name, alias, status, classification FROM fpd_intel_persons '
-                .. 'WHERE agency_id = ? AND id IN (%s)'):format(marks(#ids)), values)
-    end
+--- People for a board by id, in this agency.
+function Repo.boardPersonsById(agencyId, ids)
+    if #ids == 0 then return {} end
+    local values = { agencyId }
+    for _, id in ipairs(ids) do values[#values + 1] = id end
+    return db().query(
+        ('SELECT id, agency_id AS agencyId, name, alias, status, classification FROM fpd_intel_persons '
+            .. 'WHERE agency_id = ? AND id IN (%s)'):format(marks(#ids)), values)
+end
 
+--- One page of people for the everyone board, newest activity first. The
+--- caller over-fetches page by page, because the access filter drops rows
+--- after the query: a fixed window would show the hidden ones as a gap.
+function Repo.boardPersonsPage(agencyId, limit, offset)
     return db().query(
         [[SELECT id, agency_id AS agencyId, name, alias, status, classification FROM fpd_intel_persons
-           WHERE agency_id = ? ORDER BY updated_at DESC LIMIT ?]],
-        { agencyId, limit + 1 })
+           WHERE agency_id = ? ORDER BY updated_at DESC, id DESC LIMIT ? OFFSET ?]],
+        { agencyId, limit, offset })
 end
 
-function Repo.boardOrgs(agencyId, ids, limit)
-    if ids then
-        if #ids == 0 then return {} end
-        local values = { agencyId }
-        for _, id in ipairs(ids) do values[#values + 1] = id end
-        return db().query(
-            ('SELECT id, agency_id AS agencyId, name, type, status, classification FROM fpd_intel_orgs '
-                .. 'WHERE agency_id = ? AND id IN (%s)'):format(marks(#ids)), values)
-    end
+function Repo.boardOrgsById(agencyId, ids)
+    if #ids == 0 then return {} end
+    local values = { agencyId }
+    for _, id in ipairs(ids) do values[#values + 1] = id end
+    return db().query(
+        ('SELECT id, agency_id AS agencyId, name, type, status, classification FROM fpd_intel_orgs '
+            .. 'WHERE agency_id = ? AND id IN (%s)'):format(marks(#ids)), values)
+end
 
+function Repo.boardOrgsPage(agencyId, limit, offset)
     return db().query(
         [[SELECT id, agency_id AS agencyId, name, type, status, classification FROM fpd_intel_orgs
-           WHERE agency_id = ? ORDER BY name LIMIT ?]],
-        { agencyId, limit })
+           WHERE agency_id = ? ORDER BY name, id LIMIT ? OFFSET ?]],
+        { agencyId, limit, offset })
 end
 
---- Every membership and association touching these people. The service keeps
---- only the ones with both ends on the board.
-function Repo.boardEdges(personIds)
+--- The memberships and associations with *both* ends on the board: an edge
+--- to anything else never leaves the database.
+function Repo.boardEdges(personIds, orgIds)
     if #personIds == 0 then return {}, {} end
 
-    local list = marks(#personIds)
-    local memberships = db().query(
-        ('SELECT person_id AS personId, org_id AS orgId, role, is_confirmed AS isConfirmed '
-            .. 'FROM fpd_intel_memberships WHERE person_id IN (%s)'):format(list), personIds)
+    local people = marks(#personIds)
+    local memberships = {}
+
+    if #orgIds > 0 then
+        local values = {}
+        for _, id in ipairs(personIds) do values[#values + 1] = id end
+        for _, id in ipairs(orgIds) do values[#values + 1] = id end
+        memberships = db().query(
+            ('SELECT person_id AS personId, org_id AS orgId, role, is_confirmed AS isConfirmed '
+                .. 'FROM fpd_intel_memberships WHERE person_id IN (%s) AND org_id IN (%s)')
+                :format(people, marks(#orgIds)), values)
+    end
+
+    local values = {}
+    for _, id in ipairs(personIds) do values[#values + 1] = id end
+    for _, id in ipairs(personIds) do values[#values + 1] = id end
     local associates = db().query(
         ('SELECT person_id AS personId, associate_id AS associateId, relationship, is_confirmed AS isConfirmed '
-            .. 'FROM fpd_intel_associates WHERE person_id IN (%s)'):format(list), personIds)
+            .. 'FROM fpd_intel_associates WHERE person_id IN (%s) AND associate_id IN (%s)')
+            :format(people, people), values)
 
     return memberships, associates
 end

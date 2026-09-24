@@ -241,10 +241,42 @@ test.describe('link diagram', () => {
     const crew = board.getByRole('button', { name: 'Open Alta Street Crew' });
     await expect(crew).toBeVisible();
 
-    // Keyboard: Tab reaches a node, Enter opens it.
+    // Keyboard: a real Tab reaches the nodes, Space opens one.
+    await page.getByRole('button', { name: 'Reset view' }).focus();
+    await page.keyboard.press('Tab');
+    await expect(board.getByRole('button').first()).toBeFocused();
     await crew.focus();
-    await page.keyboard.press('Enter');
+    await page.keyboard.press(' ');
     await expect(page.getByRole('heading', { name: 'Alta Street Crew' })).toBeVisible();
+  });
+
+  test('fits the workspace at 1280x720 and keeps a focused node in view', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await openIntel(page);
+    await page.getByRole('button', { name: 'Link diagram', exact: true }).click();
+
+    const board = page.getByRole('group', { name: 'Link diagram' });
+    await expect(board).toBeVisible();
+    const frame = await board.boundingBox();
+    const viewport = page.viewportSize();
+    expect(frame && viewport && frame.y + frame.height <= viewport.height).toBeTruthy();
+    await expect(page.getByRole('list', { name: 'Legend' })).toBeInViewport();
+
+    // Zoomed right in, a node reached by keyboard is brought into view.
+    for (let i = 0; i < 5; i += 1) await page.getByRole('button', { name: 'Zoom in' }).click();
+    const crew = board.getByRole('button', { name: 'Open Alta Street Crew' });
+    await crew.focus();
+    // Inside the diagram's own frame, not just somewhere on the page.
+    await expect(async () => {
+      const node = await crew.boundingBox();
+      const svg = await board.boundingBox();
+      expect(node && svg).toBeTruthy();
+      if (!node || !svg) return;
+      expect(node.x).toBeGreaterThanOrEqual(svg.x - 1);
+      expect(node.y).toBeGreaterThanOrEqual(svg.y - 1);
+      expect(node.x + node.width).toBeLessThanOrEqual(svg.x + svg.width + 1);
+      expect(node.y + node.height).toBeLessThanOrEqual(svg.y + svg.height + 1);
+    }).toPass();
   });
 
   test('scopes the diagram to one case', async ({ page }) => {
