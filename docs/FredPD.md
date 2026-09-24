@@ -1104,6 +1104,12 @@ Built (the disciplinary file only).
 
 - [S] Printable forms and PDF packets (report, case summary, warrant, citation, lab report, custody log) rendered by the gateway with letterhead, page numbers, document number and classification watermark.
 - [S] "Print" creates an in-game paper document item whose metadata references the document ID; using it opens a read-only viewer. Access to the original stays controlled.
+- **Built (ADR-020, 0039)** for the citation, the anmälan and the custody log.
+  - Each module registers a printer that reads its record through its own access check. `document.print` numbers the result (`{AGENCY}-D{YY}-{######}`), keeps it in `fpd_documents` and audits it.
+  - A paper copy is an ox_inventory item. Its metadata carries the document as printed, so whoever holds it can read it, and the record itself stays behind its own check.
+  - A PDF, when the gateway is on, carries the letterhead, the page numbers, the document number and a classification watermark on every page.
+  - Not yet printable: the case summary, the warrant and the lab report.
+- **Permissions:** `document.print` (patrol_basic), plus the record's own view permission.
 
 ### 7.29 Civilian and legal access (S, M6)
 
@@ -1808,6 +1814,7 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Tvångsmedel | `tvang.view`, `tvang.decide`, `tvang.decide.aklagare`, `tvang.decide.domare`, `tvang.verkstall`, `efterlysning.issue` |
 | Spaning | `spaning.view`, `spaning.create` |
 | Enforcement | `rms.arrest.create`, `rms.citation.issue`, `rms.citation.void`, `rms.fi.create`, `rms.fi.view`, `rms.stops.create`, `rms.stops.view`, `rms.impound.create`, `rms.impound.release`, `rms.impound.hold.release`, `rms.warrant.serve` |
+| Printing | `document.print` (ADR-020) |
 | Ordningsbot and impound | `page.ordningsbot`, `ordningsbot.view`, `ordningsbot.issue`, `ordningsbot.contest`, `ordningsbot.pay`, `ordningsbot.void`, `ordningsbot.tariff.view`, `ordningsbot.tariff.edit` (ADR-018), `page.impound`, `impound.view`, `impound.create`, `impound.release`, `impound.authorize` — the keys 7.11 and 7.15 shipped under |
 | Investigations (intelligence cases, §10) | `inv.case.create`, `inv.case.view`, `inv.case.edit`, `inv.case.assign`, `inv.case.close` |
 | Booking | `booking.view`, `booking.intake`, `booking.release` (this row's `booking.create`/`booking.biometrics.capture` were this catalog's own initial guess at names 7.9 shipped under `booking.intake` instead — including 8.8's ten-print capture, `booking.tenPrint.capture`, which reuses it rather than adding a fifth key) |
@@ -1948,6 +1955,7 @@ row it came from.
 | Secret coercive measure (HAK/HRA/spårsändare) | `hak` | `YYYY` | `H{YY}-{#####}` | H26-00007 |
 | Åtal | `atal` | `YYYY` | `A{YY}-{#####}` | A26-00014 |
 | Impound | `impound` | `YYYY` | `I{YY}-{#####}` | I26-00019 |
+| Printed document | `document` | `YYYY` | `{AGENCY}-D{YY}-{######}` | LSPD-D26-000004 |
 | Internal affairs case | `ia_case` | `YYYY` | `IA{YY}-{#####}` | IA26-00003 |
 
 **The `year` column is a scope key, not a year.** It carries `0` for a sequence

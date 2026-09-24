@@ -131,6 +131,29 @@ export interface DocumentInput {
   body: EditorDocument;
   /** Printed once, faint, in the header of every page (spec 6, classification banners). */
   classification?: string | undefined;
+  /** The agency's name at the head of every page (7.28's letterhead). */
+  letterhead?: string | undefined;
+  /** The document's own number (Appendix D), at the foot of every page. */
+  documentNumber?: string | undefined;
+  /** "Page" / "Sida": the word before "3 / 5", in the reader's language. */
+  pageLabel?: string | undefined;
+  /** "Printed 2026-09-24 14:02 by 1-ADAM-12", already in the reader's language. */
+  printedLabel?: string | undefined;
+}
+
+/**
+ * The running head and foot Chromium prints on every page: letterhead and
+ * classification above, the document number, who printed it and the page
+ * count below. Chromium fills `pageNumber`/`totalPages` itself; everything
+ * else is escaped text.
+ */
+export function pageTemplates(input: DocumentInput): { header: string; footer: string } {
+  const style = 'font-family: DejaVu Sans, Arial, sans-serif; font-size: 8px; width: 100%; padding: 0 18mm; display: flex; justify-content: space-between; color: #333;';
+
+  return {
+    header: `<div style="${style}"><span>${escapeHtml(input.letterhead ?? '')}</span><span style="font-weight:700; letter-spacing:1px;">${escapeHtml((input.classification ?? '').toUpperCase())}</span></div>`,
+    footer: `<div style="${style}"><span>${escapeHtml(input.documentNumber ?? '')}</span><span>${escapeHtml(input.printedLabel ?? '')}</span><span>${escapeHtml(input.pageLabel ?? 'Page')} <span class="pageNumber"></span> / <span class="totalPages"></span></span></div>`,
+  };
 }
 
 /**
@@ -168,9 +191,13 @@ export function documentToHtml(input: DocumentInput): string {
   table.fields td { padding: 2px 0; }
   .classification { text-align: center; font-weight: 700; letter-spacing: 2px; border: 1px solid #111; padding: 2px; margin-bottom: 12px; }
   .body p { margin: 0 0 8px; }
+  /* position: fixed repeats on every printed page in Chromium: the
+     classification is on each sheet, not only the first. */
+  .watermark { position: fixed; top: 45%; left: 0; right: 0; text-align: center; font-size: 64pt; font-weight: 700; color: rgba(0, 0, 0, 0.06); transform: rotate(-30deg); z-index: -1; letter-spacing: 8px; }
 </style>
 </head>
 <body>
+${input.classification ? `<div class="watermark">${escapeHtml(input.classification.toUpperCase())}</div>` : ''}
 ${classificationBanner}
 <h1>${escapeHtml(input.title)}</h1>
 <table class="fields">${fieldRows}</table>

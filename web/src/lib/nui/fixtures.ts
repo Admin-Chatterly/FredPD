@@ -4372,6 +4372,7 @@ const fixturePhotos: Record<number, { id: number; kind: string; takenAgo: number
 };
 let nextPhotoId = 10;
 let nextMediaRef = 1;
+let nextDocumentNumber = 1;
 /** Begun uploads waiting for their commit, as `fpd_media` holds them. */
 const pendingPhotos: Record<string, { personId: number; kind: string }> = {};
 
@@ -6545,6 +6546,20 @@ export const fixtures: FixtureSet = {
       if (booking.releasedAgo !== undefined) return refuse('conflict', { number: 'already_released' });
 
       return { number: booking.number, identifiedAs: null };
+    },
+
+    // ------------------------------------------------------------ printing
+
+    'document.capabilities': () => ({ paper: true, pdf: true }),
+
+    'document.print': (input) => {
+      const { kind, id, copy } = (input ?? {}) as { kind?: string; id?: number; copy?: string };
+      if (!kind || !id) return refuse('not_found', { kind: 'unknown' });
+
+      const number = `LSPD-D26-0000${10 + nextDocumentNumber++}`;
+      return copy === 'pdf'
+        ? { id: nextDocumentNumber, number, url: `https://media.example/media/${number}?token=mock` }
+        : { id: nextDocumentNumber, number };
     },
 
     'person.photo.commit': (input) => {

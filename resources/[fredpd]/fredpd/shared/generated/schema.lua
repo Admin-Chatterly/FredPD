@@ -1559,6 +1559,16 @@ FredPD.Schema = {
         kind = { type = 'enum', required = true, values = { 'mugshot', 'field', 'scar', 'mark', 'tattoo' } },
     },
 
+    DocumentPrint = {
+        kind = { type = 'enum', required = true, values = { 'citation', 'anmalan', 'custody' } },
+        id = { type = 'integer', required = true, min = 1 },
+        copy = { type = 'enum', required = true, values = { 'paper', 'pdf' } },
+    },
+
+    DocumentCapabilities = {
+
+    },
+
     PersonPhotoCommit = {
         mediaRef = { type = 'string', required = true, min = 1, max = 64 },
     },

@@ -36,6 +36,12 @@ nui.on('fredpd:open', () => {
   root.style.visibility = '';
 });
 
+// A paper copy being read (App.svelte) opens the page without the MDT.
+nui.on('fredpd:paper', () => {
+  root.hidden = false;
+  root.style.visibility = '';
+});
+
 nui.on('fredpd:close', () => {
   root.hidden = true;
   root.style.visibility = '';

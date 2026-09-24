@@ -694,3 +694,57 @@ route.define({
         return runFuDecision(session, input, 'lagg_ned')
     end,
 })
+
+-- -----------------------------------------------------------------------------
+-- Printing (7.28, ADR-020)
+-- -----------------------------------------------------------------------------
+
+--- The händelseförlopp as the editor stored it (JSON), or as the paragraphs
+--- an older plain-text value becomes. Never HTML (invariant 10).
+local function narrativeDoc(value)
+    if type(value) == 'string' and value:sub(1, 1) == '{' then
+        local ok, decoded = pcall(json.decode, value)
+        if ok and type(decoded) == 'table' and decoded.type == 'doc' then return decoded end
+    end
+
+    return FredPD.Modules.documents.textToDoc(value)
+end
+
+--- An anmälan as its printed copy reads. The people are the ones the report
+--- names by person number and role, the offences by their catalogue labels.
+FredPD.Modules.documents.register('anmalan', function(session, id)
+    if not FredPD.Core.perms.satisfies(session.permissions, 'rms.anmalan.view') then
+        return nil, route.refuse(FredPD.ErrorCode.FORBIDDEN)
+    end
+
+    local row, refusal = readable(session, id)
+    if not row then return nil, refusal end
+
+    local t = FredPD.t
+
+    local offences = {}
+    for _, charge in ipairs(repo.charges(row.id)) do
+        offences[#offences + 1] = t(charge.labelKey)
+    end
+
+    local people = {}
+    for _, person in ipairs(repo.personer(row.id)) do
+        people[#people + 1] = ('%s (%s)'):format(person.personNumber or '', t('anmalan.roll.' .. tostring(person.roll)))
+    end
+
+    return {
+        title = t('document.title.anmalan', { number = row.number }),
+        classification = row.classification,
+        fields = {
+            { label = t('document.field.number'), value = row.number },
+            { label = t('document.field.heading'), value = row.title or '' },
+            { label = t('document.field.status'), value = t('anmalan.status.' .. tostring(row.status)) },
+            { label = t('document.field.occurred'), value = tostring(row.occurredAt or '') },
+            { label = t('document.field.place'), value = row.occurredPlace or '' },
+            { label = t('document.field.offences'), value = table.concat(offences, '; ') },
+            { label = t('document.field.people'), value = table.concat(people, '; ') },
+        },
+        body = narrativeDoc(row.handelseforlopp),
+    }
+end)
+

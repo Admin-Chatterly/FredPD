@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PrintMenu from '../documents/PrintMenu.svelte';
   import { onDestroy } from 'svelte';
   import { nui } from '../../lib/nui';
   import { t } from '../../lib/i18n';
@@ -937,6 +938,11 @@
             {/if}
           </p>
         </header>
+
+        <!-- A copy of this record, on paper or as a PDF (7.28). -->
+        <div class="mb-3">
+          <PrintMenu kind="custody" id={record.id} />
+        </div>
 
         {#if record.needsAttention}
           <!--

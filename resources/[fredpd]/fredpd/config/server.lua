@@ -442,6 +442,14 @@ FredPD.Config.server = {
         },
     },
 
+    --- Printing (spec 7.28, ADR-020). A paper copy is an ox_inventory item
+    --- that must exist in your item list (docs/installation.sv.md, 11d); its
+    --- metadata carries the document as printed, so whoever holds the paper
+    --- can read it. A PDF needs the gateway (3.7).
+    documents = {
+        paperItem = 'fredpd_paper',
+    },
+
     --- Impound in the world (spec 7.15, ADR-016). "Impound" on a car through
     --- ox_target records the impound and takes the car off the street; the
     --- owner's garage shows it as out until it is released, when it is back

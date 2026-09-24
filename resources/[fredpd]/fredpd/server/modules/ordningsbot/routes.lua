@@ -380,3 +380,49 @@ route.define({
         return { id = row.id }
     end,
 })
+
+-- -----------------------------------------------------------------------------
+-- Printing (7.28, ADR-020)
+-- -----------------------------------------------------------------------------
+
+--- A citation as its printed copy reads: what, how much, by when, and whom
+--- -- the person or vehicle only when this officer may read that record.
+FredPD.Modules.documents.register('citation', function(session, id)
+    if not FredPD.Core.perms.satisfies(session.permissions, 'ordningsbot.view') then
+        return nil, route.refuse(FredPD.ErrorCode.FORBIDDEN)
+    end
+
+    local row, refusal = readable(session, id)
+    if not row then return nil, refusal end
+
+    local documents = FredPD.Modules.documents
+    local t = FredPD.t
+    local tariff = repo.tariffById(row.tariffId, session.agencyId)
+
+    local fields = {
+        { label = t('document.field.number'), value = row.number },
+        { label = t('document.field.issued'), value = documents.moment(row.issuedAt) },
+        { label = t('document.field.offence'), value = tariff and (tariff.label or t(tariff.labelKey)) or '' },
+        { label = t('document.field.amount'), value = t('document.amount', { amount = tariff and tariff.amount or 0 }) },
+        { label = t('document.field.due'), value = documents.moment(row.dueAt) },
+        { label = t('document.field.status'), value = t('ordningsbot.status.' .. row.status) },
+    }
+
+    local person = row.personId and FredPD.Repo.persons.readPerson(session, row.personId) or nil
+    if person then fields[#fields + 1] = { label = t('document.field.person'), value = documents.personLine(person) } end
+
+    if row.vehicleId then
+        local vehicle = FredPD.Repo.registry.findVehicle(session.agencyId, { id = row.vehicleId })
+        if vehicle and access.read(session, 'vehicle', vehicle) then
+            fields[#fields + 1] = { label = t('document.field.vehicle'), value = vehicle.plate }
+        end
+    end
+
+    return {
+        title = t('document.title.citation', { number = row.number }),
+        classification = row.classification,
+        fields = fields,
+        body = documents.textToDoc(t('document.citation.body', { due = documents.moment(row.dueAt) })),
+    }
+end)
+

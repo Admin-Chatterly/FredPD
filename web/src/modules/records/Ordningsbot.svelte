@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PrintMenu from '../documents/PrintMenu.svelte';
   import { nui } from '../../lib/nui';
   import { t } from '../../lib/i18n';
   import { formatMoment } from '../../lib/time';
@@ -399,6 +400,11 @@
             {t(`ordningsbot.status.${detail.status}`)} · {formatMoment(detail.issuedAt)}
           </p>
         </header>
+
+        <!-- A copy of this record, on paper or as a PDF (7.28). -->
+        <div class="mb-3">
+          <PrintMenu kind="citation" id={detail.id} />
+        </div>
 
         {#if detail.tariff}
           <p class="mb-3 text-xs">

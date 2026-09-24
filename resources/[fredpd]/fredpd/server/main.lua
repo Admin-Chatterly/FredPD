@@ -141,6 +141,7 @@ local REQUIRED_TABLES <const> = {
     -- Migration 0035. Field interview cards and stop data (7.14).
     'fpd_fi_cards',
     'fpd_media',
+    'fpd_documents',
     'fpd_fi_associates',
     'fpd_stops',
 }

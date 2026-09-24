@@ -911,3 +911,14 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
 
 INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('patrol', 'rms.person.photo.upload');
+
+-- -----------------------------------------------------------------------------
+-- Printing (spec 7.28, ADR-020)
+--
+-- Printing a copy of a record an officer may already read: the citation handed
+-- to a driver, the custody log for the file. The record's own read permission
+-- is asked again by the module that prints it.
+-- -----------------------------------------------------------------------------
+
+INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
+    ('patrol_basic', 'document.print');

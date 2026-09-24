@@ -1253,3 +1253,13 @@ export type MediaPurpose = (typeof MEDIA_PURPOSES)[number];
 export const MEDIA_STATUSES = ['pending', 'committed'] as const;
 
 export type MediaStatus = (typeof MEDIA_STATUSES)[number];
+
+/** `ck_fpd_documents_kind` (spec 7.28, 0039) -- what a printed document was printed from. */
+export const DOCUMENT_KINDS = ['citation', 'anmalan', 'custody'] as const;
+
+export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
+
+/** How a document is printed: a paper item in the game, or a PDF from the gateway. */
+export const DOCUMENT_COPIES = ['paper', 'pdf'] as const;
+
+export type DocumentCopy = (typeof DOCUMENT_COPIES)[number];

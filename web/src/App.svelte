@@ -22,6 +22,8 @@
   import Personnel from './modules/personnel/Personnel.svelte';
   import Booking from './modules/booking/Booking.svelte';
   import Comms from './modules/comms/Comms.svelte';
+  import PaperViewer from './modules/documents/PaperViewer.svelte';
+  import { parsePaper, type PaperDocument } from './lib/paper';
 
   /**
    * The application shell (spec 6.3). M1 fills in the command line, tabs and
@@ -299,9 +301,29 @@
     'booking',
     'comms',
   ]);
+
+  /**
+   * A printed document being read (7.28, ADR-020): opened by using the paper
+   * item, by anybody holding it, with or without an MDT session. The MDT
+   * stays mounted underneath, hidden, so nothing open in it is lost.
+   */
+  let paper = $state<PaperDocument | null>(null);
+  $effect(() => nui.on('fredpd:paper', (message) => (paper = parsePaper(message['document']))));
+  $effect(() => nui.on('fredpd:close', () => (paper = null)));
+  $effect(() => nui.on('fredpd:open', () => (paper = null)));
 </script>
 
-<div class="fredpd-stage">
+{#if paper}
+  <PaperViewer
+    {paper}
+    onClose={() => {
+      paper = null;
+      void nui.call('fredpd:close');
+    }}
+  />
+{/if}
+
+<div class="fredpd-stage" hidden={paper !== null}>
 <div
   class="fredpd-device flex flex-col bg-[var(--color-panel)] text-[var(--color-ink)]"
   class:fredpd-device--expanded={expanded}

@@ -517,6 +517,29 @@ Signalementsfotot tas vid inskrivningsterminalen, med personen stående
 bredvid: **Inskrivning → välj inskrivningen → Ta signalementsfoto**. Andra
 fotografier (fält, ärr, märke, tatuering) tas från personens registerkort.
 
+## 11d. Utskrifter (valfritt)
+
+Ordningsböter, anmälningar och loggar över frihetsberövanden kan skrivas ut
+(ADR-020): som en **papperskopia** i spelet, eller som en **PDF** från
+gateway-tjänsten.
+
+Papperskopian är ett föremål i ox_inventory. Lägg till det i
+`ox_inventory/data/items.lua`:
+
+```lua
+['fredpd_paper'] = {
+    label = 'Papper',
+    weight = 10,
+    stack = false,
+    close = true,
+    client = { export = 'fredpd.readPaper' },
+},
+```
+
+Den som har pappret kan läsa det, även utan MDT, precis som med ett riktigt
+papper. Heter föremålet något annat, ändra `documents.paperItem` i
+`config/server.lua`. PDF kräver gatewayen (se 11c).
+
 ## 12. Vad som inte är byggt ännu
 
 Var beredd på det här — det är inte fel, det är kommande arbete:

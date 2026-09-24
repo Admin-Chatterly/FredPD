@@ -8,8 +8,9 @@ Responsibilities: the media store, PDF rendering, scheduled jobs (retention, lab
 timers, warrant expiry), Discord role *actions* (hire, promote, demote), and
 later the web portal. The media store is built and in use: photographs of
 people (ADR-019), re-encoded on upload, single-use upload tokens, and CORS for
-the NUI's origin only. PDF rendering and the scheduler exist but nothing in the
-game calls them yet.
+the NUI's origin only. PDF rendering is in use for printed documents (ADR-020):
+letterhead, page numbers, the document number and a classification watermark
+on every page. The scheduler exists but nothing in the game relies on it yet.
 
 **Reading Discord roles is no longer this service's job.** It moved into
 FXServer (`server/core/discord.lua`, ADR-010) so that a normal install deploys

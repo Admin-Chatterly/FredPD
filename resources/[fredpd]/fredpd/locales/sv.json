@@ -194,7 +194,8 @@
     "no_screenshot": "bilden kunde inte tas på den här servern",
     "not_uploaded": "bilden kom aldrig fram till bildtjänsten",
     "identity_mismatch": "personen vid terminalen är inte den person inskrivningen gäller",
-    "no_character": "personen vid terminalen har ingen karaktär inläst"
+    "no_character": "personen vid terminalen har ingen karaktär inläst",
+    "no_paper": "ingen papperskopia kunde läggas i ditt förråd (det är fullt, eller pappret är inte uppsatt)"
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -3100,6 +3101,56 @@
     },
     "column": {
       "officer": "Polis"
+    }
+  },
+  "document": {
+    "field": {
+      "number": "Nummer",
+      "issued": "Utfärdad",
+      "offence": "Förseelse",
+      "amount": "Belopp",
+      "due": "Betala senast",
+      "status": "Status",
+      "person": "Person",
+      "vehicle": "Fordon",
+      "heading": "Rubrik",
+      "occurred": "Tid",
+      "place": "Plats",
+      "offences": "Brott",
+      "people": "Personer",
+      "arrested": "Gripen",
+      "ground": "Grund"
+    },
+    "amount": "{amount} kr",
+    "title": {
+      "citation": "Föreläggande av ordningsbot {number}",
+      "anmalan": "Anmälan {number}",
+      "custody": "Frihetsberövande {number}"
+    },
+    "citation": {
+      "body": "Betala boten senast {due}. Vill du bestrida den, kontakta polisen inom samma tid."
+    },
+    "custody": {
+      "log": "Logg över frihetsberövandet",
+      "entry": "{at} — {kind} ({by}) {note}"
+    },
+    "pdf": {
+      "page": "Sida",
+      "printed": "Utskriven {at} av {by}"
+    },
+    "paper": {
+      "cut": "Resten av texten fick inte plats på den här kopian. Hela handlingen finns i registret.",
+      "printed": "Utskriven {at} av {by}",
+      "close": "Lägg undan"
+    },
+    "print": {
+      "paper": "Skriv ut papperskopia",
+      "pdf": "Exportera PDF",
+      "paperDone": "Papperskopia {number} ligger i ditt förråd.",
+      "pdfDone": "PDF {number} är klar.",
+      "failed": "Ingenting skrevs ut.",
+      "link": "Länk till PDF:en (gäller i 15 minuter)",
+      "copy": "Kopiera länk"
     }
   }
 }

@@ -75,6 +75,9 @@ server_scripts {
     -- record, because all of them ask it the same question.
     'server/modules/access/service.lua',
     'server/modules/access/repo.lua',
+    -- The printing registry (7.28, ADR-020), before every module that
+    -- registers a printer at load: ordningsbot, anmalan, frihet.
+    'server/modules/documents/service.lua',
 
     -- The registers (spec 7.2-7.5). Persons first: the vehicle and firearm
     -- registers both resolve an owner through it.
@@ -185,6 +188,9 @@ server_scripts {
     'server/modules/ordningsbot/repo.lua',
     'server/modules/ordningsbot/routes.lua',
     'server/modules/ordningsbot/events.lua',
+    -- Printing (7.28): after the modules whose printers it calls.
+    'server/modules/documents/repo.lua',
+    'server/modules/documents/routes.lua',
 
     -- Impound (spec 7.15, M6). After spaning, whose `fredpd:vehicleImpounded`
     -- handler (already wired in `spaning/events.lua`, waiting on this module)

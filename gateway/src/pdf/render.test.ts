@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { GatewayConfig } from '../config.js';
 import { renderDocumentToPdf } from './render.js';
-import { documentToHtml } from './document.js';
+import { documentToHtml, pageTemplates } from './document.js';
 import type { EditorDocument } from './document.js';
 
 /**
@@ -126,5 +126,36 @@ describe('documentToHtml', () => {
     });
 
     expect(html).toContain('<strong>onclick=&quot;alert(1)&quot;</strong>');
+  });
+
+  it('puts the classification on every page as a watermark, escaped', () => {
+    const html = documentToHtml({
+      title: 'x',
+      fields: [],
+      body: { type: 'doc' },
+      classification: '<restricted>',
+    });
+
+    expect(html).toContain('class="watermark">&lt;RESTRICTED&gt;</div>');
+  });
+});
+
+describe('pageTemplates', () => {
+  it('heads every page with the letterhead and foots it with the number and the page count', () => {
+    const { header, footer } = pageTemplates({
+      title: 'x',
+      fields: [],
+      body: { type: 'doc' },
+      classification: 'internal',
+      letterhead: 'Polismyndigheten <Syd>',
+      documentNumber: 'LSPD-D26-000001',
+      pageLabel: 'Sida',
+      printedLabel: 'Utskriven 2026-09-24 av 1-ADAM-12',
+    });
+
+    expect(header).toContain('Polismyndigheten &lt;Syd&gt;');
+    expect(header).toContain('INTERNAL');
+    expect(footer).toContain('LSPD-D26-000001');
+    expect(footer).toContain('Sida <span class="pageNumber"></span> / <span class="totalPages"></span>');
   });
 });

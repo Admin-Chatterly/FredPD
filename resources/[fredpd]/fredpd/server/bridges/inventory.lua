@@ -212,6 +212,31 @@ function Inventory.removeItem(src, item, count)
     return (before - after) >= amount
 end
 
+--- Is this item defined on this server? Asked before offering to give one:
+--- ox_inventory refuses an item its list does not name.
+function Inventory.knowsItem(item)
+    return definition(item) ~= nil
+end
+
+--- Gives a player one item, with metadata (a printed document, 7.28).
+---
+--- @param src number
+--- @param item string
+--- @param metadata table|nil
+--- @return boolean given -- false when the inventory is absent, the item is
+---   undefined, or the player's inventory has no room
+function Inventory.addItem(src, item, metadata)
+    if type(item) ~= 'string' or not Inventory.knowsItem(item) then return false end
+
+    if tryExport('CanCarryItem', src, item, 1, metadata) == false then return false end
+
+    local added = tryExport('AddItem', src, item, 1, metadata)
+
+    -- AddItem answers `true` (or a success flag first) when it placed the item.
+    if type(added) == 'boolean' then return added end
+    return added ~= nil and added ~= false
+end
+
 --- Startup check (spec 3.8).
 ---
 --- Named mechanics, not a generic warning. An operator whose server generates no

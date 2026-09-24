@@ -93,6 +93,8 @@ local KINDS <const> = {
     hak = true,
     atal = true,
     ia_case = true,
+    -- A printed document (7.28, 0039): its own number, printed on every page.
+    document = true,
 }
 
 --- The `year` value for a sequence that is not year-scoped.

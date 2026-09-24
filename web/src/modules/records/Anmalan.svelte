@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PrintMenu from '../documents/PrintMenu.svelte';
   import { nui } from '../../lib/nui';
   import { t } from '../../lib/i18n';
   import { ANMALAN_ROLLER, ANMALAN_STATUSES } from '@fredpd/schema';
@@ -552,6 +553,11 @@
             {detail.anmalan.number} · {t(`anmalan.status.${detail.anmalan.status}`)}
           </p>
         </header>
+
+        <!-- A copy of this record, on paper or as a PDF (7.28). -->
+        <div class="mb-3">
+          <PrintMenu kind="anmalan" id={detail.anmalan.id} />
+        </div>
 
         {#if isLocked}
           <p class="mb-3 border border-[var(--color-border)] px-2 py-1 text-xs">

@@ -12,6 +12,8 @@ import {
   CALL_STATUSES,
   CALL_TYPES,
   CLASSIFICATIONS,
+  DOCUMENT_COPIES,
+  DOCUMENT_KINDS,
   EVIDENCE_DESTINATIONS,
   EVIDENCE_PACKAGING,
   EVIDENCE_STATUSES,
@@ -2714,6 +2716,19 @@ export const schemas = {
     personId: { type: 'integer', required: true, min: 1 },
     kind: { type: 'enum', required: true, values: PERSON_PHOTO_KINDS },
   },
+
+  /**
+   * Prints a record (7.28, ADR-020): a paper copy into the officer's
+   * inventory, or a PDF from the gateway. What the document says is built on
+   * the server from the record, through the record's own access check.
+   */
+  DocumentPrint: {
+    kind: { type: 'enum', required: true, values: DOCUMENT_KINDS },
+    id: { type: 'integer', required: true, min: 1 },
+    copy: { type: 'enum', required: true, values: DOCUMENT_COPIES },
+  },
+
+  DocumentCapabilities: {},
 
   /** Attaches an uploaded photograph to the record it was begun for. */
   PersonPhotoCommit: {

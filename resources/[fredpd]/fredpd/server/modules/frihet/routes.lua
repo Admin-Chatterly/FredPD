@@ -623,3 +623,62 @@ route.define({
         return { id = row.id }
     end,
 })
+
+-- -----------------------------------------------------------------------------
+-- Printing (7.28, ADR-020)
+-- -----------------------------------------------------------------------------
+
+--- The custody log as its printed copy reads: the chain's facts above, and
+--- every entry below, in order, with who made it.
+FredPD.Modules.documents.register('custody', function(session, id)
+    if not FredPD.Core.perms.satisfies(session.permissions, 'frihet.view') then
+        return nil, route.refuse(FredPD.ErrorCode.FORBIDDEN)
+    end
+
+    local row, refusal = readable(session, id)
+    if not row then return nil, refusal end
+
+    local documents = FredPD.Modules.documents
+    local t = FredPD.t
+
+    local fields = {
+        { label = t('document.field.number'), value = row.number },
+        { label = t('document.field.status'), value = t('frihet.status.' .. tostring(row.status)) },
+        { label = t('document.field.arrested'), value = documents.moment(row.gripenAt) },
+        { label = t('document.field.ground'), value = row.gripandeGrund and t('frihet.grund.' .. row.gripandeGrund) or '' },
+        { label = t('document.field.place'), value = row.gripandePlats or '' },
+    }
+
+    local person = row.personId and FredPD.Repo.persons.readPerson(session, row.personId) or nil
+    if person then table.insert(fields, 2, { label = t('document.field.person'), value = documents.personLine(person) }) end
+
+    local entries = {}
+    for _, entry in ipairs(repo.log(row.id, session.agencyId)) do
+        entries[#entries + 1] = {
+            type = 'listItem',
+            content = { {
+                type = 'paragraph',
+                content = { { type = 'text', text = t('document.custody.entry', {
+                    at = documents.moment(entry.loggedAt),
+                    kind = t('frihet.logKind.' .. tostring(entry.kind)),
+                    by = entry.loggedByCallsign or '',
+                    note = entry.note or '',
+                }) } },
+            } },
+        }
+    end
+
+    return {
+        title = t('document.title.custody', { number = row.number }),
+        classification = row.classification,
+        fields = fields,
+        body = {
+            type = 'doc',
+            content = {
+                { type = 'heading', attrs = { level = 2 }, content = { { type = 'text', text = t('document.custody.log') } } },
+                { type = 'orderedList', content = entries },
+            },
+        },
+    }
+end)
+

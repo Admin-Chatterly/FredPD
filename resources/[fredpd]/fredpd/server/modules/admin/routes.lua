@@ -358,6 +358,9 @@ local PERMISSION_CATALOGUE <const> = {
     'ordningsbot.pay', 'ordningsbot.void', 'ordningsbot.tariff.view', 'ordningsbot.tariff.edit',
     'page.impound', 'impound.view', 'impound.create', 'impound.release', 'impound.authorize',
 
+    -- Printing (7.28): a paper copy or a PDF of a record the reader may read.
+    'document.print',
+
     -- Investigations
     'inv.case.create', 'inv.case.view', 'inv.case.edit', 'inv.case.assign', 'inv.case.close',
 

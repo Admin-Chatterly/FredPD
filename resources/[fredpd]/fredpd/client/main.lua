@@ -296,6 +296,10 @@ local NUI_ROUTES <const> = {
     'booking.mugshot.begin',
     'booking.tenPrint.capture',
 
+    -- Printing (7.28, ADR-020).
+    'document.capabilities',
+    'document.print',
+
     -- Crime scenes, evidence and the chain of custody (spec 8).
     'scene.create',
     'scene.release',
@@ -422,6 +426,25 @@ for _, kind in ipairs({
         setOpen(true, placement)
     end)
 end
+
+--- Reading a printed document (7.28, ADR-020). ox_inventory calls this when
+--- the paper item is used (`client = { export = 'fredpd.readPaper' }` in the
+--- item list). The paper's own metadata carries the document as it was
+--- printed, so nothing is read from the server: a copy is whatever it says,
+--- to whoever holds it, and the record it came from stays behind its own
+--- access check. Open to anybody holding the paper -- no session needed.
+local function readPaper(data, slot)
+    local metadata = (type(slot) == 'table' and slot.metadata)
+        or (type(data) == 'table' and data.metadata) or nil
+    local document = type(metadata) == 'table' and metadata.fredpd or nil
+    if type(document) ~= 'table' then return end
+
+    isOpen = true
+    SetNuiFocus(true, true)
+    SendNUIMessage({ type = 'fredpd:paper', document = document })
+end
+
+exports('readPaper', readPaper)
 
 --- An impound lot (7.15, 0037) opens the MDT on the impound tab: what the
 --- officer at the lot does is find the car and write down what is in it.

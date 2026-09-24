@@ -194,7 +194,8 @@
     "no_screenshot": "the picture could not be taken on this server",
     "not_uploaded": "the picture never reached the photo service",
     "identity_mismatch": "the person at the terminal is not the person this booking names",
-    "no_character": "the person at the terminal has no character loaded"
+    "no_character": "the person at the terminal has no character loaded",
+    "no_paper": "no paper copy could be put in your inventory (it is full, or the paper item is not set up)"
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -3100,6 +3101,56 @@
     },
     "column": {
       "officer": "Officer"
+    }
+  },
+  "document": {
+    "field": {
+      "number": "Number",
+      "issued": "Issued",
+      "offence": "Offence",
+      "amount": "Amount",
+      "due": "Pay by",
+      "status": "Status",
+      "person": "Person",
+      "vehicle": "Vehicle",
+      "heading": "Heading",
+      "occurred": "Occurred",
+      "place": "Place",
+      "offences": "Offences",
+      "people": "People named",
+      "arrested": "Arrested",
+      "ground": "Ground"
+    },
+    "amount": "{amount} kr",
+    "title": {
+      "citation": "Summary fine {number}",
+      "anmalan": "Report {number}",
+      "custody": "Custody record {number}"
+    },
+    "citation": {
+      "body": "Pay the fine by {due}. To contest it, contact the police within the same time."
+    },
+    "custody": {
+      "log": "Custody log",
+      "entry": "{at} — {kind} ({by}) {note}"
+    },
+    "pdf": {
+      "page": "Page",
+      "printed": "Printed {at} by {by}"
+    },
+    "paper": {
+      "cut": "The rest of the text did not fit on this copy. The full record is in the register.",
+      "printed": "Printed {at} by {by}",
+      "close": "Put away"
+    },
+    "print": {
+      "paper": "Print paper copy",
+      "pdf": "Export PDF",
+      "paperDone": "Paper copy {number} is in your inventory.",
+      "pdfDone": "PDF {number} is ready.",
+      "failed": "Nothing was printed.",
+      "link": "Link to the PDF (valid for 15 minutes)",
+      "copy": "Copy link"
     }
   }
 }

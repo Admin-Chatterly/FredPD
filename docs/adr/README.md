@@ -30,3 +30,4 @@ When a decision changes `docs/FredPD.md`, the ADR and the spec edit go in the
 | [017](017-a-verdict-is-served.md) | A verdict is served in the game: the tilltalade is named and handed to the jail | Accepted |
 | [018](018-licence-points-and-an-editable-tariff.md) | Licence points on the tariff, and a tariff the agency's command edits | Accepted |
 | [019](019-photographs-through-the-gateway.md) | Photographs and mugshots through the gateway: a ledger, re-encoding, links FXServer signs | Accepted |
+| [020](020-printed-documents.md) | Printed documents are copies: a paper item carries its own content, a PDF is optional | Accepted |

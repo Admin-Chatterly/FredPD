@@ -162,6 +162,9 @@ const PAIRED: Record<string, keyof typeof enums> = {
   ck_fpd_media_kind: 'PERSON_PHOTO_KINDS',
   ck_fpd_media_purpose: 'MEDIA_PURPOSES',
   ck_fpd_media_status: 'MEDIA_STATUSES',
+  // Printed documents (0039).
+  ck_fpd_documents_kind: 'DOCUMENT_KINDS',
+  ck_fpd_documents_class: 'CLASSIFICATIONS',
 
   // Field interviews and stops (0035, spec 7.14).
   ck_fpd_fi_cards_reason: 'FI_REASONS',

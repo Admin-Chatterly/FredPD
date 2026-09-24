@@ -1,7 +1,7 @@
 import { chromium } from 'playwright-core';
 
 import type { GatewayConfig } from '../config.js';
-import { documentToHtml, type DocumentInput } from './document.js';
+import { documentToHtml, pageTemplates, type DocumentInput } from './document.js';
 
 /**
  * Renders a record to PDF through headless Chromium (spec 3.3's technology
@@ -33,10 +33,14 @@ export async function renderDocumentToPdf(
     // would have to account for.
     await page.setContent(html, { waitUntil: 'load' });
 
+    const templates = pageTemplates(input);
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
-      margin: { top: '16mm', bottom: '16mm', left: '18mm', right: '18mm' },
+      displayHeaderFooter: true,
+      headerTemplate: templates.header,
+      footerTemplate: templates.footer,
+      margin: { top: '20mm', bottom: '20mm', left: '18mm', right: '18mm' },
     });
 
     return pdf;

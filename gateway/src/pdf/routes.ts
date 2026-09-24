@@ -35,6 +35,10 @@ export function registerPdfRoutes(scope: FastifyInstance, config: GatewayConfig,
       fields: Array.isArray(body.fields) ? body.fields : [],
       body: body.body,
       classification: typeof body.classification === 'string' ? body.classification : undefined,
+      letterhead: typeof body.letterhead === 'string' ? body.letterhead : undefined,
+      documentNumber: typeof body.documentNumber === 'string' ? body.documentNumber : undefined,
+      pageLabel: typeof body.pageLabel === 'string' ? body.pageLabel : undefined,
+      printedLabel: typeof body.printedLabel === 'string' ? body.printedLabel : undefined,
     };
 
     const pdf = await renderDocumentToPdf(config, input);

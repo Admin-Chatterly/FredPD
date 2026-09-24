@@ -69,12 +69,13 @@ export function createMockBridge(): NuiBridge {
   );
 
   // A test (or the dev tools) opening and closing the interface the way
-  // client/main.lua does, with `window.postMessage`. Only these two: the CAD
+  // client/main.lua does, with `window.postMessage` -- and a paper copy being
+  // read (7.28). Only these: the CAD
   // pushes have their own window listener (modules/cad/push.ts), and
   // forwarding those here too would deliver them twice.
   window.addEventListener('message', (event: MessageEvent<NuiMessage>) => {
     const type = event.data?.type;
-    if (type === 'fredpd:open' || type === 'fredpd:close') emit(event.data);
+    if (type === 'fredpd:open' || type === 'fredpd:close' || type === 'fredpd:paper') emit(event.data);
   });
 
   return {
