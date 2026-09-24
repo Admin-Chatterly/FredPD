@@ -82,7 +82,8 @@ const REASONS = new Set([
   'own_request',
   'not_viewing',
   'still_taken',
-  'too_long',
+  'window_too_long',
+  // Discord role actions, answered by the gateway (ADR-022).
   'role_actions_off',
   'role_not_allowed',
   'member_not_found',

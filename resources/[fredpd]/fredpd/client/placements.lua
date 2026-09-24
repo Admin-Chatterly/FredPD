@@ -184,6 +184,13 @@ AddEventHandler('onResourceStop', function(resource)
     end
 end)
 
+--- Forgets which placement is active, so the nearest one's prompt is shown
+--- again on the next tick: for a screen that took the prompt down (a camera
+--- view) and is done with it.
+function Placements.refresh()
+    setActive(nil)
+end
+
 --- The placements this client knows about, for the editor.
 function Placements.all()
     return placements

@@ -1052,7 +1052,7 @@ so; this section says what it would take to change that.
     - The viewer's game streams the scene around the camera. Players and cars there appear only when OneSync has them in range of the viewer.
   - **Footage request** (`camera.footage.request`, `F{YY}-{#####}`): one source, a window of at most `cameras.maxWindowHours`, a reason, and optionally a förundersökning the requester may read. A supervisor approves or denies it (`camera.footage.approve`), never their own.
   - **Stills.** During a view under an approved request, **E** keeps one still. It goes through the media pipeline (ADR-019, purpose `footage_still`) and is attached to the request as its evidence.
-- **Permissions:** `camera.view` (dispatch, supervisor), `camera.footage.request` (patrol, dispatch), `camera.footage.approve` (supervisor).
+- **Permissions:** `camera.view` (dispatch, supervisor), `camera.footage.request` (patrol, dispatch, supervisor -- it is also the door to the screen), `camera.footage.approve` (supervisor).
 
 ### 7.20 Court and DOJ (M6)
 

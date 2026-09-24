@@ -5912,9 +5912,9 @@ export const fixtures: FixtureSet = {
       };
       if (!placementId) return refuse('forbidden', { placementId: 'not_at_terminal' });
       if (source === 'cctv') {
-        return { source, label: `CCTV ${cameraId}`, requestId: cameraId === 12 ? 1 : null, position: { x: 0, y: 0, z: 0, heading: 0 } };
+        return { source, cameraId, requestId: cameraId === 12 ? 1 : null, position: { x: 0, y: 0, z: 0, heading: 0 } };
       }
-      return { source, label: officerId === 2 ? '12-41' : String(officerId) };
+      return { source, officerId, callsign: officerId === 2 ? '12-41' : null };
     },
 
     /** The client's own callback (client/camera.lua): the game takes the view. */
@@ -5922,9 +5922,13 @@ export const fixtures: FixtureSet = {
 
     'camera.view.stop': () => ({}),
 
-    'camera.footage.list': () => ({
+    'camera.footage.list': (input) => ({
       mayApprove: true,
-      requests: footage.map((row) => ({
+      nextCursor: null,
+      requests: footage.filter((row) => {
+        const { status } = (input ?? {}) as { status?: string };
+        return !status || row.status === status;
+      }).map((row) => ({
         id: row.id,
         number: row.number,
         source: row.source,
@@ -5937,18 +5941,30 @@ export const fixtures: FixtureSet = {
         status: row.status,
         requestedAt: secondsAgo(row.windowFromAgo),
         stillThumbUrl: row.stillThumbUrl ?? null,
+        stillUrl: row.stillThumbUrl ?? null,
         version: row.version,
         mine: row.requestedBy === FIXTURE_VIEWER,
       })),
     }),
 
     'camera.footage.request': (input) => {
-      const body = (input ?? {}) as { source?: string; cameraId?: number; officerId?: number; reason?: string };
+      const body = (input ?? {}) as {
+        source?: string;
+        cameraId?: number;
+        officerId?: number;
+        windowFrom?: number;
+        windowTo?: number;
+        reason?: string;
+      };
       if (body.source === 'cctv' && !body.cameraId) return refuse('invalid', { cameraId: 'required' });
       if (body.source !== 'cctv' && !body.officerId) return refuse('invalid', { officerId: 'required' });
+      // `Camera.validateRequest`: a window of at most twelve hours.
+      if ((body.windowTo ?? 0) - (body.windowFrom ?? 0) > 12 * HOUR) {
+        return refuse('invalid', { windowTo: 'window_too_long' });
+      }
       if (!body.reason || body.reason.trim().length < 5) return refuse('invalid', { reason: 'too_short' });
 
-      const number = `F26-000${nextFootage++}`;
+      const number = `F26-${String(nextFootage++).padStart(5, '0')}`;
       footage.unshift({
         id: footage.length + 1,
         number,

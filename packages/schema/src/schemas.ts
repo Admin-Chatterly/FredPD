@@ -2779,6 +2779,9 @@ export const schemas = {
 
   FootageList: {
     status: { type: 'enum', required: false, values: ['requested', 'approved', 'denied'] },
+    limit: { type: 'integer', required: false, min: 1, max: 100 },
+    // The previous page's `nextCursor` (spec 12.2), decoded server-side.
+    cursor: { type: 'string', required: false, max: 64 },
   },
 
   /** A request to look through one camera over a window of time, and why. */

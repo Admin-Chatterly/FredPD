@@ -83,7 +83,7 @@
   "fieldError": {
     "type": "the wrong kind of value",
     "too_short": "too short",
-    "too_long": "the window is longer than a request may ask for",
+    "too_long": "too long",
     "too_small": "too small",
     "too_large": "too large",
     "required": "required",
@@ -218,11 +218,12 @@
     "target_stale": "their Discord roles could not be read just now; try again shortly",
     "not_here": "you are not at the front desk",
     "not_at_terminal": "watch from a station terminal or the dispatch console",
-    "needs_request": "you need an approved footage request for this camera, open now",
+    "needs_request": "you need your own approved footage request for this camera, with its window open now",
     "no_camera": "that officer has no camera recording right now",
     "own_request": "nobody decides their own request",
     "not_viewing": "you are not watching this camera under that request",
-    "still_taken": "this request already has its still"
+    "still_taken": "this request already has its still",
+    "window_too_long": "the window is longer than a request may ask for"
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -3343,19 +3344,20 @@
   },
   "camera": {
     "overlay": {
-      "plain": "{label} — arrow keys look around, Backspace leaves",
-      "withStill": "{label} — arrow keys look around, E keeps a still, Backspace leaves"
+      "plain": "{label} — arrow keys turn the camera, Backspace leaves",
+      "withStill": "{label} — arrow keys turn the camera, E keeps a still, Backspace leaves"
     },
     "still": {
       "unavailable": "Stills cannot be taken on this server (screenshot-basic is not started).",
       "failed": "The still could not be taken.",
-      "sent": "Still taken. It is attached to the request.",
+      "sent": "Still taken; attaching it to the request.",
       "kept": "Still kept on {number}."
     },
     "ended": {
       "viewer_gone": "The view ended.",
       "left_terminal": "The view ended: you left the terminal.",
-      "camera_off": "The view ended: the camera is no longer recording."
+      "camera_off": "The view ended: the camera is no longer recording.",
+      "not_authorised": "The view ended: you may no longer watch this camera."
     },
     "notify": {
       "requested": "A footage request is waiting for approval: {number}"
@@ -3379,7 +3381,8 @@
       "watch": "Watch",
       "watchLabel": "Watch {label}",
       "atTerminal": "Watch from a station terminal or the dispatch console.",
-      "byRequest": "You can watch a camera only through an approved footage request of your own, while its window is open."
+      "byRequest": "You can watch a camera only through an approved footage request of your own, while its window is open.",
+      "refused": "The camera list could not be loaded."
     },
     "requests": {
       "title": "Footage requests",
@@ -3395,8 +3398,17 @@
       "confirmApprove": "Approve {number}?",
       "confirmDeny": "Deny {number}?",
       "note": "Note",
-      "decided": "{number} is decided.",
-      "openStill": "Open the still"
+      "decision": "Decision",
+      "approveLabel": "Approve {number}",
+      "denyLabel": "Deny {number}",
+      "approved": "{number} approved.",
+      "denied": "{number} denied.",
+      "stillAlt": "Still, {number}",
+      "showStill": "Show the still for {number}",
+      "hideStill": "Hide the still for {number}",
+      "stillGone": "The still could not be loaded; the link may have expired. Reload the list.",
+      "filter": "Show",
+      "all": "All"
     },
     "form": {
       "title": "Request footage",
@@ -3408,7 +3420,10 @@
       "reason": "Reason",
       "fu": "Investigation (optional)",
       "submit": "Request",
-      "sent": "Request {number} sent for approval."
-    }
+      "sent": "Request {number} sent for approval.",
+      "choose": "Choose…"
+    },
+    "cctvName": "CCTV {id}",
+    "openFailed": "The view could not be opened."
   }
 }

@@ -970,4 +970,7 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('dispatch', 'camera.footage.request'),
     ('dispatch', 'camera.view'),
     ('supervisor', 'camera.view'),
+    -- The door to the Cameras screen itself (sources, the request list a
+    -- supervisor decides on), which every camera route asks for.
+    ('supervisor', 'camera.footage.request'),
     ('supervisor', 'camera.footage.approve');

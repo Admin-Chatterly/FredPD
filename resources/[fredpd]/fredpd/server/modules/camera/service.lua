@@ -38,7 +38,7 @@ function Camera.validateRequest(input, now, maxHours)
     local from, to = tonumber(input.windowFrom), tonumber(input.windowTo)
     if not from or not to or to <= from then return nil, { windowTo = 'out_of_range' } end
     if from < now - 3600 or to > now + 7 * 86400 then return nil, { windowFrom = 'out_of_range' } end
-    if to - from > (tonumber(maxHours) or 12) * 3600 then return nil, { windowTo = 'too_long' } end
+    if to - from > (tonumber(maxHours) or 12) * 3600 then return nil, { windowTo = 'window_too_long' } end
 
     local reason = type(input.reason) == 'string' and input.reason:match('^%s*(.-)%s*$') or ''
     if utf8.len(reason) == nil or utf8.len(reason) < 5 then return nil, { reason = 'too_short' } end

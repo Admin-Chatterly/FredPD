@@ -1605,6 +1605,8 @@ FredPD.Schema = {
 
     FootageList = {
         status = { type = 'enum', required = false, values = { 'requested', 'approved', 'denied' } },
+        limit = { type = 'integer', required = false, min = 1, max = 100 },
+        cursor = { type = 'string', required = false, max = 64 },
     },
 
     FootageRequest = {

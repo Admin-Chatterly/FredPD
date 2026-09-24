@@ -166,9 +166,12 @@ route.define({
     sensitive = true,
     limit = { per = 10, window = 60 },
     audit = 'camera.view.started',
-    subjectType = 'camera',
-    auditDetail = function(input, result)
-        return { source = input.source, cameraId = input.cameraId, officerId = input.officerId, requestId = result.requestId }
+    -- Keyed to the officer being watched, for a body-worn or dash camera, so
+    -- "who watched X" is one lookup; and built from what the server resolved,
+    -- never from the ids the client sent (11.3).
+    subjectType = 'officer',
+    auditDetail = function(_input, result)
+        return { source = result.source, cameraId = result.cameraId, officerId = result.officerId, requestId = result.requestId }
     end,
     handler = function(session, input)
         -- At a terminal a camera is watched from, checked where the player is.
@@ -187,6 +190,9 @@ route.define({
         local view = {
             source = input.source,
             requestId = request and request.id or nil,
+            -- Re-checked every couple of seconds while the view runs: the
+            -- request's window, or the permission it was started under.
+            windowTo = request and request.windowTo or nil,
             placementId = input.placementId,
             agencyId = session.agencyId,
             discordId = session.discordId,
@@ -200,8 +206,8 @@ route.define({
             local camera = input.cameraId and cctv(session.agencyId, input.cameraId)
             if not camera then return route.refuse(FredPD.ErrorCode.NOT_FOUND, { cameraId = 'unknown' }) end
             view.cameraId = camera.id
+            answer.cameraId = camera.id
             answer.position = { x = camera.x, y = camera.y, z = camera.z, heading = camera.heading or 0.0 }
-            answer.label = ('CCTV %d'):format(camera.id)
         else
             if not input.officerId or input.officerId == session.officerId then
                 return route.refuse(FredPD.ErrorCode.INVALID, { officerId = 'unknown' })
@@ -210,7 +216,9 @@ route.define({
             if not targetSrc then return route.refuse(FredPD.ErrorCode.CONFLICT, { officerId = 'no_camera' }) end
             view.officerId = input.officerId
             view.targetSrc = targetSrc
-            answer.label = target.callsign or tostring(input.officerId)
+            answer.officerId = input.officerId
+            answer.id = input.officerId
+            answer.callsign = target.callsign
         end
 
         viewers[session.src] = view
@@ -255,8 +263,18 @@ CreateThread(function()
             -- the camera is still a camera.
             if now - view.checkedAt >= 2 then
                 view.checkedAt = now
-                if not FredPD.Core.session.get(src) then
+                local session = FredPD.Core.session.get(src)
+                -- What let the view start must still hold: the permission, or
+                -- an approved request whose window is still open; a fresh
+                -- snapshot; duty. A view never outlives its authorisation.
+                local stillAllowed = session ~= nil
+                    and (perms().satisfies(session.permissions, VIEW) or (view.windowTo ~= nil and now <= view.windowTo))
+                if not session then
                     endView(src, 'viewer_gone')
+                elseif not stillAllowed or FredPD.Core.session.isStale(session)
+                    or not FredPD.Bridge.policejob.isOnDuty(src)
+                then
+                    endView(src, 'not_authorised')
                 elseif not FredPD.Core.placements.playerIsAt(src, view.placementId) then
                     endView(src, 'left_terminal')
                 elseif view.targetSrc and not liveTarget(view.agencyId, view.source, view.officerId) then
@@ -274,6 +292,12 @@ CreateThread(function()
             end
         end
     end
+end)
+
+--- A restart ends every view, and each is still audited as ended.
+AddEventHandler('onResourceStop', function(resource)
+    if resource ~= GetCurrentResourceName() then return end
+    for src in pairs(viewers) do endView(src, 'stopped') end
 end)
 
 AddEventHandler('playerDropped', function()
@@ -307,13 +331,21 @@ route.define({
     perm = REQUEST,
     schema = 'FootageList',
     handler = function(session, input)
-        local rows = repo.list(session.agencyId, session.discordId, mayApprove(session), input.status, 100)
+        local rows, nextCursor = repo.list(session.agencyId, session.discordId, mayApprove(session), input.status,
+            input.limit or 50, input.cursor)
         local out = {}
         for index, row in ipairs(rows) do
             out[index] = shaped(row)
             out[index].mine = row.requestedBy == session.discordId
+            -- The investigation a request names is shown only to a reader who
+            -- may read that investigation (4.5); the requester was checked
+            -- when they filed it, an approver is checked here.
+            if row.fuId then
+                local fu = FredPD.Repo.anmalan.fuById(row.fuId, session.agencyId)
+                if not fu or not FredPD.Repo.access.read(session, 'case', fu) then out[index].fuId = nil end
+            end
         end
-        return { requests = out, mayApprove = mayApprove(session) }
+        return { requests = out, mayApprove = mayApprove(session), nextCursor = nextCursor }
     end,
 })
 
@@ -431,6 +463,12 @@ route.define({
         local row = repo.byId(input.requestId, session.agencyId)
         if not row or row.requestedBy ~= session.discordId or row.stillRef then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND, { requestId = 'unknown' })
+        end
+
+        -- Kept only while the view it was taken in is still running under it.
+        local view = viewers[session.src]
+        if not view or view.requestId ~= row.id then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { requestId = 'not_viewing' })
         end
 
         local api = FredPD.Modules.mediaApi

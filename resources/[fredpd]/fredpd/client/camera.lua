@@ -31,10 +31,22 @@ local function setHidden(hidden)
     SendNUIMessage({ type = 'fredpd:photo', hidden = hidden })
 end
 
+local ui = FredPD.Bridge.ui
+
+--- The overlay is a prompt like any other, so it goes through the UI bridge
+--- (3.8): the terminal's own prompt is taken down when the view opens.
 local function overlay()
     if not view then return end
     local key = view.requestId and 'camera.overlay.withStill' or 'camera.overlay.plain'
-    lib.showTextUI(FredPD.t(key, { label = view.label }))
+    ui.hidePrompt()
+    ui.showPrompt(FredPD.t(key, { label = view.label }))
+end
+
+--- What the overlay calls this camera, in the player's language.
+local function labelFor(data)
+    if data.source == 'cctv' then return FredPD.t('camera.cctvName', { id = tonumber(data.cameraId) or 0 }) end
+    if type(data.callsign) == 'string' and data.callsign ~= '' then return data.callsign end
+    return tostring(tonumber(data.officerId) or '')
 end
 
 local function place(x, y, z, heading)
@@ -54,7 +66,9 @@ local function close(notice)
     RenderScriptCams(false, false, 0, true, true)
     DestroyCam(current.cam, false)
     ClearFocus()
-    lib.hideTextUI()
+    ui.hidePrompt()
+    -- The terminal the officer is standing at shows its prompt again.
+    FredPD.Client.placements.refresh()
     setHidden(false)
     SetNuiFocus(true, true)
 
@@ -70,7 +84,7 @@ local function keepStill()
         return
     end
 
-    lib.hideTextUI()
+    ui.hidePrompt()
     Wait(120)
     local ok, image = pcall(screenshot.capture)
     overlay()
@@ -117,7 +131,8 @@ local function controls()
     end)
 end
 
---- `{ source, label, requestId?, position? }`, the server's own answer.
+--- `{ source, cameraId?, officerId?, callsign?, requestId?, position? }`, the
+--- server's own answer.
 RegisterNUICallback('fredpd:cameraOpen', function(data, cb)
     if type(data) ~= 'table' or view then
         cb({ ok = false, err = FredPD.ErrorCode.CONFLICT })
@@ -126,7 +141,7 @@ RegisterNUICallback('fredpd:cameraOpen', function(data, cb)
 
     view = {
         cam = CreateCam('DEFAULT_SCRIPTED_CAMERA', true),
-        label = tostring(data.label or ''),
+        label = labelFor(data),
         requestId = tonumber(data.requestId),
         yaw = 0.0,
         pitch = data.source == 'cctv' and -20.0 or -5.0,

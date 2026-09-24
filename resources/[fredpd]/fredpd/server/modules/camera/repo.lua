@@ -60,8 +60,10 @@ function Repo.byId(id, agencyId)
 end
 
 --- The requests one officer made, or -- for whoever approves them -- all of
---- this agency's, newest first.
-function Repo.list(agencyId, discordId, all, status, limit)
+--- this agency's, newest first, a page at a time (12.2).
+---
+--- @return table rows, string|nil nextCursor
+function Repo.list(agencyId, discordId, all, status, limit, cursor)
     local where, values = { 'f.agency_id = ?' }, { agencyId }
     if not all then
         where[#where + 1] = 'f.requested_by = ?'
@@ -71,10 +73,23 @@ function Repo.list(agencyId, discordId, all, status, limit)
         where[#where + 1] = 'f.status = ?'
         values[#values + 1] = status
     end
-    values[#values + 1] = limit
+    -- Ids rise with every request, so the id alone orders them newest first.
+    local after = FredPD.Core.pagination.decode(cursor, 1)
+    if after then
+        where[#where + 1] = 'f.id < ?'
+        values[#values + 1] = after[1]
+    end
+    values[#values + 1] = limit + 1
 
-    return db().query(
-        SELECT .. ' WHERE ' .. table.concat(where, ' AND ') .. ' ORDER BY f.requested_at DESC LIMIT ?', values)
+    local rows = db().query(
+        SELECT .. ' WHERE ' .. table.concat(where, ' AND ') .. ' ORDER BY f.id DESC LIMIT ?', values)
+
+    local nextCursor = nil
+    if #rows > limit then
+        rows[limit + 1] = nil
+        nextCursor = FredPD.Core.pagination.encode({ rows[limit].id })
+    end
+    return rows, nextCursor
 end
 
 --- This officer's approved requests for a source, for "may I look now".

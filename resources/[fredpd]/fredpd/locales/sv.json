@@ -83,7 +83,7 @@
   "fieldError": {
     "type": "fel typ av värde",
     "too_short": "för kort",
-    "too_long": "tidsfönstret är längre än en begäran får vara",
+    "too_long": "för långt",
     "too_small": "för litet",
     "too_large": "för stort",
     "required": "obligatoriskt",
@@ -218,11 +218,12 @@
     "target_stale": "personens Discord-roller gick inte att läsa just nu; försök igen strax",
     "not_here": "du står inte vid receptionen",
     "not_at_terminal": "visa från en stationsterminal eller ledningsplatsen",
-    "needs_request": "du behöver en godkänd begäran för den här kameran, öppen nu",
+    "needs_request": "du behöver en egen godkänd begäran för den här kameran, med ett tidsfönster som är öppet nu",
     "no_camera": "polisen har ingen kamera som spelar in just nu",
     "own_request": "ingen beslutar om sin egen begäran",
     "not_viewing": "du tittar inte genom den här kameran med den begäran",
-    "still_taken": "begäran har redan sin stillbild"
+    "still_taken": "begäran har redan sin stillbild",
+    "window_too_long": "tidsfönstret är längre än en begäran får vara"
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -3343,8 +3344,8 @@
   },
   "camera": {
     "overlay": {
-      "plain": "{label} — piltangenterna vrider, Backsteg avslutar",
-      "withStill": "{label} — piltangenterna vrider, E sparar en stillbild, Backsteg avslutar"
+      "plain": "{label} — piltangenterna vrider kameran, Backsteg avslutar",
+      "withStill": "{label} — piltangenterna vrider kameran, E sparar en stillbild, Backsteg avslutar"
     },
     "still": {
       "unavailable": "Stillbilder kan inte tas på den här servern (screenshot-basic är inte startad).",
@@ -3355,7 +3356,8 @@
     "ended": {
       "viewer_gone": "Visningen avslutades.",
       "left_terminal": "Visningen avslutades: du lämnade terminalen.",
-      "camera_off": "Visningen avslutades: kameran spelar inte längre in."
+      "camera_off": "Visningen avslutades: kameran spelar inte längre in.",
+      "not_authorised": "Visningen avslutades: du får inte längre se genom den här kameran."
     },
     "notify": {
       "requested": "En begäran om filmmaterial väntar på beslut: {number}"
@@ -3379,7 +3381,8 @@
       "watch": "Visa",
       "watchLabel": "Visa {label}",
       "atTerminal": "Visa från en stationsterminal eller ledningsplatsen.",
-      "byRequest": "Du kan se genom en kamera bara med en egen godkänd begäran, medan dess tidsfönster är öppet."
+      "byRequest": "Du kan se genom en kamera bara med en egen godkänd begäran, medan dess tidsfönster är öppet.",
+      "refused": "Kameralistan kunde inte hämtas."
     },
     "requests": {
       "title": "Begäran om filmmaterial",
@@ -3395,8 +3398,17 @@
       "confirmApprove": "Godkänn {number}?",
       "confirmDeny": "Avslå {number}?",
       "note": "Anteckning",
-      "decided": "Beslut fattat om {number}.",
-      "openStill": "Öppna stillbilden"
+      "decision": "Beslut",
+      "approveLabel": "Godkänn {number}",
+      "denyLabel": "Avslå {number}",
+      "approved": "{number} är godkänd.",
+      "denied": "{number} är avslagen.",
+      "stillAlt": "Stillbild, {number}",
+      "showStill": "Visa stillbilden för {number}",
+      "hideStill": "Dölj stillbilden för {number}",
+      "stillGone": "Stillbilden kunde inte laddas; länken kan ha gått ut. Ladda om listan.",
+      "filter": "Visa",
+      "all": "Alla"
     },
     "form": {
       "title": "Begär filmmaterial",
@@ -3408,7 +3420,10 @@
       "reason": "Skäl",
       "fu": "Förundersökning (valfritt)",
       "submit": "Begär",
-      "sent": "Begäran {number} är skickad för beslut."
-    }
+      "sent": "Begäran {number} är skickad för beslut.",
+      "choose": "Välj…"
+    },
+    "cctvName": "Övervakningskamera {id}",
+    "openFailed": "Visningen kunde inte öppnas."
   }
 }

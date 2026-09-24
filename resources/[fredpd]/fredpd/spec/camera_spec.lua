@@ -46,7 +46,7 @@ describe('camera service', function()
         assert.are.same({ windowFrom = 'out_of_range' }, fields)
 
         _, fields = valid({ windowTo = NOW + 13 * 3600 })
-        assert.are.same({ windowTo = 'too_long' }, fields)
+        assert.are.same({ windowTo = 'window_too_long' }, fields)
     end)
 
     it('lets an approved request look only through its own camera, only while its window is open', function()
