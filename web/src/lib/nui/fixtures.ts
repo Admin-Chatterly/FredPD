@@ -206,6 +206,11 @@ const chatMessages: ChatMessage[] = [
  * `intel.source.view` — the one behaviour PD-Span had no equivalent for, so
  * the browser session shows it by default rather than hiding it.
  */
+/** A record this reader may not open, as `Access.stub` shapes it: three fields, no id. */
+function intelStub(recordType: string): { restricted: true; recordType: string; contact: string } {
+  return { restricted: true, recordType, contact: 'narcotics' };
+}
+
 let intelNotes: IntelNote[] = [
   {
     id: 1,
@@ -8364,7 +8369,9 @@ export const fixtures: FixtureSet = {
         ? intelNotes.filter((note) => note.tags.includes(filter.tag as string))
         : intelNotes;
 
-      return { notes };
+      // One note above this reader's clearance, stubbed as its compartment
+      // says (4.5). A tag filter never finds it: its tags are not counted.
+      return { notes: filter.tag ? notes : [...notes, intelStub('intel_note')] };
     },
 
     'intel.note.create': (input) => {
@@ -8399,9 +8406,11 @@ export const fixtures: FixtureSet = {
     },
 
     'intel.tags': () => ({ tags: intelTags }),
-    'intel.person.list': () => ({ persons: intelPersonsFull.map(personListRow) }),
-    'intel.org.list': () => ({ orgs: intelOrgsFull.map(orgListRow) }),
-    'intel.case.list': () => ({ cases: intelCasesFull.map(caseListRow) }),
+    // Each list carries one record this reader may not open, as the server's
+    // access filter stubs it (4.5): the lists draw it, the pickers skip it.
+    'intel.person.list': () => ({ persons: [...intelPersonsFull.map(personListRow), intelStub('intel_person')] }),
+    'intel.org.list': () => ({ orgs: [...intelOrgsFull.map(orgListRow), intelStub('intel_org')] }),
+    'intel.case.list': () => ({ cases: [...intelCasesFull.map(caseListRow), intelStub('intel_case')] }),
 
     /** The link diagram (10.6): the same shape the server's filtered board has. */
     'intel.board': (input) => {

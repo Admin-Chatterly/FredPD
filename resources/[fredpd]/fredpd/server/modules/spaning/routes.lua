@@ -53,11 +53,9 @@ local function knownAssociatesFor(session, row)
     if row.targetKind ~= 'person' or not row.targetId then return {} end
     if not FredPD.Core.perms.satisfies(session.permissions, 'intel.person.view') then return {} end
 
-    local intel = FredPD.Repo.intel
-    local subject = intel.byMasterPersonId(session.agencyId, row.targetId)
-    if not subject then return {} end
-
-    return intel.associatesForPerson(subject.id)
+    -- Through the intel module, which checks the subject and each associate
+    -- against this session's clearance (4.5).
+    return FredPD.Modules.intelAssociatesOf(session, row.targetId)
 end
 
 route.define({

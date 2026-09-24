@@ -7,7 +7,7 @@
   import { fieldList, type Failure } from '../shared/failure';
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
   import EntityPicker from '../shared/EntityPicker.svelte';
-  import { isStub, type Maybe, type PersonResult } from '../records/types';
+  import { isStub, type Maybe, type PersonResult, type Restricted } from '../records/types';
 
   /**
    * People (spec 10): the register's own person, alias or description.
@@ -124,14 +124,20 @@
     return value.replace('T', ' ').slice(0, 16);
   }
 
-  let persons = $state<IntelPerson[]>([]);
+  /** The list, with a stub where the server says a record exists that this reader may not open. */
+  let persons = $state<Maybe<IntelPerson>[]>([]);
+
+  /** Who to ask about a record this reader may see only as a stub (4.5). */
+  function stubContact(row: Restricted): string {
+    return t('records.restricted.contact', { unit: t(`access.unit.${row.contact}`) });
+  }
   let listError = $state<ErrorCode | null>(null);
   let listLoading = $state(true);
 
   async function loadList(): Promise<void> {
     listLoading = true;
 
-    const response = await nui.call<{ persons: IntelPerson[] }>('intel.person.list', {});
+    const response = await nui.call<{ persons: Maybe<IntelPerson>[] }>('intel.person.list', {});
 
     if (response.ok) {
       persons = response.data.persons;
@@ -457,12 +463,13 @@
    *  every other browse-when-empty search in the suite does), so a picker
    *  opened with nothing typed still offers something to pick from. */
   async function searchOrgs(term: string): Promise<OrgOption[]> {
-    const response = await nui.call<{ orgs: OrgOption[] }>('intel.org.list', {
+    const response = await nui.call<{ orgs: Maybe<OrgOption>[] }>('intel.org.list', {
       search: term || undefined,
       limit: 8,
     });
 
-    return response.ok ? response.data.orgs : [];
+    // A stub is nothing to link to: the server would refuse it anyway.
+    return response.ok ? response.data.orgs.filter((row): row is OrgOption => !isStub(row)) : [];
   }
 
   let membershipForm = $state({ orgId: '', orgName: '', role: '', isConfirmed: false });
@@ -524,14 +531,16 @@
    *  (`ck_fpd_intel_associates_ordered`), so offering it in the dropdown
    *  would only be a result that always fails to submit. */
   async function searchAssociateCandidates(term: string): Promise<PersonOption[]> {
-    const response = await nui.call<{ persons: PersonOption[] }>('intel.person.list', {
+    const response = await nui.call<{ persons: Maybe<PersonOption>[] }>('intel.person.list', {
       search: term || undefined,
       limit: 8,
     });
 
     if (!response.ok) return [];
 
-    return response.data.persons.filter((person) => person.id !== detail?.person.id);
+    return response.data.persons.filter(
+      (person): person is PersonOption => !isStub(person) && person.id !== detail?.person.id,
+    );
   }
 
   let associateForm = $state({ associateId: '', associateName: '', relationship: '', isConfirmed: false });
@@ -818,7 +827,12 @@
       <p class="text-sm text-[var(--color-ink-muted)]">{t('intel.person.empty')}</p>
     {:else}
       <ul class="flex flex-col">
-        {#each persons as person (person.id)}
+        {#each persons as person, index (isStub(person) ? `stub-${index}` : person.id)}
+          {#if isStub(person)}
+            <li class="border-b border-[var(--color-border)] py-2 text-sm text-[var(--color-ink-muted)] last:border-b-0">
+              {t('records.restricted.title')} — {stubContact(person)}
+            </li>
+          {:else}
           <li class="border-b border-[var(--color-border)] last:border-b-0">
             <button
               type="button"
@@ -843,6 +857,7 @@
               </span>
             </button>
           </li>
+          {/if}
         {/each}
       </ul>
     {/if}

@@ -1438,6 +1438,15 @@ That makes the bridge contract in 10.4 unnecessary — there is no second system
   - Every node passes the same access filter a search does. A node the reader could see only as a stub is left off, and a line is drawn only between two nodes on the board, so the diagram never shows who is connected to a hidden record.
   - The layout is a seeded force layout (`web/src/lib/graphLayout.ts`), so the same board opens the same way every time. Nodes are keyboard buttons that open the record.
   - Vehicles, phones and addresses are not on the diagram yet.
+- **Access control on the register (4.5).** Holding `intel.person.view` (or another register permission) opens the screen. It is not clearance for every record in it. People, organisations, cases and notes each carry their own classification, compartments and seal, and every intel route checks them on the server:
+  - Lists (`intel.person/org/case/note.list`) go through the search filter. A record the reader may not read is either hidden or stubbed, as its compartment says.
+  - A filtered note list (by subject, tag, text, source or confidence) never carries a stub. A stub there would confirm what the hidden note is about.
+  - Filtering by a protected source needs `intel.source.view`.
+  - A single read of a hidden record is answered as `not_found`, exactly like a record that does not exist. A stubbed record is answered as `restricted`. Every write checks the records it touches the same way, before touching anything.
+  - A link to a record the reader may not read is left off, with no gap. This covers memberships, associates, a roster, case links, a person's cases, the notes on a subject, and evidence that also hangs on another record.
+  - The counts on a list, the tag list and a list filtered by tag are computed over readable records only. They are counted without an audit row, because counting opens nothing.
+  - `intel.search` returns only records the reader may read in full. A vehicle is judged by the person it is on.
+  - Spaning's known associates (7.13) come through the same filter.
 - [S] Sanitized patrol flags ("Caution: armed") that never reveal the underlying intelligence or source.
 - [S] Review reminders for records not reviewed within a set period; retention rules.
 - **Permissions:** `intel.module.open`, `intel.report.create`, `intel.report.view`, `intel.surveillance.log`, `intel.source.view`, `intel.source.manage`, `intel.source.identity.view`, `intel.operation.approve`.

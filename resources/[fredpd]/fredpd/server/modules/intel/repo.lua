@@ -28,10 +28,26 @@ local PERSON_COLUMNS <const> = [[
     p.created_at AS createdAt, p.updated_at AS updatedAt
 ]]
 
---- The people list, with the counts the list page shows.
+--- `?, ?, ?` for a list of n values.
+local function marksFor(count)
+    local out = {}
+    for index = 1, count do out[index] = '?' end
+    return table.concat(out, ', ')
+end
+
+--- Narrows a list query to a set of ids (the route's tag filter, resolved
+--- over the notes the reader may read).
+local function whereIds(where, values, column, ids)
+    if not ids then return end
+    where[#where + 1] = ('%s IN (%s)'):format(column, marksFor(#ids))
+    for _, id in ipairs(ids) do values[#values + 1] = id end
+end
+
+--- The people list.
 ---
---- `search`, `status` and `tag` are optional. The tag filter goes through notes,
---- because tags live on intelligence rather than on people (spec 10).
+--- `search`, `status` and `ids` are optional. The counts the list shows are
+--- not here: they are of notes, which carry their own classification, so the
+--- route counts them after the access filter (4.5).
 function Repo.listPersons(agencyId, filter)
     local where = { 'p.agency_id = ?' }
     local values = { agencyId }
@@ -46,20 +62,14 @@ function Repo.listPersons(agencyId, filter)
         values[#values + 1] = filter.status
     end
 
-    if filter.tag then
-        where[#where + 1] = [[EXISTS (
-            SELECT 1 FROM fpd_intel_notes n
-              JOIN fpd_intel_note_tags t ON t.note_id = n.id
-             WHERE n.person_id = p.id AND t.tag = ?)]]
-        values[#values + 1] = filter.tag
-    end
+    whereIds(where, values, 'p.id', filter.ids)
 
     values[#values + 1] = filter.limit or 100
 
+    -- A vehicle carries no classification of its own: it is read as part of
+    -- the person it is on, so its plate lists with them.
     return db().query(([[
         SELECT %s,
-               (SELECT COUNT(*) FROM fpd_intel_notes n WHERE n.person_id = p.id) AS noteCount,
-               (SELECT MAX(n.created_at) FROM fpd_intel_notes n WHERE n.person_id = p.id) AS lastNoteAt,
                (SELECT GROUP_CONCAT(v.plate ORDER BY v.plate SEPARATOR ',')
                   FROM fpd_intel_vehicles v
                  WHERE v.person_id = p.id AND v.plate IS NOT NULL) AS plates
@@ -168,22 +178,14 @@ function Repo.listOrgs(agencyId, filter)
         values[#values + 1] = '%' .. filter.search .. '%'
     end
 
-    if filter.tag then
-        where[#where + 1] = [[EXISTS (
-            SELECT 1 FROM fpd_intel_notes n
-              JOIN fpd_intel_note_tags t ON t.note_id = n.id
-             WHERE n.org_id = o.id AND t.tag = ?)]]
-        values[#values + 1] = filter.tag
-    end
+    whereIds(where, values, 'o.id', filter.ids)
 
     values[#values + 1] = filter.limit or 100
 
+    -- Members and notes are counted by the route, over the records the
+    -- reader may read.
     return db().query(([[
-        SELECT %s,
-               (SELECT COUNT(*) FROM fpd_intel_memberships m WHERE m.org_id = o.id) AS memberCount,
-               (SELECT COUNT(*) FROM fpd_intel_memberships m
-                 WHERE m.org_id = o.id AND m.is_confirmed = 1) AS confirmedCount,
-               (SELECT COUNT(*) FROM fpd_intel_notes n WHERE n.org_id = o.id) AS noteCount
+        SELECT %s
           FROM fpd_intel_orgs o
          WHERE %s
          ORDER BY o.updated_at DESC
@@ -413,17 +415,76 @@ function Repo.deleteNote(agencyId, id)
     return db().execute('DELETE FROM fpd_intel_notes WHERE agency_id = ? AND id = ?', { agencyId, id })
 end
 
---- PD-Span's `distinct_tags()`: every tag in use, most used first.
-function Repo.tags(agencyId)
+--- The notes under a set of people, organisations or cases: the id, the
+--- parent and what the access check needs, for counting (never shown).
+---
+--- @param column string 'person_id' | 'org_id' | 'case_id'
+function Repo.notesUnder(column, parentIds)
+    assert(({ person_id = true, org_id = true, case_id = true })[column], 'unknown note parent')
+    if #parentIds == 0 then return {} end
+
     return db().query(
-        [[SELECT t.tag, COUNT(*) AS uses
+        ([[SELECT id, %s AS parentId, classification, created_at AS createdAt
+              FROM fpd_intel_notes WHERE %s IN (%s)]]):format(column, column, marksFor(#parentIds)),
+        parentIds)
+end
+
+--- The notes carrying a tag, by the people, organisations or cases they are
+--- on -- for a list filtered by tag, resolved over the notes the reader may
+--- read. Newest first and bounded.
+function Repo.taggedNotes(agencyId, tag, column, limit)
+    assert(({ person_id = true, org_id = true })[column], 'unknown note parent')
+
+    return db().query(
+        ([[SELECT n.id, n.%s AS parentId, n.classification
+              FROM fpd_intel_notes n
+              JOIN fpd_intel_note_tags t ON t.note_id = n.id
+             WHERE n.agency_id = ? AND t.tag = ? AND n.%s IS NOT NULL
+             ORDER BY n.id DESC
+             LIMIT ?]]):format(column, column),
+        { agencyId, tag, limit })
+end
+
+--- The members of a set of organisations, as the people they are, for counting.
+function Repo.membersOf(orgIds)
+    if #orgIds == 0 then return {} end
+
+    return db().query(
+        ([[SELECT m.org_id AS orgId, m.person_id AS personId, m.is_confirmed AS isConfirmed,
+                  p.classification AS personClassification
+             FROM fpd_intel_memberships m
+             JOIN fpd_intel_persons p ON p.id = m.person_id
+            WHERE m.org_id IN (%s)]]):format(marksFor(#orgIds)),
+        orgIds)
+end
+
+--- The links of a set of cases, with each end's classification, for counting.
+function Repo.linksOf(caseIds)
+    if #caseIds == 0 then return {} end
+
+    return db().query(
+        ([[SELECT l.case_id AS caseId, l.person_id AS personId, l.org_id AS orgId,
+                  p.classification AS personClassification, o.classification AS orgClassification
+             FROM fpd_intel_case_links l
+             LEFT JOIN fpd_intel_persons p ON p.id = l.person_id
+             LEFT JOIN fpd_intel_orgs o ON o.id = l.org_id
+            WHERE l.case_id IN (%s)]]):format(marksFor(#caseIds)),
+        caseIds)
+end
+
+--- Every tag use, with the note it is on: PD-Span's `distinct_tags()` counted
+--- these in SQL, but a tag on a note the reader may not read says what that
+--- note is about, so the route counts only the notes the reader may read.
+--- Newest notes first, bounded, so the count is of recent intelligence.
+function Repo.tagUses(agencyId, limit)
+    return db().query(
+        [[SELECT t.tag, n.id, n.classification
             FROM fpd_intel_note_tags t
             JOIN fpd_intel_notes n ON n.id = t.note_id
            WHERE n.agency_id = ?
-           GROUP BY t.tag
-           ORDER BY uses DESC, t.tag
-           LIMIT 100]],
-        { agencyId }
+           ORDER BY n.id DESC
+           LIMIT ?]],
+        { agencyId, limit }
     )
 end
 
@@ -445,6 +506,13 @@ function Repo.createVehicle(agencyId, input, discordId)
           VALUES (?, ?, ?, ?, ?, ?, ?)]],
         { agencyId, input.personId, input.plate, input.model, input.color, input.notes, discordId }
     )
+end
+
+--- The person a vehicle is on, for the access check before it is removed.
+function Repo.vehicleById(agencyId, id)
+    return db().single(
+        'SELECT id, person_id AS personId FROM fpd_intel_vehicles WHERE agency_id = ? AND id = ?',
+        { agencyId, id })
 end
 
 function Repo.deleteVehicle(agencyId, id)
@@ -485,13 +553,10 @@ function Repo.listCases(agencyId, filter)
 
     values[#values + 1] = filter.limit or 100
 
+    -- Links and notes are counted by the route, over the records the reader
+    -- may read.
     return db().query(([[
-        SELECT %s,
-               (SELECT COUNT(*) FROM fpd_intel_case_links l
-                 WHERE l.case_id = c.id AND l.person_id IS NOT NULL) AS personCount,
-               (SELECT COUNT(*) FROM fpd_intel_case_links l
-                 WHERE l.case_id = c.id AND l.org_id IS NOT NULL) AS orgCount,
-               (SELECT COUNT(*) FROM fpd_intel_notes n WHERE n.case_id = c.id) AS noteCount
+        SELECT %s
           FROM fpd_intel_cases c
          WHERE %s
          ORDER BY c.updated_at DESC
@@ -584,7 +649,8 @@ function Repo.caseLinks(caseId)
         [[SELECT l.id, l.case_id AS caseId, l.person_id AS personId, l.org_id AS orgId,
                  l.role, l.target_kind AS targetKind,
                  p.name AS personName, p.alias AS personAlias, p.status AS personStatus,
-                 o.name AS orgName, o.type AS orgType
+                 p.classification AS personClassification,
+                 o.name AS orgName, o.type AS orgType, o.classification AS orgClassification
             FROM fpd_intel_case_links l
             LEFT JOIN fpd_intel_persons p ON p.id = l.person_id
             LEFT JOIN fpd_intel_orgs o ON o.id = l.org_id
@@ -602,13 +668,24 @@ function Repo.addCaseLink(input, discordId)
     )
 end
 
+--- A case link and the agency its case is in (links carry no agency of their own).
+function Repo.caseLinkById(agencyId, id)
+    return db().single(
+        [[SELECT l.id, l.case_id AS caseId, l.person_id AS personId, l.org_id AS orgId
+            FROM fpd_intel_case_links l
+            JOIN fpd_intel_cases c ON c.id = l.case_id
+           WHERE c.agency_id = ? AND l.id = ?]],
+        { agencyId, id })
+end
+
 function Repo.removeCaseLink(id)
     return db().execute('DELETE FROM fpd_intel_case_links WHERE id = ?', { id })
 end
 
 function Repo.caseLinksForPerson(personId)
     return db().query(
-        [[SELECT l.id, l.case_id AS caseId, l.role, c.title, c.status
+        [[SELECT l.id, l.case_id AS caseId, l.role, c.number, c.title, c.status,
+                 c.classification AS caseClassification
             FROM fpd_intel_case_links l
             JOIN fpd_intel_cases c ON c.id = l.case_id
            WHERE l.person_id = ?
@@ -624,7 +701,8 @@ end
 function Repo.membershipsForPerson(personId)
     return db().query(
         [[SELECT m.org_id AS orgId, m.role, m.is_confirmed AS isConfirmed,
-                 o.name AS orgName, o.type AS orgType, o.status AS orgStatus
+                 o.name AS orgName, o.type AS orgType, o.status AS orgStatus,
+                 o.classification AS orgClassification
             FROM fpd_intel_memberships m
             JOIN fpd_intel_orgs o ON o.id = m.org_id
            WHERE m.person_id = ?
@@ -636,7 +714,7 @@ end
 function Repo.rosterForOrg(orgId)
     return db().query(
         [[SELECT m.person_id AS personId, m.role, m.is_confirmed AS isConfirmed,
-                 p.name, p.alias, p.status
+                 p.name, p.alias, p.status, p.classification AS personClassification
             FROM fpd_intel_memberships m
             JOIN fpd_intel_persons p ON p.id = m.person_id
            WHERE m.org_id = ?
@@ -665,6 +743,7 @@ end
 function Repo.associatesForPerson(personId)
     return db().query(
         [[SELECT other.id AS personId, other.name, other.alias, other.status,
+                 other.classification AS personClassification,
                  a.relationship, a.is_confirmed AS isConfirmed
             FROM fpd_intel_associates a
             JOIN fpd_intel_persons other
@@ -700,12 +779,22 @@ function Repo.evidenceFor(target, id)
     local column = ({ person = 'person_id', org = 'org_id', ['case'] = 'case_id' })[target]
     if not column then return {} end
 
+    -- Everything it hangs on, and their classifications: one item may be
+    -- attached to a person, an organisation and a case at once, and it is
+    -- shown only to a reader who may read all of them (4.5: attachments
+    -- inherit the record's access control).
     return db().query(
-        ([[SELECT id, storage_path AS storagePath, url, caption,
-                  created_by AS createdBy, created_at AS createdAt
-             FROM fpd_intel_evidence
-            WHERE %s = ?
-            ORDER BY created_at DESC]]):format(column),
+        ([[SELECT e.id, e.storage_path AS storagePath, e.url, e.caption,
+                  e.created_by AS createdBy, e.created_at AS createdAt,
+                  e.person_id AS personId, e.org_id AS orgId, e.case_id AS caseId,
+                  p.classification AS personClassification, o.classification AS orgClassification,
+                  c.classification AS caseClassification
+             FROM fpd_intel_evidence e
+             LEFT JOIN fpd_intel_persons p ON p.id = e.person_id
+             LEFT JOIN fpd_intel_orgs o ON o.id = e.org_id
+             LEFT JOIN fpd_intel_cases c ON c.id = e.case_id
+            WHERE e.%s = ?
+            ORDER BY e.created_at DESC]]):format(column),
         { id }
     )
 end
@@ -720,6 +809,14 @@ function Repo.addEvidence(agencyId, input, discordId)
             input.storagePath, input.url, input.caption, discordId,
         }
     )
+end
+
+--- What an item of evidence is attached to, for the access check before removal.
+function Repo.evidenceById(agencyId, id)
+    return db().single(
+        [[SELECT id, person_id AS personId, org_id AS orgId, case_id AS caseId
+            FROM fpd_intel_evidence WHERE agency_id = ? AND id = ?]],
+        { agencyId, id })
 end
 
 function Repo.deleteEvidence(agencyId, id)
@@ -737,27 +834,29 @@ function Repo.search(agencyId, term, perType)
 
     return db().query(
         [[  (SELECT 'person' AS kind, p.id, p.name AS title, p.alias AS subtitle,
-                    p.status, p.updated_at AS updatedAt
+                    p.status, p.updated_at AS updatedAt, p.classification, NULL AS ownerId
                FROM fpd_intel_persons p
               WHERE p.agency_id = ? AND p.search_text LIKE ?
               ORDER BY p.updated_at DESC LIMIT ?)
           UNION ALL
-            (SELECT 'organization', o.id, o.name, o.territory, o.status, o.updated_at
+            (SELECT 'organization', o.id, o.name, o.territory, o.status, o.updated_at, o.classification, NULL
                FROM fpd_intel_orgs o
               WHERE o.agency_id = ? AND o.search_text LIKE ?
               ORDER BY o.updated_at DESC LIMIT ?)
           UNION ALL
-            (SELECT 'vehicle', v.id, v.plate, CONCAT_WS(' ', v.color, v.model), NULL, v.updated_at
+            (SELECT 'vehicle', v.id, v.plate, CONCAT_WS(' ', v.color, v.model), NULL, v.updated_at,
+                    p.classification, v.person_id
                FROM fpd_intel_vehicles v
+               LEFT JOIN fpd_intel_persons p ON p.id = v.person_id
               WHERE v.agency_id = ? AND v.search_text LIKE ?
               ORDER BY v.updated_at DESC LIMIT ?)
           UNION ALL
-            (SELECT 'note', n.id, LEFT(n.body, 160), NULL, n.confidence, n.created_at
+            (SELECT 'note', n.id, LEFT(n.body, 160), NULL, n.confidence, n.created_at, n.classification, NULL
                FROM fpd_intel_notes n
               WHERE n.agency_id = ? AND LOWER(n.body) LIKE ?
               ORDER BY n.created_at DESC LIMIT ?)
           UNION ALL
-            (SELECT 'case', c.id, c.title, c.description, c.status, c.updated_at
+            (SELECT 'case', c.id, c.title, c.description, c.status, c.updated_at, c.classification, NULL
                FROM fpd_intel_cases c
               WHERE c.agency_id = ? AND (LOWER(c.title) LIKE ? OR LOWER(c.description) LIKE ?)
               ORDER BY c.updated_at DESC LIMIT ?)]],
@@ -865,11 +964,7 @@ end
 -- The link diagram (spec 10.6)
 -- -----------------------------------------------------------------------------
 
-local function marks(count)
-    local out = {}
-    for index = 1, count do out[index] = '?' end
-    return table.concat(out, ', ')
-end
+local marks = marksFor
 
 --- People for a board by id, in this agency.
 function Repo.boardPersonsById(agencyId, ids)

@@ -6,6 +6,7 @@
   import type { IntelNote, IntelOrg } from '../../lib/types';
   import { fieldList, type Failure } from '../shared/failure';
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
+  import { isStub, type Maybe, type Restricted } from '../records/types';
 
   /**
    * Organizations (spec 10): gangs, crews and the businesses that front them.
@@ -73,14 +74,20 @@
     return value.replace('T', ' ').slice(0, 16);
   }
 
-  let orgs = $state<IntelOrg[]>([]);
+  /** The list, with a stub where the server says a record exists that this reader may not open. */
+  let orgs = $state<Maybe<IntelOrg>[]>([]);
+
+  /** Who to ask about a record this reader may see only as a stub (4.5). */
+  function stubContact(row: Restricted): string {
+    return t('records.restricted.contact', { unit: t(`access.unit.${row.contact}`) });
+  }
   let listError = $state<ErrorCode | null>(null);
   let listLoading = $state(true);
 
   async function loadList(): Promise<void> {
     listLoading = true;
 
-    const response = await nui.call<{ orgs: IntelOrg[] }>('intel.org.list', {});
+    const response = await nui.call<{ orgs: Maybe<IntelOrg>[] }>('intel.org.list', {});
 
     if (response.ok) {
       orgs = response.data.orgs;
@@ -469,7 +476,12 @@
       <p class="text-sm text-[var(--color-ink-muted)]">{t('intel.org.empty')}</p>
     {:else}
       <ul class="flex flex-col">
-        {#each orgs as org (org.id)}
+        {#each orgs as org, index (isStub(org) ? `stub-${index}` : org.id)}
+          {#if isStub(org)}
+            <li class="border-b border-[var(--color-border)] py-2 text-sm text-[var(--color-ink-muted)] last:border-b-0">
+              {t('records.restricted.title')} — {stubContact(org)}
+            </li>
+          {:else}
           <li class="border-b border-[var(--color-border)] last:border-b-0">
             <button
               type="button"
@@ -491,6 +503,7 @@
               </span>
             </button>
           </li>
+          {/if}
         {/each}
       </ul>
     {/if}

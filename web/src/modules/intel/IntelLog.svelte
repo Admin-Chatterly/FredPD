@@ -4,6 +4,7 @@
   import { INTEL_CONFIDENCE, INTEL_SOURCES } from '@fredpd/schema';
   import type { ErrorCode } from '@fredpd/schema';
   import type { IntelNote, IntelTag } from '../../lib/types';
+  import { isStub, type Maybe, type Restricted } from '../records/types';
 
   /**
    * The intelligence log (spec 10): everything logged, newest first, filtered
@@ -14,7 +15,13 @@
    * it concerns, and the composer defaults to it.
    */
 
-  let notes = $state<IntelNote[]>([]);
+  /** The log, with a stub where the server says a note exists that this reader may not open. */
+  let notes = $state<Maybe<IntelNote>[]>([]);
+
+  /** Who to ask about a record this reader may see only as a stub (4.5). */
+  function stubContact(row: Restricted): string {
+    return t('records.restricted.contact', { unit: t(`access.unit.${row.contact}`) });
+  }
   let tags = $state<IntelTag[]>([]);
   let activeTag = $state<string | null>(null);
   let error = $state<ErrorCode | null>(null);
@@ -28,7 +35,7 @@
 
   async function load(): Promise<void> {
     const [noteResponse, tagResponse] = await Promise.all([
-      nui.call<{ notes: IntelNote[] }>('intel.note.list', activeTag ? { tag: activeTag } : {}),
+      nui.call<{ notes: Maybe<IntelNote>[] }>('intel.note.list', activeTag ? { tag: activeTag } : {}),
       nui.call<{ tags: IntelTag[] }>('intel.tags'),
     ]);
 
@@ -176,7 +183,12 @@
     <p class="text-sm text-[var(--color-ink-muted)]">{t('intel.log.empty')}</p>
   {:else}
     <ol class="flex flex-col gap-2">
-      {#each notes as note (note.id)}
+      {#each notes as note, index (isStub(note) ? `stub-${index}` : note.id)}
+        {#if isStub(note)}
+          <li class="border border-[var(--color-border)] p-3 text-sm text-[var(--color-ink-muted)]">
+            {t('records.restricted.title')} — {stubContact(note)}
+          </li>
+        {:else}
         <li class="border border-[var(--color-border)] p-3">
           <p class="text-sm whitespace-pre-wrap">{note.body}</p>
 
@@ -205,6 +217,7 @@
             {/each}
           </div>
         </li>
+        {/if}
       {/each}
     </ol>
   {/if}

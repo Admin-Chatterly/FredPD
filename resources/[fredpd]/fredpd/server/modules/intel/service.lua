@@ -314,4 +314,122 @@ function Intel.boardGraph(persons, orgs, memberships, associates)
     }
 end
 
+-- -----------------------------------------------------------------------------
+-- What a reader may see of linked records (4.5)
+-- -----------------------------------------------------------------------------
+
+--- The records a list links to, once each, as rows the access filter can
+--- judge: `{ id, classification }`. A row with no link in `idField` (a case
+--- link to an organisation, asked about its person) names nothing.
+---
+--- @param rows table
+--- @param idField string the linked record's id on each row
+--- @param classificationField string its classification on each row
+--- @return table
+function Intel.linkedRecords(rows, idField, classificationField)
+    local out, seen = {}, {}
+    for _, row in ipairs(rows or {}) do
+        local id = row[idField]
+        if id ~= nil and not seen[id] then
+            seen[id] = true
+            out[#out + 1] = { id = id, classification = row[classificationField] }
+        end
+    end
+    return out
+end
+
+--- The rows whose linked record the reader may read in full. A link to one
+--- they may not -- or may see only as a stub -- is left off with no gap: the
+--- link itself says who is tied to whom (4.5). Rows with no link in
+--- `idField` stay; another pass judges their other end.
+---
+--- @param rows table
+--- @param idField string
+--- @param visible table set of readable ids
+--- @return table
+function Intel.keepLinked(rows, idField, visible)
+    local out = {}
+    for _, row in ipairs(rows or {}) do
+        local id = row[idField]
+        if id == nil or visible[id] then out[#out + 1] = row end
+    end
+    return out
+end
+
+--- Per parent, how many rows link to a readable record: the notes on a
+--- person, the members of an organisation. Counted after the access check,
+--- so a count never says there is more than the reader may open (4.5).
+---
+--- @param rows table
+--- @param parentField string the parent's id on each row
+--- @param idField string the linked record's id on each row
+--- @param visible table set of readable ids
+--- @param predicate function|nil counts only rows it accepts
+--- @return table map parent id -> count
+function Intel.countLinked(rows, parentField, idField, visible, predicate)
+    local counts = {}
+    for _, row in ipairs(rows or {}) do
+        local parent, id = row[parentField], row[idField]
+        if parent ~= nil and id ~= nil and visible[id] and (not predicate or predicate(row)) then
+            counts[parent] = (counts[parent] or 0) + 1
+        end
+    end
+    return counts
+end
+
+--- Per parent, the latest `timeField` among rows linking to a readable record.
+--- @return table map parent id -> time
+function Intel.latestLinked(rows, parentField, idField, visible, timeField)
+    local latest = {}
+    for _, row in ipairs(rows or {}) do
+        local parent, at = row[parentField], row[timeField]
+        if parent ~= nil and at ~= nil and visible[row[idField]] then
+            if latest[parent] == nil or at > latest[parent] then latest[parent] = at end
+        end
+    end
+    return latest
+end
+
+--- The parents of the readable rows, once each, in order: the people or
+--- organisations a tag is on, counting only the notes the reader may read.
+--- @return table list of parent ids
+function Intel.parentsOf(rows, parentField, idField, visible)
+    local out, seen = {}, {}
+    for _, row in ipairs(rows or {}) do
+        local parent = row[parentField]
+        if parent ~= nil and visible[row[idField]] and not seen[parent] then
+            seen[parent] = true
+            out[#out + 1] = parent
+        end
+    end
+    return out
+end
+
+--- Tag counts over the notes a reader may read, most used first, as
+--- PD-Span's `distinct_tags()` ordered them.
+---
+--- @param uses table rows of `{ tag, id }` (one per tag on a note)
+--- @param visible table set of readable note ids
+--- @param limit number|nil
+--- @return table list of `{ tag, uses }`
+function Intel.tagCounts(uses, visible, limit)
+    local counts = {}
+    for _, use in ipairs(uses or {}) do
+        if visible[use.id] and type(use.tag) == 'string' then
+            counts[use.tag] = (counts[use.tag] or 0) + 1
+        end
+    end
+
+    local out = {}
+    for tag, count in pairs(counts) do out[#out + 1] = { tag = tag, uses = count } end
+    table.sort(out, function(a, b)
+        if a.uses ~= b.uses then return a.uses > b.uses end
+        return a.tag < b.tag
+    end)
+
+    local cap = limit or 100
+    for index = #out, cap + 1, -1 do out[index] = nil end
+    return out
+end
+
 FredPD.Modules.intel = Intel

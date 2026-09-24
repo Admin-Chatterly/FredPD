@@ -3,6 +3,7 @@
   import { t } from '../../lib/i18n';
   import { BOX_H, BOX_W, layoutGraph } from '../../lib/graphLayout';
   import { type Failure } from '../shared/failure';
+  import { isStub, type Maybe } from '../records/types';
 
   /**
    * The link diagram (spec 10.6), after PD-Span's `/board`: people and
@@ -82,11 +83,14 @@
 
   async function loadScopes(): Promise<void> {
     const [caseList, orgList] = await Promise.all([
-      nui.call<{ cases: { id: number; number?: string | null; title: string }[] }>('intel.case.list', { limit: 100 }),
-      nui.call<{ orgs: { id: number; name: string }[] }>('intel.org.list', { limit: 100 }),
+      nui.call<{ cases: Maybe<{ id: number; number?: string | null; title: string }>[] }>('intel.case.list', {
+        limit: 100,
+      }),
+      nui.call<{ orgs: Maybe<{ id: number; name: string }>[] }>('intel.org.list', { limit: 100 }),
     ]);
-    if (caseList.ok) cases = caseList.data.cases;
-    if (orgList.ok) orgOptions = orgList.data.orgs;
+    // A stub has no board to show: only what this reader may open is offered.
+    if (caseList.ok) cases = caseList.data.cases.flatMap((row) => (isStub(row) ? [] : [row]));
+    if (orgList.ok) orgOptions = orgList.data.orgs.flatMap((row) => (isStub(row) ? [] : [row]));
   }
 
   async function load(): Promise<void> {

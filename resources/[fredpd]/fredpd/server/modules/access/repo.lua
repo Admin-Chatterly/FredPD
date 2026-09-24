@@ -92,7 +92,11 @@ local function placeholders(count)
     return table.concat(marks, ',')
 end
 
---- The ids of a list of rows, and the rows keyed by id.
+--- The distinct ids of a list of rows, and the rows keyed by id -- every row
+--- with that id, not the last: two rows naming one record (two vehicles on
+--- one person, judged by the person) must both be given its compartments,
+--- seal and grants. Kept to one, the others would be judged on their
+--- classification alone and read as open.
 local function indexRows(rows)
     local ids, byId = {}, {}
 
@@ -101,12 +105,20 @@ local function indexRows(rows)
         local id = row and row.id
 
         if id ~= nil then
-            ids[#ids + 1] = id
-            byId[id] = row
+            if not byId[id] then
+                ids[#ids + 1] = id
+                byId[id] = {}
+            end
+            byId[id][#byId[id] + 1] = row
         end
     end
 
     return ids, byId
+end
+
+--- Calls `apply` on every row keyed under `id`.
+local function eachWithId(byId, id, apply)
+    for _, row in ipairs(byId[id] or {}) do apply(row) end
 end
 
 -- -----------------------------------------------------------------------------
@@ -217,10 +229,9 @@ function Repo.attachControl(recordType, rows)
     )
 
     for index = 1, #compartmentRows do
-        local row = byId[compartmentRows[index].recordId]
-        if row then
+        eachWithId(byId, compartmentRows[index].recordId, function(row)
             row.compartments[#row.compartments + 1] = compartmentRows[index].compartment
-        end
+        end)
     end
 
     -- A seal is a row, not a column: a record is sealed while an unlifted order
@@ -234,8 +245,7 @@ function Repo.attachControl(recordType, rows)
     )
 
     for index = 1, #sealRows do
-        local row = byId[sealRows[index].recordId]
-        if row then row.sealed = true end
+        eachWithId(byId, sealRows[index].recordId, function(row) row.sealed = true end)
     end
 
     return rows
@@ -291,15 +301,14 @@ function Repo.attachGrants(reader, recordType, rows)
 
     for index = 1, #grantRows do
         local grant = grantRows[index]
-        local row = byId[grant.recordId]
 
-        if row then
+        eachWithId(byId, grant.recordId, function(row)
             row.grants[#row.grants + 1] = {
                 subjectType = grant.subjectType,
                 subjectId = grant.subjectId,
                 expiresAt = grant.remaining and (reader.now or os.time()) + grant.remaining or nil,
             }
-        end
+        end)
     end
 
     -- Break-glass: a live entry this reader took on this record is a grant to
@@ -316,15 +325,13 @@ function Repo.attachGrants(reader, recordType, rows)
     )
 
     for index = 1, #breakglassRows do
-        local row = byId[breakglassRows[index].recordId]
-
-        if row then
+        eachWithId(byId, breakglassRows[index].recordId, function(row)
             row.grants[#row.grants + 1] = {
                 subjectType = 'breakglass',
                 subjectId = reader.discordId,
                 expiresAt = (reader.now or os.time()) + (breakglassRows[index].remaining or 0),
             }
-        end
+        end)
     end
 
     return rows
@@ -432,6 +439,37 @@ function Repo.mayBeToldOf(session, recordType, row)
     Repo.prepare(reader, recordType, { copy })
 
     return service().canRead(reader, copy) == true
+end
+
+--- The ids among `rows` this session may read in full -- for a count or a
+--- filter that shows nothing of the records themselves.
+---
+--- The same answer `filterSearch` gives, without its audit row: counting the
+--- notes on a subject opens none of them, and an `access.search` entry
+--- naming a thousand restricted notes the officer never saw would read to an
+--- auditor as a bulk read that did not happen. Works on copies, so the
+--- caller's rows are not given working fields.
+---
+--- @return table set of ids
+function Repo.readableIds(session, recordType, rows)
+    local ids = {}
+    if type(session) ~= 'table' or type(rows) ~= 'table' or #rows == 0 then return ids end
+
+    local copies = {}
+    for index = 1, #rows do
+        local copy = {}
+        for key, value in pairs(rows[index]) do copy[key] = value end
+        copies[index] = copy
+    end
+
+    local reader = Repo.reader(session)
+    Repo.prepare(reader, recordType, copies)
+
+    for index = 1, #copies do
+        if copies[index].id ~= nil and service().canRead(reader, copies[index]) then ids[copies[index].id] = true end
+    end
+
+    return ids
 end
 
 --- A list of rows, shaped by what this session may see (invariant 4).

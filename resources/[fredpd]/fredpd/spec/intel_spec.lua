@@ -291,4 +291,76 @@ describe('intel', function()
             assert.are.equal('required', fields.target)
         end)
     end)
+
+    -- 4.5: a link to a record the reader may not read is left off, because
+    -- the link itself says who is tied to whom.
+    describe('linkedRecords', function()
+        it('names each linked record once, with its classification', function()
+            local records = intel.linkedRecords({
+                { orgId = 3, orgClassification = 'secret' },
+                { orgId = 3, orgClassification = 'secret' },
+                { orgId = 4, orgClassification = 'internal' },
+            }, 'orgId', 'orgClassification')
+
+            assert.are.same({
+                { id = 3, classification = 'secret' },
+                { id = 4, classification = 'internal' },
+            }, records)
+        end)
+
+        it('skips rows that link to nothing on that side', function()
+            -- A case link to an organisation, asked about its person.
+            local records = intel.linkedRecords({ { personId = nil, orgId = 9 } }, 'personId', 'personClassification')
+            assert.are.same({}, records)
+        end)
+    end)
+
+    describe('keepLinked', function()
+        local rows = {
+            { id = 1, personId = 10 },
+            { id = 2, personId = 11 },
+            { id = 3, orgId = 20 },
+        }
+
+        it('keeps the rows whose linked record is readable, in order', function()
+            local kept = intel.keepLinked(rows, 'personId', { [11] = true })
+            assert.are.same({ { id = 2, personId = 11 }, { id = 3, orgId = 20 } }, kept)
+        end)
+
+        it('drops every link when nothing is readable, leaving no gap', function()
+            local kept = intel.keepLinked(rows, 'personId', {})
+            assert.are.equal(1, #kept)
+            assert.are.equal(3, kept[1].id)
+        end)
+
+        it('judges each side in its own pass', function()
+            local kept = intel.keepLinked(intel.keepLinked(rows, 'personId', { [10] = true }), 'orgId', {})
+            assert.are.same({ { id = 1, personId = 10 } }, kept)
+        end)
+    end)
+
+    describe('tagCounts', function()
+        local uses = {
+            { tag = 'narkotika', id = 1 },
+            { tag = 'narkotika', id = 2 },
+            { tag = 'vapen', id = 2 },
+            { tag = 'operation-x', id = 3 },
+        }
+
+        it('counts only the notes the reader may read', function()
+            local tags = intel.tagCounts(uses, { [1] = true, [2] = true })
+            assert.are.same({ { tag = 'narkotika', uses = 2 }, { tag = 'vapen', uses = 1 } }, tags)
+        end)
+
+        it('never names a tag used only on a note the reader may not read', function()
+            for _, entry in ipairs(intel.tagCounts(uses, { [1] = true })) do
+                assert.are_not.equal('operation-x', entry.tag)
+            end
+        end)
+
+        it('orders by use, then name, and stops at the limit', function()
+            local tags = intel.tagCounts(uses, { [1] = true, [2] = true, [3] = true }, 2)
+            assert.are.same({ { tag = 'narkotika', uses = 2 }, { tag = 'operation-x', uses = 1 } }, tags)
+        end)
+    end)
 end)

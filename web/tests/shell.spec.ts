@@ -165,6 +165,33 @@ test.describe('Intelligence', () => {
     await expect(page.getByText('Short, heavy build', { exact: false })).toBeVisible();
   });
 
+  test('draws a record above the reader’s clearance as a stub in every list', async ({ page }) => {
+    await openIntel(page);
+
+    // The log: the note the reader may not open says who to ask, and nothing else.
+    const stub = 'Restricted record — contact Narcotics';
+    await expect(page.locator('ol').getByText(stub)).toBeVisible();
+
+    await page.getByRole('button', { name: 'People' }).click();
+    await expect(page.getByText(stub)).toBeVisible();
+    // A stub is not a record to open.
+    await expect(page.getByRole('button', { name: new RegExp(stub) })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Organizations' }).click();
+    await expect(page.getByText(stub)).toBeVisible();
+
+    await page.getByRole('button', { name: 'Cases' }).click();
+    await expect(page.getByText(stub)).toBeVisible();
+  });
+
+  test('a filtered log leaves the restricted note out', async ({ page }) => {
+    await openIntel(page);
+
+    await page.getByRole('button', { name: /^weapons/ }).first().click();
+    await expect(page.getByText('Anonymous call', { exact: false })).toBeVisible();
+    await expect(page.getByText('Restricted record', { exact: false })).toHaveCount(0);
+  });
+
   test('lists organizations and cases', async ({ page }) => {
     await openIntel(page);
 

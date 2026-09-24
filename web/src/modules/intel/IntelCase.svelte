@@ -7,6 +7,7 @@
   import { fieldList, type Failure } from '../shared/failure';
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
   import EntityPicker from '../shared/EntityPicker.svelte';
+  import { isStub, type Maybe, type Restricted } from '../records/types';
 
   /**
    * Cases (spec 10): everyone and everything linked to an investigation, in
@@ -78,14 +79,20 @@
     return value.replace('T', ' ').slice(0, 16);
   }
 
-  let cases = $state<IntelCase[]>([]);
+  /** The list, with a stub where the server says a record exists that this reader may not open. */
+  let cases = $state<Maybe<IntelCase>[]>([]);
+
+  /** Who to ask about a record this reader may see only as a stub (4.5). */
+  function stubContact(row: Restricted): string {
+    return t('records.restricted.contact', { unit: t(`access.unit.${row.contact}`) });
+  }
   let listError = $state<ErrorCode | null>(null);
   let listLoading = $state(true);
 
   async function loadList(): Promise<void> {
     listLoading = true;
 
-    const response = await nui.call<{ cases: IntelCase[] }>('intel.case.list', {});
+    const response = await nui.call<{ cases: Maybe<IntelCase>[] }>('intel.case.list', {});
 
     if (response.ok) {
       cases = response.data.cases;
@@ -259,24 +266,26 @@
    *  does not need to know which kind it is showing. */
   async function searchLinkTargets(term: string): Promise<LinkTarget[]> {
     if (linkForm.kind === 'org') {
-      const response = await nui.call<{ orgs: { id: number; name: string }[] }>('intel.org.list', {
+      const response = await nui.call<{ orgs: Maybe<{ id: number; name: string }>[] }>('intel.org.list', {
         search: term || undefined,
         limit: 8,
       });
 
-      return response.ok ? response.data.orgs.map((org) => ({ id: org.id, label: org.name })) : [];
+      // A stub is nothing to link to: the server would refuse it anyway.
+      return response.ok
+        ? response.data.orgs.flatMap((org) => (isStub(org) ? [] : [{ id: org.id, label: org.name }]))
+        : [];
     }
 
     const response = await nui.call<{
-      persons: { id: number; name: string | null; alias: string | null }[];
+      persons: Maybe<{ id: number; name: string | null; alias: string | null }>[];
     }>('intel.person.list', { search: term || undefined, limit: 8 });
 
     if (!response.ok) return [];
 
-    return response.data.persons.map((person) => ({
-      id: person.id,
-      label: person.name ?? person.alias ?? t('intel.person.unknown'),
-    }));
+    return response.data.persons.flatMap((person) =>
+      isStub(person) ? [] : [{ id: person.id, label: person.name ?? person.alias ?? t('intel.person.unknown') }],
+    );
   }
 
   let linkForm = $state({ kind: 'person' as 'person' | 'org', targetId: '', targetName: '', role: '' });
@@ -480,7 +489,12 @@
       <p class="text-sm text-[var(--color-ink-muted)]">{t('intel.case.empty')}</p>
     {:else}
       <ul class="flex flex-col">
-        {#each cases as record (record.id)}
+        {#each cases as record, index (isStub(record) ? `stub-${index}` : record.id)}
+          {#if isStub(record)}
+            <li class="border-b border-[var(--color-border)] py-2 text-sm text-[var(--color-ink-muted)] last:border-b-0">
+              {t('records.restricted.title')} — {stubContact(record)}
+            </li>
+          {:else}
           <li class="border-b border-[var(--color-border)] last:border-b-0">
             <button
               type="button"
@@ -506,6 +520,7 @@
               </span>
             </button>
           </li>
+          {/if}
         {/each}
       </ul>
     {/if}

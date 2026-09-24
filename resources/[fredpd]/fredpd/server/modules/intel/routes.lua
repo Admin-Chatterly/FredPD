@@ -11,17 +11,96 @@
 ---   * The source of a note from an informant, a wiretap or surveillance is
 ---     withheld from readers without `intel.source.view`. The intelligence
 ---     stays readable; where it came from does not.
+---
+--- And every record goes through the access check (4.5, invariant 4): a
+--- person, organisation, case or note carries a classification, compartments
+--- and perhaps a seal, and the permission to open the register is not
+--- clearance for everything in it. Lists are filtered (hidden or stubbed, as
+--- the compartment says), a single read of a record the reader may not see is
+--- refused, and a link to one -- a membership, an associate, a case link, a
+--- note on a person -- is left off, because the link says who is tied to
+--- whom. Writes check the record they touch the same way, so an edit cannot
+--- tell a reader that a record they may not see exists.
 
 local route = FredPD.Core.route
 local service = FredPD.Modules.intel
 local repo = FredPD.Repo.intel
+
+local PERSON <const>, ORG <const>, NOTE <const>, CASE <const> = 'intel_person', 'intel_org', 'intel_note', 'intel_case'
+
+local function access() return FredPD.Repo.access end
+
+--- The ids among `records` (`{ id, classification }`) this reader may read in
+--- full. A record they would see only as a stub is not among them.
+local function visibleIds(session, recordType, records)
+    local ids = {}
+    for _, row in ipairs(access().filterSearch(session, recordType, records)) do
+        if row.restricted ~= true then ids[row.id] = true end
+    end
+    return ids
+end
+
+--- The rows of a list whose linked record (`idField`) the reader may read in
+--- full; the rest are left off with no gap.
+local function onlyReadable(session, recordType, rows, idField, classificationField)
+    local linked = service.linkedRecords(rows, idField, classificationField)
+    if #linked == 0 then return rows end
+    return service.keepLinked(rows, idField, visibleIds(session, recordType, linked))
+end
+
+--- The ids among `records` this reader may read in full, for a count or a
+--- filter that shows nothing of them -- the same answer, without an audit
+--- row for records nobody opened.
+local function countableIds(session, recordType, records)
+    if #records == 0 then return {} end
+    return access().readableIds(session, recordType, records)
+end
+
+--- One record, as this reader may read it, or the refusal to send.
+---
+--- A record this reader may be told of (a stub) is `restricted`; one they may
+--- not is answered exactly as one that does not exist -- the persons module's
+--- rule (`refusalCode`), so walking ids cannot find a hidden record (4.5).
+local function readable(session, recordType, row)
+    if not row then return nil, route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+
+    local allowed = access().read(session, recordType, row)
+    if allowed then return allowed end
+
+    -- `row` still carries what `read` attached, so this decides the refusal
+    -- without touching the access tables again.
+    local visibility = FredPD.Modules.access.visibility(access().reader(session), row)
+    return nil, route.refuse(visibility == 'stub' and FredPD.ErrorCode.RESTRICTED or FredPD.ErrorCode.NOT_FOUND)
+end
+
+--- The record a write names, when it exists and this reader may read it.
+local function mustRead(session, recordType, id)
+    local getter = ({
+        [PERSON] = repo.getPerson, [ORG] = repo.getOrg, [CASE] = repo.getCase, [NOTE] = repo.getNote,
+    })[recordType]
+
+    return readable(session, recordType, getter(session.agencyId, id))
+end
+
+--- Every record a write attaches something to, checked in turn.
+--- @return table|nil refusal
+local function mustReadAll(session, targets)
+    for _, target in ipairs(targets) do
+        if target[2] then
+            local row, refusal = mustRead(session, target[1], target[2])
+            if not row then return refusal end
+        end
+    end
+    return nil
+end
 
 --- May this session see where protected intelligence came from?
 local function canSeeSource(session)
     return FredPD.Core.perms.satisfies(session.permissions, 'intel.source.view')
 end
 
---- Applies source redaction across a list of notes.
+--- Applies source redaction across a list of notes. A 4.5 stub has no source
+--- and passes through as it is.
 local function redactAll(notes, session)
     local visible = canSeeSource(session)
 
@@ -30,6 +109,63 @@ local function redactAll(notes, session)
     end
 
     return notes
+end
+
+--- The notes on a person, organisation or case that this reader may read in
+--- full: a stub among them would still say there is more on this subject.
+local function readableNotes(session, notes)
+    return redactAll(onlyReadable(session, NOTE, notes, 'id', 'classification'), session)
+end
+
+--- Evidence shown on one record, kept only where the reader may read every
+--- other record it hangs on too (4.5: attachments inherit the record's
+--- access control). `own` is the record being viewed, already checked.
+local function readableEvidence(session, rows, own)
+    for _, side in ipairs({ { 'person', PERSON }, { 'org', ORG }, { 'case', CASE } }) do
+        if side[1] ~= own then
+            rows = onlyReadable(session, side[2], rows, side[1] .. 'Id', side[1] .. 'Classification')
+        end
+    end
+    for _, row in ipairs(rows) do
+        row.personClassification, row.orgClassification, row.caseClassification = nil, nil, nil
+    end
+    return rows
+end
+
+--- The ids of a list's rows that are not stubs.
+local function idsOf(rows)
+    local ids = {}
+    for _, row in ipairs(rows) do
+        if row.restricted ~= true and row.id ~= nil then ids[#ids + 1] = row.id end
+    end
+    return ids
+end
+
+--- For a list filtered by tag: the people or organisations it is on,
+--- counting only the notes this reader may read -- a tag on a note they may
+--- not read would otherwise pick out who it is about.
+local TAGGED_NOTES <const> = 2000
+local function taggedParents(session, tag, column)
+    local notes = repo.taggedNotes(session.agencyId, tag, column, TAGGED_NOTES)
+    local visible = countableIds(session, NOTE, service.linkedRecords(notes, 'id', 'classification'))
+    return service.parentsOf(notes, 'parentId', 'id', visible)
+end
+
+--- Note counts (and the latest note) on each listed record, over the notes
+--- this reader may read. Never touches a stub.
+local function countNotes(session, rows, column, withLatest)
+    local ids = idsOf(rows)
+    local notes = repo.notesUnder(column, ids)
+    local visible = countableIds(session, NOTE, service.linkedRecords(notes, 'id', 'classification'))
+    local counts = service.countLinked(notes, 'parentId', 'id', visible)
+    local latest = withLatest and service.latestLinked(notes, 'parentId', 'id', visible, 'createdAt') or {}
+
+    for _, row in ipairs(rows) do
+        if row.restricted ~= true then
+            row.noteCount = counts[row.id] or 0
+            if withLatest then row.lastNoteAt = latest[row.id] end
+        end
+    end
 end
 
 --- Rows affected of 0 on a versioned update means one of two things, and the
@@ -55,14 +191,21 @@ route.define({
         return { count = #result.persons, search = input.search, tag = input.tag }
     end,
     handler = function(session, input)
-        return {
-            persons = repo.listPersons(session.agencyId, {
-                search = service.searchTerm(input.search),
-                status = input.status,
-                tag = input.tag,
-                limit = input.limit,
-            }),
-        }
+        local ids
+        if input.tag then
+            ids = taggedParents(session, input.tag, 'person_id')
+            if #ids == 0 then return { persons = {} } end
+        end
+
+        local persons = access().filterSearch(session, PERSON, repo.listPersons(session.agencyId, {
+            search = service.searchTerm(input.search),
+            status = input.status,
+            ids = ids,
+            limit = input.limit,
+        }))
+        countNotes(session, persons, 'person_id', true)
+
+        return { persons = persons }
     end,
 })
 
@@ -73,8 +216,8 @@ route.define({
     audit = 'intel.person.read',
     subjectType = 'intel_person',
     handler = function(session, input)
-        local person = repo.getPerson(session.agencyId, input.id)
-        if not person then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+        local person, refusal = readable(session, PERSON, repo.getPerson(session.agencyId, input.id))
+        if not person then return refusal end
 
         -- Resolved for display, once, here -- the same reason `ordningsbot.get`
         -- attaches the tariff a citation cites rather than leaving the NUI to
@@ -97,12 +240,13 @@ route.define({
         return {
             person = person,
             masterPerson = masterPerson,
-            memberships = repo.membershipsForPerson(input.id),
-            associates = repo.associatesForPerson(input.id),
+            memberships = onlyReadable(session, ORG, repo.membershipsForPerson(input.id), 'orgId', 'orgClassification'),
+            associates = onlyReadable(session, PERSON, repo.associatesForPerson(input.id),
+                'personId', 'personClassification'),
             vehicles = repo.vehiclesForPerson(input.id),
-            cases = repo.caseLinksForPerson(input.id),
-            evidence = repo.evidenceFor('person', input.id),
-            notes = redactAll(repo.listNotes(session.agencyId, { personId = input.id }), session),
+            cases = onlyReadable(session, CASE, repo.caseLinksForPerson(input.id), 'caseId', 'caseClassification'),
+            evidence = readableEvidence(session, repo.evidenceFor('person', input.id), 'person'),
+            notes = readableNotes(session, repo.listNotes(session.agencyId, { personId = input.id })),
         }
     end,
 })
@@ -135,6 +279,9 @@ route.define({
     audit = 'intel.person.updated',
     subjectType = 'intel_person',
     handler = function(session, input)
+        local current, refusal = mustRead(session, PERSON, input.id)
+        if not current then return refusal end
+
         local affected = repo.updatePerson(session.agencyId, input.id, input.version, {
             name = input.name and service.blankToNull(input.name),
             alias = input.alias and service.blankToNull(input.alias),
@@ -159,6 +306,9 @@ route.define({
     audit = 'intel.person.deleted',
     subjectType = 'intel_person',
     handler = function(session, input)
+        local current, refusal = mustRead(session, PERSON, input.id)
+        if not current then return refusal end
+
         if repo.deletePerson(session.agencyId, input.id) == 0 then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
         end
@@ -182,6 +332,11 @@ route.define({
         return { keepId = input.keepId, dropId = input.dropId }
     end,
     handler = function(session, input)
+        -- Both ends: a merge moves one record's intelligence onto the other,
+        -- so neither may be a record this reader could not open.
+        local refusal = mustReadAll(session, { { PERSON, input.keepId }, { PERSON, input.dropId } })
+        if refusal then return refusal end
+
         local keep = repo.getPerson(session.agencyId, input.keepId)
         local drop = repo.getPerson(session.agencyId, input.dropId)
 
@@ -215,6 +370,9 @@ route.define({
     subjectType = 'intel_person',
     auditDetail = function(input) return { masterPersonId = input.masterPersonId } end,
     handler = function(session, input)
+        local current, refusal = mustRead(session, PERSON, input.id)
+        if not current then return refusal end
+
         if input.masterPersonId then
             -- `Repo.readPerson` is the persons module's own entry point: it
             -- scopes to the agency, runs the access check and audits a
@@ -256,13 +414,33 @@ route.define({
     perm = 'intel.org.view',
     schema = 'IntelOrgList',
     handler = function(session, input)
-        return {
-            orgs = repo.listOrgs(session.agencyId, {
-                search = service.searchTerm(input.search),
-                tag = input.tag,
-                limit = input.limit,
-            }),
-        }
+        local ids
+        if input.tag then
+            ids = taggedParents(session, input.tag, 'org_id')
+            if #ids == 0 then return { orgs = {} } end
+        end
+
+        local orgs = access().filterSearch(session, ORG, repo.listOrgs(session.agencyId, {
+            search = service.searchTerm(input.search),
+            ids = ids,
+            limit = input.limit,
+        }))
+        countNotes(session, orgs, 'org_id', false)
+
+        -- Members are people: counted only where this reader may read them.
+        local members = repo.membersOf(idsOf(orgs))
+        local visible = countableIds(session, PERSON, service.linkedRecords(members, 'personId', 'personClassification'))
+        local counts = service.countLinked(members, 'orgId', 'personId', visible)
+        local confirmed = service.countLinked(members, 'orgId', 'personId', visible,
+            function(row) return row.isConfirmed == 1 or row.isConfirmed == true end)
+        for _, org in ipairs(orgs) do
+            if org.restricted ~= true then
+                org.memberCount = counts[org.id] or 0
+                org.confirmedCount = confirmed[org.id] or 0
+            end
+        end
+
+        return { orgs = orgs }
     end,
 })
 
@@ -273,14 +451,14 @@ route.define({
     audit = 'intel.org.read',
     subjectType = 'intel_org',
     handler = function(session, input)
-        local org = repo.getOrg(session.agencyId, input.id)
-        if not org then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+        local org, refusal = readable(session, ORG, repo.getOrg(session.agencyId, input.id))
+        if not org then return refusal end
 
         return {
             org = org,
-            roster = repo.rosterForOrg(input.id),
-            evidence = repo.evidenceFor('org', input.id),
-            notes = redactAll(repo.listNotes(session.agencyId, { orgId = input.id }), session),
+            roster = onlyReadable(session, PERSON, repo.rosterForOrg(input.id), 'personId', 'personClassification'),
+            evidence = readableEvidence(session, repo.evidenceFor('org', input.id), 'org'),
+            notes = readableNotes(session, repo.listNotes(session.agencyId, { orgId = input.id })),
         }
     end,
 })
@@ -317,6 +495,9 @@ route.define({
     audit = 'intel.org.updated',
     subjectType = 'intel_org',
     handler = function(session, input)
+        local current, refusal = mustRead(session, ORG, input.id)
+        if not current then return refusal end
+
         local affected = repo.updateOrg(session.agencyId, input.id, input.version, {
             name = input.name and service.blankToNull(input.name),
             type = input.type,
@@ -342,6 +523,9 @@ route.define({
     audit = 'intel.org.deleted',
     subjectType = 'intel_org',
     handler = function(session, input)
+        local current, refusal = mustRead(session, ORG, input.id)
+        if not current then return refusal end
+
         -- Notes detach rather than die with the organisation: the foreign key
         -- is ON DELETE SET NULL, not CASCADE.
         -- The intelligence survives; only the profile goes.
@@ -366,8 +550,21 @@ route.define({
         return { count = #result.notes, tag = input.tag, source = input.source }
     end,
     handler = function(session, input)
-        return {
-            notes = redactAll(repo.listNotes(session.agencyId, {
+        -- Asking for the notes on one subject asks about that subject: it has
+        -- to be one this reader may read.
+        local refusal = mustReadAll(session, {
+            { PERSON, input.personId }, { ORG, input.orgId }, { CASE, input.caseId },
+        })
+        if refusal then return refusal end
+
+        -- Filtering by where intelligence came from is reading where it came
+        -- from: a reader who may not see a protected source may not ask for
+        -- the notes that have one.
+        if input.source and service.isProtectedSource(input.source) and not canSeeSource(session) then
+            return route.refuse(FredPD.ErrorCode.FORBIDDEN, { source = 'not_allowed' })
+        end
+
+        local notes = access().filterSearch(session, NOTE, repo.listNotes(session.agencyId, {
                 personId = input.personId,
                 orgId = input.orgId,
                 caseId = input.caseId,
@@ -376,8 +573,22 @@ route.define({
                 tag = input.tag,
                 search = service.searchTerm(input.search),
                 limit = input.limit,
-            }), session),
-        }
+            }))
+
+        -- A stub in a filtered list says a note the reader may not open is on
+        -- that subject, or carries that tag, or says that word: only the
+        -- unfiltered log shows stubs.
+        local filtered = input.personId or input.orgId or input.caseId or input.source
+            or input.confidence or input.tag or service.searchTerm(input.search)
+        if filtered then
+            local kept = {}
+            for _, note in ipairs(notes) do
+                if note.restricted ~= true then kept[#kept + 1] = note end
+            end
+            notes = kept
+        end
+
+        return { notes = redactAll(notes, session) }
     end,
 })
 
@@ -395,6 +606,11 @@ route.define({
     handler = function(session, input)
         local err, fields = service.validateNote(input)
         if err then return route.refuse(err, fields) end
+
+        local refusal = mustReadAll(session, {
+            { PERSON, input.personId }, { ORG, input.orgId }, { CASE, input.caseId },
+        })
+        if refusal then return refusal end
 
         local id = repo.createNote(session.agencyId, {
             personId = input.personId,
@@ -418,6 +634,9 @@ route.define({
     audit = 'intel.note.updated',
     subjectType = 'intel_note',
     handler = function(session, input)
+        local current, refusal = mustRead(session, NOTE, input.id)
+        if not current then return refusal end
+
         local affected = repo.updateNote(session.agencyId, input.id, input.version, {
             body = input.body and service.blankToNull(input.body),
             source = input.source,
@@ -445,6 +664,9 @@ route.define({
     audit = 'intel.note.deleted',
     subjectType = 'intel_note',
     handler = function(session, input)
+        local current, refusal = mustRead(session, NOTE, input.id)
+        if not current then return refusal end
+
         if repo.deleteNote(session.agencyId, input.id) == 0 then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
         end
@@ -453,11 +675,18 @@ route.define({
     end,
 })
 
+--- How many recent tag uses the tag list counts over.
+local TAG_USES <const> = 1000
+
 route.define({
     name = 'intel.tags',
     perm = 'intel.report.view',
     handler = function(session, _input)
-        return { tags = repo.tags(session.agencyId) }
+        -- Counted over the notes this reader may read: a tag on one they may
+        -- not says what it is about.
+        local uses = repo.tagUses(session.agencyId, TAG_USES)
+        local visible = countableIds(session, NOTE, service.linkedRecords(uses, 'id', 'classification'))
+        return { tags = service.tagCounts(uses, visible, 100) }
     end,
 })
 
@@ -473,6 +702,9 @@ route.define({
     audit = 'intel.vehicle.created',
     subjectType = 'intel_vehicle',
     handler = function(session, input)
+        local refusal = mustReadAll(session, { { PERSON, input.personId } })
+        if refusal then return refusal end
+
         return {
             id = repo.createVehicle(session.agencyId, {
                 personId = input.personId,
@@ -495,6 +727,11 @@ route.define({
     audit = 'intel.vehicle.deleted',
     subjectType = 'intel_vehicle',
     handler = function(session, input)
+        local vehicle = repo.vehicleById(session.agencyId, input.id)
+        if not vehicle then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+        local refusal = mustReadAll(session, { { PERSON, vehicle.personId } })
+        if refusal then return refusal end
+
         if repo.deleteVehicle(session.agencyId, input.id) == 0 then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
         end
@@ -526,14 +763,13 @@ route.define({
         return { scope = input.scope, id = input.id, persons = #result.persons, orgs = #result.orgs }
     end,
     handler = function(session, input)
-        local access = FredPD.Repo.access
         local perms = FredPD.Core.perms
         local cap = service.BOARD_PERSON_CAP
         local ORG_CAP <const> = 200
 
         local function visible(recordType, rows)
             local out = {}
-            for _, row in ipairs(access.filterSearch(session, recordType, rows)) do
+            for _, row in ipairs(access().filterSearch(session, recordType, rows)) do
                 if row.restricted ~= true then out[#out + 1] = row end
             end
             return out
@@ -562,7 +798,7 @@ route.define({
                 return route.refuse(FredPD.ErrorCode.NOT_FOUND)
             end
             local record = repo.getCase(session.agencyId, input.id)
-            if not record or not access.read(session, 'intel_case', record) then
+            if not record or not access().read(session, CASE, record) then
                 return route.refuse(FredPD.ErrorCode.NOT_FOUND)
             end
 
@@ -614,13 +850,27 @@ route.define({
     perm = 'intel.case.view',
     schema = 'IntelCaseList',
     handler = function(session, input)
-        return {
-            cases = repo.listCases(session.agencyId, {
-                status = input.status,
-                search = service.searchTerm(input.search),
-                limit = input.limit,
-            }),
-        }
+        local cases = access().filterSearch(session, CASE, repo.listCases(session.agencyId, {
+            status = input.status,
+            search = service.searchTerm(input.search),
+            limit = input.limit,
+        }))
+        countNotes(session, cases, 'case_id', false)
+
+        -- Each link counted only where this reader may read what it names.
+        local links = repo.linksOf(idsOf(cases))
+        local people = countableIds(session, PERSON, service.linkedRecords(links, 'personId', 'personClassification'))
+        local orgs = countableIds(session, ORG, service.linkedRecords(links, 'orgId', 'orgClassification'))
+        local personCounts = service.countLinked(links, 'caseId', 'personId', people)
+        local orgCounts = service.countLinked(links, 'caseId', 'orgId', orgs)
+        for _, record in ipairs(cases) do
+            if record.restricted ~= true then
+                record.personCount = personCounts[record.id] or 0
+                record.orgCount = orgCounts[record.id] or 0
+            end
+        end
+
+        return { cases = cases }
     end,
 })
 
@@ -631,14 +881,18 @@ route.define({
     audit = 'intel.case.read',
     subjectType = 'intel_case',
     handler = function(session, input)
-        local record = repo.getCase(session.agencyId, input.id)
-        if not record then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+        local record, refusal = readable(session, CASE, repo.getCase(session.agencyId, input.id))
+        if not record then return refusal end
+
+        -- Each link is judged by the record it names, person or organisation.
+        local links = onlyReadable(session, PERSON, repo.caseLinks(input.id), 'personId', 'personClassification')
+        links = onlyReadable(session, ORG, links, 'orgId', 'orgClassification')
 
         return {
             case = record,
-            links = repo.caseLinks(input.id),
-            evidence = repo.evidenceFor('case', input.id),
-            notes = redactAll(repo.listNotes(session.agencyId, { caseId = input.id }), session),
+            links = links,
+            evidence = readableEvidence(session, repo.evidenceFor('case', input.id), 'case'),
+            notes = readableNotes(session, repo.listNotes(session.agencyId, { caseId = input.id })),
         }
     end,
 })
@@ -675,6 +929,9 @@ route.define({
     audit = 'intel.case.updated',
     subjectType = 'intel_case',
     handler = function(session, input)
+        local current, refusal = mustRead(session, CASE, input.id)
+        if not current then return refusal end
+
         local affected = repo.updateCase(session.agencyId, input.id, input.version, {
             title = input.title and service.blankToNull(input.title),
             description = input.description and service.blankToNull(input.description),
@@ -698,6 +955,9 @@ route.define({
     audit = 'intel.case.deleted',
     subjectType = 'intel_case',
     handler = function(session, input)
+        local current, refusal = mustRead(session, CASE, input.id)
+        if not current then return refusal end
+
         if repo.deleteCase(session.agencyId, input.id) == 0 then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
         end
@@ -721,9 +981,10 @@ route.define({
             return route.refuse(FredPD.ErrorCode.INVALID, { target = 'exactly_one' })
         end
 
-        if not repo.getCase(session.agencyId, input.caseId) then
-            return route.refuse(FredPD.ErrorCode.NOT_FOUND)
-        end
+        local refusal = mustReadAll(session, {
+            { CASE, input.caseId }, { PERSON, input.personId }, { ORG, input.orgId },
+        })
+        if refusal then return refusal end
 
         return { id = repo.addCaseLink(input, session.discordId) }
     end,
@@ -736,7 +997,14 @@ route.define({
     writes = true,
     audit = 'intel.case.unlinked',
     subjectType = 'intel_case',
-    handler = function(_session, input)
+    handler = function(session, input)
+        local link = repo.caseLinkById(session.agencyId, input.id)
+        if not link then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+        local refusal = mustReadAll(session, {
+            { CASE, link.caseId }, { PERSON, link.personId }, { ORG, link.orgId },
+        })
+        if refusal then return refusal end
+
         if repo.removeCaseLink(input.id) == 0 then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
         end
@@ -757,11 +1025,8 @@ route.define({
     audit = 'intel.membership.set',
     subjectType = 'intel_person',
     handler = function(session, input)
-        if not repo.getPerson(session.agencyId, input.personId)
-            or not repo.getOrg(session.agencyId, input.orgId)
-        then
-            return route.refuse(FredPD.ErrorCode.NOT_FOUND)
-        end
+        local refusal = mustReadAll(session, { { PERSON, input.personId }, { ORG, input.orgId } })
+        if refusal then return refusal end
 
         repo.setMembership({
             personId = input.personId,
@@ -781,7 +1046,10 @@ route.define({
     writes = true,
     audit = 'intel.membership.removed',
     subjectType = 'intel_person',
-    handler = function(_session, input)
+    handler = function(session, input)
+        local refusal = mustReadAll(session, { { PERSON, input.personId }, { ORG, input.orgId } })
+        if refusal then return refusal end
+
         if repo.removeMembership(input.personId, input.orgId) == 0 then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
         end
@@ -805,9 +1073,8 @@ route.define({
             return route.refuse(FredPD.ErrorCode.INVALID, { associateId = err })
         end
 
-        if not repo.getPerson(session.agencyId, low) or not repo.getPerson(session.agencyId, high) then
-            return route.refuse(FredPD.ErrorCode.NOT_FOUND)
-        end
+        local refusal = mustReadAll(session, { { PERSON, low }, { PERSON, high } })
+        if refusal then return refusal end
 
         repo.setAssociate(
             low, high, service.blankToNull(input.relationship), input.isConfirmed, session.discordId
@@ -824,11 +1091,14 @@ route.define({
     writes = true,
     audit = 'intel.associate.removed',
     subjectType = 'intel_person',
-    handler = function(_session, input)
+    handler = function(session, input)
         local low, high, err = service.orderPair(input.personId, input.associateId)
         if not low then
             return route.refuse(FredPD.ErrorCode.INVALID, { associateId = err })
         end
+
+        local refusal = mustReadAll(session, { { PERSON, low }, { PERSON, high } })
+        if refusal then return refusal end
 
         if repo.removeAssociate(low, high) == 0 then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
@@ -860,6 +1130,11 @@ route.define({
         local err, fields = service.validateEvidence(input)
         if err then return route.refuse(err, fields) end
 
+        local refusal = mustReadAll(session, {
+            { PERSON, input.personId }, { ORG, input.orgId }, { CASE, input.caseId },
+        })
+        if refusal then return refusal end
+
         return {
             id = repo.addEvidence(session.agencyId, {
                 personId = input.personId,
@@ -880,6 +1155,13 @@ route.define({
     audit = 'intel.evidence.deleted',
     subjectType = 'intel_evidence',
     handler = function(session, input)
+        local item = repo.evidenceById(session.agencyId, input.id)
+        if not item then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+        local refusal = mustReadAll(session, {
+            { PERSON, item.personId }, { ORG, item.orgId }, { CASE, item.caseId },
+        })
+        if refusal then return refusal end
+
         if repo.deleteEvidence(session.agencyId, input.id) == 0 then
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
         end
@@ -891,6 +1173,11 @@ route.define({
 -- =============================================================================
 -- Global search
 -- =============================================================================
+
+--- The record type each kind of search hit is checked as.
+local SEARCH_TYPES <const> = {
+    person = PERSON, organization = ORG, note = NOTE, ['case'] = CASE, vehicle = PERSON,
+}
 
 route.define({
     name = 'intel.search',
@@ -907,6 +1194,44 @@ route.define({
         local term = service.searchTerm(input.term)
         if not term then return { results = {} } end
 
-        return { results = repo.search(session.agencyId, term, input.perType or 8) }
+        local rows = repo.search(session.agencyId, term, input.perType or 8)
+
+        -- Each kind through its own record type; a vehicle is judged by the
+        -- person it is on. Only what this reader may read in full is
+        -- returned: a stub in a mixed result list has no kind to draw, and
+        -- hiding is always an allowed answer (4.5).
+        local visible = {}
+        for kind, recordType in pairs(SEARCH_TYPES) do
+            local idField = kind == 'vehicle' and 'ownerId' or 'id'
+            local ofKind = {}
+            for _, row in ipairs(rows) do
+                if row.kind == kind then ofKind[#ofKind + 1] = row end
+            end
+            -- Once per record: two vehicles on one person are one question.
+            local records = service.linkedRecords(ofKind, idField, 'classification')
+            visible[kind] = #records > 0 and visibleIds(session, recordType, records) or {}
+        end
+
+        local results = {}
+        for _, row in ipairs(rows) do
+            local owner = row.kind == 'vehicle' and row.ownerId or row.id
+            if owner == nil or (visible[row.kind] and visible[row.kind][owner]) then
+                row.classification, row.ownerId = nil, nil
+                results[#results + 1] = row
+            end
+        end
+
+        return { results = results }
     end,
 })
+
+--- For the spaning module (a lookout naming a master person, 7.13): the
+--- associates of the intelligence subject tied to that person, as this
+--- session may read them -- nothing when the subject itself is one it may
+--- not read, and only the associates it may read in full.
+FredPD.Modules.intelAssociatesOf = function(session, masterPersonId)
+    local subject = repo.byMasterPersonId(session.agencyId, masterPersonId)
+    if not subject or not access().read(session, PERSON, subject) then return {} end
+
+    return onlyReadable(session, PERSON, repo.associatesForPerson(subject.id), 'personId', 'personClassification')
+end
