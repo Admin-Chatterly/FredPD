@@ -73,10 +73,10 @@ end
 
 --- Records a charging decision, with its charges (when `atalad`) in the same
 --- transaction: an åtal briefly holding no charges is a prosecution of
---- nothing, and `LAST_INSERT_ID()` inside oxmysql's transaction wrapper
---- (each statement runs on the one connection, in order) is what lets the
---- charge rows reference a parent id this statement list never sees handed
---- back.
+--- nothing. The parent id is captured with `LAST_INSERT_ID()` into a
+--- session variable (each statement runs on the one connection, in order),
+--- which is what lets the charge rows reference an id this statement list
+--- never sees handed back.
 ---
 --- @param charges table|nil list of { brottId, stage } -- nil or empty for
 ---   an `ej_atal` decision
@@ -105,6 +105,12 @@ function Repo.decide(input, session, charges)
                       VALUES (]] .. counters.numberSql() .. [[, ?, ?, ?, ?, ?, ?, ?)]],
             values = values,
         },
+        -- Held in a variable straight after the åtal's own INSERT. Every
+        -- charge row is itself an INSERT into a table with its own
+        -- AUTO_INCREMENT, so `LAST_INSERT_ID()` in the second charge would be
+        -- the first charge's id -- a second count filed against the wrong
+        -- parent, or refused by its foreign key and the whole åtal with it.
+        { query = 'SET @fpd_atal = LAST_INSERT_ID()', values = {} },
     }
 
     for index = 1, #(charges or {}) do
@@ -112,7 +118,7 @@ function Repo.decide(input, session, charges)
 
         statements[#statements + 1] = {
             query = [[INSERT INTO fpd_atal_brott (atal_id, brott_id, stage)
-                      VALUES (LAST_INSERT_ID(), ?, ?)]],
+                      VALUES (@fpd_atal, ?, ?)]],
             values = { charge.brottId, charge.stage },
         }
     end

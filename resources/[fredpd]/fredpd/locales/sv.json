@@ -1122,7 +1122,8 @@
       "brott": "Brottskatalog",
       "ordningsbot": "Ordningsböter",
       "impound": "Beslag",
-      "locations": "Adresser"
+      "locations": "Adresser",
+      "fi": "Kontaktkort"
     },
     "vehicle": {
       "alpr": {
@@ -2727,7 +2728,9 @@
       "runPlate": "Slå registreringsnummer",
       "arrestUnidentified": "Grip: identiteten oklar",
       "trafficStop": "Påbörja trafikkontroll",
-      "impound": "Beslagta fordon"
+      "impound": "Beslagta fordon",
+      "fieldInterview": "Kontaktkort",
+      "recordStop": "Registrera kontroll"
     },
     "person": {
       "registered": "Ny i registret: tillagd från legitimationen.",
@@ -2765,6 +2768,16 @@
       "confirm": "Beslagta {plate}? Fordonet bärgas bort och står kvar tills det lämnas ut.",
       "towed": "Beslag {number} registrerat. Fordonet har bärgats.",
       "recorded": "Beslag {number} registrerat. Fordonet kunde inte bärgas härifrån."
+    },
+    "fi": {
+      "reason": "Varför kontaktades personen?",
+      "recorded": "Kontaktkort skrivet om {name}."
+    },
+    "stop": {
+      "reason": "Varför gjordes kontrollen?",
+      "search": "Genomsöktes något?",
+      "result": "Hur slutade kontrollen?",
+      "recorded": "Kontrollen är registrerad."
     }
   },
   "status": {
@@ -2888,6 +2901,85 @@
     },
     "confirm": {
       "removeKeyholder": "Ta bort {name} från adressen? Personen listas då inte längre som kontakt här."
+    }
+  },
+  "fi": {
+    "title": "Kontaktkort",
+    "field": {
+      "person": "Person",
+      "vehicle": "Fordon",
+      "associates": "I sällskap med",
+      "reason": "Anledning",
+      "narrative": "Vad som sades och iakttogs",
+      "locationText": "Plats",
+      "here": "Spara min nuvarande position"
+    },
+    "filter": {
+      "mine": "Bara mina"
+    },
+    "written": "Kontaktkortet är skrivet.",
+    "empty": "Inga kontaktkort.",
+    "detail": {
+      "none": "Välj ett kort för att läsa det."
+    },
+    "column": {
+      "when": "När"
+    },
+    "onCall": "på händelse {number}",
+    "action": {
+      "write": "Skriv kort",
+      "remove": "Ta bort",
+      "removeAssociate": "Ta bort {name} från kortet"
+    },
+    "reason": {
+      "suspicious_behaviour": "Misstänkt beteende",
+      "matches_description": "Stämmer med signalement",
+      "known_associate": "Känd kontakt",
+      "area_check": "Områdeskontroll",
+      "gang_activity": "Gängaktivitet",
+      "drug_activity": "Narkotikaaktivitet",
+      "other": "Annat"
+    }
+  },
+  "stop": {
+    "title": "Kontroller",
+    "field": {
+      "kind": "Typ",
+      "reason": "Anledning",
+      "search": "Visitation",
+      "result": "Resultat"
+    },
+    "kind": {
+      "traffic": "Trafikkontroll",
+      "pedestrian": "Kontroll av person"
+    },
+    "reason": {
+      "traffic_violation": "Trafikförseelse",
+      "equipment_fault": "Fel på fordonet",
+      "suspicious": "Misstänkt beteende",
+      "matches_description": "Stämmer med signalement",
+      "call_related": "Kopplad till händelse",
+      "wanted": "Efterlyst",
+      "other": "Annat"
+    },
+    "search": {
+      "none": "Ingen",
+      "consent": "Med samtycke",
+      "frisk": "Kroppsvisitation",
+      "vehicle": "Fordonet genomsökt",
+      "person_and_vehicle": "Person och fordon"
+    },
+    "result": {
+      "no_action": "Ingen åtgärd",
+      "warning": "Varning",
+      "citation": "Ordningsbot",
+      "arrest": "Gripande",
+      "other": "Annat"
+    },
+    "recorded": "Kontrollen är registrerad.",
+    "empty": "Inga registrerade kontroller.",
+    "action": {
+      "record": "Registrera kontroll"
     }
   }
 }

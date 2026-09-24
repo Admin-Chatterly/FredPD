@@ -1570,6 +1570,43 @@ FredPD.Schema = {
         classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
     },
 
+    FiCreate = {
+        personId = { type = 'integer', required = false, min = 1 },
+        vehicleId = { type = 'integer', required = false, min = 1 },
+        associateIds = { type = 'string[]', required = false, maxItems = 10, maxLength = 20 },
+        reason = { type = 'enum', required = true, values = { 'suspicious_behaviour', 'matches_description', 'known_associate', 'area_check', 'gang_activity', 'drug_activity', 'other' } },
+        narrative = { type = 'string', required = false, max = 1000 },
+        locationText = { type = 'string', required = false, max = 191 },
+        here = { type = 'boolean', required = false },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    FiList = {
+        personId = { type = 'integer', required = false, min = 1 },
+        vehicleId = { type = 'integer', required = false, min = 1 },
+        mine = { type = 'boolean', required = false },
+        limit = { type = 'integer', required = false, min = 1, max = 100 },
+    },
+
+    FiGet = {
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
+    StopCreate = {
+        kind = { type = 'enum', required = true, values = { 'traffic', 'pedestrian' } },
+        reason = { type = 'enum', required = true, values = { 'traffic_violation', 'equipment_fault', 'suspicious', 'matches_description', 'call_related', 'wanted', 'other' } },
+        search = { type = 'enum', required = true, values = { 'none', 'consent', 'frisk', 'vehicle', 'person_and_vehicle' } },
+        result = { type = 'enum', required = true, values = { 'no_action', 'warning', 'citation', 'arrest', 'other' } },
+        personId = { type = 'integer', required = false, min = 1 },
+        vehicleId = { type = 'integer', required = false, min = 1 },
+        netId = { type = 'integer', required = false, min = 1 },
+    },
+
+    StopList = {
+        mine = { type = 'boolean', required = false },
+        limit = { type = 'integer', required = false, min = 1, max = 100 },
+    },
+
     LocationSearch = {
         term = { type = 'string', required = false, max = 64 },
         limit = { type = 'integer', required = false, min = 1, max = 100 },

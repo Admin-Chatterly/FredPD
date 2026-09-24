@@ -137,6 +137,11 @@ local REQUIRED_TABLES <const> = {
     'fpd_locations',
     'fpd_location_hazards',
     'fpd_location_keyholders',
+
+    -- Migration 0035. Field interview cards and stop data (7.14).
+    'fpd_fi_cards',
+    'fpd_fi_associates',
+    'fpd_stops',
 }
 
 --- Columns a migration added to a table that already existed, which the table

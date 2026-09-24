@@ -848,9 +848,9 @@ Built. Migration 0012, `server/modules/spaning/`.
 
 ### 7.14 Field interviews and stop data (S, M6)
 
-- [S] Field interview cards (who, where, why, associates, vehicle).
-- [S] Traffic and pedestrian stop data (reason, search conducted, result), feeding statistics.
-- **Permissions:** `rms.fi.create`, `rms.stops.create`.
+- [S] Field interview cards (who, where, why, associates, vehicle). **Built (0035).** A card needs a person, a vehicle or a written note; it takes up to ten associates. Everybody and everything it names is read through its own access check before it is linked, answered as not found otherwise, so a card is never a way to learn a hidden record exists. The position (only when asked for), the officer and the officer's current call come from the server. On the Records rail as *Field interviews* and in the world as the ox_target action *Field interview* on a player (after the ID check's consent). `fi.list` filters by person (as subject or associate), vehicle or own cards; people and vehicles the reader may not read are dropped from a card, not named.
+- [S] Traffic and pedestrian stop data (reason, search conducted, result), feeding statistics. **Built (0035).** *Record stop* on a vehicle reads the plate off the car on the server (within range); on a pedestrian it names nobody -- identity is what the consented ID check asks. The stop list never names the person, and shows the plate only to a reader of the vehicle record.
+- **Permissions:** `rms.fi.create`, `rms.fi.view`, `rms.stops.create`, `rms.stops.view` (all patrol).
 
 ### 7.15 Impound and tow (M6)
 
@@ -1791,7 +1791,7 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Frihetsberövande | `frihet.view`, `frihet.gripande`, `frihet.anhallande`, `frihet.haktning`, `frihet.frigiv`, `frihet.fallback.aklagare`, `frihet.fallback.domare` |
 | Tvångsmedel | `tvang.view`, `tvang.decide`, `tvang.decide.aklagare`, `tvang.decide.domare`, `tvang.verkstall`, `efterlysning.issue` |
 | Spaning | `spaning.view`, `spaning.create` |
-| Enforcement | `rms.arrest.create`, `rms.citation.issue`, `rms.citation.void`, `rms.fi.create`, `rms.stops.create`, `rms.impound.create`, `rms.impound.release`, `rms.impound.hold.release`, `rms.warrant.serve` |
+| Enforcement | `rms.arrest.create`, `rms.citation.issue`, `rms.citation.void`, `rms.fi.create`, `rms.fi.view`, `rms.stops.create`, `rms.stops.view`, `rms.impound.create`, `rms.impound.release`, `rms.impound.hold.release`, `rms.warrant.serve` |
 | Investigations (intelligence cases, §10) | `inv.case.create`, `inv.case.view`, `inv.case.edit`, `inv.case.assign`, `inv.case.close` |
 | Booking | `booking.view`, `booking.intake`, `booking.release` (this row's `booking.create`/`booking.biometrics.capture` were this catalog's own initial guess at names 7.9 shipped under `booking.intake` instead — including 8.8's ten-print capture, `booking.tenPrint.capture`, which reuses it rather than adding a fifth key) |
 | Court | `court.warrant.request`, `court.warrant.review`, `court.warrant.recall`, `court.referral.review`, `court.calendar.manage`, `court.disposition.enter`, `court.discovery.issue`, `court.discovery.view`, `court.seal.order`, `court.citation.adjudicate`, `court.sentence.calculate` |

@@ -348,7 +348,7 @@ local PERMISSION_CATALOGUE <const> = {
 
     -- Enforcement
     'rms.arrest.create', 'rms.citation.issue', 'rms.citation.void',
-    'rms.fi.create', 'rms.stops.create',
+    'rms.fi.create', 'rms.fi.view', 'rms.stops.create', 'rms.stops.view',
     'rms.impound.create', 'rms.impound.release', 'rms.impound.hold.release',
     'rms.warrant.serve',
 

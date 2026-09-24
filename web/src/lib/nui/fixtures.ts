@@ -4336,6 +4336,113 @@ let fixtureLocations: FixtureLocation[] = [
 
 let nextLocationHazardId = 10;
 
+interface FixtureCard {
+  id: number;
+  reason: string;
+  narrative: string | null;
+  locationText: string | null;
+  createdAgo: number;
+  mine: boolean;
+  personId: number | null;
+  vehicleId: number | null;
+  associateIds: number[];
+  callNumber: string | null;
+}
+
+/** Field interview cards (7.14): one by this officer, one by a colleague. */
+let fixtureCards: FixtureCard[] = [
+  {
+    id: 1,
+    reason: 'suspicious_behaviour',
+    narrative: 'Looking into parked cars on Alta Street. Said he was waiting for a friend.',
+    locationText: 'Alta Street at Power Street',
+    createdAgo: 2 * 3600,
+    mine: true,
+    personId: 1,
+    vehicleId: null,
+    associateIds: [3],
+    callNumber: null,
+  },
+  {
+    id: 2,
+    reason: 'known_associate',
+    narrative: null,
+    locationText: null,
+    createdAgo: 3 * DAY,
+    mine: false,
+    personId: 3,
+    vehicleId: 1,
+    associateIds: [],
+    callNumber: '2026-000118',
+  },
+];
+let nextCardId = 3;
+
+interface FixtureStop {
+  id: number;
+  kind: string;
+  reason: string;
+  search: string;
+  result: string;
+  vehicleId: number | null;
+  createdAgo: number;
+  mine: boolean;
+}
+
+let fixtureStops: FixtureStop[] = [
+  {
+    id: 1,
+    kind: 'traffic',
+    reason: 'traffic_violation',
+    search: 'none',
+    result: 'citation',
+    vehicleId: 1,
+    createdAgo: 3600,
+    mine: true,
+  },
+  {
+    id: 2,
+    kind: 'pedestrian',
+    reason: 'matches_description',
+    search: 'consent',
+    result: 'no_action',
+    vehicleId: null,
+    createdAgo: DAY,
+    mine: false,
+  },
+];
+let nextStopId = 3;
+
+function fixtureVehicleRef(id: number | null): Record<string, unknown> | null {
+  if (id === null) return null;
+  const found = registerVehicles
+    .map((entry) => entry.row)
+    .find((row): row is VehicleResult => !isStub(row) && row.id === id);
+  return found ? { id: found.id, plate: found.plate, model: found.model } : null;
+}
+
+function cardRow(card: FixtureCard, withAssociates: boolean): Record<string, unknown> {
+  return {
+    id: card.id,
+    reason: card.reason,
+    narrative: card.narrative,
+    locationText: card.locationText,
+    createdAt: secondsAgo(card.createdAgo),
+    createdByCallsign: card.mine ? '1-ADAM-12' : '2-LINCOLN-4',
+    createdByName: card.mine ? 'Berg' : 'Lind',
+    callNumber: card.callNumber,
+    person: card.personId !== null ? personRef(card.personId) : null,
+    vehicle: fixtureVehicleRef(card.vehicleId),
+    ...(withAssociates
+      ? {
+          associates: card.associateIds
+            .map((id) => personRef(id))
+            .filter((person): person is Record<string, unknown> => person !== null),
+        }
+      : {}),
+  };
+}
+
 function liveLocationHazards(location: FixtureLocation): FixtureLocation['hazards'] {
   return location.hazards.filter((hazard) => hazard.cancelledAgo === undefined);
 }
@@ -6164,6 +6271,101 @@ export const fixtures: FixtureSet = {
       if (location.keyholders.length === before) return refuse('not_found', { personId: 'unknown' });
 
       return { locationId: location.id };
+    },
+
+    'fi.list': (input) => {
+      const { mine, personId } = (input ?? {}) as { mine?: boolean; personId?: number };
+
+      return {
+        cards: fixtureCards
+          .filter((card) => !mine || card.mine)
+          .filter((card) => personId === undefined || card.personId === personId || card.associateIds.includes(personId))
+          .sort((a, b) => a.createdAgo - b.createdAgo)
+          .map((card) => cardRow(card, false)),
+      };
+    },
+
+    'fi.get': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const card = fixtureCards.find((entry) => entry.id === id);
+      if (!card) return refuse('not_found');
+
+      return { card: cardRow(card, true) };
+    },
+
+    'fi.create': (input) => {
+      const form = (input ?? {}) as {
+        personId?: number;
+        vehicleId?: number;
+        associateIds?: string[];
+        reason?: string;
+        narrative?: string;
+        locationText?: string;
+      };
+
+      if (form.personId === undefined && form.vehicleId === undefined && !form.narrative?.trim()) {
+        return refuse('invalid', { personId: 'required' });
+      }
+      if ((form.associateIds ?? []).length > 10) return refuse('invalid', { associateIds: 'too_many' });
+
+      const id = nextCardId++;
+      fixtureCards = [
+        {
+          id,
+          reason: form.reason ?? 'other',
+          narrative: form.narrative ?? null,
+          locationText: form.locationText ?? null,
+          createdAgo: 0,
+          mine: true,
+          personId: form.personId ?? null,
+          vehicleId: form.vehicleId ?? null,
+          associateIds: [...new Set((form.associateIds ?? []).map(Number))].filter((entry) => entry !== form.personId),
+          callNumber: null,
+        },
+        ...fixtureCards,
+      ];
+
+      return { id, associates: (form.associateIds ?? []).length };
+    },
+
+    'stop.list': (input) => {
+      const { mine } = (input ?? {}) as { mine?: boolean };
+
+      return {
+        stops: fixtureStops
+          .filter((stop) => !mine || stop.mine)
+          .sort((a, b) => a.createdAgo - b.createdAgo)
+          .map((stop) => ({
+            id: stop.id,
+            kind: stop.kind,
+            reason: stop.reason,
+            search: stop.search,
+            result: stop.result,
+            plate: (fixtureVehicleRef(stop.vehicleId)?.plate as string | undefined) ?? null,
+            createdAt: secondsAgo(stop.createdAgo),
+            createdByCallsign: stop.mine ? '1-ADAM-12' : '2-LINCOLN-4',
+          })),
+      };
+    },
+
+    'stop.create': (input) => {
+      const form = (input ?? {}) as { kind: string; reason: string; search: string; result: string; vehicleId?: number };
+      const id = nextStopId++;
+      fixtureStops = [
+        {
+          id,
+          kind: form.kind,
+          reason: form.reason,
+          search: form.search,
+          result: form.result,
+          vehicleId: form.vehicleId ?? null,
+          createdAgo: 0,
+          mine: true,
+        },
+        ...fixtureStops,
+      ];
+
+      return { id };
     },
 
     'impound.list': (input) => {

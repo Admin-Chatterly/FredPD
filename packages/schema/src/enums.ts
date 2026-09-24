@@ -1186,3 +1186,44 @@ export type LocationHazardKind = (typeof LOCATION_HAZARD_KINDS)[number];
 export const LOCATION_KEYHOLDER_ROLES = ['owner', 'tenant', 'keyholder', 'manager', 'employee'] as const;
 
 export type LocationKeyholderRole = (typeof LOCATION_KEYHOLDER_ROLES)[number];
+
+/** `ck_fpd_fi_cards_reason` (spec 7.14, 0035) — why somebody was spoken to. */
+export const FI_REASONS = [
+  'suspicious_behaviour',
+  'matches_description',
+  'known_associate',
+  'area_check',
+  'gang_activity',
+  'drug_activity',
+  'other',
+] as const;
+
+export type FiReason = (typeof FI_REASONS)[number];
+
+/** `ck_fpd_stops_kind` (spec 7.14, 0035). */
+export const STOP_KINDS = ['traffic', 'pedestrian'] as const;
+
+export type StopKind = (typeof STOP_KINDS)[number];
+
+/** `ck_fpd_stops_reason` (spec 7.14, 0035) — why the stop was made. */
+export const STOP_REASONS = [
+  'traffic_violation',
+  'equipment_fault',
+  'suspicious',
+  'matches_description',
+  'call_related',
+  'wanted',
+  'other',
+] as const;
+
+export type StopReason = (typeof STOP_REASONS)[number];
+
+/** `ck_fpd_stops_search` (spec 7.14, 0035) — what, if anything, was searched. */
+export const STOP_SEARCHES = ['none', 'consent', 'frisk', 'vehicle', 'person_and_vehicle'] as const;
+
+export type StopSearch = (typeof STOP_SEARCHES)[number];
+
+/** `ck_fpd_stops_result` (spec 7.14, 0035) — how the stop ended. */
+export const STOP_RESULTS = ['no_action', 'warning', 'citation', 'arrest', 'other'] as const;
+
+export type StopResult = (typeof STOP_RESULTS)[number];

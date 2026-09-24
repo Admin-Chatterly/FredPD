@@ -874,3 +874,18 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('dispatch', 'rms.location.view'),
     ('patrol', 'rms.location.edit'),
     ('patrol', 'rms.location.hazard.edit');
+
+-- -----------------------------------------------------------------------------
+-- Field interviews and stop data (spec 7.14)
+--
+-- Writing a card or recording a stop is patrol work, and so is reading the
+-- cards -- a card is written to be found by the next officer who meets the
+-- same person. The stop list names no person, and a plate only to a reader
+-- of that vehicle, so it is ordinary reading too.
+-- -----------------------------------------------------------------------------
+
+INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
+    ('patrol', 'rms.fi.create'),
+    ('patrol', 'rms.fi.view'),
+    ('patrol', 'rms.stops.create'),
+    ('patrol', 'rms.stops.view');

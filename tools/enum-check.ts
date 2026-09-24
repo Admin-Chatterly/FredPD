@@ -157,6 +157,15 @@ const PAIRED: Record<string, keyof typeof enums> = {
   // Impound (0020, spec 7.15).
   ck_fpd_impound_reason: 'IMPOUND_HELD_REASONS',
 
+  // Field interviews and stops (0035, spec 7.14).
+  ck_fpd_fi_cards_reason: 'FI_REASONS',
+  ck_fpd_fi_cards_class: 'CLASSIFICATIONS',
+  ck_fpd_stops_kind: 'STOP_KINDS',
+  ck_fpd_stops_reason: 'STOP_REASONS',
+  ck_fpd_stops_search: 'STOP_SEARCHES',
+  ck_fpd_stops_result: 'STOP_RESULTS',
+  ck_fpd_stops_class: 'CLASSIFICATIONS',
+
   // Locations and premises (0034, spec 7.6).
   ck_fpd_locations_kind: 'LOCATION_KINDS',
   ck_fpd_locations_class: 'CLASSIFICATIONS',

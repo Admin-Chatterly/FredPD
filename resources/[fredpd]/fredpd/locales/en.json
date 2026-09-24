@@ -1122,7 +1122,8 @@
       "brott": "Offences",
       "ordningsbot": "Citations",
       "impound": "Impound",
-      "locations": "Locations"
+      "locations": "Locations",
+      "fi": "Field interviews"
     },
     "vehicle": {
       "alpr": {
@@ -2727,7 +2728,9 @@
       "runPlate": "Run plate",
       "arrestUnidentified": "Arrest: identity not established",
       "trafficStop": "Start traffic stop",
-      "impound": "Impound"
+      "impound": "Impound",
+      "fieldInterview": "Field interview",
+      "recordStop": "Record stop"
     },
     "person": {
       "registered": "New to the register: added from their ID.",
@@ -2765,6 +2768,16 @@
       "confirm": "Impound {plate}? It is towed away and stays held until it is released.",
       "towed": "Impound {number} recorded. The vehicle has been towed.",
       "recorded": "Impound {number} recorded. The vehicle could not be towed from here."
+    },
+    "fi": {
+      "reason": "Why was this person spoken to?",
+      "recorded": "Field interview card written about {name}."
+    },
+    "stop": {
+      "reason": "Why was the stop made?",
+      "search": "Was anything searched?",
+      "result": "How did the stop end?",
+      "recorded": "Stop recorded."
     }
   },
   "status": {
@@ -2888,6 +2901,85 @@
     },
     "confirm": {
       "removeKeyholder": "Remove {name} from this address? They are no longer listed as someone to contact here."
+    }
+  },
+  "fi": {
+    "title": "Field interview cards",
+    "field": {
+      "person": "Person",
+      "vehicle": "Vehicle",
+      "associates": "With (associates)",
+      "reason": "Reason",
+      "narrative": "What was said and seen",
+      "locationText": "Place",
+      "here": "Record my current position"
+    },
+    "filter": {
+      "mine": "Only mine"
+    },
+    "written": "Field interview card written.",
+    "empty": "No field interview cards.",
+    "detail": {
+      "none": "Choose a card to read it."
+    },
+    "column": {
+      "when": "When"
+    },
+    "onCall": "on call {number}",
+    "action": {
+      "write": "Write card",
+      "remove": "Remove",
+      "removeAssociate": "Remove {name} from the card"
+    },
+    "reason": {
+      "suspicious_behaviour": "Suspicious behaviour",
+      "matches_description": "Matches a description",
+      "known_associate": "Known associate",
+      "area_check": "Area check",
+      "gang_activity": "Gang activity",
+      "drug_activity": "Drug activity",
+      "other": "Other"
+    }
+  },
+  "stop": {
+    "title": "Stops",
+    "field": {
+      "kind": "Kind",
+      "reason": "Reason",
+      "search": "Search",
+      "result": "Result"
+    },
+    "kind": {
+      "traffic": "Traffic stop",
+      "pedestrian": "Pedestrian stop"
+    },
+    "reason": {
+      "traffic_violation": "Traffic violation",
+      "equipment_fault": "Equipment fault",
+      "suspicious": "Suspicious behaviour",
+      "matches_description": "Matches a description",
+      "call_related": "Related to a call",
+      "wanted": "Wanted",
+      "other": "Other"
+    },
+    "search": {
+      "none": "No search",
+      "consent": "Search with consent",
+      "frisk": "Frisk",
+      "vehicle": "Vehicle searched",
+      "person_and_vehicle": "Person and vehicle searched"
+    },
+    "result": {
+      "no_action": "No action",
+      "warning": "Warning",
+      "citation": "Citation",
+      "arrest": "Arrest",
+      "other": "Other"
+    },
+    "recorded": "Stop recorded.",
+    "empty": "No stops recorded.",
+    "action": {
+      "record": "Record stop"
     }
   }
 }

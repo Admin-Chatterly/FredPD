@@ -19,6 +19,7 @@
   import Ordningsbot from './Ordningsbot.svelte';
   import Impound from './Impound.svelte';
   import Locations from './Locations.svelte';
+  import FieldWork from './FieldWork.svelte';
   import { t } from '../../lib/i18n';
   import { formatDate, formatMoment } from '../../lib/time';
   import {
@@ -100,7 +101,8 @@
     | 'spaning'
     | 'ordningsbot'
     | 'impound'
-    | 'locations';
+    | 'locations'
+    | 'fi';
 
   /** Which form's label a rejected field belongs to (spec 3.5). */
   const FIELD_LABELS: Record<string, string> = {
@@ -1214,6 +1216,8 @@
     'impound',
     // The address index and its hazards (7.6).
     'locations',
+    // Field interview cards and stop data (7.14).
+    'fi',
   ];
 
   /**
@@ -3312,5 +3316,7 @@
     <Impound />
   {:else if tab === 'locations'}
     <Locations />
+  {:else if tab === 'fi'}
+    <FieldWork />
   {/if}
 </section>

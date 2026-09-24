@@ -279,6 +279,11 @@ local NUI_ROUTES <const> = {
     'location.hazard.cancel',
     'location.keyholder.set',
     'location.keyholder.remove',
+    'fi.create',
+    'fi.list',
+    'fi.get',
+    'stop.create',
+    'stop.list',
     'impound.authorize',
     'impound.release',
 

@@ -5,7 +5,7 @@ ESX server already uses (spec 3.3).
 
 ## Migrations
 
-**The current migration is `0034_locations.sql`. Apply every file up to and
+**The current migration is `0035_field_interviews.sql`. Apply every file up to and
 including it.** This list has been wrong before, and an operator who trusts a
 stale one applies `0001` and then spends an evening reading SQL errors about
 tables nobody told them existed. If you add a migration, add it here in the

@@ -26,6 +26,7 @@ import {
   HAK_STATUSES,
   HAK_TARGETS,
   HOTLIST_REASONS,
+  FI_REASONS,
   IMPOUND_HELD_REASONS,
   LOCATION_HAZARD_KINDS,
   LOCATION_KEYHOLDER_ROLES,
@@ -47,6 +48,10 @@ import {
   PLACEMENT_KINDS,
   SCENE_STATUSES,
   SPANING_TARGETS,
+  STOP_KINDS,
+  STOP_REASONS,
+  STOP_RESULTS,
+  STOP_SEARCHES,
   TVANG_KINDS,
   TVANG_TARGETS,
   SELF_SET_UNIT_STATUSES,
@@ -2723,6 +2728,56 @@ export const schemas = {
    * plate and model are read off the car by the server; the client names only
    * the entity and the reason.
    */
+  // --------------------------------------- field interviews and stops (7.14)
+
+  /**
+   * A field interview card. The position is the officer's own, read by the
+   * server; the call is the one the officer is on, found by the server.
+   * `associateIds` are person ids, each read through the person's access
+   * check before it is linked.
+   */
+  FiCreate: {
+    personId: { type: 'integer', required: false, min: 1 },
+    vehicleId: { type: 'integer', required: false, min: 1 },
+    associateIds: { type: 'string[]', required: false, maxItems: 10, maxLength: 20 },
+    reason: { type: 'enum', required: true, values: FI_REASONS },
+    narrative: { type: 'string', required: false, max: 1000 },
+    locationText: { type: 'string', required: false, max: 191 },
+    here: { type: 'boolean', required: false },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
+  FiList: {
+    personId: { type: 'integer', required: false, min: 1 },
+    vehicleId: { type: 'integer', required: false, min: 1 },
+    mine: { type: 'boolean', required: false },
+    limit: { type: 'integer', required: false, min: 1, max: 100 },
+  },
+
+  FiGet: {
+    id: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
+   * Stop data. `netId` names the car in front of the officer (ox_target):
+   * the server reads its plate and finds the vehicle, so a client never names
+   * a vehicle id it was not shown.
+   */
+  StopCreate: {
+    kind: { type: 'enum', required: true, values: STOP_KINDS },
+    reason: { type: 'enum', required: true, values: STOP_REASONS },
+    search: { type: 'enum', required: true, values: STOP_SEARCHES },
+    result: { type: 'enum', required: true, values: STOP_RESULTS },
+    personId: { type: 'integer', required: false, min: 1 },
+    vehicleId: { type: 'integer', required: false, min: 1 },
+    netId: { type: 'integer', required: false, min: 1 },
+  },
+
+  StopList: {
+    mine: { type: 'boolean', required: false },
+    limit: { type: 'integer', required: false, min: 1, max: 100 },
+  },
+
   // ----------------------------------------------------- locations (spec 7.6)
 
   /** The address index. An empty term lists the most recently touched. */

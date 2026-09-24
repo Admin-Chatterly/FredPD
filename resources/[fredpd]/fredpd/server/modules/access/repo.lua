@@ -60,6 +60,8 @@ local RECORD_TYPES <const> = {
     efterlysning = true, spaning = true,
     lab_request = true, intel_person = true, intel_org = true, intel_note = true,
     intel_case = true, surveillance = true, ia_case = true, uof_report = true,
+    -- 7.14: field interview cards and stop data.
+    fi_card = true, stop = true,
 }
 
 --- Who a grant may be written for. `breakglass` is not here: a break-glass

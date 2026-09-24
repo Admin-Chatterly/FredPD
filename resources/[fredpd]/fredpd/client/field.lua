@@ -157,6 +157,42 @@ local function impound(netId, label)
     lib.showContext('fredpd_field_impound')
 end
 
+--- Stop data (7.14), three quick choices: why, what was searched, how it
+--- ended. The server takes the position, the call and -- for a car -- the
+--- vehicle from the plate on it.
+local STOP_REASONS <const> = {
+    'traffic_violation', 'equipment_fault', 'suspicious', 'matches_description',
+    'call_related', 'wanted', 'other',
+}
+local STOP_SEARCHES <const> = { 'none', 'consent', 'frisk', 'vehicle', 'person_and_vehicle' }
+local STOP_RESULTS <const> = { 'no_action', 'warning', 'citation', 'arrest', 'other' }
+
+local function pick(id, title, values, keyPrefix, onPick)
+    local options = {}
+    for _, value in ipairs(values) do
+        options[#options + 1] = {
+            title = FredPD.t(keyPrefix .. value),
+            onSelect = function() onPick(value) end,
+        }
+    end
+
+    lib.registerContext({ id = id, title = title, options = options })
+    lib.showContext(id)
+end
+
+local function recordStop(kind, netId)
+    pick('fredpd_stop_reason', FredPD.t('field.stop.reason'), STOP_REASONS, 'stop.reason.', function(reason)
+        pick('fredpd_stop_search', FredPD.t('field.stop.search'), STOP_SEARCHES, 'stop.search.', function(search)
+            pick('fredpd_stop_result', FredPD.t('field.stop.result'), STOP_RESULTS, 'stop.result.', function(result)
+                local recorded = call('stop.create', {
+                    kind = kind, reason = reason, search = search, result = result, netId = netId,
+                })
+                if recorded then core.notify('field.stop.recorded') end
+            end)
+        end)
+    end)
+end
+
 --- Picks a fine from the catalogue and issues it. One citation per press.
 local function cite(subject)
     local list = call('ordningsbot.tariff.list', {})
@@ -355,6 +391,22 @@ local function checkId(entity)
     lib.showContext('fredpd_field_person')
 end
 
+--- Why somebody was spoken to, for a field interview card (7.14).
+local FI_REASONS <const> = {
+    'suspicious_behaviour', 'matches_description', 'known_associate', 'area_check',
+    'gang_activity', 'drug_activity', 'other',
+}
+
+local function fieldInterview(entity)
+    local person = resolvePerson(entity)
+    if not person then return end
+
+    pick('fredpd_fi_reason', FredPD.t('field.fi.reason'), FI_REASONS, 'fi.reason.', function(reason)
+        local written = call('fi.create', { personId = person.id, reason = reason, here = true })
+        if written then core.notify('field.fi.recorded', { name = core.plainText(person.label) }) end
+    end)
+end
+
 target.addPlayerOptions({
     {
         name = 'fredpd_field_check_id',
@@ -363,6 +415,24 @@ target.addPlayerOptions({
         distance = DISTANCE,
         canInteract = function(entity) return serverIdOf(entity) ~= nil end,
         onSelect = function(data) checkId(data and data.entity) end,
+    },
+    {
+        name = 'fredpd_field_interview',
+        icon = 'fa-solid fa-clipboard-user',
+        label = FredPD.t('field.action.fieldInterview'),
+        distance = DISTANCE,
+        canInteract = function(entity) return serverIdOf(entity) ~= nil end,
+        onSelect = function(data) fieldInterview(data and data.entity) end,
+    },
+    {
+        -- A pedestrian stop names nobody: who they are is what Check ID asks,
+        -- with their consent. The stop is the fact that it happened.
+        name = 'fredpd_field_stop_person',
+        icon = 'fa-solid fa-clipboard-list',
+        label = FredPD.t('field.action.recordStop'),
+        distance = DISTANCE,
+        canInteract = function(entity) return serverIdOf(entity) ~= nil end,
+        onSelect = function() recordStop('pedestrian', nil) end,
     },
     {
         name = 'fredpd_field_cite_person',
@@ -478,6 +548,17 @@ target.addVehicleOptions({
         distance = DISTANCE,
         canInteract = function(entity) return netIdOf(entity) ~= nil end,
         onSelect = function(data) runPlate(data and data.entity) end,
+    },
+    {
+        name = 'fredpd_field_stop_vehicle',
+        icon = 'fa-solid fa-clipboard-list',
+        label = FredPD.t('field.action.recordStop'),
+        distance = DISTANCE,
+        canInteract = function(entity) return netIdOf(entity) ~= nil end,
+        onSelect = function(data)
+            local netId = netIdOf(data and data.entity)
+            if netId then recordStop('traffic', netId) end
+        end,
     },
     {
         -- Any car, an owner's or an abandoned NPC's: the server records the
