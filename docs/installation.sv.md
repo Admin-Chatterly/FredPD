@@ -540,6 +540,49 @@ Den som har pappret kan läsa det, även utan MDT, precis som med ett riktigt
 papper. Heter föremålet något annat, ändra `documents.paperItem` i
 `config/server.lua`. PDF kräver gatewayen (se 11c).
 
+## 11e. Anställa, befordra och avskeda via Discord (valfritt)
+
+Från personalregistret kan befälet anställa, befordra, degradera och avskeda
+genom att ändra en **Discord-roll** (ADR-022). FredPD delar aldrig ut en
+behörighet själv: rollen ändras i Discord, och FredPD läser tillbaka den som
+vanligt. Det kräver gatewayen (se 11c) och en **egen bot** som får ändra
+roller. Använd inte samma bot som läser rollerna.
+
+1. Skapa en ny bot i Discord Developer Portal och bjud in den med behörigheten
+   **Manage Roles** och inget annat.
+2. Dra botens roll i serverns rollista så att den ligger **ovanför** varje roll
+   den ska hantera, men **under** alla administratörsroller.
+3. I gatewayens miljö:
+
+   ```
+   FREDPD_ROLE_ACTIONS_ENABLED=true
+   DISCORD_ROLE_BOT_TOKEN=<botens token>
+   DISCORD_GUILD_ID=<serverns id>
+   FREDPD_ROLE_ACTIONS_ALLOWED=<roll-id>,<roll-id>
+   ```
+
+4. I `config/server.lua`, samma roller:
+
+   ```lua
+   roleActions = {
+       enabled = true,
+       roles = {
+           { id = '<roll-id för anställd>', kind = 'hire' },
+           { id = '<roll-id för en grad>', kind = 'rank' },
+       },
+   },
+   ```
+
+`hire` är rollen som gör någon till anställd (anställa, avskeda) och kräver
+`personnel.hire`. `rank` är en tjänstegrad (befordra, degradera) och kräver
+`personnel.promote`. Båda ges till `command` i standardinställningen.
+
+Ingen kan ändra sina egna roller, ge en roll som är värd mer än vad hen själv
+har, eller ändra rollerna för någon som har behörigheter hen själv saknar. Varje
+ändring kräver ett skäl, som sparas i FredPD:s granskningslogg och i Discords.
+Lägg **aldrig** en administratörsroll i listorna: gatewayen vägrar röra en roll
+som inte står i dess egen lista, oavsett vad FXServer ber om.
+
 ## 12. Vad som inte är byggt ännu
 
 Var beredd på det här — det är inte fel, det är kommande arbete:

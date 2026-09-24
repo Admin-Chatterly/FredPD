@@ -6,13 +6,14 @@ import { createDiskStore } from './media/store.js';
 import { noopScanner, type Scanner } from './media/scan.js';
 import { registerFxMediaRoutes, registerPublicMediaRoutes, type MediaDeps } from './media/routes.js';
 import { registerPdfRoutes } from './pdf/routes.js';
+import { registerDiscordRoutes, type DiscordFetch } from './discord/roles.js';
 
 /**
  * The gateway HTTP surface (spec 3.7).
  *
  * M0 gave this a signed, loopback-only skeleton with a health endpoint. Media
- * and PDF rendering mount onto it here; the Discord bot and the web portal
- * are later milestones.
+ * and PDF rendering mount onto it here, and Discord role actions (ADR-022);
+ * the web portal is a later milestone.
  */
 
 declare module 'fastify' {
@@ -24,6 +25,8 @@ declare module 'fastify' {
 
 export interface ServerDeps {
   scanner?: Scanner;
+  /** Discord's REST API; a test passes its own. */
+  discordFetch?: DiscordFetch;
 }
 
 export function createServer(config: GatewayConfig, deps: ServerDeps = {}): FastifyInstance {
@@ -98,6 +101,7 @@ export function createServer(config: GatewayConfig, deps: ServerDeps = {}): Fast
 
       registerFxMediaRoutes(scope, config, mediaDeps);
       registerPdfRoutes(scope, config, store);
+      registerDiscordRoutes(scope, config, deps.discordFetch ?? ((input, init) => fetch(input, init)));
     },
     { prefix: '/fx' },
   );

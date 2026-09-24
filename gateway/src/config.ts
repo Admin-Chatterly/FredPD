@@ -56,6 +56,34 @@ function port(name: string, fallback: number): number {
   return parsed;
 }
 
+const SNOWFLAKE = /^\d{17,20}$/;
+
+function snowflake(name: string): string {
+  const value = required(name);
+  if (!SNOWFLAKE.test(value)) throw new Error(`${name} must be a Discord id (digits only), got "${value}".`);
+  return value;
+}
+
+/**
+ * A comma-separated list of Discord role ids, none of them empty. Required
+ * and non-empty: role actions with nothing allowed is a configuration
+ * mistake, and a gateway that started anyway would refuse every request with
+ * no hint why.
+ */
+function snowflakeList(name: string): ReadonlySet<string> {
+  const ids = required(name)
+    .split(',')
+    .map((id) => id.trim())
+    .filter((id) => id !== '');
+
+  for (const id of ids) {
+    if (!SNOWFLAKE.test(id)) throw new Error(`${name} must list Discord role ids, got "${id}".`);
+  }
+  if (ids.length === 0) throw new Error(`${name} lists no roles.`);
+
+  return new Set(ids);
+}
+
 export interface GatewayConfig {
   env: 'development' | 'staging' | 'production';
   host: string;
@@ -102,6 +130,19 @@ export interface GatewayConfig {
     chromiumExecutable: string;
   };
 
+  /**
+   * Discord role actions (ADR-022): hire, promote, demote, dismiss. Off by
+   * default. A bot of its own -- not the read bot FXServer uses (ADR-010) --
+   * whose token only this service holds, and an allowlist of the only roles
+   * it will ever touch, set here rather than trusted from any request.
+   */
+  roleActions: {
+    enabled: boolean;
+    botToken: string | null;
+    guildId: string | null;
+    allowedRoleIds: ReadonlySet<string>;
+  };
+
   scheduler: {
     /**
      * Off by default (this package's whole rule), and **superseded for
@@ -140,6 +181,7 @@ export function loadConfig(): GatewayConfig {
 
   const gatewayPort = port('FREDPD_GATEWAY_PORT', 3080);
   const schedulerEnabled = optionalBoolean('FREDPD_SCHEDULER_ENABLED', false);
+  const roleActionsEnabled = optionalBoolean('FREDPD_ROLE_ACTIONS_ENABLED', false);
 
   return {
     env,
@@ -160,6 +202,15 @@ export function loadConfig(): GatewayConfig {
 
     pdf: {
       chromiumExecutable: optional('PLAYWRIGHT_CHROMIUM_EXECUTABLE', '/opt/pw-browsers/chromium'),
+    },
+
+    roleActions: {
+      enabled: roleActionsEnabled,
+      // Required only when role actions are on: nothing an install is
+      // required to run needs a write-capable bot (this package's rule).
+      botToken: roleActionsEnabled ? required('DISCORD_ROLE_BOT_TOKEN') : null,
+      guildId: roleActionsEnabled ? snowflake('DISCORD_GUILD_ID') : null,
+      allowedRoleIds: roleActionsEnabled ? snowflakeList('FREDPD_ROLE_ACTIONS_ALLOWED') : new Set<string>(),
     },
 
     scheduler: {

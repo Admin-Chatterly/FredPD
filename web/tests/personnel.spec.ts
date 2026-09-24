@@ -161,3 +161,68 @@ test('renders the module in Swedish', async ({ page }) => {
 
   await expect(page.getByRole('button', { name: '12-40' })).toBeVisible();
 });
+
+// ------------------------------------------------------------------ roles
+
+test('promotes an officer through a Discord role, with a reason, after confirming', async ({ page }) => {
+  await openPersonnel(page);
+  await page.getByRole('button', { name: '12-41' }).click();
+
+  const roles = page.getByRole('region', { name: 'Discord roles' });
+  await expect(roles.getByText('Inspektör')).toBeVisible();
+  await roles.getByRole('button', { name: 'Promote' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Promote' });
+  await expect(dialog).toContainText('Give Inspektör?');
+  await dialog.getByLabel(/Reason/).fill('Passed the inspector board');
+  await dialog.getByRole('button', { name: 'Promote' }).click();
+
+  await expect(roles.getByRole('status')).toHaveText('Inspektör was given.');
+  await expect(roles.getByRole('button', { name: 'Demote' })).toBeVisible();
+});
+
+test('never offers an officer a change to their own roles', async ({ page }) => {
+  await openPersonnel(page);
+  await page.getByRole('button', { name: '12-40' }).click();
+
+  const roles = page.getByRole('region', { name: 'Discord roles' });
+  await expect(roles.getByText('You cannot change your own roles.')).toBeVisible();
+  await expect(roles.getByRole('button', { name: /Promote|Demote|Hire|Dismiss/ })).toHaveCount(0);
+});
+
+test('Escape closes the role dialog, not the interface', async ({ page }) => {
+  await openPersonnel(page);
+  await page.getByRole('button', { name: '12-41' }).click();
+
+  const roles = page.getByRole('region', { name: 'Discord roles' });
+  await roles.getByRole('button', { name: 'Dismiss' }).click();
+  await expect(page.getByRole('dialog', { name: 'Dismiss' })).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(roles.getByRole('button', { name: 'Dismiss' })).toBeFocused();
+});
+
+test('hires somebody new by Discord id, and says why when Discord does not know them', async ({ page }) => {
+  await openPersonnel(page);
+
+  await page.getByRole('button', { name: 'Hire a new member…' }).click();
+  await page.getByLabel('Discord user id').fill('999999999999999999');
+  await page.getByLabel(/Reason/).fill('Passed the academy');
+  await page.getByRole('button', { name: 'Hire', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('that Discord user is not in the server');
+
+  await page.getByLabel('Discord user id').fill('300000000000000003');
+  await page.getByRole('button', { name: 'Hire', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Hired' })).toContainText('Hired with Polis.');
+});
+
+test('shows role actions in Swedish', async ({ page }) => {
+  await page.goto('/?locale=sv');
+  await page.locator('nav').first().getByRole('button', { name: 'Personal' }).click();
+  await page.getByRole('button', { name: '12-41' }).click();
+
+  const roles = page.getByRole('region', { name: 'Discord-roller' });
+  await expect(roles.getByRole('button', { name: 'Befordra' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Anställ en ny medlem…' })).toBeVisible();
+});

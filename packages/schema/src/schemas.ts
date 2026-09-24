@@ -2536,6 +2536,27 @@ export const schemas = {
     id: { type: 'integer', required: true, min: 1 },
   },
 
+  /**
+   * The Discord roles role actions may change (ADR-022): for one officer, or
+   * with no id, the roles a new hire can be given.
+   */
+  PersonnelRolesGet: {
+    id: { type: 'integer', required: false, min: 1 },
+  },
+
+  /**
+   * One Discord role added or removed (ADR-022). `officerId`, or -- only to
+   * hire -- `discordId` for somebody not on the roster yet. The reason goes
+   * to FredPD's audit log and to Discord's.
+   */
+  PersonnelRoleChange: {
+    officerId: { type: 'integer', required: false, min: 1 },
+    discordId: { type: 'string', required: false, min: 17, max: 20 },
+    roleId: { type: 'string', required: true, min: 17, max: 20 },
+    grant: { type: 'boolean', required: true },
+    reason: { type: 'string', required: true, min: 3, max: 200 },
+  },
+
   PersonnelRosterUpdate: {
     id: { type: 'integer', required: true, min: 1 },
     badgeNumber: { type: 'string', required: false, max: 16 },

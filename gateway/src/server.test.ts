@@ -24,6 +24,7 @@ const config: GatewayConfig = {
   pdf: {
     chromiumExecutable: process.env['PLAYWRIGHT_CHROMIUM_EXECUTABLE'] ?? '/opt/pw-browsers/chromium',
   },
+  roleActions: { enabled: false, botToken: null, guildId: null, allowedRoleIds: new Set<string>() },
   scheduler: {
     enabled: false,
     intervalSeconds: 300,

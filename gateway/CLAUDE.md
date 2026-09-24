@@ -6,7 +6,9 @@ systemd. Read spec sections 3.7 (interface), 4.2 (Discord sync) and 11
 
 Responsibilities: the media store, PDF rendering, scheduled jobs (lab timers,
 warrant expiry; retention moved to FXServer), Discord role *actions* (hire,
-promote, demote), and later the web portal. The media store is built and in use: photographs of
+promote, demote, dismiss; ADR-022, `src/discord/roles.ts`), and later the web
+portal. Role actions use a bot of their own, off by default, and never touch a
+role missing from `FREDPD_ROLE_ACTIONS_ALLOWED`, whatever FXServer asks. The media store is built and in use: photographs of
 people (ADR-019), re-encoded on upload, single-use upload tokens, and CORS for
 the NUI's origin only. PDF rendering is in use for printed documents (ADR-020):
 letterhead, page numbers, the document number and a classification watermark

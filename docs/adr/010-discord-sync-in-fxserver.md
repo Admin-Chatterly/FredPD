@@ -1,6 +1,6 @@
 # ADR-010: Discord role sync runs in FXServer, not in the gateway
 
-- **Status:** Accepted
+- **Status:** Accepted (role actions amended by ADR-022)
 - **Date:** 2026-09-17
 - **Spec:** 4.2, 3.7, 16, and ADR-003 (which this narrows)
 

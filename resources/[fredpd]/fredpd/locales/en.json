@@ -202,7 +202,19 @@
     "compartmented": "a record only certain units may read, or a sealed one, is never printed on paper",
     "breakglass": "a record opened with emergency access is not printed on paper",
     "unclassified": "the record has no valid classification",
-    "export_restricted": "a PDF of a restricted record needs the export permission"
+    "export_restricted": "a PDF of a restricted record needs the export permission",
+    "self": "nobody changes their own roles",
+    "needs_permission": "this needs a permission you do not hold",
+    "exceeds_own": "the role grants more than you hold yourself",
+    "outranks": "this officer holds permissions you do not",
+    "role_actions_off": "role changes are not switched on on this server",
+    "role_not_allowed": "the gateway does not manage this role",
+    "member_not_found": "that Discord user is not in the server",
+    "bot_cannot_manage": "the bot cannot manage this role (its own role must sit above it)",
+    "bot_token_rejected": "Discord rejected the role bot’s token",
+    "rate_limited": "Discord asked for a pause; try again shortly",
+    "discord_error": "Discord could not make the change",
+    "discord_unreachable": "Discord did not answer; try again"
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -2597,6 +2609,31 @@
         "sustained_suspension": "Sustained — suspension",
         "sustained_termination": "Sustained — termination"
       }
+    },
+    "roles": {
+      "title": "Discord roles",
+      "notOwn": "You cannot change your own roles.",
+      "none": "No roles are set up for role actions.",
+      "kind": {
+        "hire": "Employment",
+        "rank": "Rank"
+      },
+      "held": "held",
+      "notHeld": "not held",
+      "hire": "Hire",
+      "dismiss": "Dismiss",
+      "promote": "Promote",
+      "demote": "Demote",
+      "hireNew": "Hire a new member…",
+      "discordId": "Discord user id",
+      "role": "Role",
+      "reason": "Reason (kept in the audit log and in Discord)",
+      "officer": "Officer",
+      "confirmGrant": "Give {role}? The change is made in Discord and takes effect when FredPD reads it back.",
+      "confirmRemove": "Take {role} away? The change is made in Discord and takes effect when FredPD reads it back.",
+      "granted": "{role} was given.",
+      "removed": "{role} was taken away.",
+      "hired": "Hired with {role}. They appear on the roster the next time they connect."
     }
   },
   "booking": {

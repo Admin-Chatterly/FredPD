@@ -105,6 +105,31 @@ function Gateway.renderPdfNow(document)
     return false, { reason = result.reason or 'gateway_error' }
 end
 
+--- Adds or removes one Discord role (ADR-022). Now or not at all: never
+--- queued, because a promotion that lands an hour after the officer was told
+--- it failed is a change nobody decided.
+---
+--- @param action string 'add' | 'remove'
+--- @return boolean ok, string|nil reason -- the gateway's own reason, or
+---   `gateway_unavailable` when it could not be asked
+function Gateway.setDiscordRole(discordId, roleId, action, reason)
+    if not Gateway.isEnabled() then return false, 'gateway_off' end
+
+    local result = client.request('POST', '/fx/discord/role', {
+        discordId = discordId,
+        roleId = roleId,
+        action = action,
+        reason = reason,
+    })
+
+    if result.ok then return true end
+
+    local err = type(result.body) == 'table' and result.body.err or nil
+    if type(err) ~= 'string' or not err:match('^[a-z_]+$') then return false, 'gateway_unavailable' end
+
+    return false, err
+end
+
 --- How long a signed download link stays good, in seconds.
 function Gateway.linkSeconds()
     return tonumber(FredPD.Config.server.gateway.mediaLinkSeconds) or 900

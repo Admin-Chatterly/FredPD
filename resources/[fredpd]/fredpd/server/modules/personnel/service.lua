@@ -4,10 +4,12 @@
 --- Pure: no natives, no database, so busted exercises it outside FXServer
 --- (`spec/personnel_spec.lua`).
 ---
---- **Rank grants nothing.** ADR-010 settled that FXServer only ever reads the
---- Discord guild; nothing here writes a role back, and nothing here treats a
---- Discord role as a permission by itself (invariant 2). `division` is a
---- roster label a supervisor sets from this screen, not a permission source.
+--- **Rank grants nothing by itself.** A Discord role grants only through the
+--- role map (invariant 2); `division` is a roster label a supervisor sets
+--- from this screen, not a permission source. Role *actions* (ADR-022,
+--- amending ADR-010) ask the gateway to change a Discord role, and the change
+--- comes back through the same read sync as any other: `roleChange` below is
+--- the guard on who may ask.
 
 FredPD = FredPD or {}
 FredPD.Modules = FredPD.Modules or {}
@@ -367,6 +369,80 @@ function Personnel.validateDisciplineClose(input)
     end
 
     return nil
+end
+
+-- -----------------------------------------------------------------------------
+-- Discord role actions (ADR-022)
+-- -----------------------------------------------------------------------------
+
+--- `hire`: the role that makes somebody an officer at all (hire, dismiss).
+--- `rank`: a rung of the ladder (promote, demote).
+local ROLE_KINDS <const> = { hire = 'personnel.hire', rank = 'personnel.promote' }
+
+--- The roles config says may be managed, by id. Anything without a Discord id
+--- or a known kind is dropped: a typo must shrink what can be changed, never
+--- widen it.
+---
+--- @param list table|nil `roleActions.roles` from config/server.lua
+--- @return table id -> { id, kind }
+function Personnel.manageableRoles(list)
+    local roles = {}
+    for _, entry in ipairs(type(list) == 'table' and list or {}) do
+        local id = type(entry) == 'table' and entry.id
+        if type(id) == 'string' and id:match('^%d+$') and #id >= 17 and #id <= 20 and ROLE_KINDS[entry.kind] then
+            roles[id] = { id = id, kind = entry.kind }
+        end
+    end
+    return roles
+end
+
+--- The permission a role of this kind needs.
+function Personnel.roleKindPermission(kind)
+    return ROLE_KINDS[kind]
+end
+
+--- May this actor add (or remove) this role on this target?
+---
+--- In order:
+---   * the role is one config says may be managed at all;
+---   * nobody changes their own roles -- a promotion is somebody else's
+---     decision, and a demotion of yourself is a way to hand a role on;
+---   * the actor holds the kind's permission (`personnel.hire` for the hire
+---     role, `personnel.promote` for a rank);
+---   * a role granted is worth no more than what the actor holds (the same
+---     rule the role-map editor applies, `perms.missing`);
+---   * the target holds nothing the actor does not: a supervisor does not
+---     demote the commander.
+--- A superuser is past the last two, as everywhere.
+---
+--- @param args table { role, grant, actorDiscordId, targetDiscordId,
+---   actorPermissions, targetPermissions, rolePermissions, superuser,
+---   satisfies, missing } -- `satisfies`/`missing` are `perms`' own, passed in
+---   so this stays pure
+--- @return boolean ok, string|nil reason, table|nil detail
+function Personnel.roleChange(args)
+    local role = args.role
+    if type(role) ~= 'table' or not ROLE_KINDS[role.kind] then return false, 'not_allowed' end
+
+    if args.actorDiscordId == nil or args.targetDiscordId == nil then return false, 'not_allowed' end
+    if tostring(args.actorDiscordId) == tostring(args.targetDiscordId) then return false, 'self' end
+
+    local needed = ROLE_KINDS[role.kind]
+    if not args.satisfies(args.actorPermissions or {}, needed) then
+        return false, 'needs_permission', { permission = needed }
+    end
+
+    if args.superuser then return true end
+
+    if args.grant then
+        local over = args.missing(args.rolePermissions or {}, args.actorPermissions or {})
+        if #over > 0 then return false, 'exceeds_own', { missing = over } end
+    end
+
+    local outranked = args.missing(args.targetPermissions or {}, args.actorPermissions or {})
+    if #outranked > 0 then return false, 'outranks' end
+
+    return true
 end
 
 FredPD.Modules.personnel = Personnel

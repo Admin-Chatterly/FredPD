@@ -440,6 +440,23 @@ FredPD.Config.server = {
         },
     },
 
+    --- Discord role actions (ADR-022): hire, promote, demote and dismiss
+    --- from the roster, as a Discord role change the gateway makes with a bot
+    --- of its own. Off by default, and needs the gateway (3.7).
+    ---
+    --- `roles` lists the only roles that can be changed from FredPD, each a
+    --- `hire` role (what makes somebody an officer; needs personnel.hire) or
+    --- a `rank` (needs personnel.promote). The gateway keeps its own copy of
+    --- the list (FREDPD_ROLE_ACTIONS_ALLOWED) and refuses anything else, so
+    --- both must name the same ids. Never list an administration role here.
+    roleActions = {
+        enabled = false,
+        roles = {
+            -- { id = '123456789012345678', kind = 'hire' },
+            -- { id = '223456789012345678', kind = 'rank' },
+        },
+    },
+
     --- Retention (spec 13.3, ADR-021): what is deleted, and when. Runs inside
     --- FXServer every `intervalMinutes`, the first time ten minutes after
     --- start. Days below a sweep's floor are raised to it (see

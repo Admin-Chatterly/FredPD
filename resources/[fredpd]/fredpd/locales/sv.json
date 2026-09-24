@@ -202,7 +202,19 @@
     "compartmented": "en handling som bara vissa enheter får läsa, eller en förseglad, skrivs aldrig ut på papper",
     "breakglass": "en handling som öppnats med nödåtkomst skrivs inte ut på papper",
     "unclassified": "handlingen saknar giltig klassning",
-    "export_restricted": "en PDF av en begränsad handling kräver exportbehörighet"
+    "export_restricted": "en PDF av en begränsad handling kräver exportbehörighet",
+    "self": "ingen ändrar sina egna roller",
+    "needs_permission": "det här kräver en behörighet du saknar",
+    "exceeds_own": "rollen ger mer än du själv har",
+    "outranks": "den här personen har behörigheter du saknar",
+    "role_actions_off": "rolländringar är inte påslagna på den här servern",
+    "role_not_allowed": "gatewayen hanterar inte den här rollen",
+    "member_not_found": "Discord-användaren finns inte på servern",
+    "bot_cannot_manage": "boten kan inte hantera rollen (botens egen roll måste ligga ovanför)",
+    "bot_token_rejected": "Discord avvisade rollbotens token",
+    "rate_limited": "Discord bad om en paus; försök igen strax",
+    "discord_error": "Discord kunde inte göra ändringen",
+    "discord_unreachable": "Discord svarade inte; försök igen"
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -2597,6 +2609,31 @@
         "sustained_suspension": "Fastställd — avstängning",
         "sustained_termination": "Fastställd — avsked"
       }
+    },
+    "roles": {
+      "title": "Discord-roller",
+      "notOwn": "Du kan inte ändra dina egna roller.",
+      "none": "Inga roller är inställda för rolländringar.",
+      "kind": {
+        "hire": "Anställning",
+        "rank": "Tjänstegrad"
+      },
+      "held": "innehas",
+      "notHeld": "innehas inte",
+      "hire": "Anställ",
+      "dismiss": "Avskeda",
+      "promote": "Befordra",
+      "demote": "Degradera",
+      "hireNew": "Anställ en ny medlem…",
+      "discordId": "Discord-användar-id",
+      "role": "Roll",
+      "reason": "Skäl (sparas i granskningsloggen och i Discord)",
+      "officer": "Anställd",
+      "confirmGrant": "Ge rollen {role}? Ändringen görs i Discord och gäller när FredPD har läst tillbaka den.",
+      "confirmRemove": "Ta bort rollen {role}? Ändringen görs i Discord och gäller när FredPD har läst tillbaka den.",
+      "granted": "Rollen {role} har getts.",
+      "removed": "Rollen {role} har tagits bort.",
+      "hired": "Anställd med rollen {role}. Personen syns i personalregistret nästa gång hen ansluter."
     }
   },
   "booking": {

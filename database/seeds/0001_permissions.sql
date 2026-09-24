@@ -929,3 +929,15 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
 INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('supervisor', 'document.export.restricted'),
     ('utredare', 'document.export.restricted');
+
+-- -----------------------------------------------------------------------------
+-- Discord role actions (ADR-022)
+--
+-- Hiring and dismissing (the hire role) and promoting and demoting (a rank)
+-- as a Discord role change. Command only: a role granted is never worth more
+-- than the granter holds, and nobody changes their own.
+-- -----------------------------------------------------------------------------
+
+INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
+    ('command', 'personnel.hire'),
+    ('command', 'personnel.promote');

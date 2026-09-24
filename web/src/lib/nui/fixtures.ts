@@ -4032,6 +4032,37 @@ const officers: FixtureOfficer[] = [
   },
 ];
 
+/** The roles role actions may manage (ADR-022), and who holds them. */
+const MANAGED_ROLES = [
+  { id: '700000000000000001', kind: 'hire' as const, name: 'Polis' },
+  { id: '700000000000000002', kind: 'rank' as const, name: 'Inspektör' },
+];
+
+const roleHolders: Record<string, Set<string>> = {
+  [FIXTURE_VIEWER]: new Set(['700000000000000001', '700000000000000002']),
+  '100000000000000002': new Set(['700000000000000001']),
+};
+
+/** One role change against the fixtures, with the server's own refusals. */
+function changeFixtureRole(input: unknown, kind: 'hire' | 'rank'): unknown {
+  const body = (input ?? {}) as { officerId?: number; discordId?: string; roleId?: string; grant?: boolean };
+  const role = MANAGED_ROLES.find((entry) => entry.id === body.roleId);
+  if (!role || role.kind !== kind) return refuse('forbidden', { roleId: 'not_allowed' });
+
+  const officer = body.officerId ? officers.find((entry) => entry.id === body.officerId) : undefined;
+  const discordId = officer?.discordId ?? (kind === 'hire' && body.grant ? body.discordId : undefined);
+  if (!discordId) return refuse('invalid', { officerId: 'required' });
+  if (discordId === FIXTURE_VIEWER) return refuse('forbidden', { roleId: 'self' });
+  // Somebody the fixture Discord does not know.
+  if (discordId === '999999999999999999') return refuse('conflict', { roleId: 'member_not_found' });
+
+  const held = (roleHolders[discordId] ??= new Set<string>());
+  if (body.grant) held.add(role.id);
+  else held.delete(role.id);
+
+  return { id: officer?.id ?? 0, roleId: role.id, kind, grant: body.grant === true };
+}
+
 interface FixtureDiscipline {
   id: number;
   officerId: number;
@@ -5765,6 +5796,24 @@ export const fixtures: FixtureSet = {
 
       return { officer: officerRow(row, true) };
     },
+
+    'personnel.roles.get': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const row = id === undefined ? undefined : officers.find((entry) => entry.id === id);
+      if (id !== undefined && !row) return refuse('not_found');
+
+      const held = row ? (roleHolders[row.discordId] ?? new Set<string>()) : new Set<string>();
+
+      return {
+        enabled: true,
+        roles: MANAGED_ROLES.map((role) => ({ ...role, held: held.has(role.id) })),
+        self: row?.discordId === FIXTURE_VIEWER,
+        may: { hire: true, promote: true },
+      };
+    },
+
+    'personnel.roles.rank': (input) => changeFixtureRole(input, 'rank'),
+    'personnel.roles.hire': (input) => changeFixtureRole(input, 'hire'),
 
     'personnel.roster.update': (input) => {
       const body = (input ?? {}) as { id?: number; badgeNumber?: string; division?: string };

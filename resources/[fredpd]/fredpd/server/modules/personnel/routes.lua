@@ -467,3 +467,184 @@ route.define({
         return { id = input.id }
     end,
 })
+
+-- -----------------------------------------------------------------------------
+-- Discord role actions (ADR-022, amending ADR-010)
+--
+-- Hire, promote, demote and dismiss, as a Discord role change the gateway
+-- makes with a bot of its own. FredPD never writes a permission: the change
+-- goes to Discord, and comes back through the read sync like any other
+-- (`discord.refreshOne`, then every open session re-derives its grants).
+-- Both routes are `sensitive` (refused on a stale snapshot, spec 4.2),
+-- audited with the reason, and rate-limited; `service.roleChange` is the
+-- guard on who may ask for what.
+-- -----------------------------------------------------------------------------
+
+local function roleConfig()
+    return FredPD.Config.server.roleActions or {}
+end
+
+--- Role actions are offered only when this server and the gateway both say
+--- so; either one off is "not here", never an error to retry.
+local function roleActionsOn()
+    return roleConfig().enabled == true and FredPD.Bridge.gateway.service.isEnabled()
+end
+
+--- Discord's own names for the managed roles, read at most every ten
+--- minutes: the names are Discord's data, not text FredPD owns (invariant 6).
+local roleNames = { at = 0, names = {} }
+
+local function namesOfRoles()
+    if os.time() - roleNames.at < 600 then return roleNames.names end
+
+    local names = {}
+    for _, role in ipairs(FredPD.Core.discord.guildRoles() or {}) do names[role.id] = role.name end
+
+    roleNames = { at = os.time(), names = names }
+    return names
+end
+
+--- The managed roles as a screen shows them, and which this member holds.
+local function rolesFor(held)
+    local holds = {}
+    for _, id in ipairs(held or {}) do holds[tostring(id)] = true end
+
+    local names = namesOfRoles()
+    local out = {}
+    for id, role in pairs(service.manageableRoles(roleConfig().roles)) do
+        out[#out + 1] = { id = id, kind = role.kind, name = names[id] or id, held = holds[id] == true }
+    end
+
+    table.sort(out, function(a, b)
+        if a.kind ~= b.kind then return a.kind == 'hire' end
+        return a.name < b.name
+    end)
+
+    return out
+end
+
+route.define({
+    name = 'personnel.roles.get',
+    perm = 'personnel.roster.view',
+    schema = 'PersonnelRolesGet',
+    handler = function(session, input)
+        -- No officer: the roles a new hire could be given, held by nobody.
+        local officer = nil
+        if input.id then
+            officer = repo.byId(input.id, session.agencyId)
+            if not officer then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+        end
+
+        if not roleActionsOn() then return { enabled = false, roles = {} } end
+
+        local perms = FredPD.Core.perms
+        return {
+            enabled = true,
+            roles = rolesFor(officer and repo.discordRoles(officer.discordId) or {}),
+            self = officer ~= nil and officer.discordId == session.discordId,
+            may = {
+                hire = perms.satisfies(session.permissions, 'personnel.hire'),
+                promote = perms.satisfies(session.permissions, 'personnel.promote'),
+            },
+        }
+    end,
+})
+
+--- One role change, for either route. `kind` is the route's own: the hire
+--- route never touches a rank and the rank route never touches the hire role.
+local function changeRole(session, input, kind)
+    if not roleActionsOn() then return route.refuse(FredPD.ErrorCode.CONFLICT, { roleId = 'role_actions_off' }) end
+
+    local role = service.manageableRoles(roleConfig().roles)[input.roleId]
+    if not role or role.kind ~= kind then return route.refuse(FredPD.ErrorCode.FORBIDDEN, { roleId = 'not_allowed' }) end
+
+    -- The target: an officer on this agency's roster, or -- only to hire --
+    -- a Discord member who is not on it yet.
+    local targetDiscordId, officerId
+    if input.officerId then
+        local officer = repo.byId(input.officerId, session.agencyId)
+        if not officer then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+        targetDiscordId, officerId = officer.discordId, officer.id
+    elseif input.discordId and kind == 'hire' and input.grant then
+        if not tostring(input.discordId):match('^%d+$') then
+            return route.refuse(FredPD.ErrorCode.INVALID, { discordId = 'not_snowflake' })
+        end
+        targetDiscordId = input.discordId
+    else
+        return route.refuse(FredPD.ErrorCode.INVALID, { officerId = 'required' })
+    end
+
+    local perms = FredPD.Core.perms
+    local ok, why = service.roleChange({
+        role = role,
+        grant = input.grant,
+        actorDiscordId = session.discordId,
+        targetDiscordId = targetDiscordId,
+        actorPermissions = session.permissions,
+        targetPermissions = perms.effectiveFor(targetDiscordId, session.agencyId),
+        rolePermissions = perms.ofRoles({ role.id }, session.agencyId),
+        superuser = session.superuser == true,
+        satisfies = perms.satisfies,
+        missing = perms.missing,
+    })
+    if not ok then
+        return route.refuse(FredPD.ErrorCode.FORBIDDEN, { roleId = why })
+    end
+
+    local reason = ('%s (%s): %s'):format(
+        session.callsign or session.name or '', session.discordId, input.reason)
+
+    local changed, err = FredPD.Bridge.gateway.service.setDiscordRole(
+        targetDiscordId, role.id, input.grant and 'add' or 'remove', reason)
+    if not changed then
+        -- The gateway's own words for "not switched on there" and "that is
+        -- not a request I understand", in this screen's vocabulary.
+        if err == 'disabled' then err = 'role_actions_off' end
+        if err == 'invalid' then err = 'discord_error' end
+        return route.refuse(FredPD.ErrorCode.CONFLICT, { roleId = err })
+    end
+
+    -- Discord is the truth: read it back rather than assume, then let every
+    -- open session -- the target's included -- re-derive what it may do.
+    FredPD.Core.discord.refreshOne(targetDiscordId, true)
+    FredPD.Core.session.refreshAll()
+
+    return { id = officerId or 0, roleId = role.id, kind = role.kind, grant = input.grant }
+end
+
+local function roleAuditDetail(input, result)
+    return {
+        officerId = input.officerId,
+        discordId = input.discordId,
+        roleId = input.roleId,
+        kind = result.kind,
+        grant = input.grant,
+        reason = input.reason,
+    }
+end
+
+route.define({
+    name = 'personnel.roles.hire',
+    perm = 'personnel.hire',
+    schema = 'PersonnelRoleChange',
+    writes = true,
+    sensitive = true,
+    limit = { per = 10, window = 60 },
+    audit = 'personnel.role.changed',
+    subjectType = 'officer',
+    auditDetail = roleAuditDetail,
+    handler = function(session, input) return changeRole(session, input, 'hire') end,
+})
+
+route.define({
+    name = 'personnel.roles.rank',
+    perm = 'personnel.promote',
+    schema = 'PersonnelRoleChange',
+    writes = true,
+    sensitive = true,
+    limit = { per = 10, window = 60 },
+    audit = 'personnel.role.changed',
+    subjectType = 'officer',
+    auditDetail = roleAuditDetail,
+    handler = function(session, input) return changeRole(session, input, 'rank') end,
+})

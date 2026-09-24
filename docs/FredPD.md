@@ -326,7 +326,7 @@ Built (the outbound half). `server/bridges/gateway/{sha256,hmac,client,repo,serv
 - **FXServer → gateway:** `PerformHttpRequest` to `http://127.0.0.1:<port>`, signed `HMAC-SHA256(secret, "<timestamp>.<body>")` in `x-fredpd-signature`/`x-fredpd-timestamp` — the exact wire format `gateway/src/hmac.ts`'s own `sign()` already implements on the gateway side, so the two sides can only ever agree or both be wrong the same way. `sha256.lua` and `hmac.lua` are pure Lua (no natives), pinned in busted against FIPS 180-4's own test vectors and RFC 4231's, respectively — an unverified hash implementation was judged worse than no bridge at all, which is why one was not shipped until it could be verified this way. `Gateway.requestUploadToken`, `.requestDownloadToken` and `.renderPdf` call the gateway's media and PDF routes. `Gateway.downloadUrl` signs a download link in Lua with the same derived key the gateway verifies (ADR-019). Photographs of people use the media half (ADR-019); nothing exports a PDF yet.
 - **Gateway → FXServer:** not built. A reverse channel needs FXServer to run its own HTTP listener (`SetHttpHandler`), which nothing here currently requires — everything the gateway serves today (a token, a rendered PDF) is a synchronous reply to an FXServer-initiated request, not an event the gateway raises on its own. Left for whichever of "role changes, lab timer completions, scheduled jobs" is built first and actually needs to push.
 - **Reliability:** an outbox table on the FXServer side (`fpd_gateway_outbox`) retries a failed `renderPdf` call on a five-minute timer, up to 10 attempts or 24 hours old, whichever comes first. A gateway-side outbox is not built — nothing yet calls FXServer for the gateway to need to retry into.
-- **Discord role actions are not built.** See section 7.22's own note: ADR-010 settled that FXServer only reads the guild, and the reasoning against writing to it from anywhere in this suite generalised past the read path.
+- **Discord role actions** (ADR-022): `Gateway.setDiscordRole` calls `/fx/discord/role`. The gateway changes one role with a bot of its own, and only a role in its own allowlist. The call is never queued.
 
 ### 3.8 Bridges
 
@@ -451,7 +451,7 @@ Where the two overlap, the rule is one owner per concern:
 - **Outage policy:**
   - Snapshot older than `perms.sensitive_stale_after` (default 15 minutes): approvals, releases, deletions, intelligence and surveillance actions are blocked.
   - Snapshot older than `perms.stale_after` (default 6 hours): read-only mode.
-- **Role actions from FredPD** (hire, promote, demote, suspend, dismiss) still belong to the gateway, which holds a bot able to *write* roles. Not built. Discord stays the single source of truth either way, and that bot's Discord role must sit above the roles it manages.
+- **Role actions from FredPD** (hire, promote, demote, dismiss; ADR-022) belong to the gateway, which holds a separate bot able to *write* roles. It touches only the roles in its own allowlist. Discord stays the single source of truth: the change comes back through the read sync. That bot's Discord role must sit above the roles it manages and below every administrator role.
 
 ### 4.3 Permission model
 
@@ -1042,8 +1042,12 @@ Built (the charging decision and the disposition). Migration 0016, `server/modul
 
 Built. Migration 0017, `server/modules/personnel/`.
 
-- [M] Officer profile: badge number, callsign, division, hire date, bound character — extends `fpd_officers` (0001) rather than a second roster table. Rank is read-only display of the officer's mapped Discord roles (invariant 2); nothing here writes to Discord.
-- **Not built as sketched:** hire, promote, demote and dismiss as Discord role changes through the gateway. ADR-010 settled that FXServer only ever *reads* the guild — ADR-013's reasoning generalised: a resource that could also grant a role would be the permission source contradicting itself. "Promote" here means editing `division`, not a role.
+- [M] Officer profile: badge number, callsign, division, hire date, bound character — extends `fpd_officers` (0001) rather than a second roster table. Rank is the officer's Discord roles (invariant 2). It is changed only through a role action (below), never written to FredPD.
+- [M] **Hire, promote, demote and dismiss as Discord role changes** (ADR-022, amending ADR-010). `personnel.roles.hire` (`personnel.hire`) and `personnel.roles.rank` (`personnel.promote`) ask the gateway to change one role.
+  - Only roles listed in `roleActions.roles` can be changed, and the gateway keeps its own allowlist.
+  - Nobody changes their own roles, grants a role worth more than they hold, or acts on someone holding permissions they lack.
+  - Each change is sensitive, audited with a reason, and rate-limited.
+  - A new hire is added by Discord id.
 - [M] Shift log: start/end, self-service only (`personnel.shift.own` acts on the caller's own row, never an id in the input).
 - [M] Equipment assignment: item, optional serial, optionally linked to the firearms registry (0005) by id.
 - [M] **Equipment loadouts, issued and returned with duty** (0026). A loadout is a named set of item keys (`personnel.loadout.create`), assignable to one officer (`personnel.officer.setLoadout`). It issues nothing by itself: `server/modules/personnel/events.lua` listens for `fredpd:dutyChanged` -- fired from `cad/events.lua`'s own sign-on poll, the one place in the suite that already knows when duty changes -- and diffs the loadout against what the officer already holds, so a shift that starts with a radio already open does not get a second one. Going off duty closes every open row the loadout names.
@@ -1831,7 +1835,7 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Lab | `lab.request.create`, `lab.queue.view`, `lab.analysis.perform`, `lab.analysis.review`, `lab.report.release` |
 | Surveillance | `surv.view`, `surv.request`, `surv.decide`, `surv.upphav`, `surv.phone.intercept`, `surv.radio.monitor`, `surv.device.deploy`, `surv.device.listen`, `surv.tracker.deploy`, `surv.tracker.view`, `surv.log.view` |
 | Intelligence | `intel.module.open`, `intel.report.create`, `intel.report.view`, `intel.report.edit`, `intel.person.view`, `intel.person.edit`, `intel.person.merge`, `intel.org.view`, `intel.org.edit`, `intel.case.view`, `intel.case.edit`, `intel.evidence.add`, `intel.record.delete`, `intel.surveillance.log`, `intel.source.view`, `intel.source.manage`, `intel.source.identity.view`, `intel.operation.approve` |
-| Personnel | `personnel.view`, `personnel.hire`, `personnel.promote`, `personnel.discipline`, `personnel.equipment.assign`, `ia.case.view`, `ia.case.manage`, `uof.review`, `policy.manage`, `policy.ack`; as 7.22 shipped: `personnel.roster.view`, `personnel.roster.edit`, `personnel.shift.own`, `personnel.certification.manage`, `personnel.discipline.view`, `personnel.discipline.manage`, `personnel.equipment.manage` |
+| Personnel | `personnel.view`, `personnel.hire` (ADR-022: hire and dismiss roles, command), `personnel.promote` (ADR-022: rank roles, command), `personnel.discipline`, `personnel.equipment.assign`, `ia.case.view`, `ia.case.manage`, `uof.review`, `policy.manage`, `policy.ack`; as 7.22 shipped: `personnel.roster.view`, `personnel.roster.edit`, `personnel.shift.own`, `personnel.certification.manage`, `personnel.discipline.view`, `personnel.discipline.manage`, `personnel.equipment.manage` |
 | Communications | `comms.message.send`, `comms.bulletin.post`, `comms.pdchat.send`, `comms.pdchat.view`, `comms.pdchat.all` |
 | Motor pool | `garage.vehicle.draw`, `garage.vehicle.return`, `garage.fleet.edit` |
 | Statistics | `stats.view`, `stats.export` |

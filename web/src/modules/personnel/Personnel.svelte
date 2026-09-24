@@ -4,6 +4,7 @@
   import { formatMoment } from '../../lib/time';
   import { fieldList, type Failure } from '../shared/failure';
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
+  import DiscordRoles from './DiscordRoles.svelte';
   import { isStub, type Maybe, type Restricted } from '../records/types';
 
   /**
@@ -11,10 +12,10 @@
    * disciplinary file (spec 7.22-7.24).
    *
    * Rank is never shown as a permission: `discordRoles` is display only
-   * (invariant 2) and this screen never lets a session change it — hire,
-   * promote and demote are Discord role actions the gateway does not build
-   * yet (see `0017_personnel.sql`'s header), so this screen edits the roster
-   * label fields FredPD actually owns.
+   * (invariant 2). Hire, promote, demote and dismiss are Discord role
+   * actions (ADR-022, `DiscordRoles.svelte`): the role changes in Discord and
+   * comes back through the read sync; this screen never grants anything
+   * itself.
    */
 
   interface Equipment {
@@ -545,6 +546,8 @@
     </button>
   </form>
 
+  <DiscordRoles officerId={null} onChanged={() => void load()} />
+
   {#if managingLoadouts}
     <div class="border border-[var(--color-border)] p-3">
       <h3 class="mb-1 text-xs font-semibold">{t('personnel.loadout.title')}</h3>
@@ -780,6 +783,8 @@
             {t('form.save')}
           </button>
         </form>
+
+        <DiscordRoles officerId={detail.id} onChanged={() => detail && void open(detail.id)} />
 
         <section class="mb-4">
           <h3 class="mb-1 text-xs font-semibold">{t('personnel.loadout.title')}</h3>

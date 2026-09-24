@@ -12,6 +12,7 @@ const config: GatewayConfig = {
   replayWindowSeconds: 30,
   media: { directory: '/tmp/x', tokenTtlSeconds: 300, maxBytes: 1024, publicBaseUrl: 'http://x', allowedOrigin: 'https://cfx-nui-fredpd' },
   pdf: { chromiumExecutable: '/opt/pw-browsers/chromium' },
+  roleActions: { enabled: false, botToken: null, guildId: null, allowedRoleIds: new Set<string>() },
   scheduler: {
     enabled: true,
     intervalSeconds: 300,

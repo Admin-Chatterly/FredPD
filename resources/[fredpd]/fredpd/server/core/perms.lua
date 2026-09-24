@@ -262,6 +262,13 @@ function Perms.effectiveFor(discordId, agencyId)
     return Perms.computeEffective(roleIds, rolesToGroups, cache.groupPermissions)
 end
 
+--- What a set of Discord roles would grant in one agency -- for asking what a
+--- role is worth before it is handed out (ADR-022).
+--- @return table set of permission keys
+function Perms.ofRoles(roleIds, agencyId)
+    return Perms.computeEffective(roleIds, cache.roleMap[agencyId] or {}, cache.groupPermissions or {})
+end
+
 --- Permissions in `required` that `effective` does not already satisfy.
 ---
 --- Used to stop an administrator granting a group that is worth more than what

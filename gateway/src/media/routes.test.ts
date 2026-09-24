@@ -32,6 +32,7 @@ function baseConfig(mediaDir: string): GatewayConfig {
       allowedOrigin: 'https://cfx-nui-fredpd',
     },
     pdf: { chromiumExecutable: '/opt/pw-browsers/chromium' },
+    roleActions: { enabled: false, botToken: null, guildId: null, allowedRoleIds: new Set<string>() },
     scheduler: {
       enabled: false,
       intervalSeconds: 300,
