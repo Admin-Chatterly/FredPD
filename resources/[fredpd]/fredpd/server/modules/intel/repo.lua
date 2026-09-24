@@ -861,4 +861,64 @@ function Repo.mergePersons(agencyId, keepId, dropId, merged)
     })
 end
 
+-- -----------------------------------------------------------------------------
+-- The link diagram (spec 10.6)
+-- -----------------------------------------------------------------------------
+
+local function marks(count)
+    local out = {}
+    for index = 1, count do out[index] = '?' end
+    return table.concat(out, ', ')
+end
+
+--- People for a board, newest activity first, one more than asked so the
+--- caller can tell it was cut.
+function Repo.boardPersons(agencyId, ids, limit)
+    if ids then
+        if #ids == 0 then return {} end
+        local values = { agencyId }
+        for _, id in ipairs(ids) do values[#values + 1] = id end
+        return db().query(
+            ('SELECT id, agency_id AS agencyId, name, alias, status, classification FROM fpd_intel_persons '
+                .. 'WHERE agency_id = ? AND id IN (%s)'):format(marks(#ids)), values)
+    end
+
+    return db().query(
+        [[SELECT id, agency_id AS agencyId, name, alias, status, classification FROM fpd_intel_persons
+           WHERE agency_id = ? ORDER BY updated_at DESC LIMIT ?]],
+        { agencyId, limit + 1 })
+end
+
+function Repo.boardOrgs(agencyId, ids, limit)
+    if ids then
+        if #ids == 0 then return {} end
+        local values = { agencyId }
+        for _, id in ipairs(ids) do values[#values + 1] = id end
+        return db().query(
+            ('SELECT id, agency_id AS agencyId, name, type, status, classification FROM fpd_intel_orgs '
+                .. 'WHERE agency_id = ? AND id IN (%s)'):format(marks(#ids)), values)
+    end
+
+    return db().query(
+        [[SELECT id, agency_id AS agencyId, name, type, status, classification FROM fpd_intel_orgs
+           WHERE agency_id = ? ORDER BY name LIMIT ?]],
+        { agencyId, limit })
+end
+
+--- Every membership and association touching these people. The service keeps
+--- only the ones with both ends on the board.
+function Repo.boardEdges(personIds)
+    if #personIds == 0 then return {}, {} end
+
+    local list = marks(#personIds)
+    local memberships = db().query(
+        ('SELECT person_id AS personId, org_id AS orgId, role, is_confirmed AS isConfirmed '
+            .. 'FROM fpd_intel_memberships WHERE person_id IN (%s)'):format(list), personIds)
+    local associates = db().query(
+        ('SELECT person_id AS personId, associate_id AS associateId, relationship, is_confirmed AS isConfirmed '
+            .. 'FROM fpd_intel_associates WHERE person_id IN (%s)'):format(list), personIds)
+
+    return memberships, associates
+end
+
 FredPD.Repo.intel = Repo

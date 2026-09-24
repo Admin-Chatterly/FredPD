@@ -153,6 +153,13 @@
   let busy = $state(false);
   let failure = $state<Failure | null>(null);
 
+  interface Props {
+    /** A record to open on arrival -- the link diagram's "open" (10.6). */
+    initialId?: number | null;
+  }
+
+  let { initialId = null }: Props = $props();
+
   async function open(id: number): Promise<void> {
     busy = true;
 
@@ -172,6 +179,10 @@
 
     busy = false;
   }
+
+  $effect(() => {
+    if (initialId) void open(initialId);
+  });
 
   function close(): void {
     openId = null;

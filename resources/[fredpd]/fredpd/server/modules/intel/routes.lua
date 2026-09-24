@@ -504,6 +504,70 @@ route.define({
 })
 
 -- =============================================================================
+-- The link diagram (PD-Span's /board, spec 10.6)
+-- =============================================================================
+
+--- A board scoped to everything, one case or one organisation. Every node
+--- goes through the same access filter a search does, and a node this reader
+--- would only see as a stub is left off entirely: a stub on a diagram, with
+--- its edges, would say who it is connected to (4.5).
+route.define({
+    name = 'intel.board',
+    perm = 'intel.person.view',
+    schema = 'IntelBoard',
+    limit = { per = 20, window = 60 },
+    audit = 'intel.board.read',
+    auditDetail = function(input, result)
+        return { scope = input.scope, id = input.id, persons = #result.persons, orgs = #result.orgs }
+    end,
+    handler = function(session, input)
+        local access = FredPD.Repo.access
+        local cap = service.BOARD_PERSON_CAP
+        local personIds, orgIds
+
+        if input.scope == 'case' then
+            if not input.id then return route.refuse(FredPD.ErrorCode.INVALID, { id = 'required' }) end
+            local record = repo.getCase(session.agencyId, input.id)
+            if not record or not access.read(session, 'intel_case', record) then
+                return route.refuse(FredPD.ErrorCode.NOT_FOUND)
+            end
+            personIds, orgIds = {}, {}
+            for _, link in ipairs(repo.caseLinks(input.id)) do
+                if link.personId then personIds[#personIds + 1] = link.personId end
+                if link.orgId then orgIds[#orgIds + 1] = link.orgId end
+            end
+        elseif input.scope == 'org' then
+            if not input.id then return route.refuse(FredPD.ErrorCode.INVALID, { id = 'required' }) end
+            personIds, orgIds = {}, { input.id }
+            for _, member in ipairs(repo.rosterForOrg(input.id)) do personIds[#personIds + 1] = member.personId end
+        end
+
+        local canOrgs = FredPD.Core.perms.satisfies(session.permissions, 'intel.org.view')
+
+        local function visible(recordType, rows)
+            local out = {}
+            for _, row in ipairs(access.filterSearch(session, recordType, rows)) do
+                if row.restricted ~= true then out[#out + 1] = row end
+            end
+            return out
+        end
+
+        local persons = visible('intel_person', repo.boardPersons(session.agencyId, personIds, cap))
+        local orgs = canOrgs and visible('intel_org', repo.boardOrgs(session.agencyId, orgIds, 200)) or {}
+
+        -- An organisation board whose organisation this reader may not see is
+        -- not a board of its members: it is not found.
+        if input.scope == 'org' and #orgs == 0 then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+
+        local ids = {}
+        for index = 1, math.min(#persons, cap) do ids[index] = persons[index].id end
+        local memberships, associates = repo.boardEdges(ids)
+
+        return service.boardGraph(persons, orgs, memberships, associates)
+    end,
+})
+
+-- =============================================================================
 -- Cases
 -- =============================================================================
 

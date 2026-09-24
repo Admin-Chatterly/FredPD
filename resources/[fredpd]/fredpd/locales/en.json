@@ -506,7 +506,8 @@
       "log": "Intelligence log",
       "people": "People",
       "orgs": "Organizations",
-      "cases": "Cases"
+      "cases": "Cases",
+      "board": "Link diagram"
     },
     "search": {
       "placeholder": "Search the register",
@@ -665,6 +666,25 @@
       "url": "Link",
       "caption": "Caption",
       "add": "Add evidence"
+    },
+    "board": {
+      "title": "Link diagram",
+      "scope": "Show",
+      "everything": "Everyone (newest first)",
+      "counts": "{nodes} on the diagram, {links} links. Select one to open its file.",
+      "truncated": "only the 300 most recently active people are drawn",
+      "empty": "Nothing to draw here.",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "reset": "Fit",
+      "openPerson": "Open {name}",
+      "openOrg": "Open {name}",
+      "legend": "Legend",
+      "person": "Person",
+      "org": "Organization",
+      "membership": "Member of",
+      "associate": "Associate",
+      "unconfirmed": "Not confirmed"
     }
   },
   "admin": {

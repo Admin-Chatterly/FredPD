@@ -8243,6 +8243,39 @@ export const fixtures: FixtureSet = {
     'intel.org.list': () => ({ orgs: intelOrgsFull.map(orgListRow) }),
     'intel.case.list': () => ({ cases: intelCasesFull.map(caseListRow) }),
 
+    /** The link diagram (10.6): the same shape the server's filtered board has. */
+    'intel.board': (input) => {
+      const { scope, id } = (input ?? {}) as { scope?: string; id?: number };
+      let personIds = intelPersonsFull.map((row) => row.id);
+      let orgIds = intelOrgsFull.map((row) => row.id);
+
+      if (scope === 'case') {
+        const links = intelCaseLinks.filter((link) => link.caseId === id);
+        if (!intelCasesFull.some((row) => row.id === id)) return refuse('not_found');
+        personIds = links.flatMap((link) => (link.personId ? [link.personId] : []));
+        orgIds = links.flatMap((link) => (link.orgId ? [link.orgId] : []));
+      } else if (scope === 'org') {
+        if (!intelOrgsFull.some((row) => row.id === id)) return refuse('not_found');
+        orgIds = [id ?? 0];
+        personIds = intelMemberships.filter((m) => m.orgId === id).map((m) => m.personId);
+      }
+
+      const persons = intelPersonsFull.filter((row) => personIds.includes(row.id));
+      const orgs = intelOrgsFull.filter((row) => orgIds.includes(row.id));
+      const onBoard = new Set(persons.map((row) => row.id));
+      const orgsOnBoard = new Set(orgs.map((row) => row.id));
+
+      return {
+        persons: persons.map((row) => ({ id: row.id, name: row.name, alias: row.alias, status: row.status })),
+        orgs: orgs.map((row) => ({ id: row.id, name: row.name, type: row.type, status: row.status })),
+        memberships: intelMemberships.filter((m) => onBoard.has(m.personId) && orgsOnBoard.has(m.orgId)),
+        associates: intelAssociates
+          .filter((a) => onBoard.has(a.low) && onBoard.has(a.high))
+          .map((a) => ({ personId: a.low, associateId: a.high, relationship: a.relationship, isConfirmed: a.isConfirmed })),
+        truncated: false,
+      };
+    },
+
     'intel.person.get': (input) => {
       const { id } = (input ?? {}) as { id?: number };
       const person = intelPersonsFull.find((row) => row.id === id);

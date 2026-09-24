@@ -83,6 +83,7 @@ local NUI_ROUTES <const> = {
 
     -- Intelligence (spec 10).
     'intel.search',
+    'intel.board',
     'intel.tags',
     'intel.note.list',
     'intel.note.create',

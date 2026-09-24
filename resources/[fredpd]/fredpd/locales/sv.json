@@ -506,7 +506,8 @@
       "log": "Underrättelselogg",
       "people": "Personer",
       "orgs": "Organisationer",
-      "cases": "Ärenden"
+      "cases": "Ärenden",
+      "board": "Länkdiagram"
     },
     "search": {
       "placeholder": "Sök i registret",
@@ -665,6 +666,25 @@
       "url": "Länk",
       "caption": "Bildtext",
       "add": "Lägg till bevis"
+    },
+    "board": {
+      "title": "Länkdiagram",
+      "scope": "Visa",
+      "everything": "Alla (senast ändrade först)",
+      "counts": "{nodes} i diagrammet, {links} kopplingar. Välj en för att öppna akten.",
+      "truncated": "bara de 300 senast aktiva personerna ritas",
+      "empty": "Det finns inget att rita här.",
+      "zoomIn": "Zooma in",
+      "zoomOut": "Zooma ut",
+      "reset": "Anpassa",
+      "openPerson": "Öppna {name}",
+      "openOrg": "Öppna {name}",
+      "legend": "Teckenförklaring",
+      "person": "Person",
+      "org": "Organisation",
+      "membership": "Medlem i",
+      "associate": "Umgänge",
+      "unconfirmed": "Inte bekräftad"
     }
   },
   "admin": {

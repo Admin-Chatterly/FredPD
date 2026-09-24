@@ -1418,6 +1418,12 @@ That makes the bridge contract in 10.4 unnecessary — there is no second system
   - contact log.
 - [M] Operations that need command approval (for example a raid based on intelligence) go through an approval workflow.
 - [S] Taskings, watchlists, organisation (gang) profiles, link-analysis graph of persons, vehicles, phones, addresses and organisations.
+- **Link diagram built** (`intel.board`, the Intelligence module's *Link diagram* tab), after PD-Span's `/board`.
+  - It draws people and organisations, with memberships and associations between them. Unconfirmed links are dashed.
+  - It can be scoped to everyone (the 300 most recently active people, with the cut said out loud), one case, or one organisation.
+  - Every node passes the same access filter a search does. A node the reader could see only as a stub is left off, and a line is drawn only between two nodes on the board, so the diagram never shows who is connected to a hidden record.
+  - The layout is a seeded force layout (`web/src/lib/graphLayout.ts`), so the same board opens the same way every time. Nodes are keyboard buttons that open the record.
+  - Vehicles, phones and addresses are not on the diagram yet.
 - [S] Sanitized patrol flags ("Caution: armed") that never reveal the underlying intelligence or source.
 - [S] Review reminders for records not reviewed within a set period; retention rules.
 - **Permissions:** `intel.module.open`, `intel.report.create`, `intel.report.view`, `intel.surveillance.log`, `intel.source.view`, `intel.source.manage`, `intel.source.identity.view`, `intel.operation.approve`.

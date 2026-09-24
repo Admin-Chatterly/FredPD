@@ -226,3 +226,42 @@ test('renders the people screen in Swedish', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Slå ihop' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Ta bort' })).toBeVisible();
 });
+
+// ------------------------------------------------------------ link diagram (10.6)
+
+test.describe('link diagram', () => {
+  test('draws people and organisations, and opens a record from the diagram', async ({ page }) => {
+    await openIntel(page);
+    await page.getByRole('button', { name: 'Link diagram', exact: true }).click();
+
+    const board = page.getByRole('group', { name: 'Link diagram' });
+    await expect(board).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'on the diagram' })).toBeVisible();
+
+    const crew = board.getByRole('button', { name: 'Open Alta Street Crew' });
+    await expect(crew).toBeVisible();
+
+    // Keyboard: Tab reaches a node, Enter opens it.
+    await crew.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('heading', { name: 'Alta Street Crew' })).toBeVisible();
+  });
+
+  test('scopes the diagram to one case', async ({ page }) => {
+    await openIntel(page);
+    await page.getByRole('button', { name: 'Link diagram', exact: true }).click();
+
+    await page.getByLabel('Show').selectOption({ label: 'LSPD-IC26-00001 — Operation Kvarnen' });
+    const board = page.getByRole('group', { name: 'Link diagram' });
+    await expect(board.getByRole('button', { name: 'Open Marko Petrov' })).toBeVisible();
+    await expect(board.getByRole('button', { name: 'Open Alta Street Crew' })).toBeVisible();
+  });
+
+  test('in Swedish', async ({ page }) => {
+    await openIntel(page, 'sv');
+    await page.getByRole('button', { name: 'Länkdiagram', exact: true }).click();
+
+    await expect(page.getByRole('group', { name: 'Länkdiagram' })).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Teckenförklaring' })).toBeVisible();
+  });
+});

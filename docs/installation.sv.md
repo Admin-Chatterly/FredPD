@@ -595,7 +595,6 @@ som inte står i dess egen lista, oavsett vad FXServer ber om.
 Var beredd på det här — det är inte fel, det är kommande arbete:
 
 - **Migrationskörare.** Migrationerna körs för hand tills vidare.
-- **Länkdiagrammet** (`/board` i PD-Span) är ännu inte byggt i MDT:n.
 - **Uppladdade bilder som bevis** i underrättelsemodulen är inte kopplade till
   gatewayen ännu (fotografier av personer är det, se 11c). Externa länkar
   (Medal, YouTube, Streamable, bildadresser) fungerar.

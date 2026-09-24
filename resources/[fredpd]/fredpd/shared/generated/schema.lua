@@ -489,6 +489,11 @@ FredPD.Schema = {
         id = { type = 'integer', required = true, min = 1 },
     },
 
+    IntelBoard = {
+        scope = { type = 'enum', required = true, values = { 'all', 'case', 'org' } },
+        id = { type = 'integer', required = false, min = 1 },
+    },
+
     IntelSearch = {
         term = { type = 'string', required = true, min = 2, max = 128 },
         perType = { type = 'integer', required = false, min = 1, max = 25 },

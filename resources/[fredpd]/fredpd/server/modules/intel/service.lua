@@ -249,4 +249,69 @@ function Intel.validateEvidence(input)
     return nil
 end
 
+-- -----------------------------------------------------------------------------
+-- The link diagram (PD-Span's /board, spec 10.6)
+-- -----------------------------------------------------------------------------
+
+--- How many people a board draws. Past this the diagram is unreadable, and
+--- the reader is told it was cut rather than handed a hairball.
+Intel.BOARD_PERSON_CAP = 300
+
+--- A board from what the reader may see: nodes that survived the access
+--- filter, and only the edges whose both ends did. An edge to a node that is
+--- not on the board would point at something the reader cannot read -- which
+--- is itself the thing access control exists to hide (4.5).
+---
+--- @param persons table rows the access filter kept (stubs already dropped)
+--- @param orgs table rows the access filter kept
+--- @param memberships table { personId, orgId, role, isConfirmed }
+--- @param associates table { personId, associateId, relationship, isConfirmed }
+--- @return table { persons, orgs, memberships, associates, truncated }
+function Intel.boardGraph(persons, orgs, memberships, associates)
+    local truncated = #persons > Intel.BOARD_PERSON_CAP
+    local keptPersons, personIds, orgIds = {}, {}, {}
+
+    for index = 1, math.min(#persons, Intel.BOARD_PERSON_CAP) do
+        local person = persons[index]
+        keptPersons[#keptPersons + 1] = {
+            id = person.id, name = person.name, alias = person.alias, status = person.status,
+        }
+        personIds[person.id] = true
+    end
+
+    local keptOrgs = {}
+    for _, org in ipairs(orgs) do
+        keptOrgs[#keptOrgs + 1] = { id = org.id, name = org.name, type = org.type, status = org.status }
+        orgIds[org.id] = true
+    end
+
+    local keptMemberships = {}
+    for _, edge in ipairs(memberships) do
+        if personIds[edge.personId] and orgIds[edge.orgId] then
+            keptMemberships[#keptMemberships + 1] = {
+                personId = edge.personId, orgId = edge.orgId, role = edge.role,
+                isConfirmed = edge.isConfirmed == true or edge.isConfirmed == 1,
+            }
+        end
+    end
+
+    local keptAssociates = {}
+    for _, edge in ipairs(associates) do
+        if personIds[edge.personId] and personIds[edge.associateId] then
+            keptAssociates[#keptAssociates + 1] = {
+                personId = edge.personId, associateId = edge.associateId, relationship = edge.relationship,
+                isConfirmed = edge.isConfirmed == true or edge.isConfirmed == 1,
+            }
+        end
+    end
+
+    return {
+        persons = keptPersons,
+        orgs = keptOrgs,
+        memberships = keptMemberships,
+        associates = keptAssociates,
+        truncated = truncated,
+    }
+end
+
 FredPD.Modules.intel = Intel
