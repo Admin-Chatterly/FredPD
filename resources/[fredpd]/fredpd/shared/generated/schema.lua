@@ -1548,6 +1548,21 @@ FredPD.Schema = {
         placementId = { type = 'integer', required = true, min = 1 },
     },
 
+    BookingMugshotBegin = {
+        number = { type = 'string', required = true, min = 1, max = 32 },
+        targetId = { type = 'integer', required = true, min = 1 },
+        placementId = { type = 'integer', required = true, min = 1 },
+    },
+
+    PersonPhotoBegin = {
+        personId = { type = 'integer', required = true, min = 1 },
+        kind = { type = 'enum', required = true, values = { 'mugshot', 'field', 'scar', 'mark', 'tattoo' } },
+    },
+
+    PersonPhotoCommit = {
+        mediaRef = { type = 'string', required = true, min = 1, max = 64 },
+    },
+
     BookingRelease = {
         id = { type = 'integer', required = true, min = 1 },
         version = { type = 'integer', required = true, min = 1 },

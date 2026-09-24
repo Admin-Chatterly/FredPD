@@ -43,6 +43,7 @@ import {
   LAB_PRIORITIES,
   ORDNINGSBOT_STATUSES,
   PERSON_CAUTION_KINDS,
+  PERSON_PHOTO_KINDS,
   PERSON_SEXES,
   PERSONNEL_ISSUE_KINDS,
   PLACEMENT_INTERACTIONS,
@@ -2692,6 +2693,31 @@ export const schemas = {
     number: { type: 'string', required: true, min: 1, max: 32 },
     targetId: { type: 'integer', required: true, min: 1 },
     placementId: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
+   * A mugshot at the booking terminal (7.9, 0038): of the player standing
+   * there, against the person the booking already names. The first of the
+   * three upload steps; `PersonPhotoCommit` is the last.
+   */
+  BookingMugshotBegin: {
+    number: { type: 'string', required: true, min: 1, max: 32 },
+    targetId: { type: 'integer', required: true, min: 1 },
+    placementId: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
+   * A photograph for a person's record, from the record (7.3, 0038). Not a
+   * mugshot: that is taken at the booking terminal only.
+   */
+  PersonPhotoBegin: {
+    personId: { type: 'integer', required: true, min: 1 },
+    kind: { type: 'enum', required: true, values: PERSON_PHOTO_KINDS },
+  },
+
+  /** Attaches an uploaded photograph to the record it was begun for. */
+  PersonPhotoCommit: {
+    mediaRef: { type: 'string', required: true, min: 1, max: 64 },
   },
 
   BookingRelease: {

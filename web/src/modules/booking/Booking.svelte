@@ -1,3 +1,23 @@
+<script lang="ts" module>
+  import { nui as bridge } from '../../lib/nui';
+
+  /**
+   * The terminal the MDT was opened at, kept at module level so a tab opened
+   * after the MDT still knows it (the same shape `Lab.svelte` uses): a
+   * mugshot is taken at the booking terminal only (spec 1.4), and the server
+   * checks the officer is standing at it.
+   */
+  let openedAt: number | null = null;
+
+  bridge.on('fredpd:open', (message) => {
+    openedAt = typeof message['placementId'] === 'number' ? message['placementId'] : null;
+  });
+
+  bridge.on('fredpd:close', () => {
+    openedAt = null;
+  });
+</script>
+
 <script lang="ts">
   import { nui } from '../../lib/nui';
   import { t } from '../../lib/i18n';
@@ -6,6 +26,7 @@
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
   import { isStub, type Maybe, type Restricted } from '../records/types';
   import { onIntent, peekIntent, takeIntent } from '../../lib/intent';
+  import { takePhoto, type PhotoBegun } from '../../lib/photo';
 
   /**
    * Booking: inskrivning i arrest — cell assignment, property inventory and
@@ -54,6 +75,74 @@
 
   let confirmingRelease = $state(false);
   let trigger: HTMLButtonElement | null = null;
+
+
+  let mugshotBusy = $state(false);
+
+  /**
+   * Ten-print of whoever stands at the terminal (8.8), filed against this
+   * booking: the same route `/fredpd tenprint` calls, from the screen the
+   * officer already has open.
+   */
+  async function takeTenPrint(): Promise<void> {
+    if (!detail || mugshotBusy) return;
+    mugshotBusy = true;
+    status = '';
+
+    const number = detail.number;
+    const nearest = await nui.call<{ targetId: number }>('fredpd:photoNearest', {});
+    const response = nearest.ok
+      ? await nui.call<{ number: string; identifiedAs?: string | null }>('booking.tenPrint.capture', {
+          number,
+          targetId: nearest.data.targetId,
+          placementId: openedAt ?? undefined,
+        })
+      : nearest;
+
+    if (response.ok) {
+      failure = null;
+      status = response.data.identifiedAs
+        ? t('fingerprintScanner.tenPrint.identified', { number, person: response.data.identifiedAs })
+        : t('fingerprintScanner.tenPrint.captured', { number });
+    } else {
+      failure = response;
+    }
+
+    mugshotBusy = false;
+  }
+
+  /**
+   * A mugshot of whoever stands at the terminal, filed on the person this
+   * booking names (ADR-019): the client finds them and frames their face, the
+   * server checks the range and that they are who the booking says.
+   */
+  async function takeMugshot(): Promise<void> {
+    if (!detail || mugshotBusy) return;
+    mugshotBusy = true;
+    status = '';
+
+    const number = detail.number;
+    const nearest = await nui.call<{ targetId: number }>('fredpd:photoNearest', {});
+
+    const response = nearest.ok
+      ? await takePhoto(() =>
+          nui.call<PhotoBegun>('booking.mugshot.begin', {
+            number,
+            targetId: nearest.data.targetId,
+            placementId: openedAt ?? undefined,
+          }),
+        )
+      : nearest;
+
+    if (response.ok) {
+      failure = null;
+      status = t('booking.mugshot.taken', { number });
+    } else {
+      failure = response;
+    }
+
+    mugshotBusy = false;
+  }
 
   const messages = $derived(fieldList(failure, FIELD_LABELS));
 
@@ -350,6 +439,23 @@
             </p>
           </div>
           {#if !detail.releasedAt}
+            <div class="flex gap-2">
+            <button
+              type="button"
+              class="border border-[var(--color-border)] px-3 py-1 text-xs focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+              disabled={mugshotBusy}
+              onclick={() => void takeMugshot()}
+            >
+              {t('booking.mugshot.take')}
+            </button>
+            <button
+              type="button"
+              class="border border-[var(--color-border)] px-3 py-1 text-xs focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+              disabled={mugshotBusy}
+              onclick={() => void takeTenPrint()}
+            >
+              {t('fingerprintScanner.tenPrint.title')}
+            </button>
             <button
               type="button"
               class="border border-[var(--color-border)] px-3 py-1 text-xs"
@@ -363,6 +469,7 @@
             >
               {t('booking.action.release')}
             </button>
+            </div>
           {/if}
         </header>
 

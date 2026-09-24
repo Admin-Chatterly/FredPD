@@ -43,10 +43,12 @@ end
 -- The three calls
 -- -----------------------------------------------------------------------------
 
+--- @param kind string|nil 'image' for a photograph the gateway re-encodes
+---   and refuses when it is not one
 --- @return boolean ok
 --- @return table result `{ mediaRef, uploadUrl, expiresAt }` or `{ reason }`
-function Gateway.requestUploadToken()
-    local result = client.request('POST', '/fx/media/upload-token', {})
+function Gateway.requestUploadToken(kind)
+    local result = client.request('POST', '/fx/media/upload-token', { kind = kind })
 
     if not result.ok then return false, { reason = result.reason or 'gateway_error' } end
 
@@ -85,6 +87,51 @@ function Gateway.renderPdf(document)
 
     FredPD.Repo.gatewayOutbox.recordFailure(outboxId, result.reason or 'gateway_error')
     return false, { reason = result.reason or 'gateway_error', outboxId = outboxId }
+end
+
+-- -----------------------------------------------------------------------------
+-- Download links, signed here (ADR-019)
+-- -----------------------------------------------------------------------------
+
+--- The download key, derived once: `deriveKey(secret, 'media-download')` in
+--- the gateway's own `config.ts`, byte for byte.
+local downloadKey, downloadKeyFor = nil, nil
+
+local function keyFor(secret)
+    if downloadKeyFor ~= secret then
+        downloadKey = FredPD.Bridge.gateway.hmac.sha256Hex(secret, 'media-download')
+        downloadKeyFor = secret
+    end
+
+    return downloadKey
+end
+
+--- A link the NUI can load a stored file from, for `mediaLinkSeconds`.
+---
+--- Signed here rather than asked of the gateway: a person record with six
+--- photographs would otherwise cost six HTTP round trips on every open, and
+--- the token is the same HMAC the gateway would have computed with the same
+--- derived key (`media/tokens.ts`). The ref is always one this server stored
+--- on a row; it is never taken from input.
+---
+--- @param mediaRef string
+--- @param thumbnail boolean|nil the 320px WebP instead of the original
+--- @param now number|nil epoch seconds, for tests
+--- @return string|nil url, nil when the gateway is off
+function Gateway.downloadUrl(mediaRef, thumbnail, now)
+    if not Gateway.isEnabled() or type(mediaRef) ~= 'string' or not mediaRef:match('^media_[%x%-]+$') then
+        return nil
+    end
+
+    local cfg = FredPD.Config.server.gateway
+    local expiresAt = (now or os.time()) + (tonumber(cfg.mediaLinkSeconds) or 900)
+    local token = FredPD.Bridge.gateway.hmac.sha256Hex(
+        keyFor(cfg.secret), ('%s.download.%d'):format(mediaRef, expiresAt))
+
+    local base = tostring(cfg.mediaUrl or cfg.url):gsub('/+$', '')
+
+    return ('%s/media/%s%s?token=%s&expires=%d'):format(
+        base, mediaRef, thumbnail and '/thumbnail' or '', token, expiresAt)
 end
 
 -- -----------------------------------------------------------------------------

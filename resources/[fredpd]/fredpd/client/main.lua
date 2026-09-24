@@ -290,6 +290,12 @@ local NUI_ROUTES <const> = {
     'impound.release',
     'impound.inventory',
 
+    -- Photographs and mugshots through the gateway (ADR-019).
+    'person.photo.begin',
+    'person.photo.commit',
+    'booking.mugshot.begin',
+    'booking.tenPrint.capture',
+
     -- Crime scenes, evidence and the chain of custody (spec 8).
     'scene.create',
     'scene.release',

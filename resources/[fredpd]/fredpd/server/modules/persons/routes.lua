@@ -336,12 +336,22 @@ route.define({
         local reader = accessRepo.reader(session)
         local cautions = repo.liveCautions(session.agencyId, { person.id })[person.id] or {}
 
+        -- A photograph the reader may read gets a link signed for a few
+        -- minutes (ADR-019); the ref alone is worth nothing to anybody.
+        local media = FredPD.Modules.mediaApi
+        local photos = visiblePhotos(reader, repo.photos(session.agencyId, person.id))
+        for _, photo in ipairs(photos) do
+            if media then photo.url, photo.thumbnailUrl = media.links(photo.mediaRef) end
+            photo.mediaRef, photo.createdBy = nil, nil
+        end
+
         return {
             id = person.id,
             person = redactAddress(session, person),
             aliases = repo.aliases(session.agencyId, person.id),
             descriptors = repo.descriptors(session.agencyId, person.id),
-            photos = visiblePhotos(reader, repo.photos(session.agencyId, person.id)),
+            photos = photos,
+            photoCapture = media ~= nil and media.canCapture(session) or false,
             cautions = visibleCautions(session, reader, cautions),
             biometrics = repo.biometrics(session.agencyId, person.id),
             -- Read under their own record types, so a person an officer may

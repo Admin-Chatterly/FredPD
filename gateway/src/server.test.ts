@@ -19,6 +19,7 @@ const config: GatewayConfig = {
     tokenTtlSeconds: 300,
     maxBytes: 15 * 1024 * 1024,
     publicBaseUrl: 'http://127.0.0.1:3080',
+    allowedOrigin: 'https://cfx-nui-fredpd',
   },
   pdf: {
     chromiumExecutable: process.env['PLAYWRIGHT_CHROMIUM_EXECUTABLE'] ?? '/opt/pw-browsers/chromium',

@@ -84,6 +84,14 @@ export interface GatewayConfig {
      * wildcard (invariant 9).
      */
     publicBaseUrl: string;
+    /**
+     * The one browser origin allowed to upload from script: the NUI, which
+     * FiveM serves as `https://cfx-nui-<resource>`. An upload is a `PUT` with
+     * an image content type, so the browser asks first (a CORS preflight),
+     * and without an answer naming this origin every upload fails before it
+     * is sent. Nothing else is let in; the token is still what authorises.
+     */
+    allowedOrigin: string;
   };
 
   pdf: {
@@ -141,6 +149,7 @@ export function loadConfig(): GatewayConfig {
       tokenTtlSeconds: optionalInt('FREDPD_MEDIA_TOKEN_TTL', 300),
       maxBytes: optionalInt('FREDPD_MEDIA_MAX_BYTES', 15 * 1024 * 1024),
       publicBaseUrl: optional('FREDPD_MEDIA_BASE_URL', `http://127.0.0.1:${gatewayPort}`),
+      allowedOrigin: optional('FREDPD_MEDIA_ALLOWED_ORIGIN', 'https://cfx-nui-fredpd'),
     },
 
     pdf: {

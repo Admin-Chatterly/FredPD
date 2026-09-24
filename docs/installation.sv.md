@@ -490,14 +490,42 @@ Två saker skiljer den från PD-Span, båda avsiktligt:
 Ge någon behörighet genom att koppla en Discord-roll till `intel_analyst`,
 `intel_handler` eller `intel_command` i MDT:n.
 
+## 11c. Fotografier och signalementsfoton (valfritt)
+
+Fotografier på personer och signalementsfoton vid inskrivningen går genom
+gateway-tjänsten (ADR-019). Utan den fungerar allt annat, och knappen säger
+varför den inte kan ta bilden.
+
+1. **screenshot-basic** måste vara installerad och startad före `fredpd`.
+2. **Gatewayen** körs med bland annat:
+   - `FREDPD_GATEWAY_SECRET`, samma hemlighet som `set fredpd:gateway_secret`
+     i `server.cfg`;
+   - `FREDPD_MEDIA_BASE_URL`, den adress spelarnas klient når gatewayen på,
+     t.ex. `https://media.example.se`;
+   - `FREDPD_MEDIA_ALLOWED_ORIGIN`, standard `https://cfx-nui-fredpd`. Byt
+     bara om resursen heter något annat.
+3. **MDT:n byggs med samma adress**, annars stoppar dess säkerhetspolicy varje
+   bild:
+
+   ```bash
+   VITE_MEDIA_HOST=https://media.example.se pnpm build
+   ```
+4. I `config/server.lua`, under `gateway`, sätt `enabled = true`, och sätt
+   `set fredpd:gateway_media_url "https://media.example.se"` i `server.cfg`.
+
+Signalementsfotot tas vid inskrivningsterminalen, med personen stående
+bredvid: **Inskrivning → välj inskrivningen → Ta signalementsfoto**. Andra
+fotografier (fält, ärr, märke, tatuering) tas från personens registerkort.
+
 ## 12. Vad som inte är byggt ännu
 
 Var beredd på det här — det är inte fel, det är kommande arbete:
 
 - **Migrationskörare.** Migrationerna körs för hand tills vidare.
 - **Länkdiagrammet** (`/board` i PD-Span) är ännu inte byggt i MDT:n.
-- **Uppladdade bilder som bevis** kräver gateway-tjänstens mediadel, som inte är
-  byggd. Externa länkar (Medal, YouTube, Streamable, bildadresser) fungerar.
+- **Uppladdade bilder som bevis** i underrättelsemodulen är inte kopplade till
+  gatewayen ännu (fotografier av personer är det, se 11c). Externa länkar
+  (Medal, YouTube, Streamable, bildadresser) fungerar.
 - **Kommandoraden** (Ctrl+K i MDT:n) kan söka (`REG`, `N`, `VAP`, `TEL`, `ADR`),
   sätta status (`ST ER`), ansluta till närmaste händelse (`TILL`) och avsluta den
   (`KLAR`). Att öppna en händelse, anmälan eller ett bevis med nummer, skicka

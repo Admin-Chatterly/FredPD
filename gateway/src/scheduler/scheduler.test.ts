@@ -10,7 +10,7 @@ const config: GatewayConfig = {
   port: 0,
   secret: 'x',
   replayWindowSeconds: 30,
-  media: { directory: '/tmp/x', tokenTtlSeconds: 300, maxBytes: 1024, publicBaseUrl: 'http://x' },
+  media: { directory: '/tmp/x', tokenTtlSeconds: 300, maxBytes: 1024, publicBaseUrl: 'http://x', allowedOrigin: 'https://cfx-nui-fredpd' },
   pdf: { chromiumExecutable: '/opt/pw-browsers/chromium' },
   scheduler: {
     enabled: true,

@@ -89,6 +89,12 @@ server_scripts {
     'server/modules/interviews/service.lua',
     'server/modules/interviews/repo.lua',
     'server/modules/interviews/routes.lua',
+    -- Photographs of people through the gateway (ADR-019). After persons,
+    -- whose repo it reads at call time, and before booking, whose mugshot
+    -- begins through it.
+    'server/modules/media/service.lua',
+    'server/modules/media/repo.lua',
+    'server/modules/media/routes.lua',
 
     -- Suggests real citizens and vehicles from ESX's own tables while
     -- registering one (server/bridges/framework.lua). Routes only: the SQL
@@ -253,6 +259,7 @@ client_scripts {
     'client/bridges/ui.lua',
     'client/bridges/garage.lua',
     'client/bridges/target.lua',
+    'client/bridges/screenshot.lua',
     'client/core.lua',
     -- The toast relay for `fredpd:notify` (server/core/push.lua).
     'client/notify.lua',
@@ -266,6 +273,9 @@ client_scripts {
     -- ox_target on people and vehicles. After core (binds it at load) and
     -- the bridge; calls `FredPD.Client.mdt` from main.lua only at runtime.
     'client/field.lua',
+    -- Photographs and mugshots (ADR-019): the camera and the screenshot; the
+    -- NUI does the upload.
+    'client/photo.lua',
     -- Dispatch: the panic keybind and the relay that carries the server's
     -- `fredpd:cad:*` pushes into the NUI. After `client/core.lua`, whose
     -- namespace it binds at load; before `client/main.lua`, which stays last

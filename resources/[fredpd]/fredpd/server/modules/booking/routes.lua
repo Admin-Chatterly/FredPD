@@ -283,6 +283,59 @@ route.define({
 })
 
 -- -----------------------------------------------------------------------------
+-- Mugshot (7.9, ADR-019)
+-- -----------------------------------------------------------------------------
+
+--- The first step of a mugshot: the same terminal, range and identity rules
+--- as the ten-print above, then an upload begun for the person the booking
+--- already names -- never a person the client names. The client then points
+--- a camera at the target's face, and the NUI uploads and commits
+--- (`media/routes.lua`).
+route.define({
+    name = 'booking.mugshot.begin',
+    perm = 'booking.intake',
+    schema = 'BookingMugshotBegin',
+    context = { onDuty = true, accessPoint = 'booking_terminal' },
+    writes = true,
+    limit = { per = 6, window = 60 },
+    handler = function(session, input)
+        local booking = repo.byNumber(input.number, session.agencyId)
+        if not booking then return route.refuse(FredPD.ErrorCode.NOT_FOUND, { number = 'unknown' }) end
+
+        if booking.releasedAt then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { number = 'already_released' })
+        end
+
+        local at, here = positionOf(input.targetId), positionOf(session.src)
+        if not at or not here then return route.refuse(FredPD.ErrorCode.NOT_FOUND, { targetId = 'unreachable' }) end
+
+        local range = FredPD.Forensics.grid.settings().collectRange
+        local dx, dy, dz = at.x - here.x, at.y - here.y, at.z - here.z
+        if (dx * dx + dy * dy + dz * dz) > (range * range) then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { targetId = 'out_of_range' })
+        end
+
+        -- Somebody else's face on this person's file is refused exactly as
+        -- somebody else's prints are.
+        local character = FredPD.Bridge.framework.getCharacter(input.targetId)
+        local identifier = character and character.identifier or nil
+        if not identifier then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { targetId = 'no_character' })
+        end
+
+        if personsRepo.identifierConflict(session.agencyId, booking.personId, identifier) then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { targetId = 'identity_mismatch' })
+        end
+
+        local result, refusal = FredPD.Modules.mediaApi.beginPhoto(session, booking.personId, 'mugshot')
+        if not result then return refusal end
+
+        result.targetId = input.targetId
+        return result
+    end,
+})
+
+-- -----------------------------------------------------------------------------
 -- Property inventory
 -- -----------------------------------------------------------------------------
 

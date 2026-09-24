@@ -157,6 +157,11 @@ const PAIRED: Record<string, keyof typeof enums> = {
   // Impound (0020, spec 7.15).
   ck_fpd_impound_reason: 'IMPOUND_HELD_REASONS',
   ck_fpd_impound_keys: 'IMPOUND_KEYS',
+  // Person photographs and the media ledger (0005, 0038).
+  ck_fpd_person_photos_kind: 'PERSON_PHOTO_KINDS',
+  ck_fpd_media_kind: 'PERSON_PHOTO_KINDS',
+  ck_fpd_media_purpose: 'MEDIA_PURPOSES',
+  ck_fpd_media_status: 'MEDIA_STATUSES',
 
   // Field interviews and stops (0035, spec 7.14).
   ck_fpd_fi_cards_reason: 'FI_REASONS',
@@ -216,7 +221,6 @@ const UNPAIRED: Record<string, string> = {
   // `persons/service.lua`, where an unknown value fails at the call site with
   // its name in the message rather than as a constraint name.
   ck_fpd_person_aliases_kind: 'what kind of other name this is; the service owns the list (0005 argues why)',
-  ck_fpd_person_photos_kind: 'what a photograph shows; the service owns the list',
 
   // The unified query and hot-file confirmation (0005, 0006). Both are written
   // from what the server just did, and neither appears in a route input.

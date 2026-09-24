@@ -3,8 +3,9 @@ import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import type { GatewayConfig } from '../config.js';
 import { deriveKey } from '../config.js';
 import { newMediaRef, signMediaToken, verifyMediaToken } from './tokens.js';
-import { TooLargeError, type MediaStore } from './store.js';
+import { AlreadyStoredError, TooLargeError, type MediaStore } from './store.js';
 import { makeThumbnail } from './thumbnail.js';
+import { contentTypeOf, reencodeImage } from './image.js';
 import type { Scanner } from './scan.js';
 
 /**
@@ -36,10 +37,17 @@ export interface MediaDeps {
   scanner: Scanner;
 }
 
-function uploadUrl(config: GatewayConfig, mediaRef: string, token: string, expiresAt: number): string {
+function uploadUrl(
+  config: GatewayConfig,
+  mediaRef: string,
+  token: string,
+  expiresAt: number,
+  image: boolean,
+): string {
   const url = new URL(`/media/upload/${mediaRef}`, config.media.publicBaseUrl);
   url.searchParams.set('token', token);
   url.searchParams.set('expires', String(expiresAt));
+  if (image) url.searchParams.set('kind', 'image');
 
   return url.toString();
 }
@@ -64,16 +72,19 @@ export function registerFxMediaRoutes(
   const downloadKey = deriveKey(config.secret, DOWNLOAD_PURPOSE);
 
   scope.post('/media/upload-token', async (request) => {
+    const body = request.verifiedBody as { kind?: unknown } | undefined;
+    const image = body?.kind === 'image';
+
     const mediaRef = newMediaRef();
     const expiresAt = Math.floor(Date.now() / 1000) + config.media.tokenTtlSeconds;
-    const token = signMediaToken(uploadKey, mediaRef, 'upload', expiresAt);
+    const token = signMediaToken(uploadKey, mediaRef, image ? 'upload_image' : 'upload', expiresAt);
 
-    request.log.info({ mediaRef }, 'issued media upload token');
+    request.log.info({ mediaRef, image }, 'issued media upload token');
 
     return {
       ok: true,
       mediaRef,
-      uploadUrl: uploadUrl(config, mediaRef, token, expiresAt),
+      uploadUrl: uploadUrl(config, mediaRef, token, expiresAt, image),
       expiresAt,
     };
   });
@@ -99,12 +110,13 @@ export function registerFxMediaRoutes(
 }
 
 /** Reads `?token=` and `?expires=` off a request, both required. */
-function tokenParams(query: unknown): { token: string | undefined; expiresAt: number } {
-  const params = (query ?? {}) as { token?: unknown; expires?: unknown };
+function tokenParams(query: unknown): { token: string | undefined; expiresAt: number; image: boolean } {
+  const params = (query ?? {}) as { token?: unknown; expires?: unknown; kind?: unknown };
 
   return {
     token: typeof params.token === 'string' ? params.token : undefined,
     expiresAt: Number.parseInt(typeof params.expires === 'string' ? params.expires : '', 10),
+    image: params.kind === 'image',
   };
 }
 
@@ -127,11 +139,30 @@ export const registerPublicMediaRoutes: (config: GatewayConfig, deps: MediaDeps)
       done(null, payload);
     });
 
+    // CORS for the NUI's upload, and only for its origin (`allowedOrigin`).
+    // A preflight is answered here; the PUT and GET themselves carry the
+    // header so the browser lets the NUI read the answer.
+    app.addHook('onRequest', async (request, reply) => {
+      if (request.headers.origin !== config.media.allowedOrigin) return;
+
+      reply.header('access-control-allow-origin', config.media.allowedOrigin);
+      reply.header('vary', 'origin');
+
+      if (request.method === 'OPTIONS') {
+        reply.header('access-control-allow-methods', 'PUT, GET');
+        reply.header('access-control-allow-headers', 'content-type');
+        reply.header('access-control-max-age', '600');
+        return reply.code(204).send();
+      }
+    });
+
+    app.options('/media/upload/:mediaRef', async (_request, reply) => reply.code(204).send());
+
     app.put<{ Params: { mediaRef: string } }>('/media/upload/:mediaRef', async (request, reply) => {
       const { mediaRef } = request.params;
-      const { token, expiresAt } = tokenParams(request.query);
+      const { token, expiresAt, image } = tokenParams(request.query);
 
-      const verified = verifyMediaToken(uploadKey, mediaRef, 'upload', expiresAt, token);
+      const verified = verifyMediaToken(uploadKey, mediaRef, image ? 'upload_image' : 'upload', expiresAt, token);
       if (!verified.ok) {
         request.log.warn({ mediaRef, reason: verified.reason }, 'rejected media upload');
         return reply.code(401).send({ ok: false, err: 'forbidden' });
@@ -159,8 +190,30 @@ export const registerPublicMediaRoutes: (config: GatewayConfig, deps: MediaDeps)
           return reply.code(422).send({ ok: false, err: 'invalid', fields: { file: 'unsafe' } });
         }
 
+        // A photograph is decoded and written out again (`image.ts`): what
+        // is kept is sharp's own JPEG, never the bytes as sent.
+        if (image) {
+          const chunks: Buffer[] = [];
+          for await (const chunk of deps.store.read(mediaRef) as AsyncIterable<Buffer>) chunks.push(chunk);
+
+          const encoded = await reencodeImage(Buffer.concat(chunks));
+          if (!encoded) {
+            await deps.store.remove(mediaRef);
+            request.log.warn({ mediaRef }, 'upload refused: not an image');
+            return reply.code(422).send({ ok: false, err: 'invalid', fields: { file: 'not_image' } });
+          }
+
+          await deps.store.replace(mediaRef, encoded);
+          return { ok: true, mediaRef, bytes: encoded.length };
+        }
+
         return { ok: true, mediaRef, bytes };
       } catch (error) {
+        if (error instanceof AlreadyStoredError) {
+          request.log.warn({ mediaRef }, 'upload refused: the ref already holds a file');
+          return reply.code(409).send({ ok: false, err: 'conflict' });
+        }
+
         if (error instanceof TooLargeError) {
           await deps.store.remove(mediaRef);
           return reply.code(413).send({ ok: false, err: 'invalid', fields: { file: 'too_large' } });
@@ -188,7 +241,11 @@ export const registerPublicMediaRoutes: (config: GatewayConfig, deps: MediaDeps)
       // token in the URL is what limits how long the *link* itself works, not
       // this header.
       reply.header('cache-control', 'private, max-age=31536000, immutable');
-      return reply.type('application/octet-stream').send(deps.store.read(mediaRef));
+      // Named from the file's own first bytes, and never sniffed further by
+      // the browser: a stored file is what this gateway says it is or an
+      // opaque download, nothing in between.
+      reply.header('x-content-type-options', 'nosniff');
+      return reply.type(contentTypeOf(await deps.store.head(mediaRef, 8))).send(deps.store.read(mediaRef));
     });
 
     app.get<{ Params: { mediaRef: string } }>('/media/:mediaRef/thumbnail', async (request, reply) => {

@@ -58,6 +58,15 @@ const REASONS = new Set([
   'mapped_to_roles',
   'too_many',
   'needs_subject',
+  // Photographs through the gateway (ADR-019).
+  'not_image',
+  'unsafe',
+  'gateway_off',
+  'gateway_unavailable',
+  'no_screenshot',
+  'not_uploaded',
+  'identity_mismatch',
+  'no_character',
   'callsign_format',
   // Not `released`: an evidence item's status is `released` too, and the codes
   // share one namespace regardless of which field carried them, so the item

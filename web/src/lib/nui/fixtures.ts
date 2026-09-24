@@ -4360,6 +4360,27 @@ let fixtureLocations: FixtureLocation[] = [
 
 let nextLocationHazardId = 10;
 
+// --------------------------------------------------------------- photographs
+
+/** A 1x1 image: what a signed photo link loads in the browser (ADR-019). */
+const TINY_IMAGE =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+/** Photographs on file, by person id. */
+const fixturePhotos: Record<number, { id: number; kind: string; takenAgo: number }[]> = {
+  1: [{ id: 1, kind: 'mugshot', takenAgo: 3 * DAY }],
+};
+let nextPhotoId = 10;
+let nextMediaRef = 1;
+/** Begun uploads waiting for their commit, as `fpd_media` holds them. */
+const pendingPhotos: Record<string, { personId: number; kind: string }> = {};
+
+function beginFixturePhoto(personId: number, kind: string): { mediaRef: string; uploadUrl: string } {
+  const mediaRef = `media_0000000${nextMediaRef++}`;
+  pendingPhotos[mediaRef] = { personId, kind };
+  return { mediaRef, uploadUrl: 'mock://upload' };
+}
+
 interface FixtureCard {
   id: number;
   reason: string;
@@ -6451,6 +6472,91 @@ export const fixtures: FixtureSet = {
 
       return { id };
     },
+
+    // ------------------------------------------------------- photographs
+
+    /**
+     * The master register's person, for the record page. Only what the
+     * record page draws; the name index and the register rows above are the
+     * same people.
+     */
+    'person.get': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const person = registerPersons
+        .map((entry) => entry.row)
+        .find((row): row is PersonResult => !isStub(row) && row.id === id);
+      if (!person) return refuse('not_found');
+
+      return {
+        id: person.id,
+        person,
+        aliases: [],
+        descriptors: null,
+        photos: (fixturePhotos[person.id] ?? []).map((photo) => ({
+          id: photo.id,
+          kind: photo.kind,
+          bodyLocation: null,
+          description: null,
+          takenAt: secondsAgo(photo.takenAgo),
+          sourceCase: null,
+          classification: 'internal',
+          createdAt: secondsAgo(photo.takenAgo),
+          url: TINY_IMAGE,
+          thumbnailUrl: TINY_IMAGE,
+        })),
+        cautions: [],
+        biometrics: [],
+        vehicles: [],
+        firearms: [],
+        photoCapture: true,
+      };
+    },
+
+    'person.photo.begin': (input) => {
+      const { personId, kind } = (input ?? {}) as { personId?: number; kind?: string };
+      if (kind === 'mugshot') return refuse('invalid', { kind: 'not_allowed' });
+      if (!personId) return refuse('not_found', { personId: 'unknown' });
+
+      return beginFixturePhoto(personId, kind ?? 'field');
+    },
+
+    'booking.mugshot.begin': (input) => {
+      const { number, targetId } = (input ?? {}) as { number?: string; targetId?: number };
+      const booking = bookings.find((row) => row.number === number);
+      if (!booking) return refuse('not_found', { number: 'unknown' });
+      if (booking.releasedAgo !== undefined) return refuse('conflict', { number: 'already_released' });
+
+      const chain = frihetsberovanden.find((row) => row.id === booking.frihetId);
+      return { ...beginFixturePhoto(chain?.personId ?? 1, 'mugshot'), targetId };
+    },
+
+    'booking.tenPrint.capture': (input) => {
+      const { number } = (input ?? {}) as { number?: string };
+      const booking = bookings.find((row) => row.number === number);
+      if (!booking) return refuse('not_found', { number: 'unknown' });
+      if (booking.releasedAgo !== undefined) return refuse('conflict', { number: 'already_released' });
+
+      return { number: booking.number, identifiedAs: null };
+    },
+
+    'person.photo.commit': (input) => {
+      const { mediaRef } = (input ?? {}) as { mediaRef?: string };
+      const pending = mediaRef ? pendingPhotos[mediaRef] : undefined;
+      if (!mediaRef || !pending) return refuse('not_found', { mediaRef: 'unknown' });
+
+      delete pendingPhotos[mediaRef];
+      const photoId = nextPhotoId++;
+      fixturePhotos[pending.personId] = [
+        { id: photoId, kind: pending.kind, takenAgo: 0 },
+        ...(fixturePhotos[pending.personId] ?? []),
+      ];
+
+      return { id: pending.personId, photoId, kind: pending.kind };
+    },
+
+    /** The client's own callbacks (client/photo.lua): somebody at the terminal, and the picture. */
+    'fredpd:photoNearest': () => ({ targetId: 7 }),
+    'fredpd:photoCapture': () => ({ image: TINY_IMAGE }),
 
     'impound.list': (input) => {
       const filter = (input ?? {}) as { held?: boolean };

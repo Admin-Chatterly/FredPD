@@ -14,7 +14,13 @@ import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
  * without invalidating the signature.
  */
 
-export type MediaAction = 'upload' | 'download';
+/**
+ * `upload_image` is an upload the gateway re-encodes as a photograph and
+ * refuses when it is not one; `upload` stores the bytes as sent. Separate
+ * actions, so a token issued for a photograph cannot be spent on anything
+ * else by dropping `kind` from the URL.
+ */
+export type MediaAction = 'upload' | 'upload_image' | 'download';
 
 export interface MediaToken {
   mediaRef: string;

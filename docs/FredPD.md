@@ -323,7 +323,7 @@ to be argued for in an ADR, not a convenience. See ADR-013.
 
 Built (the outbound half). `server/bridges/gateway/{sha256,hmac,client,repo,service}.lua`, migration 0021.
 
-- **FXServer → gateway:** `PerformHttpRequest` to `http://127.0.0.1:<port>`, signed `HMAC-SHA256(secret, "<timestamp>.<body>")` in `x-fredpd-signature`/`x-fredpd-timestamp` — the exact wire format `gateway/src/hmac.ts`'s own `sign()` already implements on the gateway side, so the two sides can only ever agree or both be wrong the same way. `sha256.lua` and `hmac.lua` are pure Lua (no natives), pinned in busted against FIPS 180-4's own test vectors and RFC 4231's, respectively — an unverified hash implementation was judged worse than no bridge at all, which is why one was not shipped until it could be verified this way. `Gateway.requestUploadToken`, `.requestDownloadToken` and `.renderPdf` call the gateway's existing media and PDF routes; nothing calls them yet (no NUI screen uploads media or exports a PDF), so the bridge exists and is tested but is not yet reachable from a workflow.
+- **FXServer → gateway:** `PerformHttpRequest` to `http://127.0.0.1:<port>`, signed `HMAC-SHA256(secret, "<timestamp>.<body>")` in `x-fredpd-signature`/`x-fredpd-timestamp` — the exact wire format `gateway/src/hmac.ts`'s own `sign()` already implements on the gateway side, so the two sides can only ever agree or both be wrong the same way. `sha256.lua` and `hmac.lua` are pure Lua (no natives), pinned in busted against FIPS 180-4's own test vectors and RFC 4231's, respectively — an unverified hash implementation was judged worse than no bridge at all, which is why one was not shipped until it could be verified this way. `Gateway.requestUploadToken`, `.requestDownloadToken` and `.renderPdf` call the gateway's media and PDF routes. `Gateway.downloadUrl` signs a download link in Lua with the same derived key the gateway verifies (ADR-019). Photographs of people use the media half (ADR-019); nothing exports a PDF yet.
 - **Gateway → FXServer:** not built. A reverse channel needs FXServer to run its own HTTP listener (`SetHttpHandler`), which nothing here currently requires — everything the gateway serves today (a token, a rendered PDF) is a synchronous reply to an FXServer-initiated request, not an event the gateway raises on its own. Left for whichever of "role changes, lab timer completions, scheduled jobs" is built first and actually needs to push.
 - **Reliability:** an outbox table on the FXServer side (`fpd_gateway_outbox`) retries a failed `renderPdf` call on a five-minute timer, up to 10 attempts or 24 hours old, whichever comes first. A gateway-side outbox is not built — nothing yet calls FXServer for the gateway to need to retry into.
 - **Discord role actions are not built.** See section 7.22's own note: ADR-010 settled that FXServer only reads the guild, and the reasoning against writing to it from anywhere in this suite generalised past the read path.
@@ -680,7 +680,7 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 
 - [M] Identity from the framework (name, DOB, sex, phone), with FredPD-owned extensions.
 - [M] Descriptors: height, weight, build, hair, eyes, scars/marks/tattoos with photos.
-- [M] Photo history (mugshots and field photos) with dates and source.
+- [M] Photo history (mugshots and field photos) with dates and source. **Built (ADR-019, 0038).** A field, scar, mark or tattoo photograph is taken from the record: the MDT hides, the client takes a screenshot through screenshot-basic, the NUI uploads it to a single-use gateway link, and the server attaches it, re-encoded, only if it began that upload for that officer. A reader sees thumbnails through links the server signs for a few minutes, only on photographs they may read. Needs the gateway (3.7).
 - [M] Aliases and monikers; known addresses; phone numbers.
 - [M] Licences (driving, weapons, hunting, pilot, business), with status and points (bridge to framework licences).
 - [M] Linked vehicles, firearms, properties; involvements in reports (suspect, victim, witness, reporting party).
@@ -692,7 +692,7 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 - [S] Deceased flag and missing-person status.
 - [O] Record sealing and expungement (court-ordered).
 - **Based on:** RMS master name index; ps-mdt v3 citizen profiles.
-- **Permissions:** `rms.person.view`, `rms.person.edit`, `rms.person.photo.upload`, `rms.person.caution.edit`, `fields.mental_health.view`.
+- **Permissions:** `rms.person.view`, `rms.person.edit`, `rms.person.photo.upload` (patrol), `rms.person.caution.edit`, `fields.mental_health.view`.
 
 ### 7.4 Vehicles (M2)
 
@@ -775,6 +775,7 @@ A chain of three decisions taken by three different people, not one arrest recor
   - **RB 24:13** — the häktningsförhandling within four dygn of the gripande. That one is 96 hours.
 - [M] An append-only custody log: förhör, försvarare, måltider, the calls a detainee is entitled to.
 - [M] What somebody is held for is its own charge list, separate from the anmälan's: a prosecutor anhåller for two of the five offences reported, and the chain has to say which two.
+- [M] **Mugshot at the booking terminal** (ADR-019). `booking.mugshot.begin` applies the ten-print's rules (the terminal, the range, no identity conflict with the booked person). The client points a camera at the person's face, and the photograph is filed on the person the booking names under `booking.intake`.
 - [M] **Inskrivning i arrest** (M6). Built. Migration 0018, `server/modules/booking/`. Cell assignment and a property inventory, picking up from a `frihetsberövande` row still open; release requires a reason from a closed list, checked server-side the same way every other closed-list ground in this suite is. Mugshot and ten-print capture are not built — they need the media pipeline (section 3.2), which has no NUI wiring yet either. Fires `fredpd:arrestBooked` for the jail bridge (section 4.2 in its M6 state) to pick up.
 - **Permissions:** `frihet.view`, `frihet.gripande`, `frihet.frigiv` (patrol); `frihet.anhallande` (åklagare); `frihet.haktning` (domare); `frihet.fallback.aklagare` (supervisor), `frihet.fallback.domare` (command); `booking.view` (patrol_basic), `booking.intake`, `booking.release` (patrol).
 

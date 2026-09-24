@@ -20,6 +20,7 @@
   import Impound from './Impound.svelte';
   import Locations from './Locations.svelte';
   import FieldWork from './FieldWork.svelte';
+  import { takePhoto } from '../../lib/photo';
   import { t } from '../../lib/i18n';
   import { formatDate, formatMoment } from '../../lib/time';
   import {
@@ -425,6 +426,34 @@
    * untouched field is not sent at all, so a save that changes nothing is
    * refused as `nothing_to_change` rather than bumping the version for nobody.
    */
+  /** A photograph for the open record (ADR-019): the kind chosen, the one enlarged. */
+  let photoKind = $state<'field' | 'scar' | 'mark' | 'tattoo'>('field');
+  let photoBusy = $state(false);
+  let photoFailure = $state<Failure | null>(null);
+  let photoStatus = $state('');
+  let enlargedPhoto = $state<number | null>(null);
+  const photoMessages = $derived(fieldList(photoFailure, { file: 'records.person.photo.file', _input: 'records.person.photos' }));
+
+  async function capturePhoto(personId: number): Promise<void> {
+    if (photoBusy) return;
+    photoBusy = true;
+    photoStatus = '';
+
+    const response = await takePhoto(() =>
+      nui.call('person.photo.begin', { personId, kind: photoKind }),
+    );
+
+    if (response.ok) {
+      photoFailure = null;
+      photoStatus = t('records.person.photo.taken_ok');
+      await loadPerson(personId);
+    } else {
+      photoFailure = response;
+    }
+
+    photoBusy = false;
+  }
+
   async function loadPerson(id: number): Promise<void> {
     const response = await nui.call<PersonDetail>('person.get', { id });
 
@@ -1611,15 +1640,17 @@
           </ul>
         </div>
 
-        <!-- Photographs. The image itself is media and is served through the
-             gateway behind a signed URL (invariant 9); there is no media route
-             in this build, so what is on file is listed and not rendered. -->
+        <!-- Photographs (ADR-019). The image is media, served by the gateway
+             behind a link the server signed for this reader, for a few
+             minutes (invariant 9); a photograph the reader may not see was
+             never sent. -->
         <div>
           <h3 class="text-xs font-semibold">{t('records.person.photos')}</h3>
           <div class="mt-1 overflow-x-auto border border-[var(--color-border)]">
             <table class="w-full border-collapse text-xs">
               <thead>
                 <tr class="border-b border-[var(--color-border)] text-left">
+                  <th class="px-3 py-2 font-semibold"><span class="sr-only">{t('records.person.photo.image')}</span></th>
                   <th class="px-3 py-2 font-semibold">{t('records.person.photo.kind')}</th>
                   <th class="px-3 py-2 font-semibold">{t('records.person.photo.taken')}</th>
                   <th class="px-3 py-2 font-semibold">{t('records.person.photo.location')}</th>
@@ -1630,6 +1661,24 @@
               <tbody>
                 {#each personDetail.photos ?? [] as photo (photo.id)}
                   <tr class="border-b border-[var(--color-border)] last:border-b-0">
+                    <td class="px-3 py-2">
+                      {#if photo.thumbnailUrl}
+                        <button
+                          type="button"
+                          class="block focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+                          aria-expanded={enlargedPhoto === photo.id}
+                          aria-label={t('records.person.photo.enlarge', { kind: t(`records.photoKind.${photo.kind}`) })}
+                          onclick={() => (enlargedPhoto = enlargedPhoto === photo.id ? null : photo.id)}
+                        >
+                          <img
+                            src={photo.thumbnailUrl}
+                            alt={t(`records.photoKind.${photo.kind}`)}
+                            loading="lazy"
+                            class="h-12 w-12 border border-[var(--color-border)] object-cover"
+                          />
+                        </button>
+                      {/if}
+                    </td>
                     <td class="px-3 py-2">{t(`records.photoKind.${photo.kind}`)}</td>
                     <td class="px-3 py-2">{formatMoment(photo.takenAt)}</td>
                     <td class="px-3 py-2">{photo.bodyLocation ?? ''}</td>
@@ -1638,9 +1687,20 @@
                       {photo.sourceCase ?? ''}
                     </td>
                   </tr>
+                  {#if enlargedPhoto === photo.id && photo.url}
+                    <tr class="border-b border-[var(--color-border)]">
+                      <td class="px-3 py-2" colspan="6">
+                        <img
+                          src={photo.url}
+                          alt={t(`records.photoKind.${photo.kind}`)}
+                          class="max-h-96 max-w-full border border-[var(--color-border)]"
+                        />
+                      </td>
+                    </tr>
+                  {/if}
                 {:else}
                   <tr>
-                    <td class="px-3 py-3 text-[var(--color-ink-muted)]" colspan="5">
+                    <td class="px-3 py-3 text-[var(--color-ink-muted)]" colspan="6">
                       {t('records.person.photo.empty')}
                     </td>
                   </tr>
@@ -1648,7 +1708,39 @@
               </tbody>
             </table>
           </div>
-          <p class="mt-1 text-xs text-[var(--color-ink-muted)]">{t('records.person.photo.note')}</p>
+
+          {#if personDetail.photoCapture}
+            <div class="mt-2 flex flex-wrap items-end gap-2 text-xs">
+              <label class="flex flex-col gap-1">
+                {t('records.person.photo.captureKind')}
+                <select bind:value={photoKind} class="border border-[var(--color-border)] px-2 py-1">
+                  {#each ['field', 'scar', 'mark', 'tattoo'] as kind (kind)}
+                    <option value={kind}>{t(`records.photoKind.${kind}`)}</option>
+                  {/each}
+                </select>
+              </label>
+              <button
+                type="button"
+                class="border border-[var(--color-border)] px-3 py-1 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+                disabled={photoBusy}
+                onclick={() => void capturePhoto(openPerson.id)}
+              >
+                {t('records.person.photo.take')}
+              </button>
+              <span class="text-[var(--color-ink-muted)]">{t('records.person.photo.takeHint')}</span>
+            </div>
+          {/if}
+          {#if photoFailure}
+            <div class="mt-2 border border-[var(--color-alert)] px-2 py-1 text-xs" role="alert">
+              <p>{t(`error.${photoFailure.err}`)}</p>
+              {#each photoMessages as message (message.name)}
+                <p class="text-[var(--color-ink-muted)]">{message.reason}</p>
+              {/each}
+            </div>
+          {/if}
+          {#if photoStatus}
+            <p class="mt-1 text-xs text-[var(--color-ink-muted)]" role="status">{photoStatus}</p>
+          {/if}
         </div>
 
         <!-- Biometrics: on file or not, never a value (8.1). -->

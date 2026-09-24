@@ -526,6 +526,14 @@ FredPD.Config.server = {
         secret = setting('fredpd:gateway_secret', ''),
         --- How long a signed request stays valid, in seconds (spec 3.7).
         replayWindow = 30,
+        --- Where players' NUI reaches the gateway's media routes: the
+        --- gateway's own `FREDPD_MEDIA_BASE_URL`, and the host the NUI was
+        --- built with (`VITE_MEDIA_HOST`), or the CSP blocks every image.
+        mediaUrl = setting('fredpd:gateway_media_url', 'http://127.0.0.1:3080'),
+        --- How long a signed photo link works, in seconds. The gateway's own
+        --- `FREDPD_MEDIA_TOKEN_TTL` bounds upload links; this bounds the
+        --- download links FXServer signs itself (ADR-019).
+        mediaLinkSeconds = 900,
     },
 
     --- Suggesting real citizens and vehicles while an officer is registering

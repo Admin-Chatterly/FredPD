@@ -17,7 +17,7 @@ const config: GatewayConfig = {
   port: 0,
   secret: 'test-secret',
   replayWindowSeconds: 30,
-  media: { directory: '/tmp/unused', tokenTtlSeconds: 300, maxBytes: 1024, publicBaseUrl: 'http://x' },
+  media: { directory: '/tmp/unused', tokenTtlSeconds: 300, maxBytes: 1024, publicBaseUrl: 'http://x', allowedOrigin: 'https://cfx-nui-fredpd' },
   pdf: { chromiumExecutable: process.env['PLAYWRIGHT_CHROMIUM_EXECUTABLE'] ?? '/opt/pw-browsers/chromium' },
   scheduler: {
     enabled: false,

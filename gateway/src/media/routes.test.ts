@@ -2,6 +2,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 
 import type { GatewayConfig } from '../config.js';
@@ -28,6 +29,7 @@ function baseConfig(mediaDir: string): GatewayConfig {
       tokenTtlSeconds: 300,
       maxBytes: 1024,
       publicBaseUrl: 'http://127.0.0.1:3080',
+      allowedOrigin: 'https://cfx-nui-fredpd',
     },
     pdf: { chromiumExecutable: '/opt/pw-browsers/chromium' },
     scheduler: {
@@ -207,6 +209,137 @@ describe('media', () => {
     // Not stored at all: the scan ran before the ref could ever be handed
     // back to anything that might download it.
     expect(downloadTokenResponse.statusCode).toBe(404);
+
+    await app.close();
+  });
+
+  async function imageUpload(app: ReturnType<typeof createServer>, config: GatewayConfig) {
+    const body = JSON.stringify({ kind: 'image' });
+    const tokenResponse = await app.inject({
+      method: 'POST',
+      url: '/fx/media/upload-token',
+      headers: signedHeaders(config.secret, body),
+      payload: body,
+    });
+
+    const { mediaRef, uploadUrl } = tokenResponse.json() as { mediaRef: string; uploadUrl: string };
+    return { mediaRef, uploadPath: new URL(uploadUrl).pathname + new URL(uploadUrl).search, uploadUrl };
+  }
+
+  async function download(app: ReturnType<typeof createServer>, config: GatewayConfig, mediaRef: string) {
+    const body = JSON.stringify({ mediaRef });
+    const tokenResponse = await app.inject({
+      method: 'POST',
+      url: '/fx/media/download-token',
+      headers: signedHeaders(config.secret, body),
+      payload: body,
+    });
+    if (tokenResponse.statusCode !== 200) return tokenResponse;
+
+    const { downloadUrl } = tokenResponse.json() as { downloadUrl: string };
+    return app.inject({ method: 'GET', url: new URL(downloadUrl).pathname + new URL(downloadUrl).search });
+  }
+
+  it('re-encodes a photograph as a fresh JPEG and serves it as one', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'fredpd-media-'));
+    const config = baseConfig(dir);
+    config.media.maxBytes = 1024 * 1024;
+    const app = createServer(config);
+
+    const png = await sharp({ create: { width: 64, height: 48, channels: 3, background: '#336699' } })
+      .png()
+      .toBuffer();
+
+    const { mediaRef, uploadUrl, uploadPath } = await imageUpload(app, config);
+    expect(new URL(uploadUrl).searchParams.get('kind')).toBe('image');
+
+    const upload = await app.inject({ method: 'PUT', url: uploadPath, payload: png });
+    expect(upload.statusCode).toBe(200);
+
+    const served = await download(app, config, mediaRef);
+    expect(served.statusCode).toBe(200);
+    expect(served.headers['content-type']).toBe('image/jpeg');
+    expect(served.headers['x-content-type-options']).toBe('nosniff');
+    expect(served.rawPayload.subarray(0, 3)).toEqual(Buffer.from([0xff, 0xd8, 0xff]));
+
+    await app.close();
+  });
+
+  it('refuses a photograph upload that is not an image, and keeps nothing', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'fredpd-media-'));
+    const config = baseConfig(dir);
+    const app = createServer(config);
+
+    const { mediaRef, uploadPath } = await imageUpload(app, config);
+    const upload = await app.inject({ method: 'PUT', url: uploadPath, payload: Buffer.from('<script>x</script>') });
+
+    expect(upload.statusCode).toBe(422);
+    expect(upload.json()).toMatchObject({ fields: { file: 'not_image' } });
+    expect((await download(app, config, mediaRef)).statusCode).toBe(404);
+
+    await app.close();
+  });
+
+  it('will not let a photograph token be spent as a plain upload', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'fredpd-media-'));
+    const config = baseConfig(dir);
+    const app = createServer(config);
+
+    const { uploadPath } = await imageUpload(app, config);
+    const upload = await app.inject({
+      method: 'PUT',
+      url: uploadPath.replace('&kind=image', ''),
+      payload: Buffer.from('not re-encoded'),
+    });
+
+    expect(upload.statusCode).toBe(401);
+
+    await app.close();
+  });
+
+  it('accepts one upload per token and refuses the second', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'fredpd-media-'));
+    const config = baseConfig(dir);
+    const app = createServer(config);
+
+    const tokenResponse = await app.inject({
+      method: 'POST',
+      url: '/fx/media/upload-token',
+      headers: signedHeaders(config.secret, ''),
+      payload: '',
+    });
+    const { uploadUrl } = tokenResponse.json() as { uploadUrl: string };
+    const uploadPath = new URL(uploadUrl).pathname + new URL(uploadUrl).search;
+
+    const first = await app.inject({ method: 'PUT', url: uploadPath, payload: Buffer.from('first') });
+    const second = await app.inject({ method: 'PUT', url: uploadPath, payload: Buffer.from('second') });
+
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(409);
+
+    await app.close();
+  });
+
+  it('answers the upload preflight from the NUI origin only', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'fredpd-media-'));
+    const config = baseConfig(dir);
+    const app = createServer(config);
+
+    const nui = await app.inject({
+      method: 'OPTIONS',
+      url: '/media/upload/media_00000000-0000-0000-0000-000000000000',
+      headers: { origin: 'https://cfx-nui-fredpd', 'access-control-request-method': 'PUT' },
+    });
+    expect(nui.statusCode).toBe(204);
+    expect(nui.headers['access-control-allow-origin']).toBe('https://cfx-nui-fredpd');
+    expect(nui.headers['access-control-allow-methods']).toContain('PUT');
+
+    const other = await app.inject({
+      method: 'OPTIONS',
+      url: '/media/upload/media_00000000-0000-0000-0000-000000000000',
+      headers: { origin: 'https://evil.example', 'access-control-request-method': 'PUT' },
+    });
+    expect(other.headers['access-control-allow-origin']).toBeUndefined();
 
     await app.close();
   });

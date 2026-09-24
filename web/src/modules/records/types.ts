@@ -169,14 +169,15 @@ export interface PersonDescriptors {
 export interface PersonPhoto {
   id: number;
   kind: string;
-  mediaRef: string;
   bodyLocation: string | null;
   description: string | null;
   takenAt: Moment;
   sourceCase: string | null;
   classification: string;
-  createdBy: string | null;
   createdAt: Moment;
+  /** Signed for this reader by the server (ADR-019), a few minutes long; absent without the gateway. */
+  url?: string | null;
+  thumbnailUrl?: string | null;
 }
 
 /** "Fingerprints on file", "DNA on file" — never a biometric value (8.1). */
@@ -234,6 +235,8 @@ export interface PersonDetail {
   firearms?: Maybe<LinkedFirearm>[];
   /** Licence points from citations (ADR-018); absent for a reader of no citations. */
   licence?: { points: number; threshold: number; standing: 'valid' | 'warning' | 'revoked' } | null;
+  /** Whether this session may take a photograph for the record right now (ADR-019). */
+  photoCapture?: boolean;
 }
 
 // --------------------------------------------------------------- vehicles

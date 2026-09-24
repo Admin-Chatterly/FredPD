@@ -1234,3 +1234,22 @@ export type StopSearch = (typeof STOP_SEARCHES)[number];
 export const STOP_RESULTS = ['no_action', 'warning', 'citation', 'arrest', 'other'] as const;
 
 export type StopResult = (typeof STOP_RESULTS)[number];
+
+/**
+ * `ck_fpd_person_photos_kind` (0005) and `ck_fpd_media_kind` (0038) -- what
+ * a photograph of a person shows. A mugshot is taken at the booking terminal
+ * only; the others from the record.
+ */
+export const PERSON_PHOTO_KINDS = ['mugshot', 'field', 'scar', 'mark', 'tattoo'] as const;
+
+export type PersonPhotoKind = (typeof PERSON_PHOTO_KINDS)[number];
+
+/** `ck_fpd_media_purpose` (0038) -- what an upload is for. */
+export const MEDIA_PURPOSES = ['person_photo'] as const;
+
+export type MediaPurpose = (typeof MEDIA_PURPOSES)[number];
+
+/** `ck_fpd_media_status` (0038). */
+export const MEDIA_STATUSES = ['pending', 'committed'] as const;
+
+export type MediaStatus = (typeof MEDIA_STATUSES)[number];

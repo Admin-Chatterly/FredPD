@@ -900,3 +900,14 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
 
 INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('command', 'ordningsbot.tariff.edit');
+
+-- -----------------------------------------------------------------------------
+-- Photographs on a person's record (spec 7.3, ADR-019)
+--
+-- A field photograph, a scar, a tattoo: the officer who met the person takes
+-- it. A mugshot is the booking terminal's and rides on `booking.intake`,
+-- which patrol already holds.
+-- -----------------------------------------------------------------------------
+
+INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
+    ('patrol', 'rms.person.photo.upload');

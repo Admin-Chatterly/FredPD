@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, open, rename, stat, unlink } from 'node:fs/promises';
+import { mkdir, open, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { join, resolve } from 'node:path';
 
@@ -19,8 +19,16 @@ import { join, resolve } from 'node:path';
 const REF_PATTERN = /^media_[0-9a-f-]{36}$/;
 
 export interface MediaStore {
-  /** Streams a request body to disk, capped at `maxBytes`. */
+  /**
+   * Streams a request body to disk, capped at `maxBytes`. Once only: a ref
+   * that already exists, or one another upload is writing right now, is
+   * refused with `AlreadyStoredError`.
+   */
   save(mediaRef: string, stream: NodeJS.ReadableStream, maxBytes: number): Promise<{ bytes: number }>;
+  /** Replaces a stored file's bytes, atomically (the re-encoded image). */
+  replace(mediaRef: string, bytes: Buffer): Promise<void>;
+  /** The first bytes of a stored file, for telling what it is. */
+  head(mediaRef: string, length: number): Promise<Buffer>;
   /** The absolute path of a stored file, once it exists. */
   pathFor(mediaRef: string): string;
   exists(mediaRef: string): Promise<boolean>;
@@ -38,7 +46,14 @@ class TooLargeError extends Error {
   }
 }
 
-export { TooLargeError };
+class AlreadyStoredError extends Error {
+  constructor() {
+    super('this media ref already holds a file');
+    this.name = 'AlreadyStoredError';
+  }
+}
+
+export { AlreadyStoredError, TooLargeError };
 
 export function createDiskStore(directory: string): MediaStore {
   const root = resolve(directory);
@@ -102,9 +117,22 @@ export function createDiskStore(directory: string): MediaStore {
     async save(mediaRef, stream, maxBytes) {
       await mkdir(root, { recursive: true });
 
+      // An upload token is good for one file. A ref that already holds one
+      // is not written again, and 'wx' makes a second upload racing the first
+      // fail on the `.part` file rather than interleave with it.
+      if (await this.exists(mediaRef)) throw new AlreadyStoredError();
+
       const tmp = partPath(mediaRef);
-      const handle = await open(tmp, 'w');
+      let handle;
+      try {
+        handle = await open(tmp, 'wx');
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new AlreadyStoredError();
+        throw error;
+      }
+
       let bytes = 0;
+      let complete = false;
 
       try {
         for await (const chunk of stream as AsyncIterable<Buffer>) {
@@ -116,13 +144,34 @@ export function createDiskStore(directory: string): MediaStore {
 
           await handle.write(chunk);
         }
+
+        complete = true;
       } finally {
         await handle.close();
+        // A refused or broken upload leaves nothing behind, not even a part.
+        if (!complete) await unlink(tmp).catch(() => undefined);
       }
 
       await rename(tmp, finalPath(mediaRef));
 
       return { bytes };
+    },
+
+    async replace(mediaRef, bytes) {
+      const tmp = `${partPath(mediaRef)}.replace`;
+      await writeFile(tmp, bytes);
+      await rename(tmp, finalPath(mediaRef));
+    },
+
+    async head(mediaRef, length) {
+      const handle = await open(finalPath(mediaRef), 'r');
+      try {
+        const buffer = Buffer.alloc(length);
+        const { bytesRead } = await handle.read(buffer, 0, length, 0);
+        return buffer.subarray(0, bytesRead);
+      } finally {
+        await handle.close();
+      }
     },
   };
 }

@@ -37,6 +37,12 @@ nui.on('fredpd:close', () => {
   root.hidden = true;
 });
 
+// Out of the picture while a photograph is taken (client/photo.lua), without
+// closing: every form stays exactly as it was.
+nui.on('fredpd:photo', (message) => {
+  root.style.visibility = message['hidden'] === true ? 'hidden' : '';
+});
+
 // Escape asks the client to close, so focus and visibility change in one place.
 window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') void nui.call('fredpd:close');

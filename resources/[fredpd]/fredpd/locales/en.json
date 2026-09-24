@@ -186,7 +186,15 @@
     "not_suspect": "That person is not a suspect in this investigation.",
     "no_position": "Your position could not be read.",
     "already_cancelled": "It has already been cancelled.",
-    "needs_subject": "a card needs a person, a vehicle or a note"
+    "needs_subject": "a card needs a person, a vehicle or a note",
+    "not_image": "the file is not a photograph",
+    "unsafe": "the file failed the virus scan",
+    "gateway_off": "photographs need the media gateway, which is turned off on this server",
+    "gateway_unavailable": "the media gateway did not answer; try again",
+    "no_screenshot": "the picture could not be taken (screenshot-basic is not running)",
+    "not_uploaded": "the picture never reached the media gateway",
+    "identity_mismatch": "the person at the terminal is not the person this booking names",
+    "no_character": "the person at the terminal has no character loaded"
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -1075,8 +1083,14 @@
         "empty": "No photographs on record.",
         "kind": "Kind",
         "location": "Body location",
-        "note": "Photographs are served through the media gateway and are not shown on this screen.",
-        "taken": "Taken"
+        "taken": "Taken",
+        "image": "Photograph",
+        "enlarge": "Show the {kind} at full size",
+        "take": "Take photograph",
+        "takeHint": "The MDT is hidden for a moment while the picture is taken.",
+        "taken_ok": "Photograph added to the record.",
+        "file": "File",
+        "captureKind": "Kind of photograph"
       },
       "photos": "Photographs",
       "search": {
@@ -2620,6 +2634,10 @@
     },
     "confirm": {
       "release": "Release this person from custody?"
+    },
+    "mugshot": {
+      "take": "Take mugshot",
+      "taken": "Mugshot filed with booking {number}."
     }
   },
   "comms": {
