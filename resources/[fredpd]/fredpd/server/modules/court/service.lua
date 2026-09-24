@@ -171,6 +171,36 @@ function Court.validateDisposition(input)
     return nil
 end
 
+--- The game minutes a verdict is served as (spec 7.20, ADR-017), or nil when
+--- it is not a custodial sentence at all.
+---
+--- Only a guilty verdict or a plea, and only with months or livstid: a fine,
+--- an acquittal or a dismissal sends nobody anywhere. Clamped to the jail's
+--- configured bounds, so a two-year sentence does not keep a player in a cell
+--- for a real day, and livstid is the longest stay the server allows.
+---
+--- @param disposition string
+--- @param months number|nil
+--- @param livstid boolean
+--- @param config table { minutesPerMonth, minMinutes, maxMinutes }
+--- @return number|nil
+function Court.jailMinutes(disposition, months, livstid, config)
+    if disposition ~= 'guilty' and disposition ~= 'plea' then return nil end
+
+    config = config or {}
+    local perMonth = tonumber(config.minutesPerMonth) or 1
+    local lowest = tonumber(config.minMinutes) or 5
+    local highest = tonumber(config.maxMinutes) or 120
+
+    if livstid then return math.floor(highest) end
+
+    months = tonumber(months) or 0
+    if months <= 0 then return nil end
+
+    local minutes = math.floor(months * perMonth + 0.5)
+    return math.floor(math.max(lowest, math.min(highest, minutes)))
+end
+
 FredPD.Modules.court = Court
 
 return Court

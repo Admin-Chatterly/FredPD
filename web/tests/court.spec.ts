@@ -73,6 +73,64 @@ test('charges a referral', async ({ page }) => {
   await expect(page.getByText('FU26-00030')).toHaveCount(0);
 });
 
+test('starts the charge sheet from what the investigation already says', async ({ page }) => {
+  await openCourt(page);
+
+  await page.getByRole('button', { name: 'Awaiting a charging decision' }).click();
+  await page.getByRole('listitem').getByRole('button', { name: 'Decide the referral' }).click();
+
+  const form = page.locator('form').filter({ hasText: 'Choose a decision' });
+
+  // The reports name one misstänkt, so they are the tilltalade -- shown, not
+  // offered -- and the offence they allege is already ticked.
+  await expect(form.getByText('Defendant: Petrov, Marko (P-000588)')).toBeVisible();
+  await form.getByRole('searchbox', { name: /Find an offence/ }).fill('aggravated');
+  await expect(form.getByRole('checkbox', { name: /Aggravated theft/ })).toBeChecked();
+});
+
+test('asks which misstänkt to charge when the reports name several', async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as unknown as { __fixtureTwoSuspects?: boolean }).__fixtureTwoSuspects = true;
+  });
+  await openCourt(page);
+
+  await page.getByRole('button', { name: 'Awaiting a charging decision' }).click();
+  await page.getByRole('listitem').getByRole('button', { name: 'Decide the referral' }).click();
+
+  const form = page.locator('form').filter({ hasText: 'Choose a decision' });
+  const defendant = form.getByLabel(/Defendant/);
+
+  // Nothing chosen for them, and choosing is required.
+  await expect(defendant).toHaveValue('');
+  await expect(defendant).toHaveAttribute('aria-required', 'true');
+
+  await defendant.selectOption('3');
+  await form.getByRole('button', { name: 'Decide the referral' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Decide the referral' }).click();
+
+  await expect(page.getByRole('status')).toContainText('charged');
+  await expect(page.getByText(/Defendant: Petrov, Marko/)).toBeVisible();
+});
+
+test('names the tilltalade in Swedish', async ({ page }) => {
+  await page.goto('/?locale=sv');
+  await page.locator('nav').first().getByRole('button', { name: 'Domstol' }).click();
+
+  await page.getByRole('button', { name: 'A26-00011' }).click();
+
+  await expect(page.getByText(/Tilltalad: Petrov, Marko/)).toBeVisible();
+  await expect(page.getByText('Fängelsestraffet överlämnat för verkställighet')).toBeVisible();
+});
+
+test('names the defendant and says the sentence reached the prison', async ({ page }) => {
+  await openCourt(page);
+
+  await page.getByRole('button', { name: 'A26-00011' }).click();
+
+  await expect(page.getByText(/Defendant: Petrov, Marko/)).toBeVisible();
+  await expect(page.getByText('Prison sentence sent for enforcement')).toBeVisible();
+});
+
 test('declines a referral, with a ground', async ({ page }) => {
   await openCourt(page);
 

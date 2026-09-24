@@ -1392,6 +1392,7 @@ FredPD.Schema = {
         brottIds = { type = 'string[]', required = false, maxItems = 25, maxLength = 20 },
         stages = { type = 'string[]', required = false, maxItems = 25, maxLength = 16 },
         classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+        personId = { type = 'integer', required = false, min = 1 },
     },
 
     CourtDispositionEnter = {

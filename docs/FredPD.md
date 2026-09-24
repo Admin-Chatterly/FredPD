@@ -342,7 +342,7 @@ Built (the outbound half). `server/bridges/gateway/{sha256,hmac,client,repo,serv
 | voice | Radio channels, voice targets | pma-voice |
 | dispatch | Incoming alerts from other scripts | Built-in API, optional ps-dispatch adapter |
 | phone | Numbers, 911 calls, photos | Configurable (lb-phone, npwd, yseries) |
-| jail | Sentence handoff, release | Configurable |
+| jail | Sentence handoff (ADR-017) | p_policejob `JailPlayer`, configurable (`jail` in config) |
 | billing | Fines and fees: send a bill, see it paid, withdraw it (ADR-015) | esx_billing (`server/bridges/billing.lua`) |
 | garage | Vehicle ownership, impound state | Configurable |
 | housing | Properties and addresses | Configurable |
@@ -1004,13 +1004,20 @@ Built (the charging decision and the disposition). Migration 0016, `server/modul
 
 - [M] Prosecutor intake of a redovisad förundersökning; charging decision (charge, or decline with a reason from a closed list). "Request more investigation" is not built — it would reopen a redovisad FU, which is a change to the FU's own lifecycle this module does not make (0016's header).
 - [S] Court calendar, hearings and officer subpoenas — not built.
-- [M] Dispositions: guilty, not guilty, dismissed, plea. A sentence is checked against `Brott.gemensamStraffskala` for the exact charges on the row, never trusted from input. Handoff to a jail bridge is not built (no such bridge exists yet).
+- [M] **The tilltalade** (migration 0033). The åklagare picks the defendant from the misstänkta on the FU's reports they may read, and the server refuses anyone else (`not_suspect`). One misstänkt in the whole FU is chosen automatically; with several, choosing is required. The pending queue also brings the offences the FU's reports allege, so the charge sheet starts filled in.
+- [M] Dispositions: guilty, not guilty, dismissed, plea. A sentence is checked against `Brott.gemensamStraffskala` for the exact charges on the row, never trusted from input.
+- [M] **The sentence is served in the game** (ADR-017).
+  - A guilty verdict or plea with months or livstid is converted to jail minutes, fixed on the row (`jail.minutesPerMonth`, clamped to `minMinutes`–`maxMinutes`; livstid is served as `maxMinutes`).
+  - `fredpd:sentenced` hands the tilltalade to p_policejob's `JailPlayer` through the policejob bridge. This happens at once if they are online, otherwise the next time their character loads.
+  - Each sentence is claimed before the jail call and released if the call fails, so nobody is jailed twice and no sentence is lost.
+  - The officers who worked the case (arrests, reports, FU lead) are told the verdict.
 - [S] Discovery packages and record sealing — not built.
 - **Permissions:** `court.referral.review` (åklagare and domare — reading the docket is part of disposing of it), `court.disposition.enter` (domare only).
 
 ### 7.21 Corrections bridge (M6)
 
-- [M] Sentence handoff, time served, release date; inmate roster view for authorized users.
+- [M] Sentence handoff — built as the `jail` part of the policejob bridge (7.20, ADR-017). Time served, release date and an inmate roster stay with the jail resource.
+- [M] Time served, release date; inmate roster view for authorized users — not built.
 
 ### 7.22 Personnel and roster (M6)
 

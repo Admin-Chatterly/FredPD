@@ -436,6 +436,28 @@ FredPD.Config.server = {
         },
     },
 
+    --- Jail: a court sentence is served in the game (spec 7.20, ADR-017).
+    ---
+    --- When a domare enters a guilty verdict with a prison sentence, the
+    --- person is handed to the police job's jail -- at once if they are on,
+    --- or the next time their character loads. p_policejob's documented
+    --- server export is `JailPlayer(source, { player, jail, fine, reason })`;
+    --- `resource` and `export` name another jail that takes the same call.
+    ---
+    --- A Swedish sentence is months; the jail counts game minutes. The
+    --- conversion is fixed onto the verdict when it is entered.
+    jail = {
+        enabled = true,
+        resource = 'p_policejob',
+        export = 'JailPlayer',
+        --- Game minutes per month of the sentence.
+        minutesPerMonth = 1,
+        --- The shortest and longest time the jail is asked for, in minutes.
+        --- Livstid is served as `maxMinutes`.
+        minMinutes = 5,
+        maxMinutes = 120,
+    },
+
     --- Billing: a citation sends a real bill (spec 7.11, 3.8).
     ---
     --- Issuing an ordningsbot citation bills the person it names -- or, for a

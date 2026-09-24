@@ -182,7 +182,8 @@
     "occupied": "Någon sitter i fordonet.",
     "fleet_vehicle": "Det är ett utryckningsfordon eller myndighetens fordon.",
     "in_progress": "Det pågår redan.",
-    "unreachable": "Det gick inte att hitta härifrån."
+    "unreachable": "Det gick inte att hitta härifrån.",
+    "not_suspect": "Personen är inte misstänkt i den här förundersökningen."
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -2418,7 +2419,10 @@
       "dispositionChoose": "Välj dom",
       "sentenceMonths": "Påföljd (månader)",
       "sentenceLivstid": "Livstids fängelse",
-      "note": "Anteckning"
+      "note": "Anteckning",
+      "defendant": "Tilltalad",
+      "defendantNone": "Ingen misstänkt att välja",
+      "defendantChoose": "Välj tilltalad"
     },
     "straffskala": {
       "title": "Straffskala för åtalspunkterna",
@@ -2438,7 +2442,19 @@
     "disposed": "Dom registrerad på {number}.",
     "notAtalad": "Detta åtal avslogs och har inget att döma i.",
     "pendingTitle": "Väntar på åtalsbeslut",
-    "pendingEmpty": "Inga förundersökningar väntar på beslut."
+    "pendingEmpty": "Inga förundersökningar väntar på beslut.",
+    "jail": {
+      "reason": "Dömd, åtal {number}",
+      "served": "Fängelsestraffet överlämnat för verkställighet",
+      "waiting": "Ännu inte överlämnat för verkställighet. Det sker när den dömde nästa gång finns i staden.",
+      "noDefendant": "Ingen tilltalad är angiven, så straffet överlämnas inte för verkställighet."
+    },
+    "notify": {
+      "guilty": "Åtal {number}: fällande dom har meddelats.",
+      "plea": "Åtal {number}: den tilltalade har erkänt och dom har meddelats.",
+      "not_guilty": "Åtal {number}: friande dom.",
+      "dismissed": "Åtal {number}: målet har avskrivits."
+    }
   },
   "personnel": {
     "filter": {

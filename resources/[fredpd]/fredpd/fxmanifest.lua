@@ -152,6 +152,7 @@ server_scripts {
     'server/modules/court/service.lua',
     'server/modules/court/repo.lua',
     'server/modules/court/routes.lua',
+    'server/modules/court/events.lua',
 
     -- Personnel (spec 7.22-7.24, M6). Reads `fpd_officers` (0001) and the
     -- firearms registry (0005), so it loads after `registry`.

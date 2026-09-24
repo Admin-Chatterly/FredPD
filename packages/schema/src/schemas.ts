@@ -2493,6 +2493,8 @@ export const schemas = {
     // catalogue row it applies to (`Anmalan.stageIsAvailable`).
     stages: { type: 'string[]', required: false, maxItems: 25, maxLength: 16 },
     classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+    /** The tilltalade: one of the FU's misstänkta, checked on the server. */
+    personId: { type: 'integer', required: false, min: 1 },
   },
 
   /**

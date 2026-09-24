@@ -674,4 +674,88 @@ function Repo.fuLeaderByNumber(agencyId, number)
         { agencyId, number })
 end
 
+local function inList(ids)
+    local marks = {}
+    for index = 1, #ids do marks[index] = '?' end
+    return table.concat(marks, ', ')
+end
+
+--- The misstänkta named on these anmälningar, for the åklagare choosing whom
+--- to charge (spec 7.20). The caller passes only the anmälningar the reader
+--- may read, so a sealed report's link to a person is never used; ids only,
+--- and each person is then read through the persons module.
+function Repo.suspectsIn(anmalanIds, agencyId)
+    if #anmalanIds == 0 then return {} end
+
+    local values = {}
+    for index = 1, #anmalanIds do values[index] = anmalanIds[index] end
+    values[#values + 1] = agencyId
+
+    local rows = FredPD.Core.db.query(
+        ([[SELECT DISTINCT ap.person_id AS personId
+             FROM fpd_anmalan_personer ap
+             JOIN fpd_anmalan a ON a.id = ap.anmalan_id
+            WHERE ap.anmalan_id IN (%s) AND a.agency_id = ? AND ap.roll = 'misstankt'
+            ORDER BY ap.person_id
+            LIMIT 25]]):format(inList(anmalanIds)),
+        values)
+
+    local ids = {}
+    for index = 1, #rows do ids[index] = rows[index].personId end
+    return ids
+end
+
+--- How many misstänkta an investigation names at all, readable or not: the
+--- tilltalade is chosen automatically only when there is exactly one.
+function Repo.suspectCountOfFu(fuId, agencyId)
+    return FredPD.Core.db.scalar(
+        [[SELECT COUNT(DISTINCT ap.person_id)
+            FROM fpd_anmalan_personer ap
+            JOIN fpd_anmalan a ON a.id = ap.anmalan_id
+           WHERE a.fu_id = ? AND a.agency_id = ? AND ap.roll = 'misstankt']],
+        { fuId, agencyId }) or 0
+end
+
+--- The offences these anmälningar report, as catalogue version ids, for the
+--- åklagare's charge sheet to start from. Readable anmälningar only, as above.
+function Repo.brottIdsIn(anmalanIds, agencyId)
+    if #anmalanIds == 0 then return {} end
+
+    local values = {}
+    for index = 1, #anmalanIds do values[index] = anmalanIds[index] end
+    values[#values + 1] = agencyId
+
+    local rows = FredPD.Core.db.query(
+        ([[SELECT DISTINCT ab.brott_id AS brottId
+             FROM fpd_anmalan_brott ab
+             JOIN fpd_anmalan a ON a.id = ab.anmalan_id
+            WHERE ab.anmalan_id IN (%s) AND a.agency_id = ?
+            ORDER BY ab.brott_id
+            LIMIT 25]]):format(inList(anmalanIds)),
+        values)
+
+    local ids = {}
+    for index = 1, #rows do ids[index] = rows[index].brottId end
+    return ids
+end
+
+--- Who worked this investigation -- the officers who arrested somebody in it,
+--- wrote its reports, or led it -- and are told of the verdict. Discord ids;
+--- never returned to a client.
+function Repo.fuArresters(fuId, agencyId)
+    local rows = FredPD.Core.db.query(
+        [[SELECT DISTINCT gripen_by AS discordId FROM fpd_frihetsberovande
+           WHERE fu_id = ? AND agency_id = ? AND gripen_by IS NOT NULL
+          UNION
+          SELECT created_by FROM fpd_anmalan WHERE fu_id = ? AND agency_id = ? AND created_by IS NOT NULL
+          UNION
+          SELECT fu_ledare FROM fpd_forundersokning
+           WHERE id = ? AND agency_id = ? AND fu_ledare IS NOT NULL]],
+        { fuId, agencyId, fuId, agencyId, fuId, agencyId })
+
+    local ids = {}
+    for index = 1, #rows do ids[index] = rows[index].discordId end
+    return ids
+end
+
 FredPD.Repo.anmalan = Repo

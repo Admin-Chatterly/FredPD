@@ -182,7 +182,8 @@
     "occupied": "Somebody is in the vehicle.",
     "fleet_vehicle": "That is an emergency or agency vehicle.",
     "in_progress": "That is already being done.",
-    "unreachable": "It could not be found from here."
+    "unreachable": "It could not be found from here.",
+    "not_suspect": "That person is not a suspect in this investigation."
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -2418,7 +2419,10 @@
       "dispositionChoose": "Choose a disposition",
       "sentenceMonths": "Sentence (months)",
       "sentenceLivstid": "Life imprisonment",
-      "note": "Note"
+      "note": "Note",
+      "defendant": "Defendant",
+      "defendantNone": "No suspect to choose",
+      "defendantChoose": "Choose the defendant"
     },
     "straffskala": {
       "title": "Range this charge sheet allows",
@@ -2438,7 +2442,19 @@
     "disposed": "Disposition entered on {number}.",
     "notAtalad": "This referral was declined and has nothing to dispose of.",
     "pendingTitle": "Awaiting a charging decision",
-    "pendingEmpty": "No investigations are waiting on a decision."
+    "pendingEmpty": "No investigations are waiting on a decision.",
+    "jail": {
+      "reason": "Sentenced, referral {number}",
+      "served": "Prison sentence sent for enforcement",
+      "waiting": "Not yet sent for enforcement. It is sent when the defendant is next in the city.",
+      "noDefendant": "No defendant is named, so the sentence is not sent to prison."
+    },
+    "notify": {
+      "guilty": "Referral {number}: guilty. Judgment has been given.",
+      "plea": "Referral {number}: the defendant admitted the charges. Judgment has been given.",
+      "not_guilty": "Referral {number}: acquitted.",
+      "dismissed": "Referral {number}: dismissed."
+    }
   },
   "personnel": {
     "filter": {

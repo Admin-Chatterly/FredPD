@@ -84,6 +84,50 @@ function PoliceJob.getImpound(plate)
     return tryExport('getImpoundByPlate', plate)
 end
 
+--- Sends somebody to jail (spec 7.20, ADR-017), through the export named in
+--- `config/server.lua`'s `jail` -- p_policejob's `JailPlayer(source, data)` by
+--- default. `source` is who jails them: the domare who entered the verdict
+--- when they are on, otherwise the person themselves (a sentence handed over
+--- when they next load in, with no officer present).
+---
+--- @param target number the prisoner's server id
+--- @param minutes number
+--- @param reason string plain text, shown by the jail
+--- @param jailer number|nil
+--- @return boolean|nil true sent; false the call failed; nil no jail here
+function PoliceJob.jail(target, minutes, reason, jailer)
+    if not PoliceJob.jailAvailable() then return nil end
+
+    local config = FredPD.Config.server.jail or {}
+    local resource = config.resource or RESOURCE
+    local export = config.export or 'JailPlayer'
+
+    local ok, err = pcall(function()
+        return exports[resource][export](nil, jailer or target, {
+            player = target, jail = minutes, fine = 0, reason = reason,
+        })
+    end)
+
+    -- A call that did not throw but answered `false` refused the prisoner
+    -- (a jailer check, say): that is a failure, and the sentence is kept for
+    -- the next attempt rather than marked served.
+    if not ok or err == false then
+        print(('[fredpd] jail bridge: %s:%s did not jail (%s) -- check `jail` in config/server.lua')
+            :format(resource, export, tostring(err)))
+        return false
+    end
+
+    return true
+end
+
+--- Is there a jail to hand a sentence to right now?
+function PoliceJob.jailAvailable()
+    local config = FredPD.Config.server.jail or {}
+    if config.enabled == false then return false end
+
+    return GetResourceState(config.resource or RESOURCE) == 'started'
+end
+
 --- Startup check (spec 3.8).
 ---
 --- A missing p_policejob is a warning, not a fatal error: FredPD's own modules

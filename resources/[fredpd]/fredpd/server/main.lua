@@ -151,6 +151,7 @@ local REQUIRED_COLUMNS <const> = {
     { table = 'fpd_lab_analyses', column = 'completed_by' },
     { table = 'fpd_ordningsbot', column = 'bill_id' },
     { table = 'fpd_impound', column = 'towed_at' },
+    { table = 'fpd_atal', column = 'jail_minutes' },
 }
 
 --- Returns the names of any dependency that is not started.

@@ -11,7 +11,7 @@ function Repo.numberPrefix()
 end
 
 local ATAL_SELECT <const> = [[
-    SELECT id, agency_id AS agencyId, number, fu_id AS fuId,
+    SELECT id, agency_id AS agencyId, number, fu_id AS fuId, person_id AS personId,
            beslut, beslut_grund AS beslutGrund,
            decided_by AS decidedBy,
            UNIX_TIMESTAMP(decided_at) AS decidedAt,
@@ -20,6 +20,7 @@ local ATAL_SELECT <const> = [[
            disposition_note AS dispositionNote,
            disposition_by AS dispositionBy,
            UNIX_TIMESTAMP(disposition_at) AS dispositionAt,
+           jail_minutes AS jailMinutes, UNIX_TIMESTAMP(jailed_at) AS jailedAt,
            classification, version
       FROM fpd_atal
 ]]
@@ -92,13 +93,16 @@ function Repo.decide(input, session, charges)
     values[base + 4] = input.beslutGrund
     values[base + 5] = session.discordId
     values[base + 6] = input.classification or 'internal'
+    -- The tilltalade, already checked by the route against the FU's own
+    -- misstänkta. Never taken from input unchecked.
+    values[base + 7] = input.personId
 
     local statements = {
         {
             query = [[INSERT INTO fpd_atal
                           (number, agency_id, fu_id, beslut, beslut_grund,
-                           decided_by, classification)
-                      VALUES (]] .. counters.numberSql() .. [[, ?, ?, ?, ?, ?, ?)]],
+                           decided_by, classification, person_id)
+                      VALUES (]] .. counters.numberSql() .. [[, ?, ?, ?, ?, ?, ?, ?)]],
             values = values,
         },
     }
@@ -125,17 +129,54 @@ end
 
 --- Enters a disposition. Only a row still awaiting one (`disposition IS
 --- NULL`) moves -- a verdict, once entered, is not retaken here.
-function Repo.enterDisposition(id, agencyId, discordId, input, expectedVersion)
+function Repo.enterDisposition(id, agencyId, discordId, input, expectedVersion, jailMinutes)
     return FredPD.Core.db.execute([[
         UPDATE fpd_atal
            SET disposition = ?, sentence_months = ?, sentence_livstid = ?,
                disposition_note = ?, disposition_by = ?, disposition_at = CURRENT_TIMESTAMP(3),
-               version = version + 1
+               jail_minutes = ?, version = version + 1
          WHERE id = ? AND agency_id = ? AND version = ? AND disposition IS NULL]],
         {
             input.disposition, input.sentenceMonths, input.sentenceLivstid and 1 or 0,
-            input.note, discordId, id, agencyId, expectedVersion,
+            input.note, discordId, jailMinutes, id, agencyId, expectedVersion,
         })
+end
+
+-- -----------------------------------------------------------------------------
+-- The sentence, served (ADR-017)
+-- -----------------------------------------------------------------------------
+
+--- Custodial sentences not yet handed to the jail, for one character.
+function Repo.unservedFor(identifier)
+    return FredPD.Core.db.query(
+        [[SELECT a.id, a.agency_id AS agencyId, a.number, a.jail_minutes AS jailMinutes
+            FROM fpd_atal a
+            JOIN fpd_persons p ON p.id = a.person_id AND p.agency_id = a.agency_id
+           WHERE p.identifier = ? AND a.jail_minutes > 0 AND a.jailed_at IS NULL
+             AND a.disposition IN ('guilty', 'plea')
+           ORDER BY a.id]],
+        { identifier })
+end
+
+--- The character a sentence is to be served by.
+function Repo.identifierFor(id, agencyId)
+    return FredPD.Core.db.scalar(
+        [[SELECT p.identifier FROM fpd_atal a
+            JOIN fpd_persons p ON p.id = a.person_id AND p.agency_id = a.agency_id
+           WHERE a.id = ? AND a.agency_id = ?]],
+        { id, agencyId })
+end
+
+--- Claims a sentence for serving: 1 when this call took it, 0 when it was
+--- already handed over (a second login racing the first, or the verdict's
+--- own attempt). Claimed before the jail is called, released if it fails.
+function Repo.claimJail(id)
+    return FredPD.Core.db.execute(
+        'UPDATE fpd_atal SET jailed_at = CURRENT_TIMESTAMP(3) WHERE id = ? AND jailed_at IS NULL', { id })
+end
+
+function Repo.releaseJailClaim(id)
+    return FredPD.Core.db.execute('UPDATE fpd_atal SET jailed_at = NULL WHERE id = ?', { id })
 end
 
 FredPD.Repo.court = Repo

@@ -6,6 +6,7 @@
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
   import { isStub, type Maybe, type Restricted } from '../records/types';
   import ChargePicker from '../shared/ChargePicker.svelte';
+  import { personName } from '../shared/names';
 
   /**
    * Åtal och dom — the prosecutor's charging decision and the court's
@@ -65,12 +66,28 @@
     version: number;
     charges?: Charge[];
     straffskala?: Straffskala | null;
+    /** The tilltalade, when this reader may read them (7.20). */
+    defendant?: PersonRef | null;
+    /** The sentence as the jail serves it, and when it was handed over. */
+    jailMinutes?: number | null;
+    jailedAt?: number | null;
+  }
+
+  interface PersonRef {
+    id: number;
+    personNumber?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
   }
 
   interface PendingFu {
     id: number;
     number: string;
     title: string;
+    /** The FU's misstänkta this reader may read: whom to charge. */
+    suspects?: PersonRef[];
+    /** What its reports allege, for the charge sheet to start from. */
+    brottIds?: number[];
   }
 
   const BESLUT_GRUNDER = ['otillrackliga_bevis', 'ej_brott', 'preskriberat', 'annan'];
@@ -86,7 +103,37 @@
   let openId = $state<number | null>(null);
 
   let deciding = $state<PendingFu | null>(null);
-  let decideForm = $state({ beslut: 'atalad', beslutGrund: '', brottIds: [] as number[] });
+  let decideForm = $state({ beslut: 'atalad', beslutGrund: '', brottIds: [] as number[], personId: '' });
+
+  /**
+   * A new decision starts from what the investigation already says: the
+   * offences its reports allege, and -- when it names exactly one misstänkt --
+   * that person as the tilltalade. Both stay the åklagare's to change.
+   */
+  /** "Doe, John (P-000431)", without empty brackets when there is no number. */
+  function suspectLabel(person: PersonRef): string {
+    return person.personNumber ? `${personName(person)} (${person.personNumber})` : personName(person);
+  }
+
+  /** A verdict that sends somebody to prison, whether or not it can reach them. */
+  function custodial(row: AtalRow): boolean {
+    return (
+      (row.disposition === 'guilty' || row.disposition === 'plea') &&
+      (row.sentenceLivstid === true || (row.sentenceMonths ?? 0) > 0)
+    );
+  }
+
+  function startDecision(fu: PendingFu): void {
+    deciding = fu;
+    decideForm = {
+      beslut: 'atalad',
+      beslutGrund: '',
+      brottIds: [...(fu.brottIds ?? [])],
+      personId: fu.suspects?.length === 1 ? String(fu.suspects[0]!.id) : '',
+    };
+    confirmingDecide = false;
+    failure = null;
+  }
 
   let confirmingDecide = $state(false);
   let confirmingDisposition = $state(false);
@@ -104,6 +151,7 @@
     beslut: 'court.field.beslutChoose',
     beslutGrund: 'court.field.beslutGrundChoose',
     brottIds: 'court.field.brottIds',
+    personId: 'court.field.defendant',
     disposition: 'court.field.dispositionChoose',
     sentenceMonths: 'court.field.sentenceMonths',
     version: 'anmalan.column.version',
@@ -182,6 +230,7 @@
       beslut: decideForm.beslut,
       beslutGrund: decideForm.beslut === 'ej_atal' ? decideForm.beslutGrund || undefined : undefined,
       brottIds: decideForm.beslut === 'atalad' ? brottIds : undefined,
+      personId: decideForm.beslut === 'atalad' ? Number(decideForm.personId) || undefined : undefined,
     });
 
     if (response.ok) {
@@ -192,7 +241,7 @@
         decideForm.beslut === 'atalad'
           ? t('court.charged', { number: response.data.number })
           : t('court.declined', { number: response.data.number });
-      decideForm = { beslut: 'atalad', beslutGrund: '', brottIds: [] as number[] };
+      decideForm = { beslut: 'atalad', beslutGrund: '', brottIds: [] as number[], personId: '' };
       await Promise.all([load(), loadPending(), open(response.data.id)]);
     } else {
       failure = response;
@@ -303,12 +352,7 @@
               <button
                 type="button"
                 class="border border-[var(--color-border)] px-2 py-0.5"
-                onclick={() => {
-                  deciding = fu;
-                  decideForm = { beslut: 'atalad', beslutGrund: '', brottIds: [] as number[] };
-                  confirmingDecide = false;
-                  failure = null;
-                }}
+                onclick={() => startDecision(fu)}
               >
                 {t('court.action.decide')}
               </button>
@@ -341,6 +385,34 @@
           </label>
 
           {#if decideForm.beslut === 'atalad'}
+            {#if deciding.suspects && deciding.suspects.length === 1}
+              <!--
+                One misstänkt: they are the tilltalade (7.20). Shown, not
+                offered as a choice the server would not honour.
+              -->
+              <p class="text-xs">
+                {t('court.field.defendant')}: {suspectLabel(deciding.suspects[0]!)}
+              </p>
+            {:else if deciding.suspects && deciding.suspects.length > 1}
+              <label class="flex flex-col gap-1 text-xs">
+                <span>{t('court.field.defendant')} <span aria-hidden="true">{REQUIRED_MARK}</span></span>
+                <select
+                  bind:value={decideForm.personId}
+                  required
+                  aria-required="true"
+                  class="border border-[var(--color-border)] px-2 py-1"
+                >
+                  <option value="">{t('court.field.defendantChoose')}</option>
+                  {#each deciding.suspects as suspect (suspect.id)}
+                    <option value={String(suspect.id)}>{suspectLabel(suspect)}</option>
+                  {/each}
+                </select>
+              </label>
+            {:else}
+              <p class="text-xs text-[var(--color-ink-muted)]">
+                {t('court.field.defendant')}: {t('court.field.defendantNone')}
+              </p>
+            {/if}
             <div class="min-w-64 flex-1">
               <ChargePicker
                 bind:selected={decideForm.brottIds}
@@ -453,6 +525,15 @@
           </p>
         </header>
 
+        {#if detail.defendant}
+          <p class="mb-3 text-xs">
+            {t('court.field.defendant')}: {personName(detail.defendant)}
+            {#if detail.defendant.personNumber}
+              <span class="font-[family-name:var(--font-mono)]">({detail.defendant.personNumber})</span>
+            {/if}
+          </p>
+        {/if}
+
         {#if detail.beslut === 'ej_atal' && detail.beslutGrund}
           <p class="mb-3 border border-[var(--color-border)] px-2 py-1 text-xs">
             {t(`court.beslutGrund.${detail.beslutGrund}`)}
@@ -496,6 +577,14 @@
                 <dd class="font-[family-name:var(--font-mono)]">{formatMoment(detail.dispositionAt ?? null)}</dd>
               </div>
             </dl>
+            {#if detail.jailMinutes}
+              <!-- Whether the sentence has reached the prison yet (ADR-017). -->
+              <p class="mb-3 text-xs text-[var(--color-ink-muted)]">
+                {detail.jailedAt ? t('court.jail.served') : t('court.jail.waiting')}
+              </p>
+            {:else if custodial(detail) && !detail.defendant}
+              <p class="mb-3 text-xs text-[var(--color-ink-muted)]">{t('court.jail.noDefendant')}</p>
+            {/if}
           {:else}
             <section class="border-t border-[var(--color-border)] pt-3">
               {#if confirmingDisposition}

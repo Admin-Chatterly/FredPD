@@ -3788,7 +3788,48 @@ interface FixtureAtal {
   sentenceMonths?: number | null;
   sentenceLivstid?: boolean;
   dispositionAgo?: number;
+  /** The tilltalade (0033), and the sentence as the jail serves it. */
+  personId?: number;
+  jailMinutes?: number;
+  jailedAgo?: number;
   version: number;
+}
+
+/**
+ * What each redovisad FU's reports say, as `court.referral.pending` answers
+ * it: whom they name as misstänkt, and which offences they allege.
+ */
+const FU_SUSPECTS: Record<number, number[]> = { 4: [3] };
+
+/** A test sets this to put two misstänkta on the pending FU. */
+function fuSuspects(fuId: number): number[] {
+  const two = (globalThis as { __fixtureTwoSuspects?: boolean }).__fixtureTwoSuspects;
+  return two && fuId === 4 ? [1, 3] : (FU_SUSPECTS[fuId] ?? []);
+}
+const FU_BROTT: Record<number, number[]> = { 4: [11] };
+
+/** A person as the court screen names them, from the register fixtures. */
+function personRef(id: number): Record<string, unknown> | null {
+  const found = registerPersons
+    .map((entry) => entry.row)
+    .find((row): row is PersonResult => !isStub(row) && row.id === id);
+  if (!found) return null;
+
+  return {
+    id: found.id,
+    personNumber: found.personNumber,
+    firstName: found.firstName,
+    lastName: found.lastName,
+  };
+}
+
+/** `Court.jailMinutes` with the shipped `jail` config: a month a minute, 5-120. */
+function fixtureJailMinutes(disposition: string, months: number | null, livstid: boolean): number | null {
+  if (disposition !== 'guilty' && disposition !== 'plea') return null;
+  if (livstid) return 120;
+  if (!months || months <= 0) return null;
+
+  return Math.max(5, Math.min(120, Math.round(months)));
 }
 
 const atal: FixtureAtal[] = [
@@ -3804,6 +3845,9 @@ const atal: FixtureAtal[] = [
     sentenceMonths: 18,
     sentenceLivstid: false,
     dispositionAgo: 5 * DAY,
+    personId: 3,
+    jailMinutes: 18,
+    jailedAgo: 5 * DAY,
     version: 2,
   },
   {
@@ -3879,9 +3923,13 @@ function atalRow(row: FixtureAtal, withCharges: boolean): Record<string, unknown
     version: row.version,
   };
 
+  shaped.jailMinutes = row.jailMinutes ?? null;
+  shaped.jailedAt = row.jailedAgo !== undefined ? secondsAgo(row.jailedAgo) : null;
+
   if (withCharges) {
     shaped.charges = atalCharges(row);
     shaped.straffskala = atalStraffskala(row);
+    shaped.defendant = row.personId ? personRef(row.personId) : null;
   }
 
   return shaped;
@@ -5309,7 +5357,13 @@ export const fixtures: FixtureSet = {
       return {
         forundersokningar: forundersokningar
           .filter((fu) => fu.status === 'redovisad' && !decided.has(fu.id))
-          .map((fu) => ({ id: fu.id, number: fu.number, title: fu.title })),
+          .map((fu) => ({
+            id: fu.id,
+            number: fu.number,
+            title: fu.title,
+            suspects: fuSuspects(fu.id).map(personRef).filter((entry) => entry !== null),
+            brottIds: FU_BROTT[fu.id] ?? [],
+          })),
       };
     },
 
@@ -5328,6 +5382,7 @@ export const fixtures: FixtureSet = {
         beslut?: string;
         beslutGrund?: string;
         brottIds?: string[];
+        personId?: number;
       };
 
       if (FIXTURE_COURT_CAPACITY !== 'aklagare') {
@@ -5344,6 +5399,20 @@ export const fixtures: FixtureSet = {
         return refuse('conflict', { fuId: 'already_decided' });
       }
 
+      // The tilltalade: one of the FU's own misstänkta, or the only one.
+      const suspects = fuSuspects(fu.id);
+      let personId: number | undefined;
+      if (body.beslut === 'atalad') {
+        if (body.personId !== undefined) {
+          if (!suspects.includes(body.personId)) return refuse('invalid', { personId: 'not_suspect' });
+          personId = body.personId;
+        } else if (suspects.length === 1) {
+          personId = suspects[0];
+        } else if (suspects.length > 1) {
+          return refuse('invalid', { personId: 'required' });
+        }
+      }
+
       const id = atal.length + 1;
       const charges =
         body.beslut === 'atalad'
@@ -5357,6 +5426,7 @@ export const fixtures: FixtureSet = {
         beslutGrund: body.beslutGrund ?? null,
         decidedAgo: 0,
         charges,
+        ...(personId !== undefined ? { personId } : {}),
         version: 1,
       });
 
@@ -5387,7 +5457,12 @@ export const fixtures: FixtureSet = {
       row.dispositionAgo = 0;
       row.version += 1;
 
-      return { id: row.id };
+      const minutes = row.personId
+        ? fixtureJailMinutes(row.disposition ?? '', row.sentenceMonths ?? null, row.sentenceLivstid ?? false)
+        : null;
+      if (minutes) row.jailMinutes = minutes;
+
+      return { id: row.id, jailMinutes: minutes };
     },
 
     // -------------------------------------------------------- personnel

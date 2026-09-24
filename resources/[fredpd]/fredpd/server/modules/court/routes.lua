@@ -25,10 +25,49 @@ local accessRules = FredPD.Modules.access
 --- and is what a grant on an åtal would be written against.
 local ATAL <const> = 'case'
 
---- Which legal capacity this session acts in, for the one route
---- (`court.referral.decide`) where holding the read permission is not
---- enough. Derived from permissions, never sent -- a client that could name
---- its own capacity could file its own charge.
+--- The ids of an investigation's anmälningar this session may read. Every
+--- suspect and offence the court screen draws from an FU comes from these
+--- only: a sealed report's link to a person is itself something the reader
+--- may not know (invariant 4).
+local function readableReports(session, fuId)
+    local underFu = (FredPD.Repo.anmalan.list(session.agencyId, { fuId = fuId, includeSupplements = true }, 100))
+    local ids = {}
+
+    for _, row in ipairs(access.filterSearch(session, 'report', underFu)) do
+        if row.id then ids[#ids + 1] = row.id end
+    end
+
+    return ids
+end
+
+--- The misstänkta on those reports this session may read, shaped for a
+--- picker: the åklagare chooses the tilltalade from these (spec 7.20).
+local function readableSuspects(session, reportIds)
+    local out = {}
+
+    for _, personId in ipairs(FredPD.Repo.anmalan.suspectsIn(reportIds, session.agencyId)) do
+        local person = FredPD.Repo.persons.readPerson(session, personId)
+        if person then
+            out[#out + 1] = {
+                id = person.id,
+                personNumber = person.personNumber,
+                firstName = person.firstName,
+                lastName = person.lastName,
+            }
+        end
+    end
+
+    return out
+end
+
+--- What leaves this module about an åtal: never the bare id of a tilltalade,
+--- which the reader may not be allowed to know of. `defendant` carries them
+--- when they may.
+local function shaped(row)
+    if type(row) == 'table' then row.personId = nil end
+    return row
+end
+
 local function capacityOf(session)
     local perms = session.permissions
 
@@ -62,7 +101,10 @@ route.define({
             awaitingDisposition = input.awaitingDisposition,
         }, input.limit or 50)
 
-        return { atal = access.filterSearch(session, ATAL, found) }
+        local rows = access.filterSearch(session, ATAL, found)
+        for index = 1, #rows do shaped(rows[index]) end
+
+        return { atal = rows }
     end,
 })
 
@@ -77,13 +119,21 @@ route.define({
     perm = 'court.referral.review',
     schema = 'CourtReferralPending',
     handler = function(session)
-        local candidates = FredPD.Repo.anmalan.fuList(session.agencyId, { status = 'redovisad' }, 25)
+        local candidates = access.filterSearch(session, 'case',
+            (FredPD.Repo.anmalan.fuList(session.agencyId, { status = 'redovisad' }, 25)))
         local pending = {}
 
         for index = 1, #candidates do
             local fu = candidates[index]
 
-            if not repo.byFuId(fu.id, session.agencyId) then
+            -- A stubbed FU has no id to decide on; it is left out.
+            if fu.id and not repo.byFuId(fu.id, session.agencyId) then
+                -- What the åklagare starts from, so the charge sheet is not
+                -- retyped: whom the reports name as misstänkt, and what they
+                -- report. Both remain choices; the decision checks the first.
+                local reports = readableReports(session, fu.id)
+                fu.suspects = readableSuspects(session, reports)
+                fu.brottIds = FredPD.Repo.anmalan.brottIdsIn(reports, session.agencyId)
                 pending[#pending + 1] = fu
             end
         end
@@ -101,6 +151,16 @@ route.define({
         if not row then return refusal end
 
         row.charges = repo.charges(row.id)
+
+        -- The tilltalade, when this reader may read them.
+        if row.personId then
+            local person = FredPD.Repo.persons.readPerson(session, row.personId)
+            row.defendant = person and {
+                id = person.id, personNumber = person.personNumber,
+                firstName = person.firstName, lastName = person.lastName,
+            } or nil
+        end
+        shaped(row)
 
         -- The straffskala the charges allow, computed the same way
         -- `anmalan/routes.lua` computes one for a report: a domare reads this
@@ -129,7 +189,7 @@ route.define({
     audit = 'court.referral.decided',
     subjectType = ATAL,
     auditDetail = function(input)
-        return { fuId = input.fuId, beslut = input.beslut }
+        return { fuId = input.fuId, beslut = input.beslut, personId = input.personId }
     end,
     handler = function(session, input)
         if not service.mayDecide(capacityOf(session)) then
@@ -141,6 +201,10 @@ route.define({
 
         local fu = FredPD.Repo.anmalan.fuById(input.fuId, session.agencyId)
         if not fu then return route.refuse(FredPD.ErrorCode.NOT_FOUND, { fuId = 'unknown' }) end
+
+        -- Deciding on an investigation is reading it.
+        fu = access.read(session, 'case', fu)
+        if not fu then return route.refuse(FredPD.ErrorCode.RESTRICTED) end
 
         -- Only a redovisad FU has been handed to a prosecutor at all (spec
         -- 7.8): one still open, or already nedlagd, has nothing here to
@@ -158,6 +222,33 @@ route.define({
         end
 
         local charges = nil
+
+        -- The tilltalade: one of the investigation's misstänkta that this
+        -- åklagare can see -- the same list the screen offers -- never a
+        -- person the input merely names. With exactly one misstänkt in the
+        -- whole FU, and that one visible, it is them; with several, choosing
+        -- is required, so a sentence always has somebody to reach.
+        if input.beslut == 'atalad' then
+            local suspects = readableSuspects(session, readableReports(session, fu.id))
+
+            if input.personId then
+                local named = false
+                for index = 1, #suspects do
+                    if suspects[index].id == input.personId then named = true end
+                end
+                if not named then
+                    return route.refuse(FredPD.ErrorCode.INVALID, { personId = 'not_suspect' })
+                end
+            elseif #suspects == 1 and FredPD.Repo.anmalan.suspectCountOfFu(fu.id, session.agencyId) == 1 then
+                input.personId = suspects[1].id
+            elseif #suspects >= 1 then
+                -- Several, or one visible among others the reader cannot see:
+                -- the åklagare names whom they charge.
+                return route.refuse(FredPD.ErrorCode.INVALID, { personId = 'required' })
+            end
+        else
+            input.personId = nil
+        end
 
         if input.beslut == 'atalad' then
             local ids, reason = brott.parseIds(input.brottIds, 25)
@@ -189,7 +280,7 @@ route.define({
         local row = repo.decide(input, session, charges)
         if not row then return route.refuse(FredPD.ErrorCode.INTERNAL) end
 
-        return { id = row.id, number = row.number, atal = row }
+        return { id = row.id, number = row.number, atal = shaped(row) }
     end,
 })
 
@@ -205,8 +296,11 @@ route.define({
     sensitive = true,
     audit = 'court.disposition.entered',
     subjectType = ATAL,
-    auditDetail = function(input)
-        return { disposition = input.disposition }
+    auditDetail = function(input, result)
+        return {
+            disposition = input.disposition,
+            jailMinutes = type(result) == 'table' and result.jailMinutes or nil,
+        }
     end,
     handler = function(session, input)
         if not service.mayDispose(capacityOf(session)) then
@@ -240,10 +334,26 @@ route.define({
             end
         end
 
-        if repo.enterDisposition(row.id, session.agencyId, session.discordId, input, input.version) == 0 then
+        -- The sentence as the jail will serve it, fixed now (ADR-017). Nil
+        -- for anything but a custodial sentence on a named tilltalade.
+        local jailMinutes = row.personId and service.jailMinutes(
+            input.disposition, input.sentenceMonths, input.sentenceLivstid == true,
+            FredPD.Config.server.jail) or nil
+
+        if repo.enterDisposition(row.id, session.agencyId, session.discordId, input, input.version,
+                                 jailMinutes) == 0 then
             return route.refuse(FredPD.ErrorCode.CONFLICT)
         end
 
-        return { id = row.id }
+        -- Served in the game, and the officers who worked the case told.
+        TriggerEvent('fredpd:sentenced', {
+            atalId = row.id,
+            agencyId = session.agencyId,
+            disposition = input.disposition,
+            jailMinutes = jailMinutes,
+            judgeSrc = session.src,
+        })
+
+        return { id = row.id, jailMinutes = jailMinutes }
     end,
 })

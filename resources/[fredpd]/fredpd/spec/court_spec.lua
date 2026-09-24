@@ -199,3 +199,95 @@ describe('court', function()
         end)
     end)
 end)
+
+describe('court sentence served in the game', function()
+    local court
+    local JAIL <const> = { minutesPerMonth = 1, minMinutes = 5, maxMinutes = 120 }
+
+    before_each(function()
+        court = helper.load({ 'server/modules/court/service' }).Modules.court
+    end)
+
+    it('serves a month as a minute, by default', function()
+        assert.are.equal(18, court.jailMinutes('guilty', 18, false, JAIL))
+        assert.are.equal(18, court.jailMinutes('plea', 18, false, JAIL))
+    end)
+
+    it('clamps to the jail the server allows', function()
+        assert.are.equal(5, court.jailMinutes('guilty', 1, false, JAIL))
+        assert.are.equal(120, court.jailMinutes('guilty', 216, false, JAIL))
+        assert.are.equal(120, court.jailMinutes('guilty', nil, true, JAIL))
+    end)
+
+    it('sends nobody anywhere for an acquittal, a dismissal or a fine', function()
+        assert.is_nil(court.jailMinutes('not_guilty', 18, false, JAIL))
+        assert.is_nil(court.jailMinutes('dismissed', 18, false, JAIL))
+        assert.is_nil(court.jailMinutes('guilty', 0, false, JAIL))
+        assert.is_nil(court.jailMinutes('guilty', nil, false, JAIL))
+    end)
+end)
+
+describe('jail bridge', function()
+    local PoliceJob, calls, started, answer
+
+    before_each(function()
+        calls, started, answer = {}, true, nil
+        _G.GetResourceState = function() return started and 'started' or 'missing' end
+        _G.exports = setmetatable({}, {
+            __index = function(_, resource)
+                return setmetatable({}, {
+                    __index = function(_, name)
+                        return function(_, jailer, data)
+                            if name ~= 'JailPlayer' then error('No such export ' .. name .. ' in ' .. resource) end
+                            calls[#calls + 1] = { resource = resource, jailer = jailer, data = data }
+                            return answer
+                        end
+                    end,
+                })
+            end,
+        })
+        local ns = helper.load({ 'server/bridges/policejob' })
+        ns.Config = { server = { jail = { enabled = true, resource = 'p_policejob', export = 'JailPlayer' } } }
+        PoliceJob = ns.Bridge.policejob
+    end)
+
+    it('hands the prisoner to p_policejob in the shape its export documents', function()
+        assert.is_true(PoliceJob.jail(7, 18, 'Dömd, mål A26-00011', 3))
+
+        assert.are.equal('p_policejob', calls[1].resource)
+        assert.are.equal(3, calls[1].jailer)
+        assert.are.same({ player = 7, jail = 18, fine = 0, reason = 'Dömd, mål A26-00011' }, calls[1].data)
+    end)
+
+    it('uses the prisoner as the source when no officer is present', function()
+        PoliceJob.jail(7, 18, 'x', nil)
+
+        assert.are.equal(7, calls[1].jailer)
+    end)
+
+    it('says there is no jail, rather than failing, when the resource is not running', function()
+        started = false
+
+        assert.is_nil(PoliceJob.jail(7, 18, 'x'))
+        assert.are.equal(0, #calls)
+    end)
+
+    it('counts a jail that answers false as not jailed', function()
+        answer = false
+
+        assert.is_false(PoliceJob.jail(7, 18, 'x', 3))
+    end)
+
+    it('says there is no jail when it is switched off', function()
+        FredPD.Config.server.jail.enabled = false
+
+        assert.is_false(PoliceJob.jailAvailable())
+        assert.is_nil(PoliceJob.jail(7, 18, 'x'))
+    end)
+
+    it('reports a failed call, so the sentence is not lost', function()
+        FredPD.Config.server.jail.export = 'NotAnExport'
+
+        assert.is_false(PoliceJob.jail(7, 18, 'x'))
+    end)
+end)

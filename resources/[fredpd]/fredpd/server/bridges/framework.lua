@@ -343,6 +343,25 @@ function Framework.setVehicleStored(plate, value, guard)
     return (affected or 0) > 0
 end
 
+--- The server id of the character with this identifier, if they are on.
+--- @return number|nil
+function Framework.sourceOf(identifier)
+    local esx = core()
+    if not esx or type(identifier) ~= 'string' then return nil end
+
+    local player = esx.GetPlayerFromIdentifier(identifier)
+    return player and player.source or nil
+end
+
+--- Calls `handler(src, identifier)` whenever a character finishes loading.
+--- ESX's own event, named here and nowhere else.
+function Framework.onCharacterLoaded(handler)
+    AddEventHandler('esx:playerLoaded', function(src, player)
+        local identifier = type(player) == 'table' and player.identifier or nil
+        if type(src) == 'number' and identifier then handler(src, identifier) end
+    end)
+end
+
 --- Every table and column name `esxData` interpolates, checked once at
 --- startup rather than halfway through a write.
 local function verifyIdentifiers()
