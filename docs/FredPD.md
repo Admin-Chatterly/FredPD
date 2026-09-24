@@ -190,7 +190,7 @@ fredpd/
                                      ├─ Discord gateway + REST (role sync, role actions)
                                      ├─ media store (disk or S3-compatible)
                                      ├─ PDF renderer (headless Chromium)
-                                     ├─ scheduler (retention, lab timers, warrant expiry)
+                                     ├─ scheduler (superseded for retention by ADR-021)
                                      └─ web portal (Discord OAuth2), later milestone
  Caddy (TLS) → gateway media + portal
 ```
@@ -958,7 +958,7 @@ The line's own label — the icon and the word beside the timestamp — is
 
 - [S] Plate reads from Wolfknight radar logged with time, place and unit.
 - [S] Hotlist checks against BOLOs, stolen vehicles and warrants; hit banner for the unit.
-- [S] Read retention (default 30 days) enforced by the gateway scheduler.
+- [S] Read retention (default 30 days) enforced by the retention sweep in FXServer (13.3, ADR-021).
 - **Hotlist reasons** are `stolen_vehicle`, `wanted_person`, `warrant`, `bolo`, `investigation` and `other` — `ck_fpd_hotlist_reason` and `HOTLIST_REASONS`. The banner an officer reads before stopping a car is the reason's label, so each one has a key under **`alpr.reason.<value>`** (not `cad.*`: the hotlist, the reads and the hit banner are one screen and one namespace), and the free-text `note` beside it carries the detail.
 - **Permissions:** `alpr.read.view`, `alpr.hotlist.manage`.
 
@@ -1008,11 +1008,9 @@ so; this section says what it would take to change that.
 - **The screen.** `cad.tab.alpr` exists as a tab label; `Dispatch.svelte` has
   four tabs and this is not one of them. Nothing in the NUI calls the three
   routes, so the reads file, the hotlist and its editor have no way in.
-- **Retention.** 13.3 gives the 30-day sweep to the gateway scheduler and the
-  gateway is off by default (ADR-010), so nothing calls `Repo.purgeReads` and
-  `alprRetentionDays` currently changes nothing. The number is a privacy
-  commitment under 11.4 that is **not being kept**; whichever scheduler ends up
-  owning it calls that function in batches, per agency.
+- **Retention.** Enforced since ADR-021: the retention sweep in FXServer deletes
+  reads past `alprRetentionDays` (or `retention.days.alprReads`), in batches,
+  per agency.
 
 ### 7.19 Cameras (O, later)
 
@@ -1435,7 +1433,7 @@ That makes the bridge contract in 10.4 unnecessary — there is no second system
 FredPD links gameplay records to real players (Discord ID, FiveM license), so the server operator is processing personal data.
 
 - Collect only what the features need; document it in the server's privacy notice.
-- Retention periods per data type (section 7.30), enforced by the gateway scheduler.
+- Retention periods per data type (section 7.30), enforced by the retention sweep in FXServer (13.3, ADR-021).
 - A documented procedure to export or delete a player's data on request.
 - Access to real-player identifiers (Discord ID, license) is limited to administrators and always audited.
 
@@ -1511,7 +1509,13 @@ Unauthenticated call, missing permission, failed context condition, invalid type
 
 ### 13.3 Retention jobs
 
-The gateway scheduler runs retention per data type (drafts, ALPR reads, query logs, surveillance sessions, closed scenes), writes a summary to the audit log and never touches the audit log itself.
+Retention runs inside FXServer (`server/modules/retention/`, ADR-021), not in the gateway scheduler, which is off by default (ADR-010).
+
+- **Sweeps, in order:** lapsed lookouts (7.13), the query log, ALPR reads (7.18), stale draft anmälningar, ended surveillance sessions, stop data (7.14), and abandoned uploads (ADR-019). For the uploads, the files are removed through the gateway when it is on.
+- **Periods** are set in `retention.days` in `config/server.lua`. Each has a floor, so a typo cannot empty a table. `false` turns one sweep off.
+- **Bounded:** each DELETE removes at most 5000 rows, and each sweep runs at most 20 of them per run. The large tables are swept per agency, along their `(agency_id, time)` index.
+- **Closed scenes are not swept.** Their evidence chain of custody cascades with them, and archiving them is a policy decision that has not been made.
+- **Audit:** every run writes one `retention.swept` audit row with what each sweep removed. No sweep touches the audit log itself.
 
 ---
 

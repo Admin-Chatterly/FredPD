@@ -103,7 +103,13 @@ export interface GatewayConfig {
   };
 
   scheduler: {
-    /** Off by default (this package's whole rule). */
+    /**
+     * Off by default (this package's whole rule), and **superseded for
+     * retention** by the sweep FXServer runs itself (ADR-021). Leave it off:
+     * its deletes are idempotent, so running both breaks nothing, but the
+     * work is done twice and the windows here are not the ones
+     * `config/server.lua` sets.
+     */
     enabled: boolean;
     intervalSeconds: number;
     /** `mysql://user:pass@host:port/db` -- the same `DATABASE_URL` `.env.example` already documents. */
@@ -166,7 +172,7 @@ export function loadConfig(): GatewayConfig {
       databaseUrl: schedulerEnabled ? required('DATABASE_URL') : null,
       retentionDays: {
         queryLog: optionalInt('FREDPD_RETENTION_QUERY_LOG_DAYS', 365),
-        alprReads: optionalInt('FREDPD_RETENTION_ALPR_READS_DAYS', 90),
+        alprReads: optionalInt('FREDPD_RETENTION_ALPR_READS_DAYS', 30),
         staleDrafts: optionalInt('FREDPD_RETENTION_STALE_DRAFTS_DAYS', 180),
         surveillanceSessions: optionalInt('FREDPD_RETENTION_SURVEILLANCE_SESSIONS_DAYS', 730),
       },

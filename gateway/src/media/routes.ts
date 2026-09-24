@@ -96,6 +96,32 @@ export function registerFxMediaRoutes(
     };
   });
 
+  /**
+   * Deletes files FXServer's retention sweep has given up on: uploads that
+   * were begun and never committed (ADR-019, ADR-021). Signed like every
+   * `/fx` call; refs are checked against the store's own pattern, and a ref
+   * with no file is simply nothing to do.
+   */
+  scope.post('/media/delete', async (request, reply) => {
+    const body = request.verifiedBody as { mediaRefs?: unknown } | undefined;
+    const refs = Array.isArray(body?.mediaRefs) ? body.mediaRefs : [];
+
+    if (refs.length > 200 || refs.some((ref) => typeof ref !== 'string' || !/^media_[0-9a-f-]{36}$/.test(ref))) {
+      return reply.code(400).send({ ok: false, err: 'invalid', fields: { mediaRefs: 'format' } });
+    }
+
+    let removed = 0;
+    for (const ref of refs as string[]) {
+      if (await deps.store.exists(ref)) {
+        await deps.store.remove(ref);
+        removed += 1;
+      }
+    }
+
+    request.log.info({ removed, asked: refs.length }, 'removed abandoned media');
+    return { ok: true, removed };
+  });
+
   scope.post('/media/download-token', async (request, reply) => {
     const body = request.verifiedBody as { mediaRef?: unknown } | undefined;
     const mediaRef = typeof body?.mediaRef === 'string' ? body.mediaRef : undefined;

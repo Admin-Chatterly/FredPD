@@ -31,3 +31,4 @@ When a decision changes `docs/FredPD.md`, the ADR and the spec edit go in the
 | [018](018-licence-points-and-an-editable-tariff.md) | Licence points on the tariff, and a tariff the agency's command edits | Accepted |
 | [019](019-photographs-through-the-gateway.md) | Photographs and mugshots through the gateway: a ledger, re-encoding, links FXServer signs | Accepted |
 | [020](020-printed-documents.md) | Printed documents are copies: a paper item carries its own content, a PDF is optional | Accepted |
+| [021](021-retention-runs-in-fxserver.md) | Retention runs inside FXServer, on a timer, with floors and bounded deletes | Accepted |

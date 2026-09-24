@@ -4,13 +4,15 @@ TypeScript on Node 24, Fastify, pino. Runs on the same host as FXServer, under
 systemd. Read spec sections 3.7 (interface), 4.2 (Discord sync) and 11
 (security) before working here.
 
-Responsibilities: the media store, PDF rendering, scheduled jobs (retention, lab
-timers, warrant expiry), Discord role *actions* (hire, promote, demote), and
-later the web portal. The media store is built and in use: photographs of
+Responsibilities: the media store, PDF rendering, scheduled jobs (lab timers,
+warrant expiry; retention moved to FXServer), Discord role *actions* (hire,
+promote, demote), and later the web portal. The media store is built and in use: photographs of
 people (ADR-019), re-encoded on upload, single-use upload tokens, and CORS for
 the NUI's origin only. PDF rendering is in use for printed documents (ADR-020):
 letterhead, page numbers, the document number and a classification watermark
-on every page. The scheduler exists but nothing in the game relies on it yet.
+on every page. The scheduler exists but is superseded for retention: that runs
+inside FXServer (ADR-021), and the gateway is asked only to delete the files of
+abandoned uploads (`/fx/media/delete`). Do not add a sweep here.
 
 **Reading Discord roles is no longer this service's job.** It moved into
 FXServer (`server/core/discord.lua`, ADR-010) so that a normal install deploys

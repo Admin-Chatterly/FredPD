@@ -2129,10 +2129,9 @@ end
 --- which on a server that has not swept for a month is long enough to stall
 --- every plate check a patrol unit makes.
 ---
---- **Nothing calls this yet.** 7.18 gives the sweep to the gateway scheduler and
---- the gateway is off by default (ADR-010), so the retention window is not being
---- enforced anywhere; this is the statement whichever scheduler ends up owning
---- it should call.
+--- **Not called by the retention sweep**, which runs its own equivalent
+--- statement in `retention/repo.lua` (ADR-021, the same batching per agency);
+--- this stays for a caller that wants one agency on demand.
 ---
 --- @param batch number|nil rows per call
 --- @return number rows deleted in this batch

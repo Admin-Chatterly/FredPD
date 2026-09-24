@@ -89,6 +89,15 @@ function Gateway.renderPdf(document)
     return false, { reason = result.reason or 'gateway_error', outboxId = outboxId }
 end
 
+--- Deletes the files of uploads nobody finished (ADR-021's retention).
+---
+--- @param mediaRefs string[] at most 200
+--- @return boolean ok
+function Gateway.deleteMedia(mediaRefs)
+    local result = client.request('POST', '/fx/media/delete', { mediaRefs = mediaRefs })
+    return result.ok == true
+end
+
 -- -----------------------------------------------------------------------------
 -- Download links, signed here (ADR-019)
 -- -----------------------------------------------------------------------------

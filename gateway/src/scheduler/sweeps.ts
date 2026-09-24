@@ -2,7 +2,12 @@ import type { GatewayConfig } from '../config.js';
 import type { SchedulerDb } from './db.js';
 
 /**
- * The scheduled sweeps spec 13.3 asks the gateway scheduler to run: the
+ * **Superseded by ADR-021:** retention now runs inside FXServer
+ * (`server/modules/retention/`), which every install has. This file stays
+ * for an install that already runs the scheduler; new sweeps go there, not
+ * here.
+ *
+ * The scheduled sweeps spec 13.3 asked the gateway scheduler to run: the
  * lapsed-lookout sweeper, and retention over drafts, ALPR reads, query logs
  * and surveillance sessions.
  *

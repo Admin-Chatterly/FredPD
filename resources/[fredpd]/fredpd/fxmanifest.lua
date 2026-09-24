@@ -191,6 +191,11 @@ server_scripts {
     -- Printing (7.28): after the modules whose printers it calls.
     'server/modules/documents/repo.lua',
     'server/modules/documents/routes.lua',
+    -- Retention (13.3, ADR-021): the sweep on a timer, after every module
+    -- whose tables it keeps in check.
+    'server/modules/retention/service.lua',
+    'server/modules/retention/repo.lua',
+    'server/modules/retention/events.lua',
 
     -- Impound (spec 7.15, M6). After spaning, whose `fredpd:vehicleImpounded`
     -- handler (already wired in `spaning/events.lua`, waiting on this module)

@@ -387,10 +387,8 @@ FredPD.Config.server = {
     --- **Plate reads** (7.18).
     ---
     ---   alprRetentionDays How long reads are kept. Default 30, which is also
-    ---                     7.18's. Nothing enforces it yet: the sweep belongs to
-    ---                     the gateway scheduler, and the gateway is off
-    ---                     (ADR-010). Shortening this number changes nothing
-    ---                     until something runs the sweep.
+    ---                     7.18's. The retention sweep enforces it (ADR-021);
+    ---                     `retention.days.alprReads` below wins when set.
     cad = {
         -- dutyPollSeconds = 15,
         -- signOffGraceSeconds = 300,
@@ -439,6 +437,24 @@ FredPD.Config.server = {
             { code = 'no_licence_carried', labelKey = 'ordningsbot.tariff.no_licence_carried', amount = 400, points = 0 },
             { code = 'parking', labelKey = 'ordningsbot.tariff.parking', amount = 800, points = 0 },
             { code = 'noise', labelKey = 'ordningsbot.tariff.noise', amount = 1500, points = 0 },
+        },
+    },
+
+    --- Retention (spec 13.3, ADR-021): what is deleted, and when. Runs inside
+    --- FXServer every `intervalMinutes`, the first time ten minutes after
+    --- start. Days below a sweep's floor are raised to it (see
+    --- `retention/service.lua`); `false` turns one sweep off. Every run writes
+    --- one audit row saying what each sweep removed.
+    retention = {
+        enabled = true,
+        intervalMinutes = 360,
+        days = {
+            queryLog = 365,
+            -- alprReads = 30,   -- unset: `cad.alprRetentionDays` decides
+            staleDrafts = 180,
+            surveillanceSessions = 730,
+            stops = 730,
+            abandonedUploads = 1,
         },
     },
 

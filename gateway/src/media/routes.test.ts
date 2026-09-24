@@ -380,4 +380,30 @@ describe('media', () => {
 
     await app.close();
   });
+
+  it('deletes abandoned files FXServer names, and refuses anything that is not a ref', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'fredpd-media-'));
+    const config = baseConfig(dir);
+    const app = createServer(config);
+
+    const tokenResponse = await app.inject({
+      method: 'POST',
+      url: '/fx/media/upload-token',
+      headers: signedHeaders(config.secret, ''),
+      payload: '',
+    });
+    const { mediaRef, uploadUrl } = tokenResponse.json() as { mediaRef: string; uploadUrl: string };
+    await app.inject({ method: 'PUT', url: new URL(uploadUrl).pathname + new URL(uploadUrl).search, payload: Buffer.from('x') });
+
+    const body = JSON.stringify({ mediaRefs: [mediaRef] });
+    const deleted = await app.inject({ method: 'POST', url: '/fx/media/delete', headers: signedHeaders(config.secret, body), payload: body });
+    expect(deleted.json()).toMatchObject({ ok: true, removed: 1 });
+    expect((await download(app, config, mediaRef)).statusCode).toBe(404);
+
+    const bad = JSON.stringify({ mediaRefs: ['../../etc/passwd'] });
+    const refused = await app.inject({ method: 'POST', url: '/fx/media/delete', headers: signedHeaders(config.secret, bad), payload: bad });
+    expect(refused.statusCode).toBe(400);
+
+    await app.close();
+  });
 });
