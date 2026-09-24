@@ -24,6 +24,9 @@ export interface Intent {
   personId?: number;
   vehicleId?: number;
   frihetId?: number;
+  /** A call to open on the dispatch screen, or a report on its tab (the overview's rows). */
+  callId?: number;
+  anmalanId?: number;
   /** How to name it on the form, so a filled-in field says who it holds. */
   subjectLabel?: string;
 }
@@ -51,7 +54,7 @@ export function parseIntent(value: unknown): Intent | null {
   if (term !== undefined) intent.term = term;
   if (type !== undefined) intent.type = type;
 
-  for (const key of ['personId', 'vehicleId', 'frihetId'] as const) {
+  for (const key of ['personId', 'vehicleId', 'frihetId', 'callId', 'anmalanId'] as const) {
     const value = raw[key];
     if (typeof value === 'number' && Number.isInteger(value) && value > 0) intent[key] = value;
   }

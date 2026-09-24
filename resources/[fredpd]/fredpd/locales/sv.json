@@ -1274,13 +1274,15 @@
     },
     "yes": "Ja",
     "population": {
-      "title": "Folkbokförda, inte i registret",
-      "hint": "Finns i spelet men inte i FredPD än. Öppnar du en skapas posten ur folkbokföringen.",
-      "open": "Öppna",
-      "openLabel": "Öppna {name}",
+      "personsTitle": "I folkbokföringen, saknar post i FredPD",
+      "vehiclesTitle": "I vägtrafikregistret, saknar post i FredPD",
+      "hint": "Skapa post hämtar uppgifterna ur registret och öppnar posten.",
+      "open": "Skapa post",
+      "openLabel": "Skapa post för {name}",
       "noName": "Namn saknas",
       "person": "Person",
-      "plate": "Reg.nr"
+      "plate": "Reg.nr",
+      "vehicle": "Fordon"
     }
   },
   "fingerprintScanner": {
@@ -3439,42 +3441,38 @@
   "overview": {
     "updated": "Uppdaterad {time}",
     "refresh": "Uppdatera",
-    "all": "Alla",
-    "openDispatch": "Öppna ledning",
+    "retry": "Försök igen",
     "noLocation": "Plats saknas",
     "since": "sedan {time}",
     "shift": {
       "title": "Mitt pass",
-      "officer": "Polis",
-      "unit": "Enhet",
       "noCallsign": "Ingen anropssignal än",
-      "duty": "Tjänst",
-      "offDutyHint": "Gå i tjänst vid polisjobbets instämplingsplats.",
-      "status": "Status",
-      "call": "Händelse",
+      "offDutyHint": "Gå i tjänst på stationen för att få uppdrag och använda fältverktygen.",
+      "onCall": "På händelse {number}",
       "noCall": "Inte på någon händelse"
     },
     "broadcasts": {
-      "title": "Utlysningar",
-      "none": "Inga utlysningar just nu."
+      "title": "Utskick",
+      "none": "Inga aktiva utskick."
     },
     "calls": {
       "title": "Öppna händelser",
-      "counts": "Öppna {open} · Utan enhet {waiting}",
-      "none": "Inga öppna händelser."
+      "counts": "{open} · {waiting} utan enhet",
+      "none": "Inga öppna händelser.",
+      "open": "Öppna händelse {number}"
     },
     "reports": {
       "title": "Mina anmälningar",
-      "open": "Öppna anmälningar",
-      "none": "Inget väntar på dig.",
-      "counts": "Återsända {returned} · Utkast {drafts}"
+      "open": "Alla mina anmälningar",
+      "openOne": "Öppna anmälan {number}",
+      "none": "Inget väntar på dig."
     },
     "recent": {
       "title": "Mina senaste slagningar",
       "none": "Inga slagningar än.",
-      "again": "Slå {term} igen",
-      "results": "Resultat {count}",
-      "hits": "Registerträffar {count}"
-    }
+      "again": "Slå {term} igen"
+    },
+    "all": "Alla",
+    "openDispatchLabel": "Alla händelser och utskick, i ledningscentralen"
   }
 }

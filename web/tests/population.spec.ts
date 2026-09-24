@@ -21,10 +21,10 @@ test('finds a citizen with no record by full name, and opening creates the recor
   await page.getByRole('button', { name: 'Search', exact: true }).click();
 
   const population = page.getByRole('region', { name: 'In the population register, not yet on file' });
-  await expect(population).toContainText('Nora Ek');
+  await expect(population).toContainText('Ek, Nora');
   await expect(population).toContainText('1994-03-08');
 
-  await population.getByRole('button', { name: 'Open Nora Ek' }).click();
+  await population.getByRole('button', { name: 'Create a record for Ek, Nora' }).click();
   await expect(page.getByRole('heading', { name: /Ek, Nora|Nora Ek/ })).toBeVisible();
 
   // On file now: the same search finds the record, and no longer offers it as missing.
@@ -48,8 +48,8 @@ test('finds an owned car with no record from the unified query, and opens it on 
   await page.getByRole('textbox', { name: 'Search' }).fill('NORA42');
   await page.getByRole('button', { name: 'Search', exact: true }).click();
 
-  const population = page.getByRole('region', { name: 'In the population register, not yet on file' });
-  await population.getByRole('button', { name: 'Open NORA42' }).click();
+  const population = page.getByRole('region', { name: 'In the vehicle register, not yet on file' });
+  await population.getByRole('button', { name: 'Create a record for NORA42' }).click();
 
   await expect(page.getByRole('heading', { name: 'NORA42' })).toBeVisible();
 });
@@ -61,6 +61,6 @@ test('in Swedish', async ({ page }) => {
   await page.getByRole('textbox', { name: 'Namn, alias eller registernummer' }).fill('Nora');
   await page.getByRole('button', { name: 'Sök', exact: true }).click();
 
-  const population = page.getByRole('region', { name: 'Folkbokförda, inte i registret' });
-  await expect(population.getByRole('button', { name: 'Öppna Nora Ek' })).toBeVisible();
+  const population = page.getByRole('region', { name: 'I folkbokföringen, saknar post i FredPD' });
+  await expect(population.getByRole('button', { name: 'Skapa post för Ek, Nora' })).toBeVisible();
 });

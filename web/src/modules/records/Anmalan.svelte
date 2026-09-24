@@ -6,6 +6,7 @@
   import { fieldList, type Failure } from '../shared/failure';
   import LoadMore from '../shared/LoadMore.svelte';
   import { isStub, type Maybe, type Restricted } from './types';
+  import { onIntent, peekIntent, takeIntent } from '../../lib/intent';
   import { docToText, textToDoc } from '../../lib/richtext';
   import PersonPicker from '../shared/PersonPicker.svelte';
   import ChargePicker from '../shared/ChargePicker.svelte';
@@ -316,6 +317,19 @@
       busy = false;
     }
   }
+
+  /** A hand-over to this tab (the overview's report rows): open that report. Taken either way, so it is acted on once. */
+  function followIntent(): void {
+    const intent = peekIntent();
+    if (!intent || intent.module !== 'records' || intent.tab !== 'anmalan') return;
+    takeIntent();
+    if (intent.anmalanId) void open(intent.anmalanId);
+  }
+
+  $effect(() => {
+    followIntent();
+    return onIntent(followIntent);
+  });
 
   async function open(id: number): Promise<void> {
     busy = true;

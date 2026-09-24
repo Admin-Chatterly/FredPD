@@ -1346,6 +1346,7 @@
         type="button"
         class="px-3 py-1.5 text-xs hover:bg-[var(--color-surface)]"
         class:font-semibold={tab === name}
+        aria-current={tab === name ? 'page' : undefined}
         onclick={() => (tab = name)}
       >
         {t(`records.tab.${name}`)}

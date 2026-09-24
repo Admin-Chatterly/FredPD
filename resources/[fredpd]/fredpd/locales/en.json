@@ -1274,13 +1274,15 @@
     },
     "yes": "Yes",
     "population": {
-      "title": "In the population register, not yet on file",
-      "hint": "Found in the game but not in FredPD yet. Opening one creates the record from the population register.",
-      "open": "Open",
-      "openLabel": "Open {name}",
+      "personsTitle": "In the population register, not yet on file",
+      "vehiclesTitle": "In the vehicle register, not yet on file",
+      "hint": "Opening one creates the record in FredPD from the register.",
+      "open": "Create record",
+      "openLabel": "Create a record for {name}",
       "noName": "No name",
       "person": "Person",
-      "plate": "Plate"
+      "plate": "Plate",
+      "vehicle": "Vehicle"
     }
   },
   "fingerprintScanner": {
@@ -3439,42 +3441,38 @@
   "overview": {
     "updated": "Updated {time}",
     "refresh": "Refresh",
-    "all": "All",
-    "openDispatch": "Open dispatch",
+    "retry": "Try again",
     "noLocation": "No location",
     "since": "since {time}",
     "shift": {
       "title": "My shift",
-      "officer": "Officer",
-      "unit": "Unit",
       "noCallsign": "No callsign yet",
-      "duty": "Duty",
-      "offDutyHint": "Go on duty at the police job's clock-in point.",
-      "status": "Status",
-      "call": "Call",
+      "offDutyHint": "Go on duty at the station to be sent calls and use field tools.",
+      "onCall": "On call {number}",
       "noCall": "Not on a call"
     },
     "broadcasts": {
-      "title": "On the air",
-      "none": "Nothing on the air."
+      "title": "Broadcasts",
+      "none": "No active broadcasts."
     },
     "calls": {
       "title": "Open calls",
-      "counts": "Open {open} · No unit {waiting}",
-      "none": "No open calls."
+      "counts": "{open} · {waiting} without a unit",
+      "none": "No open calls.",
+      "open": "Open call {number}"
     },
     "reports": {
       "title": "My reports",
-      "open": "Open reports",
-      "none": "Nothing waiting on you.",
-      "counts": "Sent back {returned} · Drafts {drafts}"
+      "open": "All my reports",
+      "openOne": "Open report {number}",
+      "none": "Nothing waiting on you."
     },
     "recent": {
       "title": "My recent queries",
       "none": "No queries yet.",
-      "again": "Run {term} again",
-      "results": "Found {count}",
-      "hits": "Hits {count}"
-    }
+      "again": "Run {term} again"
+    },
+    "all": "All",
+    "openDispatchLabel": "All calls and broadcasts, in dispatch"
   }
 }

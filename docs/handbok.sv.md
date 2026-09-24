@@ -57,8 +57,9 @@ stänga. Tangenten går att byta under Inställningar → Tangentbindningar → 
 Därifrån slår du, skriver anmälan och ser händelser.
 
 En slagning når också **folkbokföringen**: personer och fordon som finns i spelet
-men ännu inte i registret visas under träffarna, under *Folkbokförda, inte i
-registret*. Tryck *Öppna* så skapas posten och öppnas. Skriv gärna hela namnet —
+men ännu inte i FredPD visas under träffarna, under *I folkbokföringen* respektive
+*I vägtrafikregistret, saknar post i FredPD*. Tryck *Skapa post* så hämtas
+uppgifterna och posten öppnas. Skriv gärna hela namnet —
 varje ord måste stämma.
 
 Vissa saker kräver ändå en fysisk plats, precis som med riktig

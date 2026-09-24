@@ -37,6 +37,20 @@
   let error = $state<ErrorCode | null>(null);
   let loading = $state(true);
   let current = $state<string | null>(null);
+  /** The module's heading: where focus goes when a screen hands over to another. */
+  let moduleHeading = $state<HTMLHeadingElement | null>(null);
+
+  /**
+   * Switches to a module from inside another (the overview's rows), and puts
+   * focus on the new module's heading -- not on the page, from where the next
+   * Tab would walk the whole rail again (6.4).
+   */
+  async function handOver(module: string): Promise<void> {
+    if (!session?.modules.includes(module)) return;
+    current = module;
+    await tick();
+    moduleHeading?.focus();
+  }
 
   /**
    * The shell renders as a bounded, tablet-proportioned frame by default
@@ -498,7 +512,13 @@
       {#if !loading && !error && current !== null}
         <!-- One consistent answer to "where am I", above every module's own
              content, so the active rail entry is never the only confirmation. -->
-        <h1 class="mb-3 text-base font-semibold">{t(`shell.module.${current}`)}</h1>
+        <h1
+          bind:this={moduleHeading}
+          tabindex="-1"
+          class="mb-3 text-base font-semibold outline-offset-2 focus-visible:outline focus-visible:outline-[var(--color-focus)]"
+        >
+          {t(`shell.module.${current}`)}
+        </h1>
       {/if}
 
       {#if loading}
@@ -508,9 +528,7 @@
       {:else if session && current === 'overview'}
         <Overview
           {session}
-          onOpenModule={(module) => {
-            if (session?.modules.includes(module)) current = module;
-          }}
+          onOpenModule={(module) => void handOver(module)}
         />
       {:else if current === 'intel'}
         <Intel />

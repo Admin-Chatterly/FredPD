@@ -440,6 +440,7 @@
   import type { ErrorCode } from '@fredpd/schema';
   import { fieldList, type Failure } from '../shared/failure';
   import { onPush } from './push';
+  import { onIntent, peekIntent, takeIntent } from '../../lib/intent';
   import CallQueue from './CallQueue.svelte';
   import CallCard from './CallCard.svelte';
   import UnitBoard from './UnitBoard.svelte';
@@ -776,6 +777,17 @@
     selectedId = callId;
     tab = 'queue';
   }
+
+  /** A hand-over to this screen (the overview's call rows): open that call's card. */
+  function followIntent(): void {
+    const intent = peekIntent();
+    if (!intent || intent.module !== 'dispatch') return;
+    takeIntent();
+    if (intent.callId) respond(intent.callId);
+  }
+
+  followIntent();
+  $effect(() => onIntent(followIntent));
 
   const emergencyMessages = $derived(fieldList(emergencyFailure, FIELD_LABELS));
 

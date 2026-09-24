@@ -640,19 +640,19 @@ Evidence number: [E26-001234        ] [Look up]
 Custody: 13:02 Collected (Berg) → 13:10 Temporary locker 3 → 13:40 Accepted (Lind)
 ```
 
-**The overview (Översikt)** is where F6 lands. It answers "what do I need to know right now" before the officer picks a module. It has five panels:
-- **My shift:** officer, unit, duty, unit status since, and the current call.
-- **On the air:** active broadcasts.
-- **Open calls:** most urgent first, with how many have no unit.
-- **My reports:** those sent back, then drafts.
-- **My recent queries:** each one runs again with one click.
+**The overview (Översikt)** is where F6 lands when the MDT first opens. Afterwards, the MDT reopens wherever the officer left it, because leaving a screen throws away work in progress. The overview answers "what do I need to know right now" in five panels:
+- **Mitt pass (my shift):** name, unit and duty, then unit status and the current call.
+- **Utskick:** active broadcasts.
+- **Öppna händelser:** open calls, most urgent first, with how many have no unit.
+- **Mina anmälningar:** reports sent back, then drafts.
+- **Mina senaste slagningar:** each one runs again in the register it ran against.
 
 The rules that keep it useful:
-- Each panel is a route the officer's modules already call (`unit.list`, `call.list`, `broadcast.list`, `anmalan.list`, `query.log`), checked on the server as it is there.
-- A panel whose route refuses the session is not drawn at all, so the overview never names a register the officer may not open.
-- There are at most four one-line rows per panel. Everything else is one click away, in the module that owns it.
-- The overview refreshes each time F6 opens the MDT.
-- It needs no page permission, since it holds nothing of its own. It appears only when the session can open at least one other module, so an empty rail still means that no role is mapped.
+- **It asks only what the rail allows.** A panel is fetched only when its module is on the rail: `dispatch` for the first three, `records` for the last two. It uses the module's own routes, checked on the server there. An officer without the module is not asked, and no refusal is logged for them.
+- **Refusal and failure look different.** A route that still refuses leaves its panel out. Any other failure is shown inside the panel with a retry, keeping the last data, and "Updated" is not claimed.
+- **Rows lead to the work.** There are at most four one-line rows per panel. Each row hands over to its own record: a call opens its card, a report opens on the Reports tab. Focus lands on the new module's heading.
+- **Colour follows the tokens.** P1 and query hits use `--color-alert`; a report sent back uses `--color-caution`. The text always says the same thing as the colour.
+- **No page permission.** The overview holds nothing of its own. It appears only beside another module, so an empty rail still means that no role is mapped.
 
 ### 6.4 Interaction rules
 
