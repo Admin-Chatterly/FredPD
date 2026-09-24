@@ -185,7 +185,8 @@
     "unreachable": "It could not be found from here.",
     "not_suspect": "That person is not a suspect in this investigation.",
     "no_position": "Your position could not be read.",
-    "already_cancelled": "It has already been cancelled."
+    "already_cancelled": "It has already been cancelled.",
+    "needs_subject": "a card needs a person, a vehicle or a note"
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -2908,14 +2909,16 @@
     "field": {
       "person": "Person",
       "vehicle": "Vehicle",
-      "associates": "With (associates)",
+      "associates": "Associates",
       "reason": "Reason",
       "narrative": "What was said and seen",
       "locationText": "Place",
       "here": "Record my current position"
     },
     "filter": {
-      "mine": "Only mine"
+      "mine": "Only cards I wrote",
+      "person": "Cards about a person",
+      "vehicle": "Cards about a vehicle"
     },
     "written": "Field interview card written.",
     "empty": "No field interview cards.",
@@ -2925,11 +2928,14 @@
     "column": {
       "when": "When"
     },
-    "onCall": "on call {number}",
+    "onCall": "Written on call",
     "action": {
-      "write": "Write card",
+      "write": "Write a card",
       "remove": "Remove",
-      "removeAssociate": "Remove {name} from the card"
+      "removeAssociate": "Remove {name} from the card",
+      "search": "Show cards",
+      "save": "Save card",
+      "closeForm": "Close form"
     },
     "reason": {
       "suspicious_behaviour": "Suspicious behaviour",
@@ -2939,7 +2945,13 @@
       "gang_activity": "Gang activity",
       "drug_activity": "Drug activity",
       "other": "Other"
-    }
+    },
+    "views": "Field interviews or stops",
+    "associateCount": "{count} of {max}",
+    "hint": {
+      "needs": "A card needs a person, a vehicle or a note."
+    },
+    "capped": "Showing the newest {count}. Narrow the search to see older ones."
   },
   "stop": {
     "title": "Stops",
@@ -2963,11 +2975,11 @@
       "other": "Other"
     },
     "search": {
-      "none": "No search",
-      "consent": "Search with consent",
+      "none": "None",
+      "consent": "With consent",
       "frisk": "Frisk",
-      "vehicle": "Vehicle searched",
-      "person_and_vehicle": "Person and vehicle searched"
+      "vehicle": "Vehicle",
+      "person_and_vehicle": "Person and vehicle"
     },
     "result": {
       "no_action": "No action",
@@ -2979,7 +2991,14 @@
     "recorded": "Stop recorded.",
     "empty": "No stops recorded.",
     "action": {
-      "record": "Record stop"
+      "record": "Record a stop",
+      "save": "Save stop"
+    },
+    "filter": {
+      "mine": "Only stops I recorded"
+    },
+    "column": {
+      "officer": "Officer"
     }
   }
 }

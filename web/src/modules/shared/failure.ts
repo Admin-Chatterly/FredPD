@@ -57,6 +57,7 @@ const REASONS = new Set([
   'inherited_by_groups',
   'mapped_to_roles',
   'too_many',
+  'needs_subject',
   'callsign_format',
   // Not `released`: an evidence item's status is `released` too, and the codes
   // share one namespace regardless of which field carried them, so the item

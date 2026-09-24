@@ -185,7 +185,8 @@
     "unreachable": "Det gick inte att hitta härifrån.",
     "not_suspect": "Personen är inte misstänkt i den här förundersökningen.",
     "no_position": "Din position gick inte att läsa.",
-    "already_cancelled": "Den är redan hävd."
+    "already_cancelled": "Den är redan hävd.",
+    "needs_subject": "ett kort behöver en person, ett fordon eller en anteckning"
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -2915,7 +2916,9 @@
       "here": "Spara min nuvarande position"
     },
     "filter": {
-      "mine": "Bara mina"
+      "mine": "Bara kort jag skrivit",
+      "person": "Kort om en person",
+      "vehicle": "Kort om ett fordon"
     },
     "written": "Kontaktkortet är skrivet.",
     "empty": "Inga kontaktkort.",
@@ -2925,11 +2928,14 @@
     "column": {
       "when": "När"
     },
-    "onCall": "på händelse {number}",
+    "onCall": "Skrivet under händelse",
     "action": {
-      "write": "Skriv kort",
+      "write": "Skriv ett kort",
       "remove": "Ta bort",
-      "removeAssociate": "Ta bort {name} från kortet"
+      "removeAssociate": "Ta bort {name} från kortet",
+      "search": "Visa kort",
+      "save": "Spara kortet",
+      "closeForm": "Stäng formuläret"
     },
     "reason": {
       "suspicious_behaviour": "Misstänkt beteende",
@@ -2939,19 +2945,25 @@
       "gang_activity": "Gängaktivitet",
       "drug_activity": "Narkotikaaktivitet",
       "other": "Annat"
-    }
+    },
+    "views": "Kontaktkort eller kontroller",
+    "associateCount": "{count} av {max}",
+    "hint": {
+      "needs": "Ett kort behöver en person, ett fordon eller en anteckning."
+    },
+    "capped": "Visar de {count} senaste. Avgränsa sökningen för att se äldre."
   },
   "stop": {
     "title": "Kontroller",
     "field": {
       "kind": "Typ",
       "reason": "Anledning",
-      "search": "Visitation",
+      "search": "Genomsökning",
       "result": "Resultat"
     },
     "kind": {
-      "traffic": "Trafikkontroll",
-      "pedestrian": "Kontroll av person"
+      "traffic": "Fordonskontroll",
+      "pedestrian": "Personkontroll"
     },
     "reason": {
       "traffic_violation": "Trafikförseelse",
@@ -2966,7 +2978,7 @@
       "none": "Ingen",
       "consent": "Med samtycke",
       "frisk": "Kroppsvisitation",
-      "vehicle": "Fordonet genomsökt",
+      "vehicle": "Fordonet",
       "person_and_vehicle": "Person och fordon"
     },
     "result": {
@@ -2979,7 +2991,14 @@
     "recorded": "Kontrollen är registrerad.",
     "empty": "Inga registrerade kontroller.",
     "action": {
-      "record": "Registrera kontroll"
+      "record": "Registrera en kontroll",
+      "save": "Spara kontrollen"
+    },
+    "filter": {
+      "mine": "Bara kontroller jag registrerat"
+    },
+    "column": {
+      "officer": "Polis"
     }
   }
 }

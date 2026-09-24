@@ -58,36 +58,75 @@ function Repo.fiAssociates(fiId)
         { fiId })
 end
 
---- A card and its associates, in one transaction.
+--- A card, then its associates.
+---
+--- The card is inserted on its own so its id comes back from the insert
+--- itself: reading back "this officer's newest card" names the wrong one when
+--- the same officer writes two at once. Associates follow in one
+--- transaction; if that fails the card is taken back out rather than left
+--- behind without the people it was written about.
+---
 --- @return number|nil the card's id
 function Repo.fiCreate(agencyId, fields, associateIds, discordId)
-    local statements = {
+    local id = db().insert(
+        [[INSERT INTO fpd_fi_cards (agency_id, person_id, vehicle_id, call_id, reason, narrative,
+                                    location_text, x, y, z, classification, created_by)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]],
         {
-            query = [[INSERT INTO fpd_fi_cards (agency_id, person_id, vehicle_id, call_id, reason, narrative,
-                                                location_text, x, y, z, classification, created_by)
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]],
-            values = {
-                agencyId, fields.personId, fields.vehicleId, fields.callId, fields.reason, fields.narrative,
-                fields.locationText, fields.x, fields.y, fields.z, fields.classification or 'internal', discordId,
-            },
-        },
-        -- Remembered for the associate rows and read back below: a
-        -- transaction reports only whether it committed.
-        { query = 'SET @fpd_fi_id = LAST_INSERT_ID()' },
-    }
+            agencyId, fields.personId, fields.vehicleId, fields.callId, fields.reason, fields.narrative,
+            fields.locationText, fields.x, fields.y, fields.z, fields.classification or 'internal', discordId,
+        })
+    if not id then return nil end
+    if #associateIds == 0 then return id end
 
+    local statements = {}
     for _, personId in ipairs(associateIds) do
         statements[#statements + 1] = {
-            query = 'INSERT INTO fpd_fi_associates (fi_id, person_id) VALUES (@fpd_fi_id, ?)',
-            values = { personId },
+            query = 'INSERT INTO fpd_fi_associates (fi_id, person_id) VALUES (?, ?)',
+            values = { id, personId },
         }
     end
 
-    if not db().transaction(statements) then return nil end
+    if db().transaction(statements) then return id end
 
-    return db().scalar(
-        'SELECT id FROM fpd_fi_cards WHERE agency_id = ? AND created_by = ? ORDER BY id DESC LIMIT 1',
-        { agencyId, discordId })
+    db().execute('DELETE FROM fpd_fi_cards WHERE id = ? AND agency_id = ?', { id, agencyId })
+    return nil
+end
+
+-- -----------------------------------------------------------------------------
+-- The people and vehicles a page of cards or stops names
+-- -----------------------------------------------------------------------------
+
+local function placeholders(count)
+    return string.rep('?', count, ', ')
+end
+
+--- Persons by id, agency-scoped, with what the access check needs, for one
+--- `filterSearch` over a whole page rather than one read per row.
+function Repo.personsByIds(agencyId, ids)
+    if #ids == 0 then return {} end
+
+    local values = { agencyId }
+    for index = 1, #ids do values[index + 1] = ids[index] end
+
+    return db().query(
+        ([[SELECT p.id, p.agency_id AS agencyId, p.person_number AS personNumber,
+                  p.first_name AS firstName, p.last_name AS lastName, p.classification
+             FROM fpd_persons p WHERE p.agency_id = ? AND p.id IN (%s)]]):format(placeholders(#ids)),
+        values)
+end
+
+--- Vehicles by id, the same way.
+function Repo.vehiclesByIds(agencyId, ids)
+    if #ids == 0 then return {} end
+
+    local values = { agencyId }
+    for index = 1, #ids do values[index + 1] = ids[index] end
+
+    return db().query(
+        ([[SELECT v.id, v.agency_id AS agencyId, v.plate, v.model, v.classification
+             FROM fpd_vehicles v WHERE v.agency_id = ? AND v.id IN (%s)]]):format(placeholders(#ids)),
+        values)
 end
 
 -- -----------------------------------------------------------------------------

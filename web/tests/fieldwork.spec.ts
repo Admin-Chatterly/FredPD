@@ -13,65 +13,94 @@ async function openFieldWork(page: Page, locale = 'en'): Promise<void> {
     .click();
 }
 
-test('lists the officer’s own cards and reads one with its associates', async ({ page }) => {
+test('lists the cards and reads one with its associates', async ({ page }) => {
   await openFieldWork(page);
 
-  const cards = page.getByRole('table').first();
-  await expect(cards.getByRole('row').filter({ hasText: 'Doe, John' })).toBeVisible();
-  // A colleague's card is not "mine".
-  await expect(cards.getByRole('row').filter({ hasText: 'Petrov, Marko' })).toHaveCount(0);
+  const cards = page.getByRole('region', { name: 'Field interview cards' });
+  const row = cards.getByRole('row').filter({ hasText: 'Doe, John' });
+  await expect(row).toBeVisible();
 
-  await cards.getByRole('row').filter({ hasText: 'Doe, John' }).getByRole('button').click();
-  await expect(page.getByText('Looking into parked cars on Alta Street.', { exact: false })).toBeVisible();
-  await expect(page.getByRole('definition').filter({ hasText: 'Petrov, Marko' })).toBeVisible();
+  await row.getByRole('button').click();
+  await expect(cards.getByText('Looking into parked cars on Alta Street.', { exact: false })).toBeVisible();
+  // Names on a card open the person's own record.
+  await expect(cards.getByRole('definition').getByRole('button', { name: /Petrov, Marko/ })).toBeVisible();
 });
 
-test('shows every card when "only mine" is cleared', async ({ page }) => {
+test('finds the cards about one person, as subject or associate', async ({ page }) => {
   await openFieldWork(page);
 
-  await page.getByLabel('Only mine').uncheck();
-  await expect(page.getByRole('table').first().getByRole('row').filter({ hasText: 'Petrov, Marko' })).toBeVisible();
+  const cards = page.getByRole('region', { name: 'Field interview cards' });
+  await page.getByLabel('Cards about a person').fill('petrov');
+  await page.getByRole('option', { name: /Petrov, Marko/ }).click();
+  await cards.getByRole('button', { name: 'Show cards' }).click();
+
+  // Card 1 names him as an associate, card 2 as its subject.
+  await expect(cards.locator('tbody tr')).toHaveCount(2);
+
+  await cards.getByLabel('Only cards I wrote').check();
+  await cards.getByRole('button', { name: 'Show cards' }).click();
+  await expect(cards.locator('tbody tr')).toHaveCount(1);
 });
 
 test('writes a card about a picked person with an associate', async ({ page }) => {
   await openFieldWork(page);
 
-  await page.getByLabel('Person', { exact: true }).first().fill('petrov');
+  const cards = page.getByRole('region', { name: 'Field interview cards' });
+  await cards.getByRole('button', { name: 'Write a card' }).click();
+  // The position is taken only when asked for.
+  await expect(cards.getByLabel('Record my current position')).not.toBeChecked();
+
+  await page.getByLabel('Person', { exact: true }).fill('petrov');
   await page.getByRole('option', { name: /Petrov, Marko/ }).click();
-  await page.getByLabel('With (associates)').fill('doe');
+  await page.getByLabel('Associates').fill('doe');
   await page.getByRole('option', { name: /Doe, John/ }).click();
-  await expect(page.getByRole('button', { name: /Remove Doe, John/ })).toBeVisible();
+  await expect(cards.getByText('1 of 10')).toBeVisible();
+
+  await cards.getByRole('combobox', { name: /^Reason/ }).selectOption('gang_activity');
+  await cards.getByLabel('What was said and seen').fill('Handed something to the driver of a black Sultan.');
+  await cards.getByRole('button', { name: 'Save card' }).click();
+
+  await expect(cards.getByRole('status')).toHaveText('Field interview card written.');
+  await expect(cards.getByRole('heading', { name: 'Gang activity' })).toBeVisible();
+  await expect(cards.getByText('Handed something to the driver of a black Sultan.')).toBeVisible();
+});
+
+test('removing an associate returns focus to the picker', async ({ page }) => {
+  await openFieldWork(page);
 
   const cards = page.getByRole('region', { name: 'Field interview cards' });
-  await cards.getByRole('combobox', { name: /^Reason/ }).selectOption('gang_activity');
-  await page.getByLabel('What was said and seen').fill('Handed something to the driver of a black Sultan.');
-  await page.getByRole('button', { name: 'Write card' }).click();
+  await cards.getByRole('button', { name: 'Write a card' }).click();
+  await page.getByLabel('Associates').fill('doe');
+  await page.getByRole('option', { name: /Doe, John/ }).click();
+  await cards.getByRole('button', { name: /Remove Doe, John/ }).click();
 
-  await expect(page.getByRole('status')).toHaveText('Field interview card written.');
-  await expect(page.getByRole('heading', { name: 'Gang activity' })).toBeVisible();
-  await expect(page.getByText('Handed something to the driver of a black Sultan.')).toBeVisible();
+  await expect(page.getByLabel('Associates')).toBeFocused();
 });
 
-test('refuses a card that says nothing', async ({ page }) => {
+test('says what a card needs when it says nothing', async ({ page }) => {
   await openFieldWork(page);
 
-  await page.getByRole('button', { name: 'Write card' }).click();
-  await expect(page.getByRole('alert')).toBeVisible();
+  const cards = page.getByRole('region', { name: 'Field interview cards' });
+  await cards.getByRole('button', { name: 'Write a card' }).click();
+  await cards.getByRole('button', { name: 'Save card' }).click();
+
+  await expect(cards.getByRole('alert')).toContainText('a card needs a person, a vehicle or a note');
 });
 
-test('records a stop and lists it with the plate', async ({ page }) => {
+test('records a stop from the keyboard and lists it with the plate', async ({ page }) => {
   await openFieldWork(page);
+  await page.getByRole('button', { name: 'Stops', exact: true }).click();
 
-  const section = page.getByRole('region', { name: 'Stops' });
-  const stops = section.getByRole('table');
+  const stops = page.getByRole('region', { name: 'Stops' });
   await expect(stops.getByRole('row').filter({ hasText: '45ABC123' })).toBeVisible();
 
-  await section.getByRole('combobox', { name: /^Kind/ }).selectOption('pedestrian');
-  await section.getByRole('combobox', { name: /^Search/ }).selectOption('frisk');
-  await section.getByRole('combobox', { name: /^Result/ }).selectOption('warning');
-  await section.getByRole('button', { name: 'Record stop' }).click();
+  await stops.getByRole('button', { name: 'Record a stop' }).click();
+  await stops.getByRole('combobox', { name: /^Kind/ }).selectOption('pedestrian');
+  await stops.getByRole('combobox', { name: /^Search/ }).selectOption('frisk');
+  await stops.getByRole('combobox', { name: /^Result/ }).selectOption('warning');
+  await stops.getByRole('combobox', { name: /^Result/ }).press('Control+Enter');
 
-  await expect(page.getByRole('status')).toHaveText('Stop recorded.');
+  await expect(stops.getByRole('status')).toHaveText('Stop recorded.');
   await expect(stops.getByRole('row').filter({ hasText: 'Frisk' })).toBeVisible();
 });
 
@@ -79,6 +108,6 @@ test('reads in Swedish', async ({ page }) => {
   await openFieldWork(page, 'sv');
 
   await expect(page.getByRole('heading', { name: 'Kontaktkort' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Kontroller' })).toBeVisible();
-  await expect(page.getByRole('cell', { name: 'Trafikkontroll' })).toBeVisible();
+  await page.getByRole('button', { name: 'Kontroller', exact: true }).click();
+  await expect(page.getByRole('cell', { name: 'Fordonskontroll' })).toBeVisible();
 });

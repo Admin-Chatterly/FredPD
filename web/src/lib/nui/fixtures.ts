@@ -4646,7 +4646,7 @@ export const fixtures: FixtureSet = {
         plats?: string;
       };
 
-      if (!personId) return refuse('invalid', { personId: 'required' });
+      if (!personId) return refuse('invalid', { personId: 'needs_subject' });
       if (!grund) return refuse('invalid', { grund: 'required' });
 
       const id = frihetsberovanden.length + 1;
@@ -5172,7 +5172,7 @@ export const fixtures: FixtureSet = {
         expiresInSeconds?: number;
       };
 
-      if (!notice.personId) return refuse('invalid', { personId: 'required' });
+      if (!notice.personId) return refuse('invalid', { personId: 'needs_subject' });
       if (!notice.grund) return refuse('invalid', { grund: 'required' });
       if (!DETAIN_ON_SIGHT.includes(notice.grund) && !['delgivning', 'forsvunnen', 'oidentifierad', 'annan'].includes(notice.grund)) {
         return refuse('invalid', { grund: 'unknown' });
@@ -5615,7 +5615,7 @@ export const fixtures: FixtureSet = {
         } else if (suspects.length === 1) {
           personId = suspects[0];
         } else if (suspects.length > 1) {
-          return refuse('invalid', { personId: 'required' });
+          return refuse('invalid', { personId: 'needs_subject' });
         }
       }
 
@@ -6053,7 +6053,7 @@ export const fixtures: FixtureSet = {
         return refuse('not_found', { tariffId: 'unknown' });
       }
       if (!body.personId && !body.vehicleId) {
-        return refuse('invalid', { personId: 'required' });
+        return refuse('invalid', { personId: 'needs_subject' });
       }
 
       const id = citations.length + 1;
@@ -6274,12 +6274,13 @@ export const fixtures: FixtureSet = {
     },
 
     'fi.list': (input) => {
-      const { mine, personId } = (input ?? {}) as { mine?: boolean; personId?: number };
+      const { mine, personId, vehicleId } = (input ?? {}) as { mine?: boolean; personId?: number; vehicleId?: number };
 
       return {
         cards: fixtureCards
           .filter((card) => !mine || card.mine)
           .filter((card) => personId === undefined || card.personId === personId || card.associateIds.includes(personId))
+          .filter((card) => vehicleId === undefined || card.vehicleId === vehicleId)
           .sort((a, b) => a.createdAgo - b.createdAgo)
           .map((card) => cardRow(card, false)),
       };
@@ -6304,7 +6305,7 @@ export const fixtures: FixtureSet = {
       };
 
       if (form.personId === undefined && form.vehicleId === undefined && !form.narrative?.trim()) {
-        return refuse('invalid', { personId: 'required' });
+        return refuse('invalid', { personId: 'needs_subject' });
       }
       if ((form.associateIds ?? []).length > 10) return refuse('invalid', { associateIds: 'too_many' });
 
@@ -7963,7 +7964,7 @@ export const fixtures: FixtureSet = {
         notes?: string;
       };
 
-      if (!body.personId) return refuse('invalid', { personId: 'required' });
+      if (!body.personId) return refuse('invalid', { personId: 'needs_subject' });
 
       const id = nextIntelVehicleId++;
 

@@ -3317,6 +3317,12 @@
   {:else if tab === 'locations'}
     <Locations />
   {:else if tab === 'fi'}
-    <FieldWork />
+    <FieldWork
+      onOpenPerson={(id) => {
+        tab = 'persons';
+        selectedPersonId = id;
+      }}
+      onOpenVehicle={openVehicle}
+    />
   {/if}
 </section>
