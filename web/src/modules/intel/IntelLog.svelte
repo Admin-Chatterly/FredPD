@@ -183,6 +183,7 @@
     <p class="text-sm text-[var(--color-ink-muted)]">{t('intel.log.empty')}</p>
   {:else}
     <ol class="flex flex-col gap-2">
+      <!-- A stub has no id (4.5): keyed by position, records by id, so a record's row survives a reload. -->
       {#each notes as note, index (isStub(note) ? `stub-${index}` : note.id)}
         {#if isStub(note)}
           <li class="border border-[var(--color-border)] p-3 text-sm text-[var(--color-ink-muted)]">

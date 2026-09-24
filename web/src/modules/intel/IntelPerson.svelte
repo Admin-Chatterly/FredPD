@@ -827,6 +827,7 @@
       <p class="text-sm text-[var(--color-ink-muted)]">{t('intel.person.empty')}</p>
     {:else}
       <ul class="flex flex-col">
+        <!-- A stub has no id (4.5): keyed by position, records by id, so a record's row survives a reload. -->
         {#each persons as person, index (isStub(person) ? `stub-${index}` : person.id)}
           {#if isStub(person)}
             <li class="border-b border-[var(--color-border)] py-2 text-sm text-[var(--color-ink-muted)] last:border-b-0">

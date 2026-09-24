@@ -476,6 +476,7 @@
       <p class="text-sm text-[var(--color-ink-muted)]">{t('intel.org.empty')}</p>
     {:else}
       <ul class="flex flex-col">
+        <!-- A stub has no id (4.5): keyed by position, records by id, so a record's row survives a reload. -->
         {#each orgs as org, index (isStub(org) ? `stub-${index}` : org.id)}
           {#if isStub(org)}
             <li class="border-b border-[var(--color-border)] py-2 text-sm text-[var(--color-ink-muted)] last:border-b-0">

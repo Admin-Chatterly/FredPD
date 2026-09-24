@@ -5,7 +5,7 @@ import type { FleetEntry, GroupRow, PermissionRow } from '../../modules/admin/ty
 import type { CustodyEntry, EvidenceItem, Scene } from '../../modules/evidence/types';
 import type { LabAnalysis } from '../../modules/lab/types';
 import { isStub } from '../../modules/records/types';
-import type { Maybe, PersonResult, VehicleResult } from '../../modules/records/types';
+import type { Maybe, PersonResult, Restricted, VehicleResult } from '../../modules/records/types';
 
 /**
  * Fixtures for browser development (spec 17.2, M0).
@@ -198,6 +198,11 @@ const chatMessages: ChatMessage[] = [
   },
 ];
 
+/** A record this reader may not open, as `Access.stub` shapes it: three fields, no id. */
+function intelStub(recordType: string): Restricted {
+  return { restricted: true, recordType, contact: 'narcotics' };
+}
+
 /**
  * Intelligence fixtures.
  *
@@ -206,11 +211,6 @@ const chatMessages: ChatMessage[] = [
  * `intel.source.view` — the one behaviour PD-Span had no equivalent for, so
  * the browser session shows it by default rather than hiding it.
  */
-/** A record this reader may not open, as `Access.stub` shapes it: three fields, no id. */
-function intelStub(recordType: string): { restricted: true; recordType: string; contact: string } {
-  return { restricted: true, recordType, contact: 'narcotics' };
-}
-
 let intelNotes: IntelNote[] = [
   {
     id: 1,
@@ -8364,14 +8364,18 @@ export const fixtures: FixtureSet = {
     },
 
     'intel.note.list': (input) => {
-      const filter = (input ?? {}) as { tag?: string };
-      const notes = filter.tag
-        ? intelNotes.filter((note) => note.tags.includes(filter.tag as string))
+      const filter = (input ?? {}) as Record<string, unknown>;
+      const notes = typeof filter['tag'] === 'string'
+        ? intelNotes.filter((note) => note.tags.includes(filter['tag'] as string))
         : intelNotes;
 
       // One note above this reader's clearance, stubbed as its compartment
-      // says (4.5). A tag filter never finds it: its tags are not counted.
-      return { notes: filter.tag ? notes : [...notes, intelStub('intel_note')] };
+      // says (4.5). Any filter leaves it out, as the server does: a stub in a
+      // filtered list would say what the hidden note is about.
+      const filtered = ['personId', 'orgId', 'caseId', 'source', 'confidence', 'tag', 'search'].some(
+        (key) => filter[key] !== undefined && filter[key] !== '',
+      );
+      return { notes: filtered ? notes : [...notes, intelStub('intel_note')] };
     },
 
     'intel.note.create': (input) => {
