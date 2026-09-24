@@ -45,41 +45,53 @@
     expanded = !expanded;
   }
 
-  $effect(() => {
-    let cancelled = false;
+  /**
+   * Asks the server who this is. Run on boot and again on every open: a
+   * character that loaded after the NUI booted, or a roster row created
+   * since, used to leave the MDT on "not signed on" until a reconnect.
+   */
+  let sequence = 0;
 
-    void (async () => {
-      const response = await nui.call<Session>('session.get');
-      if (cancelled) return;
+  async function loadSession(): Promise<void> {
+    const mine = ++sequence;
+    const response = await nui.call<Session>('session.get');
+    if (mine !== sequence) return;
 
-      if (response.ok) {
-        session = response.data;
-        error = null;
-        // Before anything renders a timestamp: every screen formats in the
-        // department's zone, not in the one the player's machine is set to.
-        setDepartmentTimezone(response.data.timezone);
+    if (response.ok) {
+      session = response.data;
+      error = null;
+      // Before anything renders a timestamp: every screen formats in the
+      // department's zone, not in the one the player's machine is set to.
+      setDepartmentTimezone(response.data.timezone);
 
-        // The department's configured language, unless `main.ts` already
-        // applied an explicit `?locale=` override (the dev/test escape
-        // hatch) — that override must win even after this resolves.
-        const explicit = new URLSearchParams(window.location.search).get('locale');
-        if (explicit === null && response.data.locale && isLocale(response.data.locale)) {
-          setLocale(response.data.locale);
-        }
-
-        current ??= response.data.modules[0] ?? null;
-      } else {
-        error = response.err;
-        session = null;
+      // The department's configured language, unless `main.ts` already
+      // applied an explicit `?locale=` override (the dev/test escape
+      // hatch) — that override must win even after this resolves.
+      const explicit = new URLSearchParams(window.location.search).get('locale');
+      if (explicit === null && response.data.locale && isLocale(response.data.locale)) {
+        setLocale(response.data.locale);
       }
 
-      loading = false;
-    })();
+      if (current === null || !response.data.modules.includes(current)) {
+        current = response.data.modules[0] ?? null;
+      }
+    } else {
+      error = response.err;
+      session = null;
+    }
+
+    loading = false;
+  }
+
+  $effect(() => {
+    void loadSession();
 
     return () => {
-      cancelled = true;
+      sequence++;
     };
   });
+
+  $effect(() => nui.on('fredpd:open', () => void loadSession()));
 
   /**
    * Permissions changed while the MDT was open — a role was added or removed,

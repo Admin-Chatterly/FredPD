@@ -185,6 +185,8 @@ files['**/client/**/*.lua'] = {
         'SetEntityCollision',
         'SetEntityInvincible',
         'SetModelAsNoLongerNeeded',
+        -- A dispatch push sets the officer's GPS to the call (client/notify.lua).
+        'SetNewWaypoint',
         'SetPedIntoVehicle',
         'SetTextCentre',
         'SetTextColour',

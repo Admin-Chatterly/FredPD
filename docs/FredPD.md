@@ -437,6 +437,10 @@ Where the two overlap, the rule is one owner per concern:
 - A Discord user can hold one bound character per agency. FredPD refuses to open on any other character ("This character is not registered as agency personnel"). This stops agency access being used on a criminal alt.
 - DOJ, defense and civilian access points bind the same way.
 - A player without a Discord identifier gets no access and sees an instruction to link Discord.
+- **Roster rows provision themselves** (`roster.autoProvision`). An officer with no roster row whose Discord roles map to at least one group in the agency gets one the first time they open FredPD, bound to the character they are on. That character must hold `roster.requireJob` (default `police`) so a criminal alt cannot be bound first; the job is a context condition on the bind, never a grant. A deactivated row is never reactivated this way.
+- **Callsigns are generated** from `roster.callsignFormat` (`{prefix}-{n}`, counting up from `roster.callsignStart` to the first free one) for any officer who has none when they open FredPD, since a unit cannot sign on without one. A supervisor changes it with `personnel.roster.edit`; the open session picks it up without a reconnect.
+- **First-run setup** maps the named Discord role to `admin` and to `command`, so the first administrator can grant the officer groups from the Role map straight away.
+- A context refusal names the condition that failed (`fields._context`: `onDuty`, `accessPoint`, `inAgencyVehicle`) so the officer is told which one.
 
 ### 4.2 Discord role sync
 

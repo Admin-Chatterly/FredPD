@@ -57,6 +57,7 @@ const REASONS = new Set([
   'inherited_by_groups',
   'mapped_to_roles',
   'too_many',
+  'callsign_format',
   // Not `released`: an evidence item's status is `released` too, and the codes
   // share one namespace regardless of which field carried them, so the item
   // would have been explained as a scene.
@@ -247,6 +248,9 @@ const REASONS = new Set([
   'gate_required',
 ]);
 
+/** The route context conditions (server/core/route.lua), each with a key. */
+const CONTEXT_CONDITIONS = new Set(['onDuty', 'accessPoint', 'inAgencyVehicle']);
+
 export interface FieldMessage {
   /** The server's field name, used as the key when looping. */
   name: string;
@@ -268,9 +272,18 @@ export function fieldList(
   const fields = failure?.fields;
   if (!fields) return [];
 
-  return Object.entries(fields).map(([name, code]) => ({
-    name,
-    label: labels[name] ? t(labels[name]) : name,
-    reason: REASONS.has(code) ? t(`fieldError.${code}`) : code,
-  }));
+  return Object.entries(fields).map(([name, code]) =>
+    // A context refusal (route.lua step 4) names the condition that failed.
+    name === '_context'
+      ? {
+          name,
+          label: t('form.contextLabel'),
+          reason: CONTEXT_CONDITIONS.has(code) ? t(`error.contextNeeds.${code}`) : code,
+        }
+      : {
+          name,
+          label: labels[name] ? t(labels[name]) : name,
+          reason: REASONS.has(code) ? t(`fieldError.${code}`) : code,
+        },
+  );
 }

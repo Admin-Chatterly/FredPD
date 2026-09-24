@@ -236,20 +236,22 @@ describe('setup', function()
             assert.is_truthy(statements[3].query:find("'admin'"))
         end)
 
-        it('maps the same role to patrol_basic right after', function()
-            -- Spec 4.3: `admin` does not inherit `patrol_basic`, and every
+        it('maps the same role to command right after', function()
+            -- Spec 4.3: `admin` does not inherit any officer group, and every
             -- ordinary rolemap write refuses to grant more than the caller
             -- already holds -- so the very first administrator could never
-            -- reach `patrol_basic` in game without this second mapping.
+            -- hand out `patrol` or `supervisor` in game without this second
+            -- mapping. `command` inherits the whole chain down to
+            -- `patrol_basic`.
             local statements = admin.bootstrapStatements(agency, officer, { '111' })
 
             assert.are.same({ '111', 'lspd', '900' }, statements[4].values)
-            assert.is_truthy(statements[4].query:find("'patrol_basic'"))
+            assert.is_truthy(statements[4].query:find("'command'"))
         end)
 
         it('is parameterized throughout', function()
             -- Invariant 8. The only literals in these statements are the group
-            -- keys 'admin' and 'patrol_basic', both constants and never from
+            -- keys 'admin' and 'command', both constants and never from
             -- input.
             local statements = admin.bootstrapStatements(agency, officer, { '111' })
 

@@ -103,6 +103,7 @@
   ];
 
   const FIELD_LABELS: Record<string, string> = {
+    callsign: 'personnel.field.callsign',
     badgeNumber: 'personnel.field.badgeNumber',
     division: 'personnel.field.division',
     itemKey: 'personnel.equipment.itemChoose',
@@ -126,7 +127,7 @@
   let activeOnly = $state(true);
   let status = $state('');
 
-  let editForm = $state({ badgeNumber: '', division: '' });
+  let editForm = $state({ callsign: '', badgeNumber: '', division: '' });
   let equipmentForm = $state({ itemKey: EQUIPMENT_ITEMS[0], serial: '' });
   let certForm = $state({ certKey: CERTIFICATIONS[0] });
   let disciplineForm = $state({ category: DISCIPLINE_CATEGORIES[0], summary: '' });
@@ -308,7 +309,11 @@
 
     if (response.ok) {
       detail = response.data.officer;
-      editForm = { badgeNumber: detail.badgeNumber ?? '', division: detail.division ?? '' };
+      editForm = {
+        callsign: detail.callsign ?? '',
+        badgeNumber: detail.badgeNumber ?? '',
+        division: detail.division ?? '',
+      };
       assignLoadoutId = detail.loadout ? String(detail.loadout.id) : '';
       failure = null;
     } else {
@@ -340,6 +345,7 @@
     busy = true;
     const response = await nui.call('personnel.roster.update', {
       id: detail.id,
+      callsign: editForm.callsign.trim() || undefined,
       badgeNumber: editForm.badgeNumber || undefined,
       division: editForm.division || undefined,
     });
@@ -758,6 +764,10 @@
             void saveRoster();
           }}
         >
+          <label class="flex flex-col gap-1 text-xs">
+            {t('personnel.field.callsign')}
+            <input bind:value={editForm.callsign} maxlength="16" class="border border-[var(--color-border)] px-2 py-1 font-[family-name:var(--font-mono)]" />
+          </label>
           <label class="flex flex-col gap-1 text-xs">
             {t('personnel.field.badgeNumber')}
             <input bind:value={editForm.badgeNumber} maxlength="16" class="border border-[var(--color-border)] px-2 py-1" />

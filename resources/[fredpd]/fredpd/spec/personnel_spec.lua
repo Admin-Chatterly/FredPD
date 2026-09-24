@@ -94,6 +94,49 @@ describe('personnel', function()
             assert.equal('invalid', err)
             assert.equal('too_long', fields.division)
         end)
+
+        it('refuses a callsign with characters the board cannot print', function()
+            local err, fields = personnel.validateRosterUpdate({ callsign = '1-ADAM<b>' })
+            assert.equal('invalid', err)
+            assert.equal('callsign_format', fields.callsign)
+        end)
+
+        it('accepts an ordinary callsign', function()
+            assert.is_nil(personnel.validateRosterUpdate({ id = 1, callsign = '1-ADAM-12' }))
+        end)
+    end)
+
+    describe('callsigns', function()
+        it('refuses blank, padded and over-long callsigns', function()
+            assert.is_false(personnel.isCallsign(''))
+            assert.is_false(personnel.isCallsign('  '))
+            assert.is_false(personnel.isCallsign(' LSPD-1'))
+            assert.is_false(personnel.isCallsign(('A'):rep(17)))
+            assert.is_false(personnel.isCallsign(12))
+            assert.is_true(personnel.isCallsign('LSPD 101'))
+        end)
+
+        it('fills the format', function()
+            assert.equal('LSPD-101', personnel.formatCallsign('{prefix}-{n}', 'LSPD', 101))
+            assert.equal('1-ADAM-7', personnel.formatCallsign('1-ADAM-{n}', nil, 7))
+        end)
+
+        it('treats a percent sign in the prefix as text', function()
+            assert.equal('A%1-5', personnel.formatCallsign('{prefix}-{n}', 'A%1', 5))
+        end)
+
+        it('skips callsigns already taken, case-insensitively', function()
+            local taken = { ['LSPD-101'] = true, ['lspd-102'] = true }
+            assert.equal('LSPD-103', personnel.nextCallsign('{prefix}-{n}', 'LSPD', 101, taken))
+        end)
+
+        it('starts at the configured number', function()
+            assert.equal('LSPD-200', personnel.nextCallsign('{prefix}-{n}', 'LSPD', 200, {}))
+        end)
+
+        it('returns nil for a format that can never be valid', function()
+            assert.is_nil(personnel.nextCallsign('{prefix}<{n}>', 'LSPD', 1, {}))
+        end)
     end)
 
     describe('validateEquipmentAssign', function()

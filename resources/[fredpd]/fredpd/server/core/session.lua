@@ -67,6 +67,140 @@ local function provisionFallbackOfficer(discordId, character)
     )
 end
 
+--- A free callsign in the configured format (config `roster`), or nil when
+--- the format cannot produce one. Read at call time: `personnel/service.lua`
+--- loads after this file.
+local function generateCallsign(agencyId)
+    local roster = FredPD.Config.server.roster or {}
+    local personnel = FredPD.Modules and FredPD.Modules.personnel
+    if not personnel then return nil end
+
+    local taken = {}
+    local rows = FredPD.Core.db.query(
+        'SELECT callsign FROM fpd_officers WHERE agency_id = ? AND callsign IS NOT NULL',
+        { agencyId }) or {}
+    for index = 1, #rows do taken[rows[index].callsign] = true end
+
+    return personnel.nextCallsign(
+        roster.callsignFormat or '{prefix}-{n}',
+        roster.callsignPrefix or FredPD.Config.server.agency.shortName,
+        roster.callsignStart or 101,
+        taken)
+end
+
+--- Gives an officer with no callsign a generated one. Without a callsign an
+--- officer never reaches the unit board (`fpd_units.callsign` is NOT NULL),
+--- and nothing in the interface used to set one.
+---
+--- `callsign IS NULL` in the UPDATE, so a callsign a supervisor set in the
+--- meantime is never overwritten. Two officers opening at the same instant can
+--- draw the same number; that is a label clash a supervisor can fix, not an
+--- integrity problem, and it is not worth a lock.
+local function ensureCallsign(officer)
+    if type(officer.callsign) == 'string' and officer.callsign ~= '' then return end
+
+    local roster = FredPD.Config.server.roster or {}
+    if roster.callsignFormat == false then return end
+
+    local callsign = generateCallsign(officer.agency_id)
+    if not callsign then
+        print(('[fredpd] roster: could not generate a callsign for officer %d -- check roster.callsignFormat.')
+            :format(officer.id))
+        return
+    end
+
+    local changed = FredPD.Core.db.execute(
+        'UPDATE fpd_officers SET callsign = ? WHERE id = ? AND callsign IS NULL',
+        { callsign, officer.id })
+
+    if changed and changed > 0 then
+        officer.callsign = callsign
+        print(('[fredpd] roster: officer %d is now %s.'):format(officer.id, callsign))
+        FredPD.Core.audit.write({
+            action = 'personnel.callsign.generated',
+            agencyId = officer.agency_id,
+            subjectType = 'officer',
+            subjectId = tostring(officer.id),
+            detail = { callsign = callsign },
+        })
+    end
+end
+
+--- Creates the roster row for an officer whose Discord roles grant something
+--- in this agency but who has never opened FredPD before (config `roster`).
+---
+--- The grant is still Discord's (invariant 2): nothing here adds a
+--- permission, and an officer whose roles map to nothing is refused exactly
+--- as before. What it removes is a database row somebody had to type by hand
+--- for every officer after the first.
+---
+--- `INSERT IGNORE` on `uq_fpd_officers_discord_agency`: an officer an
+--- administrator deactivated keeps their inactive row and stays refused.
+--- Auto-provisioning never reactivates anybody.
+---
+--- @return string|nil reason the officer was not provisioned, for the console
+local function autoProvisionOfficer(discordId, character)
+    local roster = FredPD.Config.server.roster or {}
+    if roster.autoProvision == false then return 'auto-provision is off (roster.autoProvision)' end
+    if not FredPD.Core.discord.enabled() then return 'Discord is not configured' end
+
+    local requiredJob = roster.requireJob
+    if type(requiredJob) == 'string' and requiredJob ~= '' and character.job ~= requiredJob then
+        return ('this character does not hold the "%s" job (roster.requireJob)'):format(requiredJob)
+    end
+
+    local agencyId = FredPD.Config.server.agency.id
+
+    -- Cheapest question first. A deactivated officer keeps hitting this on
+    -- every route call (a failed open is not cached), and must cost one
+    -- indexed lookup, not a role computation and a roster scan.
+    local existing = FredPD.Core.db.single(
+        'SELECT active FROM fpd_officers WHERE discord_id = ? AND agency_id = ? LIMIT 1',
+        { discordId, agencyId })
+    if existing then return 'a deactivated roster row exists for them' end
+
+    -- A snapshot too old to trust for a sensitive action is too old to put
+    -- somebody on the roster with (spec 4.2): they may have lost the role
+    -- while sync was down.
+    local _, age = FredPD.Core.perms.memberRoles(discordId)
+    if age == nil or age > FredPD.Config.server.discord.sensitiveStaleAfterSeconds then
+        return 'their Discord role snapshot is missing or stale'
+    end
+
+    local permissions = FredPD.Core.perms.effectiveFor(discordId, agencyId)
+    if next(permissions) == nil then
+        return 'their Discord roles map to no group in this agency (Administration > Role map)'
+    end
+
+    local agencyRow = FredPD.Core.db.single('SELECT id FROM fpd_agencies WHERE id = ?', { agencyId })
+    if not agencyRow then return 'the agency does not exist yet -- run the setup first' end
+
+    local callsign = generateCallsign(agencyId)
+    local inserted = FredPD.Core.db.execute(
+        [[INSERT IGNORE INTO fpd_officers (discord_id, agency_id, identifier, name, callsign)
+          VALUES (?, ?, ?, ?, ?)]],
+        { discordId, agencyId, character.identifier,
+          character.firstName .. ' ' .. character.lastName, callsign }
+    )
+
+    if not inserted or inserted == 0 then return 'the roster insert changed nothing' end
+
+    print(('[fredpd] roster: added %s %s (discord %s) to the roster as %s.')
+        :format(character.firstName, character.lastName, discordId, tostring(callsign)))
+
+    -- Invariant 11: binding a Discord account and a character to the agency is
+    -- exactly the fact an internal-affairs reader needs to find later.
+    FredPD.Core.audit.write({
+        action = 'personnel.roster.provisioned',
+        discordId = discordId,
+        agencyId = agencyId,
+        subjectType = 'officer',
+        detail = { identifier = character.identifier, callsign = callsign },
+    })
+
+    return nil
+end
+
 --- Builds a session for a connected player, or returns nil with a reason.
 ---
 --- @param src number server id
@@ -126,14 +260,33 @@ function Session.open(src)
         )
     end
 
+    local notProvisioned
+    if not officer and not jobFallback then
+        notProvisioned = autoProvisionOfficer(discordId, character)
+
+        if not notProvisioned then
+            officer = FredPD.Core.db.single(
+                [[SELECT id, agency_id, callsign, name, identifier, active, superuser
+                    FROM fpd_officers
+                   WHERE discord_id = ? AND active = 1
+                   LIMIT 1]],
+                { discordId }
+            )
+        end
+    end
+
     if not officer then
-        return refuse(('not_personnel: discord_id %s has no active row in fpd_officers'):format(discordId))
+        return refuse(('not_personnel: discord_id %s has no active row in fpd_officers%s'):format(
+            discordId, notProvisioned and (' and was not added: ' .. notProvisioned) or ''))
     end
 
     if officer.identifier and officer.identifier ~= character.identifier then
         return refuse(('wrong_character: fpd_officers is bound to %s, this character is %s')
             :format(officer.identifier, character.identifier))
     end
+
+    -- After the binding check, so a refused open changes nothing.
+    ensureCallsign(officer)
 
     -- A permanent grant made once from the console (spec 4.3, migration
     -- 0022). It bypasses Discord entirely rather than widening what a live
@@ -200,6 +353,15 @@ function Session.get(src)
     return (Session.open(src))
 end
 
+--- Updates the callsign on an officer's open session, if they have one.
+--- Called after a supervisor edits the roster, so the change reaches the unit
+--- board on its next pass rather than at the officer's next reconnect.
+function Session.setCallsign(officerId, callsign)
+    for _, session in pairs(sessions) do
+        if session.officerId == officerId then session.callsign = callsign end
+    end
+end
+
 function Session.drop(src)
     sessions[src] = nil
 end
@@ -216,9 +378,12 @@ function Session.refreshAll()
         -- connected has to take effect the same way every other permission
         -- change does (spec 4.2) -- immediately, with no reconnect needed.
         local officer = FredPD.Core.db.single(
-            'SELECT superuser FROM fpd_officers WHERE id = ?', { session.officerId }
+            'SELECT superuser, callsign FROM fpd_officers WHERE id = ?', { session.officerId }
         )
         session.superuser = officer ~= nil and (officer.superuser == 1 or officer.superuser == true)
+        -- Same reason: a callsign a supervisor changes takes effect without a
+        -- reconnect. The unit board picks it up on its next pass.
+        if officer then session.callsign = officer.callsign end
 
         if session.superuser then
             session.permissions = { ['*'] = true }
@@ -296,6 +461,7 @@ function Session.allowedModules(session)
         surveillance = 'page.surveillance',
         court = 'page.court',
         personnel = 'page.personnel',
+        booking = 'page.booking',
         comms = 'page.comms',
         admin = 'page.admin',
     }
@@ -303,7 +469,7 @@ function Session.allowedModules(session)
     -- Stable order, so the rail does not reshuffle between sessions.
     local order = {
         'records', 'dispatch', 'evidence', 'lab', 'intel', 'surveillance',
-        'court', 'personnel', 'comms', 'admin',
+        'court', 'personnel', 'booking', 'comms', 'admin',
     }
 
     for index = 1, #order do

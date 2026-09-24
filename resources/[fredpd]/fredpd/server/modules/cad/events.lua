@@ -413,6 +413,9 @@ local function signOn(entry)
             warned[entry.officerId] = true
             print(('[fredpd] cad: officer %d has no callsign, so they cannot go on the unit board. Set one on their roster row.')
                 :format(entry.officerId))
+            -- The officer is the one standing there wondering why they are
+            -- not on the board, so they are told too, not only the console.
+            FredPD.Core.push.notify(entry.src, 'cad.noCallsign', nil, { type = 'warning' })
         end
 
         return false

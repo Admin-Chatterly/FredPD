@@ -28,10 +28,21 @@ end
 ---
 --- Every error code has an `error.<code>` key, and `pnpm i18n:check` keeps it
 --- that way, so this can never render a blank notification.
+local CONTEXT_CONDITIONS <const> = { onDuty = true, accessPoint = true, inAgencyVehicle = true }
+
 function Client.showError(response)
+    local key = 'error.' .. (response.err or 'internal')
+
+    -- A context refusal names the condition that failed; say which one
+    -- rather than listing every condition a route could have.
+    local condition = type(response.fields) == 'table' and response.fields._context
+    if response.err == FredPD.ErrorCode.CONTEXT and CONTEXT_CONDITIONS[condition] then
+        key = 'error.contextNeeds.' .. condition
+    end
+
     lib.notify({
         title = FredPD.t('app.name'),
-        description = FredPD.t('error.' .. (response.err or 'internal')),
+        description = FredPD.t(key),
         type = 'error',
     })
 end

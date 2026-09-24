@@ -75,8 +75,19 @@ end
 --- everything else this module touches.
 function Repo.updateRoster(id, agencyId, input)
     return FredPD.Core.db.execute(
-        [[UPDATE fpd_officers SET badge_number = ?, division = ? WHERE id = ? AND agency_id = ?]],
-        { input.badgeNumber, input.division, id, agencyId })
+        [[UPDATE fpd_officers SET badge_number = ?, division = ?, callsign = COALESCE(?, callsign)
+           WHERE id = ? AND agency_id = ?]],
+        { input.badgeNumber, input.division, input.callsign, id, agencyId })
+end
+
+--- Another officer in the agency already holding this callsign,
+--- case-insensitively (the board and radio text do not tell case apart).
+function Repo.callsignTaken(callsign, agencyId, exceptId)
+    return FredPD.Core.db.scalar(
+        [[SELECT id FROM fpd_officers
+           WHERE agency_id = ? AND LOWER(callsign) = LOWER(?) AND id <> ?
+           LIMIT 1]],
+        { agencyId, callsign, exceptId }) ~= nil
 end
 
 function Repo.setActive(id, agencyId, active)

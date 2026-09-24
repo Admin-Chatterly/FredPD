@@ -63,7 +63,7 @@ route.define({
     sensitive = true,
     audit = 'personnel.roster.updated',
     subjectType = 'person',
-    auditDetail = function(input) return { id = input.id } end,
+    auditDetail = function(input) return { id = input.id, callsign = input.callsign } end,
     handler = function(session, input)
         local err, fields = service.validateRosterUpdate(input)
         if err then return route.refuse(err, fields) end
@@ -72,7 +72,15 @@ route.define({
             return route.refuse(FredPD.ErrorCode.NOT_FOUND)
         end
 
+        if input.callsign and repo.callsignTaken(input.callsign, session.agencyId, input.id) then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { callsign = 'exists' })
+        end
+
         repo.updateRoster(input.id, session.agencyId, input)
+
+        if input.callsign then
+            FredPD.Core.session.setCallsign(input.id, input.callsign)
+        end
 
         return { id = input.id }
     end,

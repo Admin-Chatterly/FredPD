@@ -93,6 +93,62 @@ function Personnel.validateRosterUpdate(input)
         return 'invalid', { division = 'too_long' }
     end
 
+    if input.callsign ~= nil and not Personnel.isCallsign(input.callsign) then
+        return 'invalid', { callsign = 'callsign_format' }
+    end
+
+    return nil
+end
+
+-- -----------------------------------------------------------------------------
+-- Callsigns
+--
+-- `fpd_units.callsign` is NOT NULL, so an officer without one never reaches the
+-- unit board. Every officer used to need a supervisor to type one in, and
+-- nothing in the interface could -- so after the first officer, nobody did.
+-- They are generated now, and a supervisor can still change one.
+-- -----------------------------------------------------------------------------
+
+--- Letters, digits, hyphens and spaces, 1-16 characters, not blank. Tight on
+--- purpose: it is printed on the board, on the map and in radio text.
+function Personnel.isCallsign(value)
+    if type(value) ~= 'string' then return false end
+    if #value < 1 or #value > 16 then return false end
+    if value:match('^%s') or value:match('%s$') then return false end
+
+    return value:match('^[%w%- ]+$') ~= nil
+end
+
+--- Fills `{prefix}` and `{n}` in a callsign format. A function replacement
+--- rather than a string one, so a `%` in either value is text, not a pattern.
+function Personnel.formatCallsign(format, prefix, n)
+    local out = tostring(format or '{prefix}-{n}')
+    out = out:gsub('{prefix}', function() return tostring(prefix or '') end)
+    out = out:gsub('{n}', function() return tostring(n) end)
+
+    return out
+end
+
+--- The first callsign of the configured format nobody on the roster holds.
+---
+--- @param format string e.g. '{prefix}-{n}'
+--- @param prefix string e.g. 'LSPD' or '1-ADAM'
+--- @param start number first sequence number tried
+--- @param taken table set of callsigns already in use, compared case-insensitively
+--- @return string|nil callsign, nil when the format cannot produce a valid free one
+function Personnel.nextCallsign(format, prefix, start, taken)
+    local lowered = {}
+    for callsign in pairs(taken or {}) do lowered[tostring(callsign):lower()] = true end
+
+    local first = math.max(0, math.floor(tonumber(start) or 1))
+
+    for n = first, first + 9999 do
+        local candidate = Personnel.formatCallsign(format, prefix, n)
+
+        if not Personnel.isCallsign(candidate) then return nil end
+        if not lowered[candidate:lower()] then return candidate end
+    end
+
     return nil
 end
 

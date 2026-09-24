@@ -152,7 +152,10 @@ function Route.define(definition)
         local contextOk, failed = checkContext(definition, session, input)
         if not contextOk then
             audit.denied(session, definition.name, 'context:' .. tostring(failed))
-            return { ok = false, err = FredPD.ErrorCode.CONTEXT }
+            -- Which condition, by name only (`onDuty`, `accessPoint`, ...).
+            -- It says nothing the route definition does not, and without it
+            -- the officer is left guessing between duty, place and vehicle.
+            return { ok = false, err = FredPD.ErrorCode.CONTEXT, fields = { _context = tostring(failed) } }
         end
 
         -- 5. Rate limit

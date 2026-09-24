@@ -36,7 +36,7 @@
     }
   },
   "error": {
-    "no_session": "Du är inte inloggad. Öppna FredPD från en terminal eller ett tjänstefordon.",
+    "no_session": "Du är inte inloggad i FredPD. Oftast beror det på att du spelar en annan karaktär än den som står på din personalrad, att dina Discordroller inte ger någon behörighet här, eller att Discord inte är igång och kopplat till FiveM. Ett befäl kan se den exakta orsaken i serverkonsolen.",
     "forbidden": "Dina Discord-roller ger inte behörighet till det här.",
     "context": "Det här går bara att göra på rätt plats, i tjänst eller i rätt enhet.",
     "rate_limited": "För många anrop. Vänta en stund och försök igen.",
@@ -45,14 +45,19 @@
     "conflict": "Någon annan ändrade posten medan du redigerade. Ladda om och försök igen.",
     "restricted": "Posten är skyddad. Begär behörighet eller använd nödöppning.",
     "stale_permissions": "Dina behörigheter är inaktuella. Logga in igen.",
-    "internal": "Något gick fel på servern. Felet har loggats."
+    "internal": "Något gick fel på servern. Felet har loggats.",
+    "contextNeeds": {
+      "onDuty": "Du måste vara i tjänst för det här.",
+      "accessPoint": "Det här görs vid rätt terminal eller station. Öppna FredPD där.",
+      "inAgencyVehicle": "Du måste sitta i ett polisfordon för det här."
+    }
   },
   "setup": {
-    "done": "FredPD är klart. {agency} skapad; Discord-rollen {role} ger nu administration och grundläggande polisbehörighet.",
+    "done": "FredPD är klart. {agency} skapad; Discord-rollen {role} ger nu administration och gruppen command (hela poliskedjan, inklusive skyddade fält och loggboken). Koppla bara en ledningsroll till den.",
     "alreadyDone": "FredPD är redan uppsatt. Hantera behörigheter under Administration i MDT:n.",
     "busy": "Uppstarten pågår redan. Vänta ett ögonblick och försök igen.",
     "badCode": "Fel uppstartskod. Den skrivs ut i serverkonsolen när resursen startar.",
-    "noRole": "Ange vilken Discord-roll som ska ge administration: /fredpd setup <kod> <roll-id>. Serverkonsolen listar dina roller.",
+    "noRole": "Ange vilken Discord-roll som ska ge administration och command: /fredpd setup <kod> <roll-id>. Välj en ledningsroll, aldrig en som alla har. Serverkonsolen listar dina roller.",
     "roleNotHeld": "Du har inte den Discord-rollen. Serverkonsolen listar dem du har.",
     "noSeed": "Behörighetsgrupperna saknas. Kör database/seeds/0001_permissions.sql och försök igen.",
     "noDiscord": "Ingen Discord-identitet. Starta Discord och anslut igen — FredPD identifierar poliser via Discord-konto.",
@@ -70,7 +75,8 @@
     "searching": "Söker…",
     "noMatches": "Inga träffar",
     "selected": "Vald: {value}",
-    "clearSelection": "Byt"
+    "clearSelection": "Byt",
+    "contextLabel": "Orsak"
   },
   "fieldError": {
     "type": "fel typ av värde",
@@ -166,7 +172,8 @@
     "not_authorized": "Utredares godkännande krävs",
     "already_linked": "Redan kopplad till en annan underrättelsepost",
     "gated": "Du har inte den roll eller grupp som krävs",
-    "gate_required": "Ange en grupp eller Discord-roll som krävs"
+    "gate_required": "Ange en grupp eller Discord-roll som krävs",
+    "callsign_format": "endast bokstäver, siffror, bindestreck och mellanslag, högst 16"
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -1580,7 +1587,8 @@
       "export": "Upprättad av {resource}",
       "panic": "Nödlarm",
       "alpr": "Skyltavläsning"
-    }
+    },
+    "noCallsign": "Du har ingen anropssignal och syns därför inte på enhetstavlan. Be ett befäl lägga in en under Personal."
   },
   "alpr": {
     "title": "Skyltavläsningar",
@@ -2366,7 +2374,8 @@
     },
     "field": {
       "badgeNumber": "Tjänstenummer",
-      "division": "Avdelning"
+      "division": "Avdelning",
+      "callsign": "Anropssignal"
     },
     "shift": {
       "start": "Starta pass",

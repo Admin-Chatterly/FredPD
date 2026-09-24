@@ -93,6 +93,26 @@ FredPD.Config.server = {
         accentColor = '#1b4f9c',
     },
 
+    --- The roster (spec 4.1, 7.22). Nobody should have to type a row into
+    --- the database before a new officer can use FredPD.
+    roster = {
+        --- An officer whose Discord roles grant anything in this agency gets
+        --- a roster row the first time they open FredPD. Their current
+        --- character is bound to it, which is why `requireJob` exists.
+        autoProvision = true,
+        --- The ESX job the character must hold for that first bind, so a
+        --- player cannot bind their criminal character by opening FredPD
+        --- on it first. `''` turns the check off. Grants nothing (invariant 2).
+        requireJob = setting('fredpd:roster_job', 'police'),
+        --- Generated callsigns. `{prefix}` is `callsignPrefix`, `{n}` counts
+        --- up from `callsignStart` to the first one nobody holds. Given to
+        --- every officer who has none when they open FredPD. A supervisor
+        --- can change it on the Personnel screen.
+        callsignFormat = '{prefix}-{n}',
+        callsignPrefix = 'LSPD',
+        callsignStart = 101,
+    },
+
     -- -------------------------------------------------------------------------
     -- 3. Everything below has a working default. Leave it alone unless you have
     --    a reason.

@@ -36,7 +36,7 @@
     }
   },
   "error": {
-    "no_session": "You are not signed on. Open FredPD from a terminal or an agency vehicle.",
+    "no_session": "You are not signed on to FredPD. Usually: you are on a different character than the one on your roster row, your Discord roles give you no access here, or Discord is not running and linked to FiveM. A supervisor can see the exact reason in the server console.",
     "forbidden": "Your Discord roles do not grant access to this.",
     "context": "This is only available at the right place, on duty, or in the right unit.",
     "rate_limited": "Too many requests. Wait a moment and try again.",
@@ -45,14 +45,19 @@
     "conflict": "Someone else changed this record while you were editing. Reload and try again.",
     "restricted": "This record is restricted. Request access or use break-glass.",
     "stale_permissions": "Your permissions are out of date. Sign on again.",
-    "internal": "Something went wrong on the server. The error has been logged."
+    "internal": "Something went wrong on the server. The error has been logged.",
+    "contextNeeds": {
+      "onDuty": "You need to be on duty for this.",
+      "accessPoint": "This is done at the right terminal or station. Open FredPD there.",
+      "inAgencyVehicle": "You need to be in a police vehicle for this."
+    }
   },
   "setup": {
-    "done": "FredPD is set up. {agency} created; the Discord role {role} now grants administration and basic officer access.",
+    "done": "FredPD is set up. {agency} created; the Discord role {role} now grants administration and the command group (the full officer chain, including restricted fields and the audit log). Map only a leadership role to it.",
     "alreadyDone": "FredPD is already set up. Manage permissions from Administration in the MDT.",
     "busy": "Setup is already running. Wait a moment and try again.",
     "badCode": "Wrong setup code. It is printed in the server console when the resource starts.",
-    "noRole": "Name the Discord role that should grant administration: /fredpd setup <code> <role id>. The server console lists your roles.",
+    "noRole": "Name the Discord role that should grant administration and command: /fredpd setup <code> <role id>. Choose a leadership role, never one everyone has. The server console lists your roles.",
     "roleNotHeld": "You do not hold that Discord role. The server console lists the ones you do.",
     "noSeed": "The permission groups are missing. Apply database/seeds/0001_permissions.sql, then try again.",
     "noDiscord": "No Discord identity. Start Discord and reconnect — FredPD identifies officers by Discord account.",
@@ -70,7 +75,8 @@
     "searching": "Searching…",
     "noMatches": "No matches",
     "selected": "Selected: {value}",
-    "clearSelection": "Change"
+    "clearSelection": "Change",
+    "contextLabel": "Why"
   },
   "fieldError": {
     "type": "the wrong kind of value",
@@ -166,7 +172,8 @@
     "not_authorized": "Investigator authorization required",
     "already_linked": "Already tied to a different intelligence subject",
     "gated": "You do not hold the role or group this requires",
-    "gate_required": "Set a required group or Discord role"
+    "gate_required": "Set a required group or Discord role",
+    "callsign_format": "letters, digits, hyphens and spaces only, up to 16"
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -1580,7 +1587,8 @@
       "export": "Raised by {resource}",
       "panic": "Emergency button",
       "alpr": "Plate read"
-    }
+    },
+    "noCallsign": "You have no callsign, so you are not on the unit board. Ask a supervisor to set one under Personnel."
   },
   "alpr": {
     "title": "Plate reads",
@@ -2366,7 +2374,8 @@
     },
     "field": {
       "badgeNumber": "Badge number",
-      "division": "Division"
+      "division": "Division",
+      "callsign": "Callsign"
     },
     "shift": {
       "start": "Start shift",

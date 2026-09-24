@@ -87,4 +87,34 @@ function Push.perSession(permission, event, build, filter)
     return sent
 end
 
+--- A toast on one officer's screen: a locale key and its parameters, never
+--- prose (invariant 6) and never a record -- a notification says *that*
+--- something happened, the MDT is where the officer reads *what*.
+---
+--- `options.waypoint` ({ x, y }) sets the officer's GPS as well, for a push
+--- that sends them somewhere (a call they were dispatched to).
+---
+--- @param src number
+--- @param key string locale key
+--- @param params table|nil named placeholders
+--- @param options table|nil { type = 'inform'|'success'|'warning'|'error', waypoint = { x, y } }
+function Push.notify(src, key, params, options)
+    options = options or {}
+    TriggerClientEvent('fredpd:notify', src, {
+        key = key,
+        params = params,
+        type = options.type or 'inform',
+        waypoint = options.waypoint,
+    })
+end
+
+--- `Push.notify` to every open session of one officer (normally one).
+function Push.notifyOfficer(officerId, key, params, options)
+    for src, session in pairs(FredPD.Core.session.all()) do
+        if session.officerId == officerId then
+            Push.notify(src, key, params, options)
+        end
+    end
+end
+
 FredPD.Core.push = Push

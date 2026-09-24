@@ -1403,6 +1403,7 @@ FredPD.Schema = {
         id = { type = 'integer', required = true, min = 1 },
         badgeNumber = { type = 'string', required = false, max = 16 },
         division = { type = 'string', required = false, max = 64 },
+        callsign = { type = 'string', required = false, min = 1, max = 16 },
     },
 
     PersonnelShiftStart = {
