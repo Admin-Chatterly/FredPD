@@ -296,6 +296,9 @@ route.define({
             -- exist: those rows were already gone before this function saw the
             -- list (invariant 4).
             restrictedWithheld = found.restrictedWithheld,
+            -- Citizens the framework knows who have no record here yet
+            -- (population register): a search is not a browse of them.
+            population = terms and FredPD.Modules.populationSearch.characters(session, terms.full) or {},
         }
     end,
 })

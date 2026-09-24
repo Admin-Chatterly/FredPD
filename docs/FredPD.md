@@ -703,6 +703,13 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 - The answer is an access-checked record id. The hits come from `query.run` itself, so logging and reason rules are the query's own; the fine and the arrest are `ordningsbot.issue` and `frihet.gripande` with their own checks.
 - No new permission keys: checking an ID is a person query, running a plate a vehicle query.
 
+**The population register (folkbokföringen).** Searches also reach characters and owned vehicles the framework knows about but that have no record yet. This covers `person.search`, `vehicle.search` and `query.run`, the unified query. It includes the officer's own character, and any citizen no one has checked in the field.
+- **Shown below the results.** They appear as "In the population register, not yet on file", at most ten. A person shows only a name and date of birth; a vehicle shows only its plate.
+- **Opening one creates the record.** `person.fromCharacter` and `vehicle.fromOwned` build it from the framework's own data, re-read on the server by the key the suggestion carried. The creation is audited (`person.created` with `source = population_register`).
+- **Every word must match.** Each word of the term must match a first name, a last name or the identifier, so a full name finds the character.
+- **Nothing hidden is disclosed.** A key that already has a record is never offered, whatever that record's access. Opening answers through the record's own access-checked read, so a hidden record answers exactly as a missing citizen (4.5).
+- **No new permission keys.** The permission that runs the search opens the suggestion (`rms.person.view`, `rms.vehicle.view`).
+
 ### 7.3 Persons — master name index (M2)
 
 - [M] Identity from the framework (name, DOB, sex, phone), with FredPD-owned extensions.

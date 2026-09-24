@@ -120,8 +120,23 @@ export interface PersonResult extends PersonRecord {
   cautions: CautionFlag[];
 }
 
+/** A citizen the game knows with no record here yet (population register). */
+export interface PopulationPerson {
+  identifier: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  dateOfBirth?: string | null;
+}
+
+/** An owned car the game knows with no record here yet. */
+export interface PopulationVehicle {
+  plate: string;
+}
+
 export interface PersonSearchResult {
   persons: Maybe<PersonResult>[];
+  /** Citizens matching the term who are not yet on file. */
+  population?: PopulationPerson[];
   /**
    * True only when this reader is cleared for the rows being held back, and the
    * query reached them without a reason or a case number (7.2).
@@ -286,6 +301,8 @@ export interface VehicleResult extends VehicleRecord {
 
 export interface VehicleSearchResult {
   vehicles: Maybe<VehicleResult>[];
+  /** Owned cars matching the term that are not yet on file. */
+  population?: PopulationVehicle[];
   /** How many rows carry a hit. The server counts; the screen does not. */
   hits: number;
 }

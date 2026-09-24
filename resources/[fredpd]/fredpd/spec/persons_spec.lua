@@ -202,6 +202,14 @@ describe('persons', function()
 
         FredPD.Modules.access.resetConfiguration()
 
+        -- The population register reads the framework's own tables, which
+        -- this spec does not fake: it answers nothing here, and
+        -- `population_spec` covers it.
+        FredPD.Modules.populationSearch = {
+            characters = function() return {} end,
+            vehicles = function() return {} end,
+        }
+
         -- An ordinary patrol officer from Appendix C: the records permission and
         -- internal clearance, which is the floor for a record that carries no
         -- classification of its own.

@@ -23,6 +23,7 @@
   import FieldWork from './FieldWork.svelte';
   import PublicReports from './PublicReports.svelte';
   import Cameras from './Cameras.svelte';
+  import PopulationMatches from './PopulationMatches.svelte';
   import { takePhoto } from '../../lib/photo';
   import { t } from '../../lib/i18n';
   import { formatDate, formatMoment } from '../../lib/time';
@@ -51,6 +52,8 @@
     type PersonRecord,
     type PersonResult,
     type PersonSearchResult,
+    type PopulationPerson,
+    type PopulationVehicle,
     type Restricted,
     type VehicleDetail,
     type VehicleResult,
@@ -288,6 +291,7 @@
   } | null>(null);
 
   let personRows = $state<Maybe<PersonResult>[]>([]);
+  let personPopulation = $state<PopulationPerson[]>([]);
   let personWithheld = $state(false);
   let personLoading = $state(false);
 
@@ -404,10 +408,12 @@
 
     if (response.ok) {
       personRows = response.data.persons;
+      personPopulation = response.data.population ?? [];
       personWithheld = response.data.restrictedWithheld;
       failure = null;
     } else {
       personRows = [];
+      personPopulation = [];
       personWithheld = false;
       failure = response;
     }
@@ -655,6 +661,7 @@
   let vehicleApplied = $state<{ term: string; reason: string; caseNumber: string } | null>(null);
 
   let vehicleRows = $state<Maybe<VehicleResult>[]>([]);
+  let vehiclePopulation = $state<PopulationVehicle[]>([]);
   let vehicleHitCount = $state(0);
   let vehicleLoading = $state(false);
 
@@ -747,10 +754,12 @@
 
     if (response.ok) {
       vehicleRows = response.data.vehicles;
+      vehiclePopulation = response.data.population ?? [];
       vehicleHitCount = response.data.hits;
       failure = null;
     } else {
       vehicleRows = [];
+      vehiclePopulation = [];
       vehicleHitCount = 0;
       failure = response;
     }
@@ -1405,7 +1414,13 @@
       different route, and a refusal for want of one is drawn here as an offer
       to run the search again rather than as a dead end.
     -->
-    <Query />
+    <Query
+      onOpenPerson={(id) => {
+        tab = 'persons';
+        selectedPersonId = id;
+      }}
+      onOpenVehicle={openVehicle}
+    />
   {:else if tab === 'persons'}
     <!-- ------------------------------------------------------- persons -->
     <form class="flex flex-wrap items-end gap-3" onsubmit={runPersonSearch}>
@@ -1511,6 +1526,7 @@
           </tbody>
         </table>
       </div>
+      <PopulationMatches persons={personPopulation} onOpenPerson={(id) => (selectedPersonId = id)} />
     {/if}
 
     {#if personDetail?.restricted}
@@ -2269,6 +2285,7 @@
           </tbody>
         </table>
       </div>
+      <PopulationMatches vehicles={vehiclePopulation} onOpenVehicle={(id) => (selectedVehicleId = id)} />
     {/if}
 
     {#if openVehicleRecord && vehicleDetail}

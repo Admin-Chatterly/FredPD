@@ -424,6 +424,12 @@ route.define({
             sources = sortedKeys(permitted),
             results = page,
             hits = hits,
+            -- Citizens and cars the framework knows with no record here yet,
+            -- from the registers this officer may query (population register).
+            population = {
+                persons = permitted.person and FredPD.Modules.populationSearch.characters(session, term) or {},
+                vehicles = permitted.vehicle and FredPD.Modules.populationSearch.vehicles(session, term) or {},
+            },
         }
     end,
 })

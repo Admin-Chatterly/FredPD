@@ -120,12 +120,14 @@ local NUI_ROUTES <const> = {
     -- The master name index (spec 7.2, 7.3).
     'person.create',
     'person.search',
+    'person.fromCharacter',
     'person.get',
     'person.update',
     'person.caution.set',
 
     -- Vehicle and firearm registers (spec 7.4, 7.5).
     'vehicle.search',
+    'vehicle.fromOwned',
     'vehicle.get',
     'vehicle.register',
     'vehicle.update',

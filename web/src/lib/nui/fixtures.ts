@@ -2128,6 +2128,37 @@ const registerVehicles: RegisterRow<VehicleResult>[] = [
  * whitespace, `Registry.searchTerm` upper-cases and strips it — so the fixture
  * does the same once here rather than twice, differently, below.
  */
+/**
+ * The population register (the game's own characters and owned cars): who
+ * exists in the game but has no record here yet. The officer's own character
+ * is the classic case. Opening one moves it into the register above.
+ */
+const populationCharacters = [
+  { identifier: 'char1:nora', firstName: 'Nora', lastName: 'Ek', dateOfBirth: '1994-03-08' },
+];
+const populationVehicles = [{ plate: 'NORA42', owner: 'char1:nora' }];
+
+/** Every word of the term matches a name or the identifier, as `Framework.searchCharacters` does. */
+function populationPersonsFor(term: string | undefined): typeof populationCharacters {
+  const words = (term ?? '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.join('').length < 2) return [];
+  const onFile = new Set(registerPersons.map((entry) => (entry.row as { identifier?: string }).identifier));
+  return populationCharacters.filter(
+    (row) =>
+      !onFile.has(row.identifier) &&
+      words.every((word) => [row.firstName, row.lastName, row.identifier].some((field) => field.toLowerCase().includes(word))),
+  );
+}
+
+function populationVehiclesFor(term: string | undefined): { plate: string }[] {
+  const needle = (term ?? '').trim().toUpperCase().replace(/\s+/g, '');
+  if (needle.length < 2) return [];
+  const onFile = new Set(registerVehicles.map((entry) => (entry.row as { plate?: string }).plate));
+  return populationVehicles
+    .filter((row) => !onFile.has(row.plate) && row.plate.includes(needle))
+    .map((row) => ({ plate: row.plate }));
+}
+
 function matches<T extends { id: number }>(rows: RegisterRow<T>[], term: string): RegisterRow<T>[] {
   const needle = term.trim().toLowerCase().replace(/\s+/g, ' ');
   if (needle === '') return [];
@@ -5167,6 +5198,10 @@ export const fixtures: FixtureSet = {
         sources: plan.sources,
         results,
         hits,
+        population: {
+          persons: plan.sources.includes('person') ? populationPersonsFor(term) : [],
+          vehicles: plan.sources.includes('vehicle') ? populationVehiclesFor(term) : [],
+        },
       };
     },
 
@@ -7798,7 +7833,89 @@ export const fixtures: FixtureSet = {
         // Only ever about rows this reader is cleared for. A stub above is not
         // counted here: for the reader it is an answer, not something withheld.
         restrictedWithheld: !authorized && found.some((entry) => entry.breakGlass === true),
+        population: trimmed === '' ? [] : populationPersonsFor(trimmed),
       };
+    },
+
+    /** One vehicle record, as `vehicle.get` answers: the record, its flags, hits and plate history. */
+    'vehicle.get': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const vehicle = registerVehicles
+        .map((entry) => entry.row)
+        .find((row): row is VehicleResult => !isStub(row) && row.id === id);
+      if (!vehicle) return refuse('not_found');
+
+      return { id: vehicle.id, vehicle, flags: vehicle.flags ?? [], hits: vehicle.hits ?? [], plates: [] };
+    },
+
+    /** Creates the record from the population register, or opens the one already made. */
+    'person.fromCharacter': (input) => {
+      const { identifier } = (input ?? {}) as { identifier?: string };
+      const existing = registerPersons.find((entry) => (entry.row as { identifier?: string }).identifier === identifier);
+      if (existing && !isStub(existing.row)) return { id: existing.row.id, created: false };
+
+      const character = populationCharacters.find((row) => row.identifier === identifier);
+      if (!character) return refuse('not_found', { identifier: 'unknown' });
+
+      const id = Math.max(...registerPersons.map((entry) => (isStub(entry.row) ? 0 : entry.row.id))) + 1;
+      registerPersons.push({
+        terms: [character.firstName.toLowerCase(), character.lastName.toLowerCase()],
+        row: {
+          ...RECORD_KEEPING,
+          id,
+          identifier: character.identifier,
+          personNumber: `P-${String(id).padStart(6, '0')}`,
+          firstName: character.firstName,
+          middleName: null,
+          lastName: character.lastName,
+          dateOfBirth: character.dateOfBirth,
+          sex: null,
+          phone: null,
+          address: null,
+          deceasedAt: null,
+          missingSince: null,
+          classification: 'internal',
+          recordType: 'person',
+          matchScore: 0,
+          matchedAlias: null,
+          cautions: [],
+        } as PersonResult,
+      });
+      return { id, created: true };
+    },
+
+    'vehicle.fromOwned': (input) => {
+      const plate = String((input as { plate?: string } | undefined)?.plate ?? '').toUpperCase().replace(/\s+/g, '');
+      const existing = registerVehicles.find((entry) => !isStub(entry.row) && entry.row.plate === plate);
+      if (existing && !isStub(existing.row)) return { id: existing.row.id, created: false };
+
+      const owned = populationVehicles.find((row) => row.plate === plate);
+      if (!owned) return refuse('not_found', { plate: 'unknown' });
+
+      const id = Math.max(...registerVehicles.map((entry) => (isStub(entry.row) ? 0 : entry.row.id))) + 1;
+      registerVehicles.push({
+        terms: [plate.toLowerCase()],
+        row: {
+          ...RECORD_KEEPING,
+          id,
+          plate,
+          vin: `FIXTURE${String(id).padStart(10, '0')}`,
+          model: null,
+          colour: null,
+          colourSecondary: null,
+          ownerPersonId: null,
+          ownerIdentifier: owned.owner,
+          registrationStatus: 'valid',
+          registrationExpires: null,
+          insuranceStatus: 'none',
+          insuranceExpires: null,
+          classification: 'internal',
+          recordType: 'vehicle',
+          hits: [],
+          flags: [],
+        } as VehicleResult,
+      });
+      return { id, created: true };
     },
 
     'vehicle.search': (input) => {
@@ -7828,6 +7945,7 @@ export const fixtures: FixtureSet = {
         // How many rows carry a hot-file hit. The server counts; the screen
         // draws what it is told.
         hits: vehicles.filter((row) => !isStub(row) && row.hits.length > 0).length,
+        population: populationVehiclesFor(term),
       };
     },
 

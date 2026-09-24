@@ -963,6 +963,14 @@ export const schemas = {
   // rather than read as "browse everything on the whole server" -- `min: 2`
   // is the floor the handler enforces too, restated here as the schema's own
   // bound the way every other search in this file names its floor twice.
+  /** Opens a citizen from the population register: the framework's own key, read again on the server. */
+  PersonFromCharacter: {
+    identifier: { type: 'string', required: true, min: 1, max: 191 },
+  },
+  /** Opens an owned car from the population register, by its plate. */
+  VehicleFromOwned: {
+    plate: { type: 'string', required: true, min: 1, max: 16 },
+  },
   EsxCharacterSearch: {
     term: { type: 'string', required: true, min: 2, max: 128 },
     limit: { type: 'integer', required: false, min: 1, max: 20 },

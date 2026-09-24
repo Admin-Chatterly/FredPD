@@ -792,6 +792,14 @@ FredPD.Schema = {
         caseNumber = { type = 'string', required = false, max = 32 },
     },
 
+    PersonFromCharacter = {
+        identifier = { type = 'string', required = true, min = 1, max = 191 },
+    },
+
+    VehicleFromOwned = {
+        plate = { type = 'string', required = true, min = 1, max = 16 },
+    },
+
     EsxCharacterSearch = {
         term = { type = 'string', required = true, min = 2, max = 128 },
         limit = { type = 'integer', required = false, min = 1, max = 20 },

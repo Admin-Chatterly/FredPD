@@ -7,7 +7,15 @@
   import { fieldList, type Failure } from '../shared/failure';
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
   import LoadMore from '../shared/LoadMore.svelte';
-  import { isStub, type Maybe, type Moment, type Restricted } from './types';
+  import PopulationMatches from './PopulationMatches.svelte';
+  import {
+    isStub,
+    type Maybe,
+    type Moment,
+    type PopulationPerson,
+    type PopulationVehicle,
+    type Restricted,
+  } from './types';
 
   /**
    * The unified query and its hot-file hits (spec 7.2).
@@ -77,7 +85,17 @@
     sources: string[];
     results: Maybe<Result>[];
     hits: number;
+    /** Citizens and cars the game knows with no record here yet. */
+    population?: { persons?: PopulationPerson[]; vehicles?: PopulationVehicle[] };
   }
+
+  interface Props {
+    /** Opens a person record on its own tab, once created from the population register. */
+    onOpenPerson?: (id: number) => void;
+    onOpenVehicle?: (id: number) => void;
+  }
+
+  let { onOpenPerson, onOpenVehicle }: Props = $props();
 
   /**
    * A row of `fpd_query_log`, named the way `Repo.queryLog` selects it.
@@ -588,6 +606,13 @@
         {/each}
       </ul>
     {/if}
+
+    <PopulationMatches
+      persons={response.population?.persons ?? []}
+      vehicles={response.population?.vehicles ?? []}
+      {onOpenPerson}
+      {onOpenVehicle}
+    />
   {/if}
 
   {#if showLog}

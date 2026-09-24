@@ -80,8 +80,11 @@ function Repo.list(agencyId, filter, limit, cursor)
             OR (priority = ? AND UNIX_TIMESTAMP(issued_at) = ? AND id < ?)
         )]]
         values[#values + 1] = after[1]
-        values[#values + 1], values[#values + 1] = after[1], after[2]
-        values[#values + 1], values[#values + 1], values[#values + 1] = after[1], after[2], after[3]
+        values[#values + 1] = after[1]
+        values[#values + 1] = after[2]
+        values[#values + 1] = after[1]
+        values[#values + 1] = after[2]
+        values[#values + 1] = after[3]
     end
 
     values[#values + 1] = limit + 1

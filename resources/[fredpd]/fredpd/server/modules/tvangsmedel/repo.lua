@@ -163,7 +163,9 @@ function Repo.list(agencyId, filter, limit, cursor)
     if after then
         clauses[#clauses + 1] =
             '(UNIX_TIMESTAMP(created_at) < ? OR (UNIX_TIMESTAMP(created_at) = ? AND id < ?))'
-        values[#values + 1], values[#values + 1], values[#values + 1] = after[1], after[1], after[2]
+        values[#values + 1] = after[1]
+        values[#values + 1] = after[1]
+        values[#values + 1] = after[2]
     end
 
     values[#values + 1] = limit + 1
@@ -318,8 +320,11 @@ function Repo.efterlysningList(agencyId, filter, limit, cursor)
             OR (e.priority = ? AND UNIX_TIMESTAMP(e.issued_at) = ? AND e.id < ?)
         )]]
         values[#values + 1] = after[1]
-        values[#values + 1], values[#values + 1] = after[1], after[2]
-        values[#values + 1], values[#values + 1], values[#values + 1] = after[1], after[2], after[3]
+        values[#values + 1] = after[1]
+        values[#values + 1] = after[2]
+        values[#values + 1] = after[1]
+        values[#values + 1] = after[2]
+        values[#values + 1] = after[3]
     end
 
     values[#values + 1] = limit + 1

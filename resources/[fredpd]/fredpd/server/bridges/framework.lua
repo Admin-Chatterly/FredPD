@@ -150,6 +150,11 @@ end
 --- character instead of retyping a name FredPD has no way to check against
 --- anything.
 ---
+--- Every word of the term must match the first name, the last name or the
+--- identifier, so a full name ("Anna Berg") finds the character whose first
+--- name is Anna and last name Berg -- one LIKE over each column alone never
+--- could, since neither holds the whole name. At most four words.
+---
 --- @param term string already trimmed and at least two characters
 --- @param limit number
 --- @return table rows: { identifier, firstName, lastName, dateOfBirth, phone }
@@ -157,22 +162,37 @@ function Framework.searchCharacters(term, limit)
     local config = esxData().characters
     if not config or esxData().enabled == false then return {} end
 
-    local likeTerm = '%' .. term .. '%'
+    local words = {}
+    for word in tostring(term):gmatch('%S+') do
+        if #words < 4 then words[#words + 1] = word end
+    end
+    if #words == 0 then return {} end
+
+    local clauses, values = {}, {}
+    for _, word in ipairs(words) do
+        clauses[#clauses + 1] = ('(`%s` LIKE ? OR `%s` LIKE ? OR `%s` LIKE ?)'):format(
+            config.firstName, config.lastName, config.identifier)
+        local like = '%' .. word .. '%'
+        -- One at a time: in `t[#t + 1], t[#t + 1] = a, b` every index is
+        -- worked out before anything is assigned, so both land in one slot.
+        for _ = 1, 3 do values[#values + 1] = like end
+    end
+    values[#values + 1] = limit or 8
 
     local ok, rows = pcall(function()
         return FredPD.Core.db.query(
             ([[SELECT `%s` AS identifier, `%s` AS firstName, `%s` AS lastName,
                       `%s` AS dateOfBirth, `%s` AS phone
                  FROM `%s`
-                WHERE `%s` LIKE ? OR `%s` LIKE ? OR `%s` LIKE ?
+                WHERE %s
                 ORDER BY `%s`, `%s`
                 LIMIT ?]]):format(
                 config.identifier, config.firstName, config.lastName,
                 config.dateOfBirth, config.phone, config.table,
-                config.firstName, config.lastName, config.identifier,
+                table.concat(clauses, ' AND '),
                 config.lastName, config.firstName
             ),
-            { likeTerm, likeTerm, likeTerm, limit or 8 }
+            values
         )
     end)
 
@@ -184,6 +204,30 @@ function Framework.searchCharacters(term, limit)
     end
 
     return rows
+end
+
+--- One character by its identifier, exactly -- whether it exists at all, and
+--- what its ID card says, for a person record opened from a search result
+--- (`person.fromCharacter`). Nil when there is no such character.
+---
+--- @return table|nil { identifier, firstName, lastName, dateOfBirth, phone }
+function Framework.characterByIdentifier(identifier)
+    local config = esxData().characters
+    if not config or esxData().enabled == false or type(identifier) ~= 'string' then return nil end
+
+    local ok, row = pcall(function()
+        return FredPD.Core.db.single(
+            ([[SELECT `%s` AS identifier, `%s` AS firstName, `%s` AS lastName,
+                      `%s` AS dateOfBirth, `%s` AS phone
+                 FROM `%s` WHERE `%s` = ? LIMIT 1]]):format(
+                config.identifier, config.firstName, config.lastName,
+                config.dateOfBirth, config.phone, config.table, config.identifier
+            ),
+            { identifier }
+        )
+    end)
+
+    return ok and row or nil
 end
 
 --- Vehicles matching a plate or owner fragment, read straight from ESX's

@@ -272,7 +272,12 @@ route.define({
         local hits = attachFlags(session, visible)
         logQuery(session, service.queryType(term), term, visible, hits, reason, caseNumber)
 
-        return { vehicles = visible, hits = hits }
+        return {
+            vehicles = visible,
+            hits = hits,
+            -- Owned cars the framework knows that have no record here yet.
+            population = term and FredPD.Modules.populationSearch.vehicles(session, term) or {},
+        }
     end,
 })
 

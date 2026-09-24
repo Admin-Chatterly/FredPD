@@ -1271,7 +1271,16 @@
       "body": "This search matched records you are cleared to read but did not open them, because it reached restricted data without a reason. Give a reason or a case number above and run the search again.",
       "title": "Records withheld"
     },
-    "yes": "Yes"
+    "yes": "Yes",
+    "population": {
+      "title": "In the population register, not yet on file",
+      "hint": "Found in the game but not in FredPD yet. Opening one creates the record from the population register.",
+      "open": "Open",
+      "openLabel": "Open {name}",
+      "noName": "No name",
+      "person": "Person",
+      "plate": "Plate"
+    }
   },
   "fingerprintScanner": {
     "noPrint": "No print within reach of the scanner.",

@@ -1271,7 +1271,16 @@
       "body": "Sökningen träffade poster du är behörig att läsa men öppnade dem inte, eftersom den nådde skyddade uppgifter utan angivet skäl. Ange ett skäl eller ett ärendenummer ovan och sök igen.",
       "title": "Poster undanhållna"
     },
-    "yes": "Ja"
+    "yes": "Ja",
+    "population": {
+      "title": "Folkbokförda, inte i registret",
+      "hint": "Finns i spelet men inte i FredPD än. Öppnar du en skapas posten ur folkbokföringen.",
+      "open": "Öppna",
+      "openLabel": "Öppna {name}",
+      "noName": "Namn saknas",
+      "person": "Person",
+      "plate": "Reg.nr"
+    }
   },
   "fingerprintScanner": {
     "noPrint": "Inget avtryck inom räckhåll för skannern.",

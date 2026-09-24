@@ -614,7 +614,9 @@ function Repo.queryLog(agencyId, filter, cursor)
     if after then
         where[#where + 1] =
             '(UNIX_TIMESTAMP(q.created_at) < ? OR (UNIX_TIMESTAMP(q.created_at) = ? AND q.id < ?))'
-        values[#values + 1], values[#values + 1], values[#values + 1] = after[1], after[1], after[2]
+        values[#values + 1] = after[1]
+        values[#values + 1] = after[1]
+        values[#values + 1] = after[2]
     end
 
     values[#values + 1] = limit + 1

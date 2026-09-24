@@ -116,6 +116,12 @@ server_scripts {
     'server/modules/field/service.lua',
     'server/modules/field/consent.lua',
     'server/modules/field/routes.lua',
+    -- The population register: search shows citizens and cars not yet on
+    -- file, and opening one creates the record (after field: it reuses
+    -- `field.personFields`).
+    'server/modules/population/service.lua',
+    'server/modules/population/repo.lua',
+    'server/modules/population/routes.lua',
 
     -- Brottskatalogen (spec 7.10). Loads before every module that writes a
     -- record, because a charge is a reference into this catalogue and the
