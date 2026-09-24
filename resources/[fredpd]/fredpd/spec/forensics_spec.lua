@@ -669,12 +669,20 @@ describe('forensics grid', function()
             assert.is_true(forensics.isLatent('dna_touch'))
         end)
 
-        it('leaves casings, magazines and blood visible to anyone', function()
+        it('leaves magazines and blood visible to anyone', function()
             -- 8.10 is built on this: a criminal has to be able to walk back and
-            -- pick up their own casings.
-            assert.is_false(forensics.isLatent('casing'))
+            -- pick those up.
             assert.is_false(forensics.isLatent('magazine'))
             assert.is_false(forensics.isLatent('blood'))
+        end)
+
+        it('makes a casing latent too, on the operator\'s own instruction', function()
+            -- Deliberately not 8.10-compliant for this one type: a criminal can
+            -- no longer see or pick up their own casings. See `LATENT`'s own
+            -- comment in forensics/service.lua for why this is accepted rather
+            -- than a bug.
+            assert.is_true(forensics.isLatent('casing'))
+            assert.is_true(forensics.revealedBy('forensic_light', 'casing'))
         end)
 
         it('matches each tool to what it finds', function()
@@ -689,7 +697,7 @@ describe('forensics grid', function()
         it('does not match a tool to a type it cannot find', function()
             assert.is_false(forensics.revealedBy('powder', 'blood'))
             assert.is_false(forensics.revealedBy('luminol', 'print'))
-            assert.is_false(forensics.revealedBy('forensic_light', 'casing'))
+            assert.is_false(forensics.revealedBy('luminol', 'casing'))
         end)
 
         it('refuses a tool it does not know', function()
@@ -1043,9 +1051,17 @@ describe('forensics grid, in memory', function()
         return count
     end
 
-    local function casing(x, serial)
+    --- A plain, always-visible trace, for tests below that are about the
+    --- push/subscription mechanics and not about which types are latent.
+    ---
+    --- Not `'casing'`: a casing is latent too now (forensics/service.lua's
+    --- `LATENT`), so it would need revealing before any of these tests could
+    --- see it, which is not what most of them are checking. `'bullet'` has
+    --- the identical owner shape (`weaponSerial` alone, no identifier) and is
+    --- still visible without a tool, so it is a drop-in replacement.
+    local function bullet(x, serial)
         return grid.place({
-            type = 'casing', x = x, y = 10.0, z = 30.0, owner = { weaponSerial = serial or ('SN-' .. x) },
+            type = 'bullet', x = x, y = 10.0, z = 30.0, owner = { weaponSerial = serial or ('SN-' .. x) },
         })
     end
 
@@ -1086,30 +1102,30 @@ describe('forensics grid, in memory', function()
     describe('streaming a cell that changed', function()
         it('re-sends a cell that emptied and refilled between two pushes', function()
             -- The stale-render bug, and it needs no walking about to reproduce:
-            -- one officer collects the casing, another shot lands in the same
+            -- one officer collects the trace, another shot lands in the same
             -- cell, and with a per-cell counter that restarts at one the client
             -- is still drawing a key that names nothing and is never told about
-            -- the casing that is actually there.
+            -- the trace that is actually there.
             positions[1] = { x = 10.0, y = 10.0, z = 30.0 }
 
-            local first = casing(10.0, 'SN-1')
+            local first = bullet(10.0, 'SN-1')
             grid.push(1)
 
             assert.is_true(drawing(1)[first.key])
 
             grid.take(first.key)
-            local second = casing(10.4, 'SN-2')
+            local second = bullet(10.4, 'SN-2')
 
             grid.push(1)
 
-            assert.is_true(drawing(1)[second.key], 'the new casing must reach a client who saw the old one')
-            assert.is_nil(drawing(1)[first.key], 'the collected casing must not still be drawn')
+            assert.is_true(drawing(1)[second.key], 'the new trace must reach a client who saw the old one')
+            assert.is_nil(drawing(1)[first.key], 'the collected trace must not still be drawn')
         end)
 
         it('retracts a cell emptied under a player who has not moved', function()
             positions[1] = { x = 10.0, y = 10.0, z = 30.0 }
 
-            local trace = casing(10.0, 'SN-1')
+            local trace = bullet(10.0, 'SN-1')
             grid.push(1)
             grid.take(trace.key)
             grid.push(1)
@@ -1122,7 +1138,7 @@ describe('forensics grid, in memory', function()
         it('retracts what a player drew when they walk out of range', function()
             positions[1] = { x = 10.0, y = 10.0, z = 30.0 }
 
-            local trace = casing(10.0, 'SN-1')
+            local trace = bullet(10.0, 'SN-1')
             grid.push(1)
 
             positions[1] = { x = 5000.0, y = 5000.0, z = 30.0 }
@@ -1135,7 +1151,7 @@ describe('forensics grid, in memory', function()
         it('says nothing twice about a cell that has not changed', function()
             positions[1] = { x = 10.0, y = 10.0, z = 30.0 }
 
-            casing(10.0, 'SN-1')
+            bullet(10.0, 'SN-1')
             grid.push(1)
             grid.push(1)
             grid.push(1)
@@ -1155,7 +1171,7 @@ describe('forensics grid, in memory', function()
             -- the loop touches makes the idle cost claimed in 12.1 unreachable
             -- for the rest of the resource's life.
             positions[1] = { x = 5000.0, y = 5000.0, z = 30.0 }
-            casing(10.0, 'SN-1')
+            bullet(10.0, 'SN-1')
 
             grid.push(1)
 
@@ -1166,7 +1182,7 @@ describe('forensics grid, in memory', function()
         it('drops a subscriber once the last thing it drew is retracted', function()
             positions[1] = { x = 10.0, y = 10.0, z = 30.0 }
 
-            local trace = casing(10.0, 'SN-1')
+            local trace = bullet(10.0, 'SN-1')
             grid.push(1)
 
             assert.are.equal(1, grid.stats().subscribers)
@@ -1237,14 +1253,14 @@ describe('forensics grid, in memory', function()
 
         it('does not tell an unprivileged client that a print has been created', function()
             -- The oracle, half of it (8.11). The player is already a subscriber,
-            -- because there is a casing at their feet, so "they were sent
+            -- because there is a bullet at their feet, so "they were sent
             -- nothing" is a claim about this change and not about their being
             -- near evidence at all. A latent print landing next to them changes
             -- only a list they may never be shown, so the second push must be
             -- silent -- otherwise the tick itself says a print was just left.
             positions[1] = { x = 10.0, y = 10.0, z = 30.0 }
 
-            casing(10.0, 'SN-1')
+            bullet(10.0, 'SN-1')
             grid.push(1)
 
             assert.are.equal(1, messages(1))
@@ -1261,7 +1277,7 @@ describe('forensics grid, in memory', function()
             -- clearance, without a tool and from across the street.
             positions[1] = { x = 10.0, y = 10.0, z = 30.0 }
 
-            local visible = casing(10.0, 'SN-1')
+            local visible = bullet(10.0, 'SN-1')
             grid.place({ type = 'print', x = 10.0, y = 10.0, z = 30.0, owner = { identifier = 'char1' } })
             grid.push(1)
 
@@ -1276,12 +1292,16 @@ describe('forensics grid, in memory', function()
 
         it('still tells the officer who dusted, in the same cell', function()
             -- The suppression must be about the tier and not about the cell:
-            -- the officer standing over the same casing is told about the print
-            -- on the very next push.
+            -- the officer standing over the same magazine is told about the
+            -- print on the very next push. Not `casing`: it is latent too now
+            -- (forensics/service.lua's `LATENT`), and unrevealed, so it would
+            -- contribute nothing to `messages(2)` even for this privileged
+            -- session -- exactly the kind of unrelated interference this test
+            -- has to avoid, not exercise.
             positions[2] = { x = 10.0, y = 10.0, z = 30.0 }
             sessions[2] = helper.session({ src = 2, permissions = { 'forensics.tools.use' } })
 
-            casing(10.0, 'SN-1')
+            grid.place({ type = 'magazine', x = 10.0, y = 10.0, z = 30.0, owner = { weaponSerial = 'SN-1' } })
             local latent = grid.place({
                 type = 'print', x = 10.0, y = 10.0, z = 30.0, owner = { identifier = 'char1' },
             })
@@ -1298,17 +1318,21 @@ describe('forensics grid, in memory', function()
             assert.is_true(drawing(2)[latent.key])
         end)
 
-        it('still tells an unprivileged client about a casing in a cell being worked', function()
+        it('still tells an unprivileged client about a magazine in a cell being worked', function()
             -- The suppression must not swallow a change they *may* see because
-            -- something else in the cell moved in the same second.
+            -- something else in the cell moved in the same second. `magazine`,
+            -- not `casing`: a casing is latent too now (`LATENT`), so an
+            -- unprivileged client never sees one at all -- this test is about
+            -- the suppression logic not swallowing an unrelated, always-visible
+            -- change, not about casing policy specifically.
             positions[1] = { x = 10.0, y = 10.0, z = 30.0 }
 
-            casing(10.0, 'SN-1')
+            grid.place({ type = 'magazine', x = 10.0, y = 10.0, z = 30.0, owner = { weaponSerial = 'SN-1' } })
             grid.place({ type = 'print', x = 10.0, y = 10.0, z = 30.0, owner = { identifier = 'char1' } })
             grid.push(1)
 
             grid.reveal(10.0, 10.0, 30.0, 4.0, 'powder')
-            local second = casing(10.4, 'SN-2')
+            local second = grid.place({ type = 'magazine', x = 10.4, y = 10.0, z = 30.0, owner = { weaponSerial = 'SN-2' } })
             grid.push(1)
 
             assert.are.equal(2, messages(1))
@@ -1387,13 +1411,13 @@ describe('forensics grid, in memory', function()
 
             local keys = {}
 
-            -- One weapon, so every casing carries the same source. Even then the
+            -- One weapon, so every trace carries the same source. Even then the
             -- fourth is refused rather than swapped in: a source filling its own
             -- cell is still a source destroying its own evidence for free, which
             -- 8.10 prices in time and items.
             for index = 1, 4 do
                 clock = clock + 1
-                keys[index] = casing(1.0 + index * 2, 'SN-1')
+                keys[index] = bullet(1.0 + index * 2, 'SN-1')
             end
 
             -- Three in the cell, three the grid believes it holds, and the
@@ -1683,7 +1707,14 @@ describe('forensics grid, in memory', function()
         it('tells a client drawing it that it is gone', function()
             positions[1] = { x = 0.0, y = 0.0, z = 0.0 }
 
-            local trace = casingAt(0.0)
+            -- Not `casingAt`: this tests the push/destroy notification itself,
+            -- and a casing is latent (deliberately, see forensics/service.lua's
+            -- `LATENT`) -- a plain subscriber never draws one at all, which
+            -- would make the first assertion below fail for a reason that has
+            -- nothing to do with what this test is checking.
+            local trace = grid.place({
+                type = 'magazine', x = 0.0, y = 0.0, z = 0.0, owner = { weaponSerial = 'SN-1' },
+            })
             grid.push(1)
 
             assert.is_true(drawing(1)[trace.key])
@@ -1791,7 +1822,13 @@ describe('forensics grid, in memory', function()
         it('tells the clients standing over it that it is back', function()
             positions[1] = { x = 10.0, y = 10.0, z = 30.0 }
 
-            local trace = casing(10.0, 'SN-1')
+            -- Not the shared `casing()` helper, for the same reason the
+            -- 'destroy' describe block's own push test avoids it: a casing is
+            -- now latent, so a plain subscriber never draws one, and this test
+            -- is about the restore-notification mechanic, not that policy.
+            local trace = grid.place({
+                type = 'magazine', x = 10.0, y = 10.0, z = 30.0, owner = { weaponSerial = 'SN-1' },
+            })
             grid.push(1)
 
             assert.is_true(drawing(1)[trace.key])

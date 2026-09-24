@@ -432,9 +432,19 @@ end
 
 --- Types that are invisible until a tool is used on them (8.4).
 ---
---- The rest -- casings, magazines, bullets, a pool of blood -- can be seen
---- without anything, which is what makes 8.10 work: a criminal can walk back
---- and pick up their own casings.
+--- Magazines, bullets and a pool of blood can still be seen without anything,
+--- which is what makes 8.10 work for them: a criminal can walk back and pick
+--- those up. `casing` is the deliberate exception, on the operator's own
+--- instruction rather than base spec 8.4/8.10: a shell casing is now latent
+--- like a print, revealed only by `forensic_light` to a session cleared to
+--- use forensic tools (`Forensics.revealedBy`, `Forensics.TOOLS` below).
+---
+--- The accepted cost, spelled out because it reads as a bug otherwise: a
+--- criminal can no longer see or pick up their own casings at all, which is
+--- exactly the "police-only restriction blocking criminal gameplay" 8.10
+--- warns against for every other type. Left in for casings specifically
+--- because the person who asked for this weighed that trade and chose it
+--- anyway, not because the reasoning stopped applying.
 local LATENT <const> = {
     print = true,
     glove_mark = true,
@@ -442,6 +452,7 @@ local LATENT <const> = {
     drug_residue = true,
     footwear = true,
     tool_mark = true,
+    casing = true,
 }
 
 --- Is this type invisible until processed?
@@ -453,11 +464,12 @@ end
 ---
 --- Powder for the ridge detail somebody left on a surface, luminol for blood
 --- including blood that has been cleaned (8.10), the forensic light for the
---- trace material neither of the other two shows.
+--- trace material neither of the other two shows -- and, by the same
+--- operator instruction `LATENT` above explains, for a shell casing too.
 local REVEALS <const> = {
     powder = { print = true, glove_mark = true, tool_mark = true },
     luminol = { blood = true },
-    forensic_light = { dna_touch = true, drug_residue = true, footwear = true },
+    forensic_light = { dna_touch = true, drug_residue = true, footwear = true, casing = true },
 }
 
 --- Does using `tool` find a trace of this type?

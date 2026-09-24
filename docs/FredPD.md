@@ -1138,7 +1138,7 @@ fired something, never what.
 
 - [M] Create a crime scene linked to a call or case; scene number; perimeter as a zone.
 - [M] Scene entry log: every player entering the perimeter is logged with time; entering without protective equipment adds contamination risk (configurable).
-- [M] Latent evidence is invisible until processed: fingerprint powder reveals prints on a surface, a forensic light or luminol reveals trace and cleaned blood. Visible evidence (casings, large blood pools, magazines) can be seen without tools.
+- [M] Latent evidence is invisible until processed: fingerprint powder reveals prints on a surface, a forensic light or luminol reveals trace and cleaned blood. Visible evidence (large blood pools, magazines) can be seen without tools. **Casings are the deliberate exception** (an operator instruction, not base spec): they are latent too, revealed only by the forensic light to a session cleared to use forensic tools — see 8.10 for what that costs.
 - [M] Numbered evidence markers (props) placed on items; marker number recorded with the item.
 - [M] Scene photography with the camera tool (screenshot-basic): position, time and marker numbers stored with each photo.
 - [M] Collection with a progress action, packaging choice and automatic evidence number and barcode.
@@ -1208,9 +1208,9 @@ fired something, never what.
 
 ### 8.10 Destroying evidence (M3)
 
-- [M] Wiping kit for surfaces and weapons, cleaning chemicals for blood, washing for GSR, picking up casings and magazines. Each takes a timed action and consumes items.
+- [M] Wiping kit for surfaces and weapons, cleaning chemicals for blood, washing for GSR, picking up magazines. Each takes a timed action and consumes items.
 - [M] Cleaning leaves detectable traces (luminol) with reduced DNA yield.
-- [M] Available to every player through ox_target, subject only to item and context rules. Police-only restrictions must never block criminal gameplay (a bug in the reference script).
+- [M] Available to every player through ox_target, subject only to item and context rules. Police-only restrictions must never block criminal gameplay (a bug in the reference script) — **except for casings**, by explicit operator instruction: making a casing latent (8.4) means only a session cleared to use forensic tools ever receives its render data at all, so a criminal can no longer see or pick up their own. This is the exact defect the rule above warns against, kept anyway because the person who asked for it weighed that cost and chose it.
 - [S] Burning a vehicle destroys its interior evidence.
 
 ### 8.11 Anti-metagaming
