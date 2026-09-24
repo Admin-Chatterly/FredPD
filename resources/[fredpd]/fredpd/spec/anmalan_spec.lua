@@ -401,3 +401,147 @@ describe('anmalan', function()
         end)
     end)
 end)
+
+describe('anmalan drafts', function()
+    local anmalan
+
+    before_each(function()
+        anmalan = helper.load({ 'server/modules/anmalan/service' }).Modules.anmalan
+    end)
+
+    it('starts a report after an arrest, a fine or "report taken"', function()
+        assert.is_true(anmalan.dispositionNeedsReport('arrest_made'))
+        assert.is_true(anmalan.dispositionNeedsReport('citation_issued'))
+        assert.is_true(anmalan.dispositionNeedsReport('report_taken'))
+    end)
+
+    it('starts none for a call that turned out to be nothing', function()
+        assert.is_false(anmalan.dispositionNeedsReport('unfounded'))
+        assert.is_false(anmalan.dispositionNeedsReport('gone_on_arrival'))
+        assert.is_false(anmalan.dispositionNeedsReport(nil))
+    end)
+
+    it('adds to a report only while it is still the author\'s to edit', function()
+        assert.is_true(anmalan.isEditable('utkast'))
+        assert.is_true(anmalan.isEditable('atersand'))
+        assert.is_false(anmalan.isEditable('inlamnad'))
+        assert.is_false(anmalan.isEditable('godkand'))
+    end)
+end)
+
+describe('anmalan events', function()
+    local handlers, state
+
+    before_each(function()
+        handlers, state = {}, { created = {}, persons = {}, notified = {}, existing = nil }
+
+        local FredPD = helper.load({ 'server/modules/anmalan/service', 'server/modules/access/service' })
+        state.canCreate = true
+
+        FredPD.t = function(key) return key end
+        FredPD.Repo = {
+            anmalan = {
+                forCall = function() return state.existing end,
+                create = function(input, session)
+                    state.created[#state.created + 1] = { input = input, session = session }
+                    return { id = 40, number = 'LSPD-26-000140', title = input.title, callId = input.callId }
+                end,
+                setPerson = function(anmalanId, personId, roll)
+                    state.persons[#state.persons + 1] = { anmalanId = anmalanId, personId = personId, roll = roll }
+                end,
+            },
+            cad = { activeAssignment = function() return state.assignment end },
+        }
+        FredPD.Core = {
+            session = {
+                all = function()
+                    return { [1] = { agencyId = 'lspd', discordId = '1', permissions = {} } }
+                end,
+                isStale = function() return false end,
+            },
+            perms = { satisfies = function() return state.canCreate end },
+            audit = { write = function() state.audits = (state.audits or 0) + 1 end },
+            push = {
+                notifyWhere = function(_predicate, key, params)
+                    state.notified[#state.notified + 1] = { key = key, params = params }
+                end,
+            },
+        }
+
+        _G.AddEventHandler = function(name, handler) handlers[name] = handler end
+        assert(loadfile('resources/[fredpd]/fredpd/server/modules/anmalan/events.lua'))()
+    end)
+
+    after_each(function() _G.AddEventHandler = nil end)
+
+    it('starts a draft after an arrest, with the arrested person as a suspect, on the officer\'s call', function()
+        state.assignment = { callId = 12 }
+
+        handlers['fredpd:gripande']({ agencyId = 'lspd', discordId = '1', personId = 3, frihetId = 9 })
+
+        assert.are.equal(12, state.created[1].input.callId)
+        assert.are.equal('1', state.created[1].session.discordId)
+        assert.are.same({ anmalanId = 40, personId = 3, roll = 'misstankt' }, state.persons[1])
+        assert.are.equal('anmalan.notify.draft', state.notified[1].key)
+    end)
+
+    it('adds the person to the call\'s open draft instead of starting another', function()
+        state.assignment = { callId = 12 }
+        state.existing = {
+            id = 7, number = 'LSPD-26-000107', status = 'utkast', createdBy = '1', classification = 'internal',
+        }
+
+        handlers['fredpd:gripande']({ agencyId = 'lspd', discordId = '1', personId = 3 })
+
+        assert.are.same({}, state.created)
+        assert.are.equal(7, state.persons[1].anmalanId)
+        assert.are.same({}, state.notified)
+    end)
+
+    it('starts a draft when a call is cleared with a report taken', function()
+        handlers['fredpd:callCleared']({
+            agencyId = 'lspd', discordId = '1', callId = 5, disposition = 'report_taken',
+            callNumber = 'C-26-0005', type = 'theft', locationText = 'Grove St',
+        })
+
+        assert.are.equal(5, state.created[1].input.callId)
+        assert.are.equal('Grove St', state.created[1].input.occurredPlace)
+    end)
+
+    it('never adds to another officer\'s draft; starts the officer\'s own', function()
+        state.assignment = { callId = 12 }
+        state.existing = {
+            id = 7, number = 'LSPD-26-000107', status = 'utkast', createdBy = '2', classification = 'internal',
+        }
+
+        handlers['fredpd:gripande']({ agencyId = 'lspd', discordId = '1', personId = 3 })
+
+        assert.are.equal(1, #state.created)
+        assert.are.equal(40, state.persons[1].anmalanId)
+    end)
+
+    it('files the draft no lower than the arrest or the person', function()
+        handlers['fredpd:gripande']({
+            agencyId = 'lspd', discordId = '1', personId = 3,
+            classification = 'internal', personClassification = 'confidential',
+        })
+
+        assert.are.equal('confidential', state.created[1].input.classification)
+    end)
+
+    it('writes nothing for somebody without the report grant, such as a dispatcher', function()
+        state.canCreate = false
+
+        handlers['fredpd:callCleared']({
+            agencyId = 'lspd', discordId = '1', callId = 5, disposition = 'report_taken',
+        })
+
+        assert.are.same({}, state.created)
+    end)
+
+    it('starts nothing for a call cleared as unfounded', function()
+        handlers['fredpd:callCleared']({ agencyId = 'lspd', discordId = '1', callId = 5, disposition = 'unfounded' })
+
+        assert.are.same({}, state.created)
+    end)
+end)

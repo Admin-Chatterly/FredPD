@@ -1506,6 +1506,20 @@ local function clearCall(session, input)
     unitsChanged(session.agencyId, rows)
     board.callChanged(session.agencyId, after)
 
+    -- Server-local (spec 14), for the modules that act on a call ending: the
+    -- anmälan module starts a report draft for a call that needs one. Never a
+    -- client event -- the payload names a record.
+    TriggerEvent('fredpd:callCleared', {
+        agencyId = session.agencyId,
+        callId = input.callId,
+        discordId = session.discordId,
+        disposition = input.disposition,
+        callNumber = after.callNumber,
+        type = after.type,
+        locationText = after.locationText,
+        classification = after.classification,
+    })
+
     return { id = input.callId, disposition = input.disposition, status = after.status }
 end
 

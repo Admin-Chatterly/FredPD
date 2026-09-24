@@ -1784,7 +1784,11 @@
       "approve": "Godkänn",
       "atersand": "Återsänd med kommentar",
       "supplement": "Lägg till tilläggsuppgift",
-      "atersandNote": "Kommentar till upprättaren"
+      "atersandNote": "Kommentar till upprättaren",
+      "createSubmit": "Påbörja anmälan",
+      "edit": "Redigera",
+      "editCharges": "Ändra brott",
+      "addPerson": "Lägg till i anmälan"
     },
     "section": {
       "brott": "Brott",
@@ -1818,7 +1822,22 @@
     },
     "notify": {
       "returned": "Din anmälan {number} har återsänts för komplettering.",
-      "approved": "Din anmälan {number} har godkänts."
+      "approved": "Din anmälan {number} har godkänts.",
+      "draft": "Anmälningsutkast {number} har påbörjats åt dig. Slutför det under Register → Anmälningar."
+    },
+    "field": {
+      "title": "Rubrik",
+      "place": "Brottsplats",
+      "narrative": "Händelseförlopp",
+      "person": "Person",
+      "roll": "Som"
+    },
+    "narrative": {
+      "empty": "Inget skrivet ännu."
+    },
+    "autoTitle": {
+      "arrest": "Gripande",
+      "call": "{type}, händelse {number}"
     }
   },
   "fu": {

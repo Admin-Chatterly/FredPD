@@ -1,10 +1,13 @@
 <script lang="ts">
   import { nui } from '../../lib/nui';
   import { t } from '../../lib/i18n';
-  import { ANMALAN_STATUSES } from '@fredpd/schema';
+  import { ANMALAN_ROLLER, ANMALAN_STATUSES } from '@fredpd/schema';
   import { fieldList, type Failure } from '../shared/failure';
   import LoadMore from '../shared/LoadMore.svelte';
   import { isStub, type Maybe, type Restricted } from './types';
+  import { docToText, textToDoc } from '../../lib/richtext';
+  import PersonPicker from '../shared/PersonPicker.svelte';
+  import ChargePicker from '../shared/ChargePicker.svelte';
 
   /**
    * Anmälan — the offence report and its approval workflow (spec 7.7).
@@ -48,11 +51,15 @@
     /** The supervisor's reason, on a report that came back. */
     returnedNote?: string | null;
     fuId?: number | null;
+    /** The narrative, as editor JSON (invariant 10) -- see lib/richtext.ts. */
+    handelseforlopp?: string | null;
     version: number;
   }
 
   interface Charge {
     id: number;
+    /** The catalogue row the charge cites. */
+    brottId?: number;
     code: string;
     labelKey: string;
     citation?: string | null;
@@ -187,8 +194,132 @@
     void load(false);
   }
 
+  // ------------------------------------------------------ writing a report
+  //
+  // The routes behind these (`anmalan.create`, `.update`, `.charges.set`,
+  // `.person.set`) all existed; no screen called them, so a report could be
+  // reviewed but never written. The server still decides who may edit what
+  // (`may.edit`) and refuses the rest.
+
+  let creating = $state(false);
+  let createForm = $state({ title: '', place: '', text: '' });
+
+  let editing = $state(false);
+  let editForm = $state({ title: '', place: '', text: '' });
+
+  let chargeIds = $state<number[]>([]);
+  let editingCharges = $state(false);
+
+  let personForm = $state({ personId: '', roll: 'misstankt' });
+
+  async function create(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    busy = true;
+
+    const response = await nui.call<{ id: number; number: string }>('anmalan.create', {
+      title: createForm.title.trim(),
+      occurredPlace: createForm.place.trim() || undefined,
+      handelseforlopp: createForm.text.trim() ? textToDoc(createForm.text) : undefined,
+    });
+
+    if (response.ok) {
+      failure = null;
+      creating = false;
+      createForm = { title: '', place: '', text: '' };
+      await load();
+      await open(response.data.id);
+    } else {
+      failure = response;
+      busy = false;
+    }
+  }
+
+  function startEdit(): void {
+    if (!detail) return;
+
+    editForm = {
+      title: detail.anmalan.title,
+      place: detail.anmalan.occurredPlace ?? '',
+      text: docToText(detail.anmalan.handelseforlopp),
+    };
+    editing = true;
+  }
+
+  async function saveEdit(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    if (!detail) return;
+
+    busy = true;
+    const id = detail.anmalan.id;
+
+    const response = await nui.call('anmalan.update', {
+      id,
+      version: detail.anmalan.version,
+      title: editForm.title.trim(),
+      occurredPlace: editForm.place.trim() || undefined,
+      handelseforlopp: textToDoc(editForm.text),
+    });
+
+    if (response.ok) {
+      failure = null;
+      editing = false;
+      await open(id);
+    } else {
+      failure = response;
+      busy = false;
+    }
+  }
+
+  function startCharges(): void {
+    chargeIds = (detail?.brott ?? []).map((charge) => charge.brottId ?? charge.id);
+    editingCharges = true;
+  }
+
+  async function saveCharges(): Promise<void> {
+    if (!detail) return;
+
+    busy = true;
+    const id = detail.anmalan.id;
+
+    const response = await nui.call('anmalan.charges.set', { id, brottIds: chargeIds.map(String) });
+
+    if (response.ok) {
+      failure = null;
+      editingCharges = false;
+      await open(id);
+    } else {
+      failure = response;
+      busy = false;
+    }
+  }
+
+  async function addPerson(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    if (!detail || !personForm.personId) return;
+
+    busy = true;
+    const id = detail.anmalan.id;
+
+    const response = await nui.call('anmalan.person.set', {
+      id,
+      personId: Number(personForm.personId),
+      roll: personForm.roll,
+    });
+
+    if (response.ok) {
+      failure = null;
+      personForm = { personId: '', roll: 'misstankt' };
+      await open(id);
+    } else {
+      failure = response;
+      busy = false;
+    }
+  }
+
   async function open(id: number): Promise<void> {
     busy = true;
+    editing = false;
+    editingCharges = false;
 
     // Cleared before the fetch, not after: a reason typed against one report
     // must not be carried to the next one and sent with its return.
@@ -304,7 +435,36 @@
     <button type="submit" class="border border-[var(--color-border)] px-3 py-1 text-xs" disabled={busy}>
       {t('form.search')}
     </button>
+
+    <button
+      type="button"
+      class="border border-[var(--color-border)] px-3 py-1 text-xs"
+      aria-expanded={creating}
+      onclick={() => (creating = !creating)}
+    >
+      {t('anmalan.action.create')}
+    </button>
   </form>
+
+  {#if creating}
+    <form class="flex flex-col gap-2 border border-[var(--color-border)] p-3 text-xs" onsubmit={create}>
+      <label class="flex flex-col gap-1">
+        <span>{t('anmalan.field.title')} <span aria-hidden="true">*</span></span>
+        <input bind:value={createForm.title} required aria-required="true" maxlength="191" class="border border-[var(--color-border)] px-2 py-1" />
+      </label>
+      <label class="flex flex-col gap-1">
+        {t('anmalan.field.place')}
+        <input bind:value={createForm.place} maxlength="191" class="border border-[var(--color-border)] px-2 py-1" />
+      </label>
+      <label class="flex flex-col gap-1">
+        {t('anmalan.field.narrative')}
+        <textarea bind:value={createForm.text} rows="6" class="border border-[var(--color-border)] px-2 py-1"></textarea>
+      </label>
+      <button type="submit" class="self-start border border-[var(--color-border)] px-3 py-1 font-semibold" disabled={busy}>
+        {t('anmalan.action.createSubmit')}
+      </button>
+    </form>
+  {/if}
 
   {#if failure}
     <!--
@@ -414,9 +574,73 @@
           </div>
         {/if}
 
+        <!-- What happened -->
+        <section class="mb-3">
+          <div class="mb-1 flex items-center gap-2">
+            <h3 class="text-xs font-semibold">{t('anmalan.section.handelseforlopp')}</h3>
+            {#if detail.may?.edit && !editing}
+              <button type="button" class="border border-[var(--color-border)] px-2 py-0.5 text-xs" onclick={startEdit}>
+                {t('anmalan.action.edit')}
+              </button>
+            {/if}
+          </div>
+
+          {#if editing}
+            <form class="flex flex-col gap-2 text-xs" onsubmit={saveEdit}>
+              <label class="flex flex-col gap-1">
+                <span>{t('anmalan.field.title')} <span aria-hidden="true">*</span></span>
+                <input bind:value={editForm.title} required aria-required="true" maxlength="191" class="border border-[var(--color-border)] px-2 py-1" />
+              </label>
+              <label class="flex flex-col gap-1">
+                {t('anmalan.field.place')}
+                <input bind:value={editForm.place} maxlength="191" class="border border-[var(--color-border)] px-2 py-1" />
+              </label>
+              <label class="flex flex-col gap-1">
+                {t('anmalan.field.narrative')}
+                <textarea bind:value={editForm.text} rows="8" class="border border-[var(--color-border)] px-2 py-1"></textarea>
+              </label>
+              <div class="flex gap-2">
+                <button type="submit" class="border border-[var(--color-border)] px-3 py-1 font-semibold" disabled={busy}>
+                  {t('form.save')}
+                </button>
+                <button type="button" class="border border-[var(--color-border)] px-3 py-1" onclick={() => (editing = false)}>
+                  {t('form.cancel')}
+                </button>
+              </div>
+            </form>
+          {:else}
+            {#if detail.anmalan.occurredPlace}
+              <p class="text-xs text-[var(--color-ink-muted)]">{detail.anmalan.occurredPlace}</p>
+            {/if}
+            {#if docToText(detail.anmalan.handelseforlopp)}
+              <p class="whitespace-pre-wrap text-xs">{docToText(detail.anmalan.handelseforlopp)}</p>
+            {:else}
+              <p class="text-xs text-[var(--color-ink-muted)]">{t('anmalan.narrative.empty')}</p>
+            {/if}
+          {/if}
+        </section>
+
         <!-- Charges, and the span they carry together -->
         <section class="mb-3">
-          <h3 class="mb-1 text-xs font-semibold">{t('anmalan.section.brott')}</h3>
+          <div class="mb-1 flex items-center gap-2">
+            <h3 class="text-xs font-semibold">{t('anmalan.section.brott')}</h3>
+            {#if detail.may?.edit && !editingCharges}
+              <button type="button" class="border border-[var(--color-border)] px-2 py-0.5 text-xs" onclick={startCharges}>
+                {t('anmalan.action.editCharges')}
+              </button>
+            {/if}
+          </div>
+          {#if editingCharges}
+            <ChargePicker bind:selected={chargeIds} legend={t('anmalan.section.brott')} disabled={busy} />
+            <div class="mt-1 flex gap-2 text-xs">
+              <button type="button" class="border border-[var(--color-border)] px-3 py-1 font-semibold" disabled={busy} onclick={() => void saveCharges()}>
+                {t('form.save')}
+              </button>
+              <button type="button" class="border border-[var(--color-border)] px-3 py-1" onclick={() => (editingCharges = false)}>
+                {t('form.cancel')}
+              </button>
+            </div>
+          {/if}
           {#if detail.brott.length === 0}
             <p class="text-xs text-[var(--color-ink-muted)]">{t('anmalan.brott.empty')}</p>
           {:else}
@@ -468,6 +692,26 @@
                 </li>
               {/each}
             </ul>
+          {/if}
+
+          {#if detail.may?.edit}
+            <form class="mt-2 flex flex-wrap items-end gap-2 text-xs" onsubmit={addPerson}>
+              <div class="flex w-64 flex-col gap-1">
+                <span id="anmalan-person-label">{t('anmalan.field.person')}</span>
+                <PersonPicker bind:value={personForm.personId} labelledby="anmalan-person-label" />
+              </div>
+              <label class="flex flex-col gap-1">
+                {t('anmalan.field.roll')}
+                <select bind:value={personForm.roll} class="border border-[var(--color-border)] px-2 py-1">
+                  {#each ANMALAN_ROLLER as roll (roll)}
+                    <option value={roll}>{t(`anmalan.roll.${roll}`)}</option>
+                  {/each}
+                </select>
+              </label>
+              <button type="submit" class="border border-[var(--color-border)] px-3 py-1" disabled={busy || !personForm.personId}>
+                {t('anmalan.action.addPerson')}
+              </button>
+            </form>
           {/if}
         </section>
 

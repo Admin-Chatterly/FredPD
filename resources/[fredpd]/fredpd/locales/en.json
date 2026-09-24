@@ -1784,7 +1784,11 @@
       "approve": "Approve",
       "atersand": "Return with comments",
       "supplement": "Add supplemental",
-      "atersandNote": "Comment to the author"
+      "atersandNote": "Comment to the author",
+      "createSubmit": "Start the report",
+      "edit": "Edit",
+      "editCharges": "Change offences",
+      "addPerson": "Add to the report"
     },
     "section": {
       "brott": "Offences",
@@ -1818,7 +1822,22 @@
     },
     "notify": {
       "returned": "Your report {number} was sent back for changes.",
-      "approved": "Your report {number} was approved."
+      "approved": "Your report {number} was approved.",
+      "draft": "Report draft {number} has been started for you. Finish it under Records → Reports."
+    },
+    "field": {
+      "title": "Title",
+      "place": "Where it happened",
+      "narrative": "What happened",
+      "person": "Person",
+      "roll": "As"
+    },
+    "narrative": {
+      "empty": "Nothing written yet."
+    },
+    "autoTitle": {
+      "arrest": "Arrest",
+      "call": "{type}, call {number}"
     }
   },
   "fu": {

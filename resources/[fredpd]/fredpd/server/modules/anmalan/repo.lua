@@ -624,6 +624,17 @@ function Repo.fuAssign(id, agencyId, fuLedare, ledareKind, expectedVersion)
         { fuLedare, ledareKind, id, agencyId, expectedVersion })
 end
 
+--- The newest anmälan filed for a call, if any.
+function Repo.forCall(agencyId, callId)
+    if not callId then return nil end
+
+    return FredPD.Core.db.single(
+        [[SELECT id, number, status, created_by AS createdBy, classification FROM fpd_anmalan
+           WHERE agency_id = ? AND call_id = ?
+           ORDER BY id DESC LIMIT 1]],
+        { agencyId, callId })
+end
+
 --- The open förundersökning a call's anmälan belongs to, by number, for the
 --- evidence an officer collects while working that call (8.4, 7.8).
 function Repo.openFuNumberForCall(agencyId, callId)

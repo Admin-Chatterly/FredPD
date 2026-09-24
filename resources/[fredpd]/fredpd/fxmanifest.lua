@@ -113,6 +113,8 @@ server_scripts {
     'server/modules/anmalan/service.lua',
     'server/modules/anmalan/repo.lua',
     'server/modules/anmalan/routes.lua',
+    -- Report drafts started by an arrest or a cleared call (server events).
+    'server/modules/anmalan/events.lua',
 
     -- Frihetsberövande (spec 7.9). After anmalan, whose förundersökning a
     -- chain links to, and after brott, whose catalogue it charges from.

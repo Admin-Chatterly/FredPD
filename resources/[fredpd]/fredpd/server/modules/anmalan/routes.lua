@@ -478,6 +478,17 @@ route.define({
             return route.refuse(FredPD.ErrorCode.INVALID, { roll = 'unknown' })
         end
 
+        -- The person must be one this session may read, in its own agency,
+        -- the check `frihet.gripande` makes: otherwise adding an id and reading
+        -- back its person number is an existence oracle across agencies and
+        -- clearances.
+        local person, visibility = FredPD.Repo.persons.readPerson(session, input.personId)
+        if not person then
+            return route.refuse(
+                visibility == 'missing' and FredPD.ErrorCode.NOT_FOUND or FredPD.ErrorCode.RESTRICTED,
+                { personId = visibility == 'missing' and 'unknown' or 'restricted' })
+        end
+
         repo.setPerson(row.id, input.personId, input.roll, input.note, session.discordId)
 
         return { id = row.id }

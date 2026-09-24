@@ -2176,8 +2176,12 @@ interface FixtureAnmalan {
   version: number;
   /** The supervisor's reason, on a report that came back. */
   returnedNote?: string | null;
+  occurredPlace?: string | null;
+  /** Editor JSON (lib/richtext.ts). */
+  handelseforlopp?: string | null;
   brott: {
     id: number;
+    brottId?: number;
     code: string;
     labelKey: string;
     citation: string;
@@ -5898,6 +5902,85 @@ export const fixtures: FixtureSet = {
           ownReport,
         },
       };
+    },
+
+    'anmalan.create': (input) => {
+      const body = (input ?? {}) as { title?: string; occurredPlace?: string; handelseforlopp?: string };
+      if (!body.title?.trim()) return refuse('invalid', { title: 'required' });
+
+      const id = Math.max(...anmalningar.map((entry) => entry.id)) + 1;
+      const row: FixtureAnmalan = {
+        id,
+        number: `LSPD-26-000${100 + id}`,
+        title: body.title.trim(),
+        status: 'utkast',
+        createdBy: FIXTURE_VIEWER,
+        version: 1,
+        occurredPlace: body.occurredPlace ?? null,
+        handelseforlopp: body.handelseforlopp ?? null,
+        brott: [],
+        personer: [],
+      };
+
+      anmalningar.unshift(row);
+      return { id, number: row.number, anmalan: row };
+    },
+
+    'anmalan.update': (input) => {
+      const body = (input ?? {}) as {
+        id?: number;
+        version?: number;
+        title?: string;
+        occurredPlace?: string;
+        handelseforlopp?: string;
+      };
+      const row = anmalningar.find((entry) => entry.id === body.id);
+      if (!row) return refuse('not_found');
+      if (row.version !== body.version) return refuse('conflict', { version: 'stale' });
+
+      if (body.title !== undefined) row.title = body.title;
+      if (body.occurredPlace !== undefined) row.occurredPlace = body.occurredPlace;
+      if (body.handelseforlopp !== undefined) row.handelseforlopp = body.handelseforlopp;
+      row.version += 1;
+
+      return { id: row.id, version: row.version };
+    },
+
+    'anmalan.charges.set': (input) => {
+      const { id, brottIds } = (input ?? {}) as { id?: number; brottIds?: string[] };
+      const row = anmalningar.find((entry) => entry.id === id);
+      if (!row) return refuse('not_found');
+
+      const chosen = (brottIds ?? []).map(Number);
+      row.brott = brottskatalog
+        .filter((entry) => chosen.includes(entry.id))
+        .map((entry, index) => ({
+          id: 800 + index,
+          brottId: entry.id,
+          code: entry.code,
+          labelKey: entry.labelKey,
+          citation: `${entry.balk} ${entry.kapitel}:${entry.paragraf}`,
+          grad: entry.grad,
+          stage: 'fullbordat',
+        }));
+
+      return { id: row.id, count: row.brott.length };
+    },
+
+    'anmalan.person.set': (input) => {
+      const { id, personId, roll } = (input ?? {}) as { id?: number; personId?: number; roll?: string };
+      const row = anmalningar.find((entry) => entry.id === id);
+      if (!row || !personId || !roll) return refuse('invalid');
+
+      const person = registerPersons.find((entry) => 'id' in entry.row && entry.row.id === personId);
+      const personNumber = person && 'personNumber' in person.row ? String(person.row.personNumber) : `P-${personId}`;
+
+      row.personer = [
+        ...row.personer.filter((entry) => !(entry.personId === personId && entry.roll === roll)),
+        { personId, roll, personNumber },
+      ];
+
+      return { id: row.id };
     },
 
     'anmalan.submit': (input) => moveAnmalan(input, 'inlamnad'),

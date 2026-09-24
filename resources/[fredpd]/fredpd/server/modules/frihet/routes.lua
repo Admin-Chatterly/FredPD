@@ -257,6 +257,9 @@ route.define({
             personId = input.personId,
             agencyId = session.agencyId,
             discordId = session.discordId,
+            -- So a record started from this one is never filed lower (4.5).
+            classification = input.classification or 'internal',
+            personClassification = person.classification,
         })
 
         announceNext(session, row.id)

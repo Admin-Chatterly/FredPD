@@ -738,6 +738,9 @@ Rewritten for Swedish procedure (ADR-014). The approval workflow this section al
 - [S] Co-authors, and void with reason (supervisor), never delete.
 - **Permissions:** `rms.anmalan.view`, `rms.anmalan.create` (both patrol), `rms.anmalan.edit.any`, `rms.anmalan.approve` (both supervisor).
 
+- **Reports start themselves.** A gripande (`fredpd:gripande`) and a call cleared with `arrest_made`, `citation_issued` or `report_taken` (`fredpd:callCleared`) start an anmälan draft as the officer, titled, linked to their call, the arrested person on it as `misstankt`; an existing draft on the call is added to instead only if the officer may edit it and it is classified at least as high. Only for an officer signed on with `rms.anmalan.create` on a fresh snapshot (a dispatcher clearing a call gets no report in their name); filed no lower than the arrest, the call or the person; every write audited (`automatic = true`). The officer is told its number. Nothing is submitted for them. `anmalan.person.set` now reads the person through `readPerson` first.
+- **Written in the MDT.** Records → Reports creates a report, edits title, place and händelseförlopp (plain paragraphs stored as editor JSON, never HTML), sets the offences from the catalogue and adds people by name; the server's `may.edit` decides who may.
+
 ### 7.8 Förundersökning (M2)
 
 Built. Migration 0009, `server/modules/anmalan/` (same module, separate table).

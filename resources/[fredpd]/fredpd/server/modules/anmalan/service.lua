@@ -413,6 +413,40 @@ function Anmalan.aklagareIndicated(skalor)
     return false
 end
 
+--- The dispositions after which a call needs a report (7.7): somebody was
+--- arrested or fined, or the officer said a report was taken. A call cleared
+--- as unfounded or gone on arrival does not.
+local NEEDS_REPORT <const> = {
+    report_taken = true, arrest_made = true, citation_issued = true,
+}
+
+function Anmalan.dispositionNeedsReport(disposition)
+    return NEEDS_REPORT[disposition] == true
+end
+
+--- The highest of several classifications, by `rank` (the access module's
+--- `clearanceRank`): a record started from others is filed no lower than
+--- any of them (4.5). Unknown or missing levels are ignored; none at all
+--- is `internal`, the default every record starts at.
+function Anmalan.highestClassification(levels, rank)
+    local best, bestRank = 'internal', rank('internal') or 0
+
+    for index = 1, #(levels or {}) do
+        local level = levels[index]
+        local value = level and rank(level)
+
+        if value and value > bestRank then best, bestRank = level, value end
+    end
+
+    return best
+end
+
+--- An anmälan that can still take another person or charge: not yet sent
+--- for review, or sent back.
+function Anmalan.isEditable(status)
+    return status == 'utkast' or status == 'atersand'
+end
+
 FredPD.Modules.anmalan = Anmalan
 
 return Anmalan
