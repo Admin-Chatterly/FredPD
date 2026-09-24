@@ -23,7 +23,7 @@ local isOpen = false
 ---
 --- @param open boolean
 --- @param placement table|nil
-local function setOpen(open, placement)
+local function setOpen(open, placement, intent)
     if not open and not isOpen then return end
 
     isOpen = open
@@ -32,6 +32,9 @@ local function setOpen(open, placement)
         type = open and 'fredpd:open' or 'fredpd:close',
         placementId = open and placement and placement.id or nil,
         placementKind = open and placement and placement.kind or nil,
+        -- Where to land: `{ module, tab, term, type }` from a field action's
+        -- "Open in MDT". Navigation only; the screen still asks the server.
+        intent = open and intent or nil,
     })
 
     -- Closing the MDT hides the interface; it does not unmount it. `main.ts`
@@ -369,6 +372,11 @@ end, false)
 
 RegisterKeyMapping(MDT_COMMAND, FredPD.t('shell.keybind'), 'keyboard',
     FredPD.Config.shared.mdcKeybind or '')
+
+--- For the field actions (client/field.lua): open the MDT on a record.
+FredPD.Client.mdt = {
+    open = function(intent) setOpen(true, nil, intent) end,
+}
 
 --- Opening a terminal is the same action wherever it is placed, so every
 --- terminal kind maps to it (spec 3.10). What the officer can then *do* inside

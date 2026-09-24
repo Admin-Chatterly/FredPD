@@ -2,6 +2,7 @@
   import { nui } from './lib/nui';
   import { t, isLocale, setLocale } from './lib/i18n';
   import { setDepartmentTimezone } from './lib/time';
+  import { parseIntent, setIntent } from './lib/intent';
   import type { ErrorCode } from '@fredpd/schema';
   import type { Session } from './lib/types';
   import RoleMap from './modules/admin/RoleMap.svelte';
@@ -108,8 +109,15 @@
 
   $effect(() =>
     nui.on('fredpd:open', (message) => {
+      // A field action's "Open in MDT" names the screen outright; a terminal
+      // names it by its kind. The screen itself takes the rest of the intent.
+      const intent = parseIntent(message['intent']);
+      if (intent) setIntent(intent);
+
       const kind = message['placementKind'];
-      void loadSession(typeof kind === 'string' ? (MODULE_FOR_PLACEMENT[kind] ?? null) : null);
+      const preferred =
+        intent?.module ?? (typeof kind === 'string' ? (MODULE_FOR_PLACEMENT[kind] ?? null) : null);
+      void loadSession(preferred);
     }),
   );
 

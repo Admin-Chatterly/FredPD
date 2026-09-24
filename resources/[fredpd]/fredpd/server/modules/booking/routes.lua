@@ -208,6 +208,63 @@ route.define({
         -- takeover `identifierConflict` exists to refuse. Re-reading after a
         -- zero-row update is the only way to tell "lost the race to a
         -- different identifier" apart from "already exactly this one".
+        -- An arrestee booked as unidentified (`field.person.unidentified`) was
+        -- recorded, out of sight, as the character arrested (0028). Only that
+        -- character's prints may be taken against this booking: otherwise an
+        -- officer could print a bystander at the terminal and learn who they
+        -- are, or bind them to the arrestee's record.
+        local pending = personsRepo.pendingIdentityMatches(session.agencyId, booking.personId, identifier)
+        if pending == false then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { targetId = 'identity_mismatch' })
+        end
+
+        -- The prints belong to somebody already on file under another record
+        -- -- an arrestee who would not show ID was booked as an unidentified
+        -- person (`field.person.unidentified`). That is an identification,
+        -- which is what the ten-print is for: the reference is filed below as
+        -- usual, and the officer is told who the prints say this is. The
+        -- identifier is not moved onto the booking's record, which
+        -- `uq_fpd_persons_identifier` would refuse anyway; joining the two
+        -- records is a supervisor's decision on the Records screen.
+        local onFile = personsRepo.byIdentifier(session.agencyId, identifier)
+
+        if onFile and onFile ~= booking.personId then
+            -- Only for the arrestee the arrest recorded. Any other booking
+            -- whose person has no identifier would otherwise answer who a
+            -- bystander printed at the terminal is -- so it is refused, as
+            -- `uq_fpd_persons_identifier` refused it before this branch existed.
+            if pending ~= true then
+                return route.refuse(FredPD.ErrorCode.CONFLICT, { targetId = 'identity_mismatch' })
+            end
+
+            if not FredPD.Repo.evidence.fileFingerprintReference(session.agencyId, identifier, session.discordId) then
+                return route.refuse(FredPD.ErrorCode.INTERNAL)
+            end
+
+            personsRepo.markBiometricOnFile(session.agencyId, onFile, 'fingerprint', session.discordId)
+            personsRepo.clearPendingIdentity(session.agencyId, booking.personId)
+
+            -- Both records, whether or not the officer may read the second:
+            -- the supervisor who joins them works from this (invariant 11).
+            FredPD.Core.audit.write({
+                action = 'booking.tenPrint.identified',
+                discordId = session.discordId,
+                agencyId = session.agencyId,
+                subjectType = 'person',
+                subjectId = tostring(onFile),
+                detail = { number = booking.number, bookingPersonId = booking.personId, identifiedPersonId = onFile },
+            })
+
+            local known = personsRepo.readPerson(session, onFile)
+
+            return {
+                number = booking.number,
+                -- Only when the officer may read that record; otherwise the
+                -- capture is filed and nothing about the other record is said.
+                identifiedAs = known and known.personNumber or nil,
+            }
+        end
+
         if personsRepo.setIdentifierIfUnset(session.agencyId, booking.personId, identifier) == 0
             and personsRepo.identifierConflict(session.agencyId, booking.personId, identifier)
         then
@@ -219,6 +276,7 @@ route.define({
         end
 
         personsRepo.markBiometricOnFile(session.agencyId, booking.personId, 'fingerprint', session.discordId)
+        personsRepo.clearPendingIdentity(session.agencyId, booking.personId)
 
         return { number = booking.number }
     end,

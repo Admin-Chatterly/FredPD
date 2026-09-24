@@ -564,6 +564,38 @@ function Repo.byIdentifier(agencyId, identifier)
     )
 end
 
+--- Records, out of sight, which character an unidentified arrestee is
+--- (0028). Hidden truth: only ever compared against, never returned.
+function Repo.setPendingIdentity(agencyId, personId, identifier, discordId)
+    return db().execute(
+        [[INSERT IGNORE INTO fpd_person_pending_identity (person_id, agency_id, identifier, created_by)
+          VALUES (?, ?, ?, ?)]],
+        { personId, agencyId, identifier, discordId }
+    )
+end
+
+--- Is `identifier` the character this unidentified person was arrested as?
+--- `nil` when no pending identity was recorded for them (a record created by
+--- hand), `true`/`false` otherwise. The identifier never leaves the database.
+function Repo.pendingIdentityMatches(agencyId, personId, identifier)
+    local row = db().single(
+        [[SELECT identifier = ? AS matches FROM fpd_person_pending_identity
+           WHERE agency_id = ? AND person_id = ?]],
+        { identifier, agencyId, personId }
+    )
+
+    if not row then return nil end
+
+    return row.matches == 1 or row.matches == true
+end
+
+function Repo.clearPendingIdentity(agencyId, personId)
+    return db().execute(
+        'DELETE FROM fpd_person_pending_identity WHERE agency_id = ? AND person_id = ?',
+        { agencyId, personId }
+    )
+end
+
 --- True when this person already carries a *different* identifier than the
 --- one a live scan or a ten-print capture just resolved.
 ---

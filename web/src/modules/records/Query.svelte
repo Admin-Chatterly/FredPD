@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { nui } from '../../lib/nui';
+  import { onIntent, peekIntent, takeIntent } from '../../lib/intent';
   import { t } from '../../lib/i18n';
   import { formatMoment } from '../../lib/time';
   import { fieldList, type Failure } from '../shared/failure';
@@ -172,6 +174,28 @@
     failure = null;
     trigger?.focus();
   }
+
+  /**
+   * A field action's "Open in MDT" (lib/intent.ts): the query the officer
+   * just ran in the world, run again here with the full record on screen.
+   * Taken, so it runs once.
+   */
+  function followIntent(): void {
+    const intent = peekIntent();
+    if (!intent || intent.module !== 'records' || intent.tab !== 'query' || !intent.term) return;
+
+    takeIntent();
+    term = intent.term;
+    type = intent.type ?? '';
+    void run();
+  }
+
+  $effect(() => {
+    // Untracked: this runs the search, which reads the form, and the form
+    // changing must not re-run the intent check on every keystroke.
+    untrack(followIntent);
+    return onIntent(() => untrack(followIntent));
+  });
 
   async function run(event?: SubmitEvent): Promise<void> {
     event?.preventDefault();

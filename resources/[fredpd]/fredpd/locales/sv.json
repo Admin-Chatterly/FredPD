@@ -77,7 +77,8 @@
     "noMatches": "Inga träffar",
     "selected": "Vald: {value}",
     "clearSelection": "Byt",
-    "contextLabel": "Orsak"
+    "contextLabel": "Orsak",
+    "confirm": "Bekräfta"
   },
   "fieldError": {
     "type": "fel typ av värde",
@@ -1185,7 +1186,8 @@
       "title": "Ta tio-fingeravtryck",
       "numberLabel": "Inskrivningsnummer",
       "captured": "Tio-fingeravtryck registrerat mot {number}.",
-      "noTerminal": "Inte vid en inskrivningsterminal."
+      "noTerminal": "Inte vid en inskrivningsterminal.",
+      "identified": "Tioavtryck för inskrivning {number} registrerat. Avtrycken matchar {person}."
     }
   },
   "forensics": {
@@ -2620,6 +2622,49 @@
       "dui": "Rattfylleri",
       "unregistered": "Oregistrerat",
       "other": "Övrigt"
+    }
+  },
+  "field": {
+    "noHits": "Inga träffar",
+    "action": {
+      "checkId": "Kontrollera legitimation",
+      "cite": "Utfärda ordningsbot",
+      "citeOwner": "Utfärda ordningsbot på fordonet",
+      "arrest": "Grip",
+      "prints": "Skanna fingeravtryck",
+      "open": "Öppna i MDT",
+      "runPlate": "Slå registreringsnummer",
+      "arrestUnidentified": "Grip: identiteten oklar"
+    },
+    "person": {
+      "registered": "Ny i registret: tillagd från legitimationen.",
+      "asking": "Ber om legitimation…",
+      "refusedTitle": "Ingen legitimation",
+      "refused": "Personen vägrade visa legitimation."
+    },
+    "vehicle": {
+      "registered": "Ny i registret: tillagd från fordonsregistret.",
+      "unregistered": "{plate} är inte registrerad på någon.",
+      "status": "Registrering: {registration} · Försäkring: {insurance}"
+    },
+    "cite": {
+      "title": "Välj ordningsbot",
+      "amount": "{amount} kr",
+      "confirmTitle": "Utfärda ordningsboten?",
+      "confirm": "{tariff} till {who}."
+    },
+    "arrest": {
+      "title": "Grund för gripandet",
+      "confirmTitle": "Grip personen?",
+      "confirm": "{who}, med grunden: {grund}.",
+      "done": "Gripen. Frihetsberövande {number} är öppnat; skriv in personen vid inskrivningsterminalen.",
+      "unidentifiedConfirm": "Personen registreras som okänd och identifieras med fingeravtryck vid inskrivningen."
+    },
+    "showId": {
+      "title": "Polisen: visa legitimation",
+      "body": "Polis {callsign} ber att få se din legitimation.",
+      "show": "Visa legitimation",
+      "refuse": "Vägra"
     }
   }
 }

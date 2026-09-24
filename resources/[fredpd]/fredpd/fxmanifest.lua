@@ -93,6 +93,11 @@ server_scripts {
     'server/modules/query/service.lua',
     'server/modules/query/repo.lua',
     'server/modules/query/routes.lua',
+    -- Field actions (ox_target on people and vehicles). After persons,
+    -- registry and access, whose repos it binds at load.
+    'server/modules/field/service.lua',
+    'server/modules/field/consent.lua',
+    'server/modules/field/routes.lua',
 
     -- Brottskatalogen (spec 7.10). Loads before every module that writes a
     -- record, because a charge is a reference into this catalogue and the
@@ -233,6 +238,7 @@ server_scripts {
 client_scripts {
     'client/bridges/ui.lua',
     'client/bridges/garage.lua',
+    'client/bridges/target.lua',
     'client/core.lua',
     -- The toast relay for `fredpd:notify` (server/core/push.lua).
     'client/notify.lua',
@@ -241,6 +247,9 @@ client_scripts {
     'client/chat.lua',
     'client/garage.lua',
     'client/fingerprint_scanner.lua',
+    -- ox_target on people and vehicles. After core (binds it at load) and
+    -- the bridge; calls `FredPD.Client.mdt` from main.lua only at runtime.
+    'client/field.lua',
     -- Dispatch: the panic keybind and the relay that carries the server's
     -- `fredpd:cad:*` pushes into the NUI. After `client/core.lua`, whose
     -- namespace it binds at load; before `client/main.lua`, which stays last

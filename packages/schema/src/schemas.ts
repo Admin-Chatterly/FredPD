@@ -2509,6 +2509,25 @@ export const schemas = {
     callsign: { type: 'string', required: false, min: 1, max: 16 },
   },
 
+  /**
+   * Field actions (field/routes.lua). A server id or a network id and
+   * nothing else: the server reads the character, the plate and both
+   * positions itself.
+   */
+  FieldPersonResolve: {
+    targetId: { type: 'integer', required: true, min: 1 },
+  },
+
+  /** The asked player's answer; `token` is the one their request carried. */
+  FieldPersonConsent: {
+    token: { type: 'string', required: true, min: 32, max: 32 },
+    shown: { type: 'boolean', required: true },
+  },
+
+  FieldVehicleResolve: {
+    netId: { type: 'integer', required: true, min: 1 },
+  },
+
   PersonnelShiftStart: {},
   PersonnelShiftEnd: {},
 

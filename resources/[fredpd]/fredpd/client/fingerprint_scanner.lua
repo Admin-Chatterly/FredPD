@@ -85,8 +85,8 @@ end
 --- are already on file. Only reached once `scanForPrint` below finds no
 --- revealed trace to collect instead -- a scanner does not choose between
 --- the two, it does whichever one there is something to do.
-local function scanForIdentity()
-    local targetId = nearestPlayerId(SCAN_RADIUS)
+local function scanForIdentity(explicitTarget)
+    local targetId = explicitTarget or nearestPlayerId(SCAN_RADIUS)
 
     if not targetId then
         FredPD.Client.core.notify('fingerprintScanner.noPrint')
@@ -187,7 +187,21 @@ local function captureTenPrint()
         return
     end
 
+    -- An arrestee booked as unidentified whose prints belong to a record
+    -- already on file: the capture says who they are.
+    if response.data.identifiedAs then
+        FredPD.Client.core.notify('fingerprintScanner.tenPrint.identified', {
+            number = response.data.number, person = response.data.identifiedAs,
+        })
+        return
+    end
+
     FredPD.Client.core.notify('fingerprintScanner.tenPrint.captured', { number = response.data.number })
 end
 
-FredPD.Client.fingerprintScanner = { capture = captureTenPrint }
+FredPD.Client.fingerprintScanner = {
+    capture = captureTenPrint,
+    --- A live scan of one named player (the ox_target option on a person).
+    --- The server still range-checks them and refuses anyone not detained.
+    identify = scanForIdentity,
+}

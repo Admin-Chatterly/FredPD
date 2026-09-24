@@ -48,6 +48,10 @@ read_globals = {
     'GetEntityCoords',
     'GetEntityHeading',
     'GetEntityModel',
+    -- A field check reads the plate off the entity on the server, and makes
+    -- sure the network id it was handed is a vehicle (field/routes.lua).
+    'GetEntityType',
+    'GetVehicleNumberPlateText',
     'GetVehicleClass',
     'GetVehiclePedIsIn',
     'joaat',
@@ -145,7 +149,6 @@ files['**/client/**/*.lua'] = {
         -- of ox_lib's contract (spec 8.2, prints per door).
         'GetPedInVehicleSeat',
         'GetShapeTestResult',
-        'GetVehicleNumberPlateText',
         'IsControlJustReleased',
         'IsModelInCdimage',
         'IsPedArmed',

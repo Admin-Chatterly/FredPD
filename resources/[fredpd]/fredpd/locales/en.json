@@ -77,7 +77,8 @@
     "noMatches": "No matches",
     "selected": "Selected: {value}",
     "clearSelection": "Change",
-    "contextLabel": "Why"
+    "contextLabel": "Why",
+    "confirm": "Confirm"
   },
   "fieldError": {
     "type": "the wrong kind of value",
@@ -1185,7 +1186,8 @@
       "title": "Capture ten-print",
       "numberLabel": "Booking number",
       "captured": "Ten-print filed against {number}.",
-      "noTerminal": "Not at a booking terminal."
+      "noTerminal": "Not at a booking terminal.",
+      "identified": "Ten-print for booking {number} filed. The prints match {person}."
     }
   },
   "forensics": {
@@ -2620,6 +2622,49 @@
       "dui": "DUI",
       "unregistered": "Unregistered",
       "other": "Other"
+    }
+  },
+  "field": {
+    "noHits": "No hits",
+    "action": {
+      "checkId": "Check ID",
+      "cite": "Issue a fine",
+      "citeOwner": "Issue a fine on this vehicle",
+      "arrest": "Arrest (gripande)",
+      "prints": "Scan fingerprints",
+      "open": "Open in MDT",
+      "runPlate": "Run plate",
+      "arrestUnidentified": "Arrest: identity not established"
+    },
+    "person": {
+      "registered": "New to the register: added from their ID.",
+      "asking": "Asking for their ID…",
+      "refusedTitle": "No ID shown",
+      "refused": "They refused to show ID."
+    },
+    "vehicle": {
+      "registered": "New to the register: added from the vehicle register.",
+      "unregistered": "{plate} is not registered to anyone.",
+      "status": "Registration: {registration} · Insurance: {insurance}"
+    },
+    "cite": {
+      "title": "Choose the fine",
+      "amount": "{amount} kr",
+      "confirmTitle": "Issue this fine?",
+      "confirm": "{tariff} to {who}."
+    },
+    "arrest": {
+      "title": "Ground for the arrest",
+      "confirmTitle": "Arrest this person?",
+      "confirm": "{who}, on the ground: {grund}.",
+      "done": "Arrested. Custody {number} is open; book them at the booking terminal.",
+      "unidentifiedConfirm": "They will be registered as an unknown person and identified by their fingerprints at booking."
+    },
+    "showId": {
+      "title": "Police: show your ID",
+      "body": "Officer {callsign} asks to see your ID.",
+      "show": "Show ID",
+      "refuse": "Refuse"
     }
   }
 }

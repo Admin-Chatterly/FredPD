@@ -52,6 +52,33 @@ function Framework.getCharacter(src)
     }
 end
 
+--- What the character's own ID card says: name, date of birth and sex, as
+--- the framework stores them. Raw -- `FredPD.Modules.field.personFields`
+--- decides what is usable -- and read only for a player the officer is
+--- standing next to (`field.person.resolve`).
+---
+--- ESX keeps these as player variables its identity resource sets
+--- (`dateofbirth`, `sex`); a fork that names them differently reads as nil,
+--- which registers the person with a name only.
+---
+--- @param src number server id
+--- @return table|nil { identifier, firstName, lastName, dateOfBirth, sex }
+function Framework.getIdentity(src)
+    local esx = core()
+    if not esx then return nil end
+
+    local player = esx.GetPlayerFromId(src)
+    if not player then return nil end
+
+    return {
+        identifier = player.identifier,
+        firstName = player.get('firstName'),
+        lastName = player.get('lastName'),
+        dateOfBirth = player.get('dateofbirth'),
+        sex = player.get('sex'),
+    }
+end
+
 --- Sets duty state, when the server models it (spec 7.1, configurable).
 --- Returns false when the server has no duty concept, so the caller can tell
 --- "refused" apart from "not applicable".
@@ -204,6 +231,42 @@ function Framework.searchOwnedVehicles(term, limit)
 end
 
 --- Startup check (spec 3.8): fail loudly and early, not on first use.
+--- The owner of one plate, read from ESX's vehicle-ownership table, for a
+--- plate FredPD's own register has never seen (`field.vehicle.resolve`).
+---
+--- Matched by equality on the plate column (its primary key on ESX, so an
+--- index seek, never a scan): the plate exactly as the game draws it, trimmed,
+--- and as FredPD stores it. ESX forks store one of those three.
+---
+--- @param drawn string the plate as `GetVehicleNumberPlateText` returned it
+--- @param plate string the same plate normalised (upper-case, no spaces)
+--- @return table|nil { plate, owner }
+function Framework.ownedVehicleByPlate(drawn, plate)
+    local config = esxData().vehicles
+    if not config or esxData().enabled == false then return nil end
+
+    local raw = tostring(drawn or plate)
+    local trimmed = raw:match('^%s*(.-)%s*$')
+
+    local ok, row = pcall(function()
+        return FredPD.Core.db.single(
+            ([[SELECT `%s` AS plate, `%s` AS owner
+                 FROM `%s`
+                WHERE `%s` IN (?, ?, ?)
+                LIMIT 1]]):format(config.plate, config.owner, config.table, config.plate),
+            { raw, trimmed, plate }
+        )
+    end)
+
+    if not ok then
+        print(('[fredpd] esxData.vehicles: plate lookup failed against `%s` -- check the column names in config/server.lua. (%s)')
+            :format(config.table, tostring(row)))
+        return nil
+    end
+
+    return row
+end
+
 function Framework.verify()
     if GetResourceState('es_extended') ~= 'started' then
         error('[fredpd] framework bridge: es_extended is not started.')

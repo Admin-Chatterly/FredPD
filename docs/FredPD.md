@@ -665,6 +665,16 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 - **Based on:** NCIC-style query and hit confirmation; ps-mdt citizen and vehicle search.
 - **Permissions:** `query.person.run`, `query.vehicle.run`, `query.firearm.run`, `query.phone.run`, `query.address.run`, `query.log.view`.
 
+#### 7.2.1 Field actions (ox_target)
+
+- Look at a player: **Check ID**, **Issue a fine**, **Arrest**, **Scan fingerprints**. Look at a car: **Run plate**. Each opens an in-game menu with the record's hits and the next actions (fine, arrest, **Open in MDT**, which lands on Records → Query with the search already run).
+- `field.person.resolve` (`query.person.run`, on duty) takes a server id; `field.vehicle.resolve` (`query.vehicle.run`, on duty) takes a network id. The server reads the character, the plate and both positions itself and refuses anything beyond `field.range` (default 5 m).
+- **Nobody is identified without their say.** Check ID asks the player on their own screen ("show ID" / "refuse", 20 s, silence is a refusal). Only a person already held under an open custody chain is identified without asking — the same gate as the live print scan (8.8). Who refuses can be arrested on `identitet_oklar`: `field.person.unidentified` (`frihet.gripande`) registers an empty person, and the booking ten-print identifies them (if the prints belong to a record already on file, the capture answers with that record's number; joining the two is a supervisor's decision).
+- **Strangers are registered, not dead ends.** A character who shows an ID the agency has never seen is registered from it (name, date of birth, sex, identifier) — never tied to an existing record by name and date of birth, which a player chooses and a look-alike character can copy. A plate FredPD has never seen but ESX's `owned_vehicles` has is registered to that owner. Registration is audited (`person.created` with `source = field_id_check`, `field.vehicle.resolved` with `registered`).
+- A record the officer may not know exists (4.5 hidden) answers exactly as an unknown person or an unowned car, so the refusal is not an oracle.
+- The answer is an access-checked record id. The hits come from `query.run` itself, so logging and reason rules are the query's own; the fine and the arrest are `ordningsbot.issue` and `frihet.gripande` with their own checks.
+- No new permission keys: checking an ID is a person query, running a plate a vehicle query.
+
 ### 7.3 Persons — master name index (M2)
 
 - [M] Identity from the framework (name, DOB, sex, phone), with FredPD-owned extensions.

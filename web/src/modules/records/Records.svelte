@@ -24,6 +24,7 @@
   } from '@fredpd/schema';
   import { fieldList, type Failure } from '../shared/failure';
   import EntityPicker from '../shared/EntityPicker.svelte';
+  import { onIntent, peekIntent, type Intent } from '../../lib/intent';
   import {
     isStub,
     type FirearmDetail,
@@ -1197,6 +1198,18 @@
     'ordningsbot',
     'impound',
   ];
+
+  /**
+   * A field action's "Open in MDT" (lib/intent.ts): switch to the tab it
+   * names. Peeked, not taken -- the tab's own screen (Query) takes the rest.
+   */
+  function followIntent(intent: Intent | null): void {
+    if (!intent || intent.module !== 'records' || !intent.tab) return;
+    if ((tabs as string[]).includes(intent.tab)) tab = intent.tab as Tab;
+  }
+
+  followIntent(peekIntent());
+  $effect(() => onIntent(followIntent));
 
   /**
    * The tabs whose searches go into the name index and the registers (7.2).

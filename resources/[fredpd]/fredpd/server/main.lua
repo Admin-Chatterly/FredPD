@@ -124,6 +124,11 @@ local REQUIRED_TABLES <const> = {
     -- Migration 0012. Spaningsuppdrag (spec 7.13), and the widened hot-file
     -- confirmation constraints.
     'fpd_spaning',
+
+    -- Migration 0028. Who an unidentified arrestee is, hidden (7.2.1). Listed
+    -- because without it the first arrest of somebody who refused ID fails at
+    -- the roadside rather than here.
+    'fpd_person_pending_identity',
 }
 
 --- Columns a migration added to a table that already existed, which the table

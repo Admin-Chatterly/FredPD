@@ -153,3 +153,20 @@ test('renders the query tab in Swedish', async ({ page }) => {
 
   await expect(page.getByRole('alert').first()).toContainText('EFTERLYST');
 });
+
+test('a field check opened in the MDT lands on the query, already run', async ({ page }) => {
+  await page.goto('/?locale=en');
+  await expect(page.getByText('Signed in as A. Lindqvist')).toBeVisible();
+
+  // What client/field.lua sends from "Open in MDT" on a person: the module,
+  // the tab and the query, so the officer does not retype what they just ran.
+  await page.evaluate(() => {
+    window.postMessage(
+      { type: 'fredpd:open', intent: { module: 'records', tab: 'query', term: 'john', type: 'person' } },
+      window.location.origin,
+    );
+  });
+
+  await expect(page.getByRole('textbox', { name: 'Search' })).toHaveValue('john');
+  await expect(page.getByRole('alert').filter({ hasText: 'WANTED' })).toBeVisible();
+});

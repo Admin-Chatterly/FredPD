@@ -1406,6 +1406,19 @@ FredPD.Schema = {
         callsign = { type = 'string', required = false, min = 1, max = 16 },
     },
 
+    FieldPersonResolve = {
+        targetId = { type = 'integer', required = true, min = 1 },
+    },
+
+    FieldPersonConsent = {
+        token = { type = 'string', required = true, min = 32, max = 32 },
+        shown = { type = 'boolean', required = true },
+    },
+
+    FieldVehicleResolve = {
+        netId = { type = 'integer', required = true, min = 1 },
+    },
+
     PersonnelShiftStart = {
 
     },

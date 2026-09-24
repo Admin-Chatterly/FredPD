@@ -93,6 +93,13 @@ FredPD.Config.server = {
         accentColor = '#1b4f9c',
     },
 
+    --- Field actions on people and vehicles (ox_target).
+    field = {
+        --- How close, in metres, an officer must stand to check an ID or run
+        --- the plate on a car. Checked on the server.
+        range = 5.0,
+    },
+
     --- The roster (spec 4.1, 7.22). Nobody should have to type a row into
     --- the database before a new officer can use FredPD.
     roster = {
