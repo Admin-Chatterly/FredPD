@@ -22,20 +22,22 @@ local function config()
     return FredPD.Config.server.retention or {}
 end
 
---- Uploads nobody finished: the files first (when the gateway can be
---- asked), then the ledger rows. A row whose file could not be removed is
---- kept for the next run rather than forgotten with its file still there.
+--- Uploads nobody finished: the files first, then the ledger rows. A row
+--- whose file could not be removed is kept for the next run rather than
+--- forgotten with its file still there -- and with the gateway off (turned
+--- off, or its secret missing after a restart) nothing is forgotten at all:
+--- the files may still be on its disk, and a pending row costs nothing.
 local function abandonedUploads(days)
+    local gateway = FredPD.Bridge.gateway.service
+    if not gateway.isEnabled() then return 0 end
+
     local rows = repo.abandonedUploads(days, 200)
     if #rows == 0 then return 0 end
 
-    local gateway = FredPD.Bridge.gateway.service
-    if gateway.isEnabled() then
-        local refs = {}
-        for index, row in ipairs(rows) do refs[index] = row.mediaRef end
+    local refs = {}
+    for index, row in ipairs(rows) do refs[index] = row.mediaRef end
 
-        if not gateway.deleteMedia(refs) then return 0 end
-    end
+    if not gateway.deleteMedia(refs) then return 0 end
 
     local forgotten = 0
     for _, row in ipairs(rows) do forgotten = forgotten + (repo.forgetUpload(row.mediaRef) or 0) end
@@ -63,6 +65,7 @@ end
 function Events.run()
     local plan = service.plan(configuredDays())
     local results = {}
+    local failed = false
 
     for _, name in ipairs(service.ORDER) do
         local days = plan[name]
@@ -75,14 +78,19 @@ function Events.run()
             end)
 
             results[name] = ok and (affected or 0) or 'failed'
-            if not ok then print(('[fredpd] retention: %s failed: %s'):format(name, tostring(affected))) end
+            if not ok then
+                failed = true
+                print(('[fredpd] retention: %s failed: %s'):format(name, tostring(affected)))
+            end
         end
     end
 
     FredPD.Core.audit.write({
         action = 'retention.swept',
         subjectType = 'retention',
-        outcome = 'ok',
+        -- A run with a failed sweep is findable by outcome, not only by
+        -- reading every row's detail.
+        outcome = failed and 'error' or 'ok',
         detail = results,
     })
 

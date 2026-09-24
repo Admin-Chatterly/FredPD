@@ -80,22 +80,36 @@ function Repo.alprReads(days)
 end
 
 --- A draft anmälan its author walked away from: `utkast`, not a
---- tilläggsuppgift, and old. One with a supervisor's return pending is not
---- a draft nobody wants (the gateway sweep's own reasoning, kept).
+--- tilläggsuppgift, not touched for `days` -- neither the report itself
+--- (`updated_at`) nor its charges or people, which live in their own tables
+--- and do not move it. One with a supervisor's return pending is not a draft
+--- nobody wants (the gateway sweep's own reasoning, kept).
 ---
---- Nor one that has a tilläggsuppgift of its own: `fk_fpd_anmalan_parent`
---- is RESTRICT (0009), and a single such row in the set would fail the whole
---- DELETE on every run for ever. The parents are read through a derived
---- table, which is how MariaDB lets a DELETE look at its own table.
+--- Kept too, whatever its age:
+---   * one with a tilläggsuppgift of its own: `fk_fpd_anmalan_parent` is
+---     RESTRICT (0009), and a single such row in the set would fail the whole
+---     DELETE on every run for ever. The parents are read through a derived
+---     table, which is how MariaDB lets a DELETE look at its own table;
+---   * one an arrest or a lookout points at: those links are SET NULL (0010,
+---     0012), so deleting the draft would silently unlink a legal decision
+---     from its report.
 function Repo.staleDrafts(days)
     return batched(
         [[DELETE FROM fpd_anmalan
            WHERE status = 'utkast' AND parent_id IS NULL AND returned_at IS NULL
-             AND created_at < DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL ? DAY)
+             AND updated_at < DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL ? DAY)
              AND id NOT IN (SELECT parent_id FROM (
                  SELECT DISTINCT parent_id FROM fpd_anmalan WHERE parent_id IS NOT NULL) AS parents)
+             AND NOT EXISTS (SELECT 1 FROM fpd_anmalan_brott b
+                              WHERE b.anmalan_id = fpd_anmalan.id
+                                AND b.created_at >= DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL ? DAY))
+             AND NOT EXISTS (SELECT 1 FROM fpd_anmalan_personer ap
+                              WHERE ap.anmalan_id = fpd_anmalan.id
+                                AND ap.created_at >= DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL ? DAY))
+             AND NOT EXISTS (SELECT 1 FROM fpd_frihetsberovande f WHERE f.anmalan_id = fpd_anmalan.id)
+             AND NOT EXISTS (SELECT 1 FROM fpd_spaning s WHERE s.anmalan_id = fpd_anmalan.id)
            LIMIT ?]],
-        { days })
+        { days, days, days })
 end
 
 --- Who listened, when: the telemetry ages out, the decision (`fpd_hak`) never.

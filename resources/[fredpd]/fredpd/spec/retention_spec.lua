@@ -93,4 +93,14 @@ describe('retention repo: bounded deletes', function()
 
         assert.are.equal(20, #sent)
     end)
+
+    it('keeps a draft an arrest or a lookout points at, and ages drafts from their last edit', function()
+        FredPD.Repo.retention.staleDrafts(180)
+
+        local sql = sent[1].sql
+        assert.truthy(sql:find('updated_at <', 1, true))
+        assert.truthy(sql:find('fpd_frihetsberovande', 1, true))
+        assert.truthy(sql:find('fpd_spaning', 1, true))
+        assert.are.same({ 180, 180, 180, 5000 }, sent[1].params)
+    end)
 end)

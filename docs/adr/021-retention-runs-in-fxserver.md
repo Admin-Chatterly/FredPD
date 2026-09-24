@@ -40,6 +40,10 @@ in the ledger for ever.
   - a draft that has a tilläggsuppgift of its own is kept, because the
     foreign key is RESTRICT;
   - a draft with a pending supervisor return is kept;
+  - a draft that an arrest or a lookout points at is kept, because those
+    links are SET NULL and would silently lose their report;
+  - a draft's age runs from its last edit, including its charges and
+    people, not from when it was created;
   - the surveillance decision (`fpd_hak`) is never swept, only the session
     telemetry.
 - **Closed scenes are still not swept.** Their evidence cascades with them;
@@ -48,8 +52,8 @@ in the ledger for ever.
   that it failed. No sweep touches `fpd_audit_log` (invariant 11).
 - **The gateway is asked only for files.** When it is on, abandoned uploads
   are removed from the media store through `/fx/media/delete`, and each ledger
-  row is dropped only after its file is gone. When the gateway is off, there
-  were never any files.
+  row is dropped only after its file is gone. When the gateway is off, the
+  rows are kept: it may only be off for now, with the files still on its disk.
 
 ## Consequences
 
