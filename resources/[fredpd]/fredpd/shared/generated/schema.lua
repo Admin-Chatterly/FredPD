@@ -58,6 +58,7 @@ FredPD.PlacementKind = {
     FINGERPRINT_SCANNER = 'fingerprint_scanner',
     IMPOUND_LOT = 'impound_lot',
     PUBLIC_COUNTER = 'public_counter',
+    CCTV_CAMERA = 'cctv_camera',
 }
 
 --- How a placement is reached in the world (spec 3.10).
@@ -271,7 +272,7 @@ FredPD.Schema = {
     },
 
     PlacementCreate = {
-        kind = { type = 'enum', required = true, values = { 'station_terminal', 'property_terminal', 'lab_terminal', 'booking_terminal', 'dispatch_console', 'courthouse_terminal', 'motorpool', 'evidence_bench', 'fingerprint_scanner', 'impound_lot', 'public_counter' } },
+        kind = { type = 'enum', required = true, values = { 'station_terminal', 'property_terminal', 'lab_terminal', 'booking_terminal', 'dispatch_console', 'courthouse_terminal', 'motorpool', 'evidence_bench', 'fingerprint_scanner', 'impound_lot', 'public_counter', 'cctv_camera' } },
         interaction = { type = 'enum', required = true, values = { 'prop', 'ped', 'zone' } },
         agencyId = { type = 'string', required = false, max = 32 },
         model = { type = 'string', required = false, max = 64 },
@@ -285,7 +286,7 @@ FredPD.Schema = {
 
     PlacementUpdate = {
         id = { type = 'integer', required = true, min = 1 },
-        kind = { type = 'enum', required = false, values = { 'station_terminal', 'property_terminal', 'lab_terminal', 'booking_terminal', 'dispatch_console', 'courthouse_terminal', 'motorpool', 'evidence_bench', 'fingerprint_scanner', 'impound_lot', 'public_counter' } },
+        kind = { type = 'enum', required = false, values = { 'station_terminal', 'property_terminal', 'lab_terminal', 'booking_terminal', 'dispatch_console', 'courthouse_terminal', 'motorpool', 'evidence_bench', 'fingerprint_scanner', 'impound_lot', 'public_counter', 'cctv_camera' } },
         interaction = { type = 'enum', required = false, values = { 'prop', 'ped', 'zone' } },
         model = { type = 'string', required = false, max = 64 },
         x = { type = 'number', required = false },
@@ -1585,6 +1586,51 @@ FredPD.Schema = {
 
     DocumentCapabilities = {
 
+    },
+
+    CameraSources = {
+        placementId = { type = 'integer', required = false, min = 1 },
+    },
+
+    CameraViewStart = {
+        placementId = { type = 'integer', required = true, min = 1 },
+        source = { type = 'enum', required = true, values = { 'cctv', 'bodycam', 'dashcam' } },
+        cameraId = { type = 'integer', required = false, min = 1 },
+        officerId = { type = 'integer', required = false, min = 1 },
+    },
+
+    CameraViewStop = {
+
+    },
+
+    FootageList = {
+        status = { type = 'enum', required = false, values = { 'requested', 'approved', 'denied' } },
+    },
+
+    FootageRequest = {
+        source = { type = 'enum', required = true, values = { 'cctv', 'bodycam', 'dashcam' } },
+        cameraId = { type = 'integer', required = false, min = 1 },
+        officerId = { type = 'integer', required = false, min = 1 },
+        windowFrom = { type = 'integer', required = true, min = 1 },
+        windowTo = { type = 'integer', required = true, min = 1 },
+        reason = { type = 'string', required = true, min = 5, max = 500 },
+        fuId = { type = 'integer', required = false, min = 1 },
+    },
+
+    FootageDecide = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        approve = { type = 'boolean', required = true },
+        note = { type = 'string', required = false, max = 500 },
+    },
+
+    FootageStillBegin = {
+        requestId = { type = 'integer', required = true, min = 1 },
+    },
+
+    FootageStillCommit = {
+        requestId = { type = 'integer', required = true, min = 1 },
+        mediaRef = { type = 'string', required = true, min = 1, max = 64 },
     },
 
     PlacementsPublic = {

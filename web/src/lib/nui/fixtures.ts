@@ -4032,6 +4032,53 @@ const officers: FixtureOfficer[] = [
   },
 ];
 
+/** Footage requests (7.19, 0041). */
+interface FixtureFootage {
+  id: number;
+  number: string;
+  source: 'cctv' | 'bodycam' | 'dashcam';
+  cameraId?: number;
+  officerId?: number;
+  officerCallsign?: string;
+  windowFromAgo: number;
+  windowToAgo: number;
+  reason: string;
+  status: 'requested' | 'approved' | 'denied';
+  requestedBy: string;
+  version: number;
+  stillThumbUrl?: string;
+}
+
+const footage: FixtureFootage[] = [
+  {
+    id: 1,
+    number: 'F26-00007',
+    source: 'cctv',
+    cameraId: 12,
+    windowFromAgo: HOUR,
+    windowToAgo: -HOUR,
+    reason: 'Robbery at the Vespucci liquor store',
+    status: 'approved',
+    requestedBy: '100000000000000001',
+    version: 2,
+  },
+  {
+    id: 2,
+    number: 'F26-00008',
+    source: 'bodycam',
+    officerId: 2,
+    officerCallsign: '12-41',
+    windowFromAgo: 0,
+    windowToAgo: -2 * HOUR,
+    reason: 'Use of force review, Alta Street',
+    status: 'requested',
+    requestedBy: '100000000000000003',
+    version: 1,
+  },
+];
+
+let nextFootage = 9;
+
 /** Reports handed in at a front desk (7.29, 0040). */
 interface FixturePublicReport {
   id: number;
@@ -5845,6 +5892,101 @@ export const fixtures: FixtureSet = {
       if (!row) return refuse('not_found');
 
       return { officer: officerRow(row, true) };
+    },
+
+    // ------------------------------------------------------------ cameras (7.19)
+
+    'camera.sources': () => ({
+      cameras: [{ id: 12 }, { id: 14 }],
+      bodycams: [{ officerId: 2, callsign: '12-41' }],
+      dashcams: [],
+      mayView: true,
+    }),
+
+    'camera.view.start': (input) => {
+      const { placementId, source, cameraId, officerId } = (input ?? {}) as {
+        placementId?: number;
+        source?: string;
+        cameraId?: number;
+        officerId?: number;
+      };
+      if (!placementId) return refuse('forbidden', { placementId: 'not_at_terminal' });
+      if (source === 'cctv') {
+        return { source, label: `CCTV ${cameraId}`, requestId: cameraId === 12 ? 1 : null, position: { x: 0, y: 0, z: 0, heading: 0 } };
+      }
+      return { source, label: officerId === 2 ? '12-41' : String(officerId) };
+    },
+
+    /** The client's own callback (client/camera.lua): the game takes the view. */
+    'fredpd:cameraOpen': () => ({}),
+
+    'camera.view.stop': () => ({}),
+
+    'camera.footage.list': () => ({
+      mayApprove: true,
+      requests: footage.map((row) => ({
+        id: row.id,
+        number: row.number,
+        source: row.source,
+        cameraId: row.cameraId ?? null,
+        officerId: row.officerId ?? null,
+        officerCallsign: row.officerCallsign ?? null,
+        windowFrom: secondsAgo(row.windowFromAgo),
+        windowTo: secondsAgo(row.windowToAgo),
+        reason: row.reason,
+        status: row.status,
+        requestedAt: secondsAgo(row.windowFromAgo),
+        stillThumbUrl: row.stillThumbUrl ?? null,
+        version: row.version,
+        mine: row.requestedBy === FIXTURE_VIEWER,
+      })),
+    }),
+
+    'camera.footage.request': (input) => {
+      const body = (input ?? {}) as { source?: string; cameraId?: number; officerId?: number; reason?: string };
+      if (body.source === 'cctv' && !body.cameraId) return refuse('invalid', { cameraId: 'required' });
+      if (body.source !== 'cctv' && !body.officerId) return refuse('invalid', { officerId: 'required' });
+      if (!body.reason || body.reason.trim().length < 5) return refuse('invalid', { reason: 'too_short' });
+
+      const number = `F26-000${nextFootage++}`;
+      footage.unshift({
+        id: footage.length + 1,
+        number,
+        source: body.source as FixtureFootage['source'],
+        ...(body.cameraId ? { cameraId: body.cameraId } : {}),
+        ...(body.officerId ? { officerId: body.officerId } : {}),
+        windowFromAgo: 0,
+        windowToAgo: -2 * HOUR,
+        reason: body.reason.trim(),
+        status: 'requested',
+        requestedBy: FIXTURE_VIEWER,
+        version: 1,
+      });
+      return { id: footage.length, number };
+    },
+
+    'camera.footage.decide': (input) => {
+      const body = (input ?? {}) as { id?: number; version?: number; approve?: boolean };
+      const row = footage.find((entry) => entry.id === body.id);
+      if (!row) return refuse('not_found');
+      if (row.requestedBy === FIXTURE_VIEWER) return refuse('forbidden', { id: 'own_request' });
+      if (row.version !== body.version || row.status !== 'requested') return refuse('conflict', { version: 'stale' });
+      row.status = body.approve ? 'approved' : 'denied';
+      row.version += 1;
+      return { id: row.id, number: row.number };
+    },
+
+    'camera.still.begin': (input) => {
+      const { requestId } = (input ?? {}) as { requestId?: number };
+      return { mediaRef: `media_00000000-0000-0000-0000-00000000000${requestId ?? 0}`, uploadUrl: 'https://media.example/upload' };
+    },
+
+    'camera.still.commit': (input) => {
+      const { requestId } = (input ?? {}) as { requestId?: number };
+      const row = footage.find((entry) => entry.id === requestId);
+      if (!row) return refuse('not_found');
+      row.stillThumbUrl = TINY_IMAGE;
+      return { id: row.id, number: row.number };
     },
 
     // ------------------------------------------------------------ civilian mode (7.29)

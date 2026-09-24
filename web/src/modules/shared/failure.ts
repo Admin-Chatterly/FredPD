@@ -75,6 +75,14 @@ const REASONS = new Set([
   'target_stale',
   // Civilian mode (7.29).
   'not_here',
+  // Cameras (7.19).
+  'not_at_terminal',
+  'needs_request',
+  'no_camera',
+  'own_request',
+  'not_viewing',
+  'still_taken',
+  'too_long',
   'role_actions_off',
   'role_not_allowed',
   'member_not_found',

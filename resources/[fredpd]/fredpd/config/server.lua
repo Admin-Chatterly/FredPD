@@ -440,6 +440,16 @@ FredPD.Config.server = {
         },
     },
 
+    --- Cameras (spec 7.19). CCTV cameras are `cctv_camera` placements set up
+    --- in game; body-worn cameras are officers' issued `bodycam`; dash cameras
+    --- are agency vehicles. `frameMs` is how often a body-worn or dash view is
+    --- moved (per viewer, never broadcast); `maxWindowHours` is the longest a
+    --- footage request may ask to look for.
+    cameras = {
+        frameMs = 250,
+        maxWindowHours = 12,
+    },
+
     --- Civilian mode (spec 7.29): a police front desk anybody may use (a
     --- `public_counter` placement, set up in game). `perDay` is how many
     --- reports one character may hand in over a day.

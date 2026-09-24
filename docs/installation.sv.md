@@ -364,6 +364,12 @@ Därefter väljer du vad placeringen ska öppna: stationsterminal, terminal i
 beslagsrummet, laboratorieterminal, terminal för inskrivning, ledningsplats,
 terminal i domstolen, fordonsdepå, bevisbänk eller **polisens reception**.
 
+En **övervakningskamera** placeras där kameran sitter, med den riktning du
+själv står i. Den öppnar ingenting där den sitter; den ses från en
+stationsterminal eller ledningsplatsen (Register → Kameror). Kroppskameror är
+utdelade `bodycam` i personalregistret, och fordonskameror är myndighetens
+fordon. Stillbilder kräver gatewayen och screenshot-basic (se 11c).
+
 Receptionen är den enda placeringen som **alla spelare** kan använda, inte bara
 poliser (7.29, ADR-023). Där ser besökaren sina egna ordningsböter och de
 åtalsbeslut och domar som gäller dem, och kan lämna in en anmälan om stöld

@@ -168,6 +168,10 @@ const PAIRED: Record<string, keyof typeof enums> = {
   // Reports from the public (0040, spec 7.29).
   ck_fpd_public_reports_kind: 'PUBLIC_REPORT_KINDS',
   ck_fpd_public_reports_status: 'PUBLIC_REPORT_STATUSES',
+  // Cameras (0041, spec 7.19).
+  ck_fpd_footage_source: 'FOOTAGE_SOURCES',
+  ck_fpd_footage_status: 'FOOTAGE_STATUSES',
+  ck_fpd_footage_class: 'CLASSIFICATIONS',
 
   // Field interviews and stops (0035, spec 7.14).
   ck_fpd_fi_cards_reason: 'FI_REASONS',

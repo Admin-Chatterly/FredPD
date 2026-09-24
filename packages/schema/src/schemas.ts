@@ -16,6 +16,7 @@ import {
   DOCUMENT_KINDS,
   PUBLIC_REPORT_KINDS,
   PUBLIC_REPORT_STATUSES,
+  FOOTAGE_SOURCES,
   EVIDENCE_DESTINATIONS,
   EVIDENCE_PACKAGING,
   EVIDENCE_STATUSES,
@@ -2758,6 +2759,55 @@ export const schemas = {
   },
 
   DocumentCapabilities: {},
+
+  // ------------------------------------------------------------ cameras (7.19)
+
+  /** The cameras there are to look through, from a terminal. */
+  CameraSources: {
+    placementId: { type: 'integer', required: false, min: 1 },
+  },
+
+  /** Live view, from a station terminal or the dispatch console. */
+  CameraViewStart: {
+    placementId: { type: 'integer', required: true, min: 1 },
+    source: { type: 'enum', required: true, values: FOOTAGE_SOURCES },
+    cameraId: { type: 'integer', required: false, min: 1 },
+    officerId: { type: 'integer', required: false, min: 1 },
+  },
+
+  CameraViewStop: {},
+
+  FootageList: {
+    status: { type: 'enum', required: false, values: ['requested', 'approved', 'denied'] },
+  },
+
+  /** A request to look through one camera over a window of time, and why. */
+  FootageRequest: {
+    source: { type: 'enum', required: true, values: FOOTAGE_SOURCES },
+    cameraId: { type: 'integer', required: false, min: 1 },
+    officerId: { type: 'integer', required: false, min: 1 },
+    windowFrom: { type: 'integer', required: true, min: 1 },
+    windowTo: { type: 'integer', required: true, min: 1 },
+    reason: { type: 'string', required: true, min: 5, max: 500 },
+    fuId: { type: 'integer', required: false, min: 1 },
+  },
+
+  FootageDecide: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    approve: { type: 'boolean', required: true },
+    note: { type: 'string', required: false, max: 500 },
+  },
+
+  /** A still from the camera being looked through, for the request it is under. */
+  FootageStillBegin: {
+    requestId: { type: 'integer', required: true, min: 1 },
+  },
+
+  FootageStillCommit: {
+    requestId: { type: 'integer', required: true, min: 1 },
+    mediaRef: { type: 'string', required: true, min: 1, max: 64 },
+  },
 
   // ------------------------------------------------------------ civilian mode (7.29)
 

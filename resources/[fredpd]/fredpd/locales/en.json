@@ -83,7 +83,7 @@
   "fieldError": {
     "type": "the wrong kind of value",
     "too_short": "too short",
-    "too_long": "too long",
+    "too_long": "the window is longer than a request may ask for",
     "too_small": "too small",
     "too_large": "too large",
     "required": "required",
@@ -216,7 +216,13 @@
     "discord_error": "Discord could not make the change",
     "discord_unreachable": "Discord did not answer; try again",
     "target_stale": "their Discord roles could not be read just now; try again shortly",
-    "not_here": "you are not at the front desk"
+    "not_here": "you are not at the front desk",
+    "not_at_terminal": "watch from a station terminal or the dispatch console",
+    "needs_request": "you need an approved footage request for this camera, open now",
+    "no_camera": "that officer has no camera recording right now",
+    "own_request": "nobody decides their own request",
+    "not_viewing": "you are not watching this camera under that request",
+    "still_taken": "this request already has its still"
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -246,7 +252,8 @@
         "evidence_bench": "Marks a location for evidence work. No client action is wired to it yet.",
         "fingerprint_scanner": "Collects a fingerprint from whoever uses it.",
         "impound_lot": "Where impounded vehicles stand. Opens the impound register.",
-        "public_counter": "A police front desk anyone may use: their own citations, prosecution decisions and verdicts, and handing in a report or a complaint."
+        "public_counter": "A police front desk anyone may use: their own citations, prosecution decisions and verdicts, and handing in a report or a complaint.",
+        "cctv_camera": "A CCTV camera: where it hangs and which way it looks (your heading). Watched from a terminal, not here."
       },
       "newZone": "New here — area",
       "newProp": "New here — bind to the prop I am looking at",
@@ -267,7 +274,8 @@
       "deleteBody": "{kind}, {distance} m away. This cannot be undone."
     },
     "impound_lot": "Impound lot",
-    "public_counter": "Front desk"
+    "public_counter": "Front desk",
+    "cctv_camera": "CCTV camera"
   },
   "chat": {
     "usage": "Write a message after the command.",
@@ -1189,7 +1197,8 @@
       "impound": "Impound",
       "locations": "Locations",
       "fi": "Field interviews",
-      "public": "From the public"
+      "public": "From the public",
+      "cameras": "Cameras"
     },
     "vehicle": {
       "alpr": {
@@ -3330,6 +3339,76 @@
       "handedIn": "Handed in",
       "status": "Status",
       "noName": "name not given"
+    }
+  },
+  "camera": {
+    "overlay": {
+      "plain": "{label} — arrow keys look around, Backspace leaves",
+      "withStill": "{label} — arrow keys look around, E keeps a still, Backspace leaves"
+    },
+    "still": {
+      "unavailable": "Stills cannot be taken on this server (screenshot-basic is not started).",
+      "failed": "The still could not be taken.",
+      "sent": "Still taken. It is attached to the request.",
+      "kept": "Still kept on {number}."
+    },
+    "ended": {
+      "viewer_gone": "The view ended.",
+      "left_terminal": "The view ended: you left the terminal.",
+      "camera_off": "The view ended: the camera is no longer recording."
+    },
+    "notify": {
+      "requested": "A footage request is waiting for approval: {number}"
+    },
+    "source": {
+      "cctv": "CCTV",
+      "bodycam": "Body-worn camera",
+      "dashcam": "Dash camera"
+    },
+    "status": {
+      "requested": "Waiting for approval",
+      "approved": "Approved",
+      "denied": "Denied"
+    },
+    "live": {
+      "title": "Live view",
+      "cameras": "CCTV cameras",
+      "bodycams": "Body-worn cameras",
+      "dashcams": "Dash cameras",
+      "none": "None right now.",
+      "watch": "Watch",
+      "watchLabel": "Watch {label}",
+      "atTerminal": "Watch from a station terminal or the dispatch console.",
+      "byRequest": "You can watch a camera only through an approved footage request of your own, while its window is open."
+    },
+    "requests": {
+      "title": "Footage requests",
+      "none": "No footage requests.",
+      "number": "Number",
+      "source": "Camera",
+      "window": "Window",
+      "status": "Status",
+      "still": "Still",
+      "requestedBy": "Requested",
+      "approve": "Approve",
+      "deny": "Deny",
+      "confirmApprove": "Approve {number}?",
+      "confirmDeny": "Deny {number}?",
+      "note": "Note",
+      "decided": "{number} is decided.",
+      "openStill": "Open the still"
+    },
+    "form": {
+      "title": "Request footage",
+      "source": "Camera type",
+      "camera": "Camera",
+      "officer": "Officer",
+      "from": "From",
+      "to": "To",
+      "reason": "Reason",
+      "fu": "Investigation (optional)",
+      "submit": "Request",
+      "sent": "Request {number} sent for approval."
     }
   }
 }

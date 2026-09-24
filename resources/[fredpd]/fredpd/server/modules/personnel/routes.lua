@@ -732,3 +732,9 @@ route.define({
     auditDetail = roleAuditDetail,
     handler = function(session, input) return changeRole(session, input, 'rank') end,
 })
+
+--- For another module that needs to know whether an officer carries an item
+--- (7.19: a body-worn camera is the `bodycam` they were issued).
+FredPD.Modules.personnelHolds = function(officerId, agencyId, itemKey)
+    return repo.holds(officerId, agencyId, itemKey)
+end

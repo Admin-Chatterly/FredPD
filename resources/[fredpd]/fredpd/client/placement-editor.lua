@@ -35,6 +35,7 @@ local KIND_ICONS <const> = {
     fingerprint_scanner = 'fingerprint',
     impound_lot = 'truck-pickup',
     public_counter = 'bell-concierge',
+    cctv_camera = 'video',
 }
 
 --- Placement kinds offered in the editor, each with its label, a one-line

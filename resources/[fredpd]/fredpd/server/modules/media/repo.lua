@@ -37,6 +37,24 @@ function Repo.pendingCount(agencyId, discordId, seconds)
         { agencyId, discordId, seconds }) or 0
 end
 
+--- Marks a pending upload committed, once: the affected-row count is the
+--- answer to "did this call commit it" (see `commitPhoto`).
+--- @return boolean
+function Repo.flip(mediaRef, agencyId)
+    return db().execute(
+        [[UPDATE fpd_media SET status = 'committed', committed_at = CURRENT_TIMESTAMP(3)
+           WHERE media_ref = ? AND agency_id = ? AND status = 'pending']],
+        { mediaRef, agencyId }) == 1
+end
+
+--- Puts a flip back when the record it was for could not be written.
+function Repo.unflip(mediaRef, agencyId)
+    return db().execute(
+        [[UPDATE fpd_media SET status = 'pending', committed_at = NULL
+           WHERE media_ref = ? AND agency_id = ? AND status = 'committed']],
+        { mediaRef, agencyId })
+end
+
 --- Attaches an uploaded photograph to a person, once.
 ---
 --- The ledger row is flipped on its own first, and its affected-row count is

@@ -159,6 +159,15 @@ function Repo.returnEquipment(id, officerId, agencyId)
         { id, officerId, agencyId })
 end
 
+--- Does this officer hold one of these, issued and not returned?
+function Repo.holds(officerId, agencyId, itemKey)
+    return FredPD.Core.db.scalar(
+        [[SELECT 1 FROM fpd_personnel_equipment
+           WHERE officer_id = ? AND agency_id = ? AND item_key = ? AND returned_at IS NULL
+           LIMIT 1]],
+        { officerId, agencyId, itemKey }) ~= nil
+end
+
 function Repo.equipmentFor(officerId, agencyId)
     return FredPD.Core.db.query(
         [[SELECT id, firearm_id AS firearmId, item_key AS itemKey, serial,

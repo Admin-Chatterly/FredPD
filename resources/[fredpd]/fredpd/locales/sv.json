@@ -83,7 +83,7 @@
   "fieldError": {
     "type": "fel typ av värde",
     "too_short": "för kort",
-    "too_long": "för långt",
+    "too_long": "tidsfönstret är längre än en begäran får vara",
     "too_small": "för litet",
     "too_large": "för stort",
     "required": "obligatoriskt",
@@ -216,7 +216,13 @@
     "discord_error": "Discord kunde inte göra ändringen",
     "discord_unreachable": "Discord svarade inte; försök igen",
     "target_stale": "personens Discord-roller gick inte att läsa just nu; försök igen strax",
-    "not_here": "du står inte vid receptionen"
+    "not_here": "du står inte vid receptionen",
+    "not_at_terminal": "visa från en stationsterminal eller ledningsplatsen",
+    "needs_request": "du behöver en godkänd begäran för den här kameran, öppen nu",
+    "no_camera": "polisen har ingen kamera som spelar in just nu",
+    "own_request": "ingen beslutar om sin egen begäran",
+    "not_viewing": "du tittar inte genom den här kameran med den begäran",
+    "still_taken": "begäran har redan sin stillbild"
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -246,7 +252,8 @@
         "evidence_bench": "Markerar en plats för bevishantering. Ingen klientfunktion är kopplad till den ännu.",
         "fingerprint_scanner": "Tar ett fingeravtryck från den som använder den.",
         "impound_lot": "Där bärgade och omhändertagna fordon ställs upp. Öppnar registret över omhändertagna fordon.",
-        "public_counter": "En reception som alla kan använda: egna ordningsböter, åtalsbeslut och domar, och att lämna in en anmälan eller ett klagomål."
+        "public_counter": "En reception som alla kan använda: egna ordningsböter, åtalsbeslut och domar, och att lämna in en anmälan eller ett klagomål.",
+        "cctv_camera": "En övervakningskamera: var den sitter och vart den pekar (din riktning). Den ses från en terminal, inte här."
       },
       "newZone": "Ny här — område",
       "newProp": "Ny här — koppla till föremålet jag tittar på",
@@ -267,7 +274,8 @@
       "deleteBody": "{kind}, {distance} m härifrån. Det går inte att ångra."
     },
     "impound_lot": "Uppställningsplats",
-    "public_counter": "Polisens reception"
+    "public_counter": "Polisens reception",
+    "cctv_camera": "Övervakningskamera"
   },
   "chat": {
     "usage": "Skriv ett meddelande efter kommandot.",
@@ -1189,7 +1197,8 @@
       "impound": "Beslag",
       "locations": "Adresser",
       "fi": "Kontaktkort",
-      "public": "Från allmänheten"
+      "public": "Från allmänheten",
+      "cameras": "Kameror"
     },
     "vehicle": {
       "alpr": {
@@ -3330,6 +3339,76 @@
       "handedIn": "Inlämnad",
       "status": "Status",
       "noName": "namn saknas"
+    }
+  },
+  "camera": {
+    "overlay": {
+      "plain": "{label} — piltangenterna vrider, Backsteg avslutar",
+      "withStill": "{label} — piltangenterna vrider, E sparar en stillbild, Backsteg avslutar"
+    },
+    "still": {
+      "unavailable": "Stillbilder kan inte tas på den här servern (screenshot-basic är inte startad).",
+      "failed": "Stillbilden kunde inte tas.",
+      "sent": "Stillbilden är tagen och kopplas till begäran.",
+      "kept": "Stillbilden är sparad på {number}."
+    },
+    "ended": {
+      "viewer_gone": "Visningen avslutades.",
+      "left_terminal": "Visningen avslutades: du lämnade terminalen.",
+      "camera_off": "Visningen avslutades: kameran spelar inte längre in."
+    },
+    "notify": {
+      "requested": "En begäran om filmmaterial väntar på beslut: {number}"
+    },
+    "source": {
+      "cctv": "Övervakningskamera",
+      "bodycam": "Kroppskamera",
+      "dashcam": "Fordonskamera"
+    },
+    "status": {
+      "requested": "Väntar på beslut",
+      "approved": "Godkänd",
+      "denied": "Avslagen"
+    },
+    "live": {
+      "title": "Direktbild",
+      "cameras": "Övervakningskameror",
+      "bodycams": "Kroppskameror",
+      "dashcams": "Fordonskameror",
+      "none": "Inga just nu.",
+      "watch": "Visa",
+      "watchLabel": "Visa {label}",
+      "atTerminal": "Visa från en stationsterminal eller ledningsplatsen.",
+      "byRequest": "Du kan se genom en kamera bara med en egen godkänd begäran, medan dess tidsfönster är öppet."
+    },
+    "requests": {
+      "title": "Begäran om filmmaterial",
+      "none": "Inga begäranden.",
+      "number": "Nummer",
+      "source": "Kamera",
+      "window": "Tidsfönster",
+      "status": "Status",
+      "still": "Stillbild",
+      "requestedBy": "Begärd",
+      "approve": "Godkänn",
+      "deny": "Avslå",
+      "confirmApprove": "Godkänn {number}?",
+      "confirmDeny": "Avslå {number}?",
+      "note": "Anteckning",
+      "decided": "Beslut fattat om {number}.",
+      "openStill": "Öppna stillbilden"
+    },
+    "form": {
+      "title": "Begär filmmaterial",
+      "source": "Kameratyp",
+      "camera": "Kamera",
+      "officer": "Polis",
+      "from": "Från",
+      "to": "Till",
+      "reason": "Skäl",
+      "fu": "Förundersökning (valfritt)",
+      "submit": "Begär",
+      "sent": "Begäran {number} är skickad för beslut."
     }
   }
 }

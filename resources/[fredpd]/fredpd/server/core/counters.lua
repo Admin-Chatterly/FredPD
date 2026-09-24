@@ -97,6 +97,8 @@ local KINDS <const> = {
     document = true,
     -- A report handed in at a front desk (7.29, 0040).
     public_report = true,
+    -- A footage request (7.19, 0041).
+    footage = true,
 }
 
 --- The `year` value for a sequence that is not year-scoped.

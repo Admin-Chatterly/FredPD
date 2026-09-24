@@ -22,6 +22,7 @@
   import Locations from './Locations.svelte';
   import FieldWork from './FieldWork.svelte';
   import PublicReports from './PublicReports.svelte';
+  import Cameras from './Cameras.svelte';
   import { takePhoto } from '../../lib/photo';
   import { t } from '../../lib/i18n';
   import { formatDate, formatMoment } from '../../lib/time';
@@ -106,7 +107,8 @@
     | 'impound'
     | 'locations'
     | 'fi'
-    | 'public';
+    | 'public'
+    | 'cameras';
 
   /** Which form's label a rejected field belongs to (spec 3.5). */
   const FIELD_LABELS: Record<string, string> = {
@@ -1279,6 +1281,8 @@
     'fi',
     // What the public handed in at a front desk (7.29).
     'public',
+    // CCTV, body-worn and dash cameras, and footage requests (7.19).
+    'cameras',
   ];
 
   /**
@@ -3473,6 +3477,8 @@
     <Impound />
   {:else if tab === 'locations'}
     <Locations />
+  {:else if tab === 'cameras'}
+    <Cameras />
   {:else if tab === 'public'}
     <PublicReports
       onOpenPerson={(id) => {

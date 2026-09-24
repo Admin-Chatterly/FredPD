@@ -76,6 +76,58 @@ function Api.links(mediaRef)
     return gateway().downloadUrl(mediaRef, false), gateway().downloadUrl(mediaRef, true)
 end
 
+--- Step 1 for any other purpose (7.19: a footage still), for a route that has
+--- already decided this officer may add one to `subjectId`.
+---
+--- @return table|nil `{ mediaRef, uploadUrl, expiresAt }`, table|nil refusal
+function Api.begin(session, purpose, subjectId)
+    if not gateway().isEnabled() then
+        return nil, route.refuse(FredPD.ErrorCode.CONFLICT, { _input = 'gateway_off' })
+    end
+
+    if repo.pendingCount(session.agencyId, session.discordId, service.PENDING_SECONDS) >= service.MAX_PENDING then
+        return nil, route.refuse(FredPD.ErrorCode.RATE_LIMITED)
+    end
+
+    local ok, token = gateway().requestUploadToken('image')
+    if not ok or not service.isRef(token.mediaRef) or type(token.uploadUrl) ~= 'string' then
+        return nil, route.refuse(FredPD.ErrorCode.CONFLICT, { _input = 'gateway_unavailable' })
+    end
+
+    repo.begin(token.mediaRef, session.agencyId, purpose, subjectId, nil, session.discordId)
+
+    return { mediaRef = token.mediaRef, uploadUrl = token.uploadUrl, expiresAt = token.expiresAt }
+end
+
+--- Step 3 for any other purpose: only a ref this server issued, to this
+--- officer, for this purpose and subject, still pending, whose file the
+--- gateway holds, is committed. The caller attaches it to its record, and
+--- calls `uncommit` when that fails.
+---
+--- @return boolean ok, table|nil refusal
+function Api.commit(session, mediaRef, purpose, subjectId)
+    if not service.isRef(mediaRef) then
+        return false, route.refuse(FredPD.ErrorCode.NOT_FOUND, { mediaRef = 'unknown' })
+    end
+
+    local pending = repo.pending(mediaRef, session.agencyId, session.discordId, service.PENDING_SECONDS)
+    if not pending or pending.purpose ~= purpose or pending.subjectId ~= subjectId then
+        return false, route.refuse(FredPD.ErrorCode.NOT_FOUND, { mediaRef = 'unknown' })
+    end
+
+    if not gateway().requestDownloadToken(mediaRef) then
+        return false, route.refuse(FredPD.ErrorCode.CONFLICT, { mediaRef = 'not_uploaded' })
+    end
+
+    if not repo.flip(mediaRef, session.agencyId) then return false, route.refuse(FredPD.ErrorCode.CONFLICT) end
+
+    return true
+end
+
+function Api.uncommit(session, mediaRef)
+    repo.unflip(mediaRef, session.agencyId)
+end
+
 FredPD.Modules.mediaApi = Api
 
 route.define({

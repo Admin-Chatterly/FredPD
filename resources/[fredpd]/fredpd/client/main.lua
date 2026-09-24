@@ -304,6 +304,15 @@ local NUI_ROUTES <const> = {
     'document.capabilities',
     'document.print',
     'document.preview',
+    -- Cameras (7.19).
+    'camera.sources',
+    'camera.view.start',
+    'camera.view.stop',
+    'camera.footage.list',
+    'camera.footage.request',
+    'camera.footage.decide',
+    'camera.still.begin',
+    'camera.still.commit',
     -- Civilian mode (7.29): the front desk, and the officers' inbox.
     'civilian.overview',
     'civilian.report.create',

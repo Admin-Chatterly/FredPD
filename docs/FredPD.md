@@ -1043,6 +1043,16 @@ so; this section says what it would take to change that.
 
 - [O] CCTV, body-worn and dash cameras with live view, as in ps-mdt v3.
 - [O] Footage request workflow (request, approve, attach a still frame as evidence).
+- **Built (0041).** Records → *Cameras*.
+  - **Sources.** A CCTV camera is a `cctv_camera` placement, set up in game with its heading. A body-worn camera is an on-duty officer's issued `bodycam` (7.22). A dash camera is the agency vehicle an on-duty officer is in.
+  - **Live view** is watched from a station terminal or the dispatch console, checked on the server. `camera.view` may look through any camera; anybody else only through an approved footage request of their own for that camera, while its window is open.
+    - For a body-worn or dash camera, the server sends the position to that one viewer every `cameras.frameMs`, and never broadcasts it.
+    - The view ends when the viewer leaves the terminal, or when the camera stops being one (off duty, bodycam handed in, out of the car).
+    - Every view is audited from start to end.
+    - The viewer's game streams the scene around the camera. Players and cars there appear only when OneSync has them in range of the viewer.
+  - **Footage request** (`camera.footage.request`, `F{YY}-{#####}`): one source, a window of at most `cameras.maxWindowHours`, a reason, and optionally a förundersökning the requester may read. A supervisor approves or denies it (`camera.footage.approve`), never their own.
+  - **Stills.** During a view under an approved request, **E** keeps one still. It goes through the media pipeline (ADR-019, purpose `footage_still`) and is attached to the request as its evidence.
+- **Permissions:** `camera.view` (dispatch, supervisor), `camera.footage.request` (patrol, dispatch), `camera.footage.approve` (supervisor).
 
 ### 7.20 Court and DOJ (M6)
 
@@ -1867,6 +1877,7 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Enforcement | `rms.arrest.create`, `rms.citation.issue`, `rms.citation.void`, `rms.fi.create`, `rms.fi.view`, `rms.stops.create`, `rms.stops.view`, `rms.impound.create`, `rms.impound.release`, `rms.impound.hold.release`, `rms.warrant.serve` |
 | Printing | `document.print`, `document.export.restricted` (ADR-020) |
 | Reports from the public | `public.report.view`, `public.report.handle` (7.29; complaints need `ia.case.view` / `ia.case.manage`) |
+| Cameras | `camera.view`, `camera.footage.request`, `camera.footage.approve` (7.19) |
 | Ordningsbot and impound | `page.ordningsbot`, `ordningsbot.view`, `ordningsbot.issue`, `ordningsbot.contest`, `ordningsbot.pay`, `ordningsbot.void`, `ordningsbot.tariff.view`, `ordningsbot.tariff.edit` (ADR-018), `page.impound`, `impound.view`, `impound.create`, `impound.release`, `impound.authorize` — the keys 7.11 and 7.15 shipped under |
 | Investigations (intelligence cases, §10) | `inv.case.create`, `inv.case.view`, `inv.case.edit`, `inv.case.assign`, `inv.case.close` |
 | Booking | `booking.view`, `booking.intake`, `booking.release` (this row's `booking.create`/`booking.biometrics.capture` were this catalog's own initial guess at names 7.9 shipped under `booking.intake` instead — including 8.8's ten-print capture, `booking.tenPrint.capture`, which reuses it rather than adding a fifth key) |
@@ -2009,6 +2020,7 @@ row it came from.
 | Impound | `impound` | `YYYY` | `I{YY}-{#####}` | I26-00019 |
 | Printed document | `document` | `YYYY` | `{AGENCY}-D{YY}-{######}` | LSPD-D26-000004 |
 | Report from the public | `public_report` | `YYYY` | `{AGENCY}-M{YY}-{######}` | LSPD-M26-000012 |
+| Footage request | `footage` | `YYYY` | `F{YY}-{#####}` | F26-00007 |
 | Internal affairs case | `ia_case` | `YYYY` | `IA{YY}-{#####}` | IA26-00003 |
 
 **The `year` column is a scope key, not a year.** It carries `0` for a sequence

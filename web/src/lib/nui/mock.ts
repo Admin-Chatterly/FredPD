@@ -84,7 +84,13 @@ export function createMockBridge(): NuiBridge {
   // forwarding those here too would deliver them twice.
   window.addEventListener('message', (event: MessageEvent<NuiMessage>) => {
     const type = event.data?.type;
-    if (type === 'fredpd:open' || type === 'fredpd:close' || type === 'fredpd:paper' || type === 'fredpd:civilian') {
+    if (
+      type === 'fredpd:open' ||
+      type === 'fredpd:close' ||
+      type === 'fredpd:paper' ||
+      type === 'fredpd:civilian' ||
+      type === 'fredpd:cameraStill'
+    ) {
       emit(event.data);
     }
     if (type === 'fredpd:paper' || type === 'fredpd:civilian') paperOpen = true;

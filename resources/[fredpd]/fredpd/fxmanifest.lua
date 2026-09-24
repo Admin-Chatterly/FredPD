@@ -198,6 +198,11 @@ server_scripts {
     'server/modules/civilian/service.lua',
     'server/modules/civilian/repo.lua',
     'server/modules/civilian/routes.lua',
+    -- Cameras (7.19): after personnel and media, whose `personnelHolds` and
+    -- `mediaApi` it calls.
+    'server/modules/camera/service.lua',
+    'server/modules/camera/repo.lua',
+    'server/modules/camera/routes.lua',
     -- Retention (13.3, ADR-021): the sweep on a timer, after every module
     -- whose tables it keeps in check.
     'server/modules/retention/service.lua',
@@ -294,6 +299,7 @@ client_scripts {
     -- Photographs and mugshots (ADR-019): the camera and the screenshot; the
     -- NUI does the upload.
     'client/photo.lua',
+    'client/camera.lua',
     -- Dispatch: the panic keybind and the relay that carries the server's
     -- `fredpd:cad:*` pushes into the NUI. After `client/core.lua`, whose
     -- namespace it binds at load; before `client/main.lua`, which stays last

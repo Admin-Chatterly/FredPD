@@ -155,6 +155,8 @@ export const PLACEMENT_KINDS = [
    * or not, to see their own citations and hand in a report.
    */
   'public_counter',
+  /** A CCTV camera (7.19): where it hangs and which way it looks. Opens nothing. */
+  'cctv_camera',
 ] as const;
 
 export type PlacementKind = (typeof PLACEMENT_KINDS)[number];
@@ -1250,7 +1252,7 @@ export const PERSON_PHOTO_KINDS = ['mugshot', 'field', 'scar', 'mark', 'tattoo']
 export type PersonPhotoKind = (typeof PERSON_PHOTO_KINDS)[number];
 
 /** `ck_fpd_media_purpose` (0038) -- what an upload is for. */
-export const MEDIA_PURPOSES = ['person_photo'] as const;
+export const MEDIA_PURPOSES = ['person_photo', 'footage_still'] as const;
 
 export type MediaPurpose = (typeof MEDIA_PURPOSES)[number];
 
@@ -1273,6 +1275,16 @@ export type DocumentCopy = (typeof DOCUMENT_COPIES)[number];
 export const PUBLIC_REPORT_KINDS = ['stolen_property', 'complaint'] as const;
 
 export type PublicReportKind = (typeof PUBLIC_REPORT_KINDS)[number];
+
+/** `ck_fpd_footage_source` (spec 7.19, 0041) -- which camera a request or a live view is for. */
+export const FOOTAGE_SOURCES = ['cctv', 'bodycam', 'dashcam'] as const;
+
+export type FootageSource = (typeof FOOTAGE_SOURCES)[number];
+
+/** `ck_fpd_footage_status` (0041). */
+export const FOOTAGE_STATUSES = ['requested', 'approved', 'denied'] as const;
+
+export type FootageStatus = (typeof FOOTAGE_STATUSES)[number];
 
 /** `ck_fpd_public_reports_status` (0040). */
 export const PUBLIC_REPORT_STATUSES = ['received', 'handled', 'rejected'] as const;

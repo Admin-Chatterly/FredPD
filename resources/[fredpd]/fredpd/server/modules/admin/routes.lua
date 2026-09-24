@@ -365,6 +365,9 @@ local PERMISSION_CATALOGUE <const> = {
     -- Reports from the public (7.29): the front-desk inbox.
     'public.report.view', 'public.report.handle',
 
+    -- Cameras (7.19): live view, and the footage request.
+    'camera.view', 'camera.footage.request', 'camera.footage.approve',
+
     -- Investigations
     'inv.case.create', 'inv.case.view', 'inv.case.edit', 'inv.case.assign', 'inv.case.close',
 

@@ -52,6 +52,30 @@ async function uploadRefusal(response: Response): Promise<RouteResponse<never>> 
   return { ok: false, err: 'conflict', fields: { _input: 'gateway_unavailable' } };
 }
 
+/**
+ * Puts a captured image (a data URI) at a single-use upload link. Nothing on
+ * success; the refusal, shaped like a route's, otherwise. Against fixtures
+ * there is no gateway, so nothing is sent.
+ */
+export async function uploadImage(uploadUrl: string, image: string): Promise<RouteResponse<never> | null> {
+  if (nui.isMock) return null;
+
+  const blob = dataUriToBlob(image);
+  if (!blob) return { ok: false, err: 'invalid', fields: { file: 'not_image' } };
+
+  try {
+    const response = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'content-type': blob.type },
+      body: blob,
+    });
+
+    return response.ok ? null : uploadRefusal(response);
+  } catch {
+    return { ok: false, err: 'conflict', fields: { _input: 'gateway_unavailable' } };
+  }
+}
+
 export async function takePhoto(
   begin: () => Promise<RouteResponse<PhotoBegun>>,
 ): Promise<RouteResponse<PhotoCommitted>> {
@@ -65,22 +89,8 @@ export async function takePhoto(
 
   // In the browser against fixtures there is no gateway to upload to; the
   // commit fixture stands in for the whole round trip.
-  if (!nui.isMock) {
-    const blob = dataUriToBlob(captured.data.image);
-    if (!blob) return { ok: false, err: 'invalid', fields: { file: 'not_image' } };
-
-    try {
-      const response = await fetch(begun.data.uploadUrl, {
-        method: 'PUT',
-        headers: { 'content-type': blob.type },
-        body: blob,
-      });
-
-      if (!response.ok) return uploadRefusal(response);
-    } catch {
-      return { ok: false, err: 'conflict', fields: { _input: 'gateway_unavailable' } };
-    }
-  }
+  const refused = await uploadImage(begun.data.uploadUrl, captured.data.image);
+  if (refused) return refused;
 
   return nui.call<PhotoCommitted>('person.photo.commit', { mediaRef: begun.data.mediaRef });
 }

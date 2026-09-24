@@ -956,3 +956,18 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
 INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('patrol', 'public.report.view'),
     ('patrol', 'public.report.handle');
+
+-- -----------------------------------------------------------------------------
+-- Cameras (spec 7.19, 0041)
+--
+-- Looking through any camera at will is dispatch's and supervisors' work.
+-- Everybody else asks: a footage request names one camera, a window and why,
+-- and a supervisor approves it (never their own).
+-- -----------------------------------------------------------------------------
+
+INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
+    ('patrol', 'camera.footage.request'),
+    ('dispatch', 'camera.footage.request'),
+    ('dispatch', 'camera.view'),
+    ('supervisor', 'camera.view'),
+    ('supervisor', 'camera.footage.approve');
