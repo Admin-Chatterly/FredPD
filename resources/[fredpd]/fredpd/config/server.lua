@@ -254,16 +254,14 @@ FredPD.Config.server = {
         ---
         --- GTA V has no built-in loose shell-casing object -- vanilla brass
         --- ejection is a particle effect, not a streamed prop -- so there is
-        --- no stock model name to fill in for `casing` here. Pick a small
-        --- static prop from a model browser (Pleb Masters' Forge, Vespura's
-        --- object list, or gtax.dev) that reads as brass at a glance, or add
-        --- one of your own to `fredpd_assets/stream/` (its own `fxmanifest.lua`
-        --- explains how) and name it here once it streams. Whatever you pick,
-        --- confirm it actually spawns in-game before relying on it -- a typo'd
-        --- model name fails to load rather than erroring loudly.
-        -- models = {
-        --     casing = 'model_name_here', -- not a real model -- pick one and confirm it spawns
-        -- },
+        --- no stock model name for `casing` that ships with the base game.
+        --- `ch_prop_ch_fib_01a` (Diamond Casino Heist DLC) is the operator's
+        --- own pick; confirm it actually spawns in-game before relying on it,
+        --- the same as any model named here -- a typo'd or wrong name fails
+        --- to load rather than erroring loudly.
+        models = {
+            casing = 'ch_prop_ch_fib_01a',
+        },
     },
 
     --- Dispatch: the unit board, the live map and the call queue (spec 7.16,
