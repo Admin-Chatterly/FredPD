@@ -4155,6 +4155,8 @@ interface FixtureCitation {
   issuedAgo: number;
   status: string;
   voidReasonKey?: string;
+  /** Seconds ago the bill went out through esx_billing (0031), if one did. */
+  billedAgo?: number;
   version: number;
 }
 
@@ -4169,6 +4171,7 @@ const citations: FixtureCitation[] = [
     vehicleId: 7,
     issuedAgo: 2 * DAY,
     status: 'issued',
+    billedAgo: 2 * DAY,
     version: 1,
   },
   {
@@ -4214,6 +4217,7 @@ function citationRow(row: FixtureCitation, detailed: boolean): Record<string, un
     // `unpaid`/`overdue` against `dueAt`, everything else passes through.
     paymentStatus: row.status === 'issued' ? (now >= dueAt ? 'overdue' : 'unpaid') : row.status,
     voidReasonKey: row.voidReasonKey ?? null,
+    billedAt: row.billedAgo !== undefined ? secondsAgo(row.billedAgo) : null,
     version: row.version,
   };
 

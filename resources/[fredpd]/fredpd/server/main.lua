@@ -149,6 +149,7 @@ local REQUIRED_COLUMNS <const> = {
 
     -- 0030: who signed a lab result.
     { table = 'fpd_lab_analyses', column = 'completed_by' },
+    { table = 'fpd_ordningsbot', column = 'bill_id' },
 }
 
 --- Returns the names of any dependency that is not started.
@@ -212,6 +213,7 @@ AddEventHandler('onResourceStart', function(resource)
     FredPD.Bridge.framework.verify()
     FredPD.Bridge.policejob.verify()
     FredPD.Bridge.society.verify()
+    FredPD.Bridge.billing.verify()
 
     -- The two forensics bridges (spec 3.8, 8.3.2). Both degrade rather than
     -- refusing to start, and both are worth a line in the console even so: a

@@ -343,7 +343,7 @@ Built (the outbound half). `server/bridges/gateway/{sha256,hmac,client,repo,serv
 | dispatch | Incoming alerts from other scripts | Built-in API, optional ps-dispatch adapter |
 | phone | Numbers, 911 calls, photos | Configurable (lb-phone, npwd, yseries) |
 | jail | Sentence handoff, release | Configurable |
-| billing | Fines and fees | Configurable |
+| billing | Fines and fees: send a bill, see it paid, withdraw it (ADR-015) | esx_billing (`server/bridges/billing.lua`) |
 | garage | Vehicle ownership, impound state | Configurable |
 | housing | Properties and addresses | Configurable |
 | appearance | Gloves, footwear, clothing descriptors | illenium-appearance or equivalent |
@@ -805,7 +805,8 @@ Renamed from "Citations": ordningsbot is the correct Swedish term for a summary 
 - [M] A **versioned tariff**, the same immutable-version shape `fpd_brott` uses (7.10): a citation references one specific tariff row forever, so a later tariff change never alters what an already-issued citation says it was for.
 - [M] Lifecycle: issued → paid, contested or void, each a one-way transition out of `issued` only. Void requires a reason from a closed list.
 - [M] **A payment due date and an overdue state** (0024). `due_at` is written once at issue time from `config.server.ordningsbot.paymentWindowDays` (default 30 days), so a later change to the window never moves the deadline on a citation already issued. `overdue` is not a fifth database status — `ordningsbot/service.lua`'s `Ordningsbot.paymentStatus` reads `issued` against `dueAt` and reports `unpaid` or `overdue`, the same "computed from dates, not timers" shape `impound/service.lua`'s fee clock already uses.
-- **Not built:** points on a licence (no licence-points concept exists in this suite) and a billing-bridge integration for payment — `ordningsbot.pay` marks a citation paid directly, a deliberate scope-narrowing recorded in the migration's own header.
+- [M] **A real bill** (ADR-015, migration 0031). Issuing a citation bills the person it names, or the vehicle's registered keeper, through esx_billing (`server/bridges/billing.lua`), paid into the agency's society account. When that bill leaves esx_billing's table, the citation is marked paid automatically and audited as such, and the issuing officer is told. Voiding, contesting or manually paying the citation withdraws the bill. `ordningsbot.pay` remains for citations that sent no bill. `billing.enabled = false` in `config/server.lua` turns this off.
+- **Not built:** points on a licence (no licence-points concept exists in this suite).
 - **Permissions:** `page.ordningsbot`, `ordningsbot.tariff.view`, `ordningsbot.view` (patrol_basic); `ordningsbot.issue`, `.contest`, `.pay` (patrol); `ordningsbot.void` (supervisor).
 
 ### 7.12 Tvångsmedel och efterlysning (M2)

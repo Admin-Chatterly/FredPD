@@ -410,6 +410,31 @@ FredPD.Config.server = {
         paymentWindowDays = 30,
     },
 
+    --- Billing: a citation sends a real bill (spec 7.11, 3.8).
+    ---
+    --- Issuing an ordningsbot citation bills the person it names -- or, for a
+    --- vehicle alone, its registered keeper -- through esx_billing, paid into
+    --- the agency's society account: `society_<agency>` by default, or the
+    --- name set for the agency in `societies`. It must be a `society_*`
+    --- account -- esx_billing pays any other account to the bill's sender,
+    --- who here is the issuing officer, so the bridge refuses one. When the bill leaves esx_billing's table the citation is
+    --- marked paid by itself; voiding or contesting it withdraws the bill.
+    --- `enabled = false`, or esx_billing not started, leaves every citation
+    --- to be marked paid by hand as before.
+    billing = {
+        enabled = true,
+        resource = 'esx_billing',
+        --- esx_billing's own table, which is where a bill's id comes from and
+        --- where its payment shows (the row is deleted when it is paid).
+        table = 'billing',
+        --- How often outstanding bills are checked for payment, in seconds.
+        syncSeconds = 60,
+    },
+
+    --- The esx_society account each agency's funds live in, when it is not
+    --- `society_<agency id>`. Used by the motor pool and by billing.
+    -- societies = { lspd = 'society_police' },
+
     --- The gateway is a separate Node service for media, PDF rendering and
     --- scheduled jobs. None of that exists yet and FXServer never calls it, so
     --- it is off and you do not need to deploy anything (ADR-010). When it

@@ -127,6 +127,7 @@ local CITATION_SELECT <const> = [[
            UNIX_TIMESTAMP(voided_at) AS voidedAt,
            UNIX_TIMESTAMP(paid_at) AS paidAt,
            UNIX_TIMESTAMP(contested_at) AS contestedAt,
+           UNIX_TIMESTAMP(billed_at) AS billedAt,
            classification, version
       FROM fpd_ordningsbot
 ]]
@@ -208,9 +209,8 @@ end
 --- module header for why there is no move out of `paid` back to anything
 --- else.
 ---
---- A real billing-bridge integration is future work (see the migration
---- header): this writes `paid_at`/`status` directly rather than waiting on
---- integration work with nothing in this repo to integrate against yet.
+--- The manual path: a billed citation is marked paid by `markPaidByBill`
+--- when its bill is (migration 0031).
 ---
 --- @return number rows affected -- 0 means the row was not `issued`, or the
 ---   version given is stale
@@ -245,6 +245,69 @@ function Repo.void(id, agencyId, discordId, voidReasonKey, expectedVersion)
                  voided_at = CURRENT_TIMESTAMP(3), version = version + 1
            WHERE id = ? AND agency_id = ? AND version = ? AND status = 'issued']],
         { voidReasonKey, discordId, id, agencyId, expectedVersion })
+end
+
+-- -----------------------------------------------------------------------------
+-- The bill (spec 7.11, migration 0031)
+-- -----------------------------------------------------------------------------
+
+--- Who a citation bills and for how much, resolved in one read: the person
+--- it names, or, for a vehicle alone, the vehicle's registered keeper. The
+--- amount is the tariff version the citation cites, never the current one.
+---
+--- @return table|nil { id, agencyId, number, amount, identifier }
+function Repo.billTarget(id, agencyId)
+    return db().single(
+        [[SELECT o.id, o.agency_id AS agencyId, o.number, t.amount,
+                 COALESCE(p.identifier, v.owner_identifier) AS identifier
+            FROM fpd_ordningsbot o
+            JOIN fpd_ordningsbot_tariff t ON t.id = o.tariff_id
+            LEFT JOIN fpd_persons p ON p.id = o.person_id AND p.agency_id = o.agency_id
+            LEFT JOIN fpd_vehicles v ON v.id = o.vehicle_id AND v.agency_id = o.agency_id
+           WHERE o.id = ? AND o.agency_id = ? AND o.status = 'issued' AND o.bill_id IS NULL]],
+        { id, agencyId })
+end
+
+--- Records the bill sent. Only onto a citation still `issued` and not yet
+--- billed: 0 rows means it was voided or contested while the bill was being
+--- written, and the caller withdraws the bill.
+function Repo.setBill(id, agencyId, billId, label)
+    return db().execute(
+        [[UPDATE fpd_ordningsbot SET bill_id = ?, bill_label = ?, billed_at = CURRENT_TIMESTAMP(3)
+           WHERE id = ? AND agency_id = ? AND status = 'issued' AND bill_id IS NULL]],
+        { billId, label, id, agencyId })
+end
+
+--- The bill a citation sent, read fresh. Used after a void, contest or manual
+--- payment, so a bill recorded between the route's read and its write is
+--- still withdrawn.
+function Repo.billOf(id, agencyId)
+    return db().single(
+        [[SELECT bill_id AS billId, bill_label AS billLabel
+            FROM fpd_ordningsbot WHERE id = ? AND agency_id = ? AND bill_id IS NOT NULL]],
+        { id, agencyId })
+end
+
+--- Billed citations still waiting on payment, a page at a time by id, so a
+--- backlog of fines nobody pays never starves the newer ones of a check.
+function Repo.outstandingBills(afterId, limit)
+    return db().query(
+        [[SELECT id, agency_id AS agencyId, number, issued_by AS issuedBy,
+                 bill_id AS billId, classification
+            FROM fpd_ordningsbot
+           WHERE status = 'issued' AND bill_id IS NOT NULL AND id > ?
+           ORDER BY id ASC LIMIT ?]],
+        { afterId, limit })
+end
+
+--- Marks a citation paid because its bill was. Keyed on the bill as well as
+--- the citation, so a citation whose bill changed under the check is left.
+function Repo.markPaidByBill(id, agencyId, billId)
+    return db().execute(
+        [[UPDATE fpd_ordningsbot
+             SET status = 'paid', paid_at = CURRENT_TIMESTAMP(3), version = version + 1
+           WHERE id = ? AND agency_id = ? AND bill_id = ? AND status = 'issued']],
+        { id, agencyId, billId })
 end
 
 FredPD.Repo.ordningsbot = Repo

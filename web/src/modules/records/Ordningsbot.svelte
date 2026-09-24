@@ -39,6 +39,8 @@
     /** Derived on the server, never stored (0024): `status` split into
      * `unpaid`/`overdue` while it is `issued`, unchanged otherwise. */
     paymentStatus: string;
+    /** When a bill was sent through esx_billing (0031); null when none was. */
+    billedAt?: number | null;
     voidReasonKey?: string | null;
     version: number;
     tariff?: Tariff;
@@ -367,6 +369,17 @@
             class:font-semibold={detail.paymentStatus === 'overdue'}
           >
             {t(`ordningsbot.payment.${detail.paymentStatus}`)} · {t('ordningsbot.field.dueAt')}: {formatMoment(detail.dueAt)}
+          </p>
+        {/if}
+
+        {#if detail.status === 'issued' && detail.billedAt}
+          <!--
+            A billed citation marks itself paid when the bill is, so the
+            officer does not have to. Said here, beside the "mark paid"
+            button, so nobody presses it for a fine already in hand.
+          -->
+          <p class="mb-3 text-xs text-[var(--color-ink-muted)]">
+            {t('ordningsbot.billSent', { at: formatMoment(detail.billedAt) })}
           </p>
         {/if}
 

@@ -25,6 +25,12 @@ local accessRules = FredPD.Modules.access
 --- `access/repo.lua`.
 local ORDNINGSBOT <const> = 'citation'
 
+--- The bill a citation sends (`events.lua`), read at call time: that file
+--- loads after this one.
+local function bills()
+    return FredPD.Modules.ordningsbotBilling
+end
+
 local function readable(session, id)
     local row = repo.byId(id, session.agencyId)
     if not row then return nil, route.refuse(FredPD.ErrorCode.NOT_FOUND) end
@@ -131,6 +137,9 @@ route.define({
         local row = repo.issue(input, session)
         if not row then return route.refuse(FredPD.ErrorCode.INTERNAL) end
 
+        -- The fined player is asked for the money; paying it pays this.
+        bills().billCitation(row.id, session)
+
         return { id = row.id, number = row.number, citation = row }
     end,
 })
@@ -163,6 +172,8 @@ route.define({
             return route.refuse(FredPD.ErrorCode.CONFLICT)
         end
 
+        bills().withdrawBill(row.id, session)
+
         return { id = row.id }
     end,
 })
@@ -194,17 +205,20 @@ route.define({
             return route.refuse(FredPD.ErrorCode.CONFLICT)
         end
 
+        -- Contested goes to court; nobody pays until the court says so.
+        bills().withdrawBill(row.id, session)
+
         return { id = row.id }
     end,
 })
 
 route.define({
     name = 'ordningsbot.pay',
-    -- Granted alongside `.issue` for the same reason `.contest` is: this
-    -- screen is the only place a payment is recorded until a billing bridge
-    -- exists (see the migration header and `repo.lua`'s `Repo.markPaid`),
-    -- and gating it more tightly than the citation's own issuance would make
-    -- an officer who wrote the ticket unable to mark it paid at the roadside.
+    -- Granted alongside `.issue` for the same reason `.contest` is. A billed
+    -- citation marks itself paid when its bill is (`events.lua`); this is for
+    -- one that sent no bill, or was settled some other way, and gating it
+    -- more tightly than the citation's own issuance would make an officer who
+    -- wrote the ticket unable to mark it paid at the roadside.
     perm = 'ordningsbot.pay',
     schema = 'OrdningsbotPay',
     writes = true,
@@ -223,6 +237,9 @@ route.define({
         if repo.markPaid(row.id, session.agencyId, input.version) == 0 then
             return route.refuse(FredPD.ErrorCode.CONFLICT)
         end
+
+        -- Settled some other way: the bill must not be paid a second time.
+        bills().withdrawBill(row.id, session)
 
         return { id = row.id }
     end,

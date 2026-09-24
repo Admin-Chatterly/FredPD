@@ -33,6 +33,7 @@ server_scripts {
     'server/bridges/framework.lua',
     'server/bridges/policejob.lua',
     'server/bridges/society.lua',
+    'server/bridges/billing.lua',
     -- Section 8 reads both of these on every sensor call: the weapon behind a
     -- casing and the glove state behind a print (8.3.2). Unlisted, they are not
     -- merely absent -- the forensics routes degrade silently and the server
@@ -170,6 +171,7 @@ server_scripts {
     'server/modules/ordningsbot/service.lua',
     'server/modules/ordningsbot/repo.lua',
     'server/modules/ordningsbot/routes.lua',
+    'server/modules/ordningsbot/events.lua',
 
     -- Impound (spec 7.15, M6). After spaning, whose `fredpd:vehicleImpounded`
     -- handler (already wired in `spaning/events.lua`, waiting on this module)

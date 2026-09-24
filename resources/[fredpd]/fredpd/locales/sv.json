@@ -2639,7 +2639,14 @@
     "tariff": {
       "parking": "Otillåten parkering",
       "noise": "Förargelseväckande beteende"
-    }
+    },
+    "bill": {
+      "label": "Ordningsbot {number}"
+    },
+    "notify": {
+      "paid": "Ordningsbot {number} är betald."
+    },
+    "billSent": "Faktura skickad {at}. Boten markeras som betald av sig själv när fakturan är betald."
   },
   "impound": {
     "filter": {

@@ -52,6 +52,17 @@ test('voids an issued citation with a reason', async ({ page }) => {
   await expect(page.getByText('Duplicate citation')).toBeVisible();
 });
 
+test('says a billed citation will mark itself paid', async ({ page }) => {
+  await openOrdningsbot(page);
+
+  // LSPD-T26-000301 sent a bill through esx_billing; LSPD-T26-000254 did not.
+  await page.getByRole('button', { name: 'LSPD-T26-000301' }).click();
+  await expect(page.getByText(/Bill sent .* marked paid by itself/)).toBeVisible();
+
+  await page.getByRole('button', { name: 'LSPD-T26-000254' }).click();
+  await expect(page.getByText(/Bill sent/)).toHaveCount(0);
+});
+
 test('a paid citation offers no further transition buttons', async ({ page }) => {
   await openOrdningsbot(page);
 

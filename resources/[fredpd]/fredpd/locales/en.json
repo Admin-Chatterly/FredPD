@@ -2639,7 +2639,14 @@
     "tariff": {
       "parking": "Illegal parking",
       "noise": "Disturbing the peace"
-    }
+    },
+    "bill": {
+      "label": "Fixed penalty {number}"
+    },
+    "notify": {
+      "paid": "Citation {number} has been paid."
+    },
+    "billSent": "Bill sent {at}. It is marked paid by itself when the bill is paid."
   },
   "impound": {
     "filter": {
