@@ -165,3 +165,97 @@ describe('appearance bridge', function()
         end)
     end)
 end)
+
+describe('framework bridge, garage state', function()
+    local Framework, executed, rows
+
+    before_each(function()
+        executed = {}
+        rows = {}
+        local ns = helper.load({ 'server/bridges/framework' })
+        ns.Config = { server = { esxData = { vehicles = {
+            table = 'owned_vehicles', plate = 'plate', owner = 'owner', stored = 'stored',
+            vehicleColumn = 'vehicle', vehicleJson = true,
+        } } } }
+        ns.Core = {
+            db = {
+                query = function(query, values)
+                    executed[#executed + 1] = { query = query, values = values }
+                    return rows
+                end,
+                execute = function(query, values)
+                    executed[#executed + 1] = { query = query, values = values }
+                    return 1
+                end,
+            },
+        }
+        Framework = ns.Bridge.framework
+    end)
+
+    it('finds the one owned car a drawn plate belongs to, exactly', function()
+        rows = { { plate = 'AB 123', owner = 'char1:x', model = '123' } }
+
+        local owned = Framework.ownedVehicleExact('AB 123  ')
+
+        assert.are.equal('char1:x', owned.owner)
+        -- Drawn and trimmed only: never the normalised "AB123", which is
+        -- somebody else's plate.
+        assert.are.same({ 'AB 123  ', 'AB 123', 'AB 123  ', 'AB 123' }, executed[1].values)
+        assert.truthy(executed[1].query:find('BINARY', 1, true))
+    end)
+
+    it('answers nothing when the plate matches more than one car', function()
+        rows = { { plate = 'AB 123' }, { plate = 'ab 123' } }
+
+        assert.is_nil(Framework.ownedVehicleExact('AB 123'))
+    end)
+
+    it('sets the garage state on that row only, and only from the expected state', function()
+        assert.is_true(Framework.setVehicleStored('AB 123', 1, { is = 2 }))
+
+        local call = executed[1]
+        assert.truthy(call.query:find('UPDATE `owned_vehicles` SET `stored` = ?', 1, true))
+        assert.truthy(call.query:find('AND `stored` = ?', 1, true))
+        assert.are.same({ 1, 'AB 123', 'AB 123', 2 }, call.values)
+    end)
+
+    it('can refuse to overwrite a car already back in its garage', function()
+        assert.is_true(Framework.setVehicleStored('AB 123', 2, { isnt = 1 }))
+
+        assert.truthy(executed[1].query:find('AND `stored` <> ?', 1, true))
+        assert.are.same({ 2, 'AB 123', 'AB 123', 1 }, executed[1].values)
+    end)
+
+    it('does nothing when the stored column is switched off', function()
+        FredPD.Config.server.esxData.vehicles.stored = nil
+
+        assert.is_false(Framework.setVehicleStored('AB123', 2))
+        assert.are.equal(0, #executed)
+    end)
+
+    it('refuses a column name that is not a plain identifier, at startup', function()
+        FredPD.Config.server.esxData.vehicles.stored = 'stored = 1, owner'
+        _G.GetResourceState = function() return 'started' end
+
+        assert.has_error(function() Framework.verify() end)
+    end)
+end)
+
+describe('impound service, model check', function()
+    local Impound
+
+    before_each(function()
+        Impound = helper.load({ 'server/modules/impound/service' }).Modules.impound
+    end)
+
+    it('matches the same hash stored signed and read unsigned', function()
+        assert.is_true(Impound.sameModel(-1216765807, 3078201489))
+        assert.is_true(Impound.sameModel('3078201489', 3078201489))
+    end)
+
+    it('refuses a different model, or one it cannot read', function()
+        assert.is_false(Impound.sameModel(123, 124))
+        assert.is_false(Impound.sameModel(nil, 124))
+        assert.is_false(Impound.sameModel('adder', 124))
+    end)
+end)

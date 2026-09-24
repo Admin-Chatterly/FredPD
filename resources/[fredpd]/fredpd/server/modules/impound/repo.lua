@@ -18,7 +18,8 @@ local IMPOUND_SELECT <const> = [[
            fee_per_day AS feePerDay,
            UNIX_TIMESTAMP(impounded_at) AS impoundedAt, impounded_by AS impoundedBy,
            UNIX_TIMESTAMP(released_at) AS releasedAt, released_by AS releasedBy,
-           fee_paid AS feePaid, classification, version
+           fee_paid AS feePaid, classification, version,
+           UNIX_TIMESTAMP(towed_at) AS towedAt, garage_plate AS garagePlate
       FROM fpd_impound
 ]]
 
@@ -114,6 +115,26 @@ function Repo.release(id, agencyId, discordId, feePaid, expectedVersion)
              SET released_at = CURRENT_TIMESTAMP(3), released_by = ?, fee_paid = ?, version = version + 1
            WHERE id = ? AND agency_id = ? AND version = ? AND released_at IS NULL]],
         { discordId, feePaid and 1 or 0, id, agencyId, expectedVersion })
+end
+
+--- Records that the tow took the car off the street, and which exact garage
+--- row it marked held (migration 0032). Only such a row writes the garage
+--- back on release.
+function Repo.markTowed(id, agencyId, garagePlate)
+    return FredPD.Core.db.execute(
+        [[UPDATE fpd_impound SET towed_at = CURRENT_TIMESTAMP(3), garage_plate = ?
+           WHERE id = ? AND agency_id = ? AND towed_at IS NULL]],
+        { garagePlate, id, agencyId })
+end
+
+--- Is any other impound, in any agency, still holding this garage plate?
+--- `owned_vehicles` is shared by every agency, so a cheap hold released in
+--- one must not hand back a car another still holds.
+function Repo.otherOpenHold(garagePlate, exceptId)
+    return FredPD.Core.db.scalar(
+        [[SELECT COUNT(*) FROM fpd_impound
+           WHERE garage_plate = ? AND released_at IS NULL AND id <> ?]],
+        { garagePlate, exceptId }) > 0
 end
 
 FredPD.Repo.impound = Repo

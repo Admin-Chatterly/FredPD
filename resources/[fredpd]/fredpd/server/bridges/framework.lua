@@ -267,7 +267,101 @@ function Framework.ownedVehicleByPlate(drawn, plate)
     return row
 end
 
+--- The one owned vehicle a plate on the street belongs to, exactly (spec
+--- 7.15, ADR-016), for the impound tow.
+---
+--- Stricter than `ownedVehicleByPlate`, because what follows is a write:
+--- matched on the plate as drawn and trimmed only -- never the normalised
+--- form, which would let "AB 123" reach somebody else's "AB123" -- and nil
+--- when that is not exactly one row. The model comes back too, so the caller
+--- can check the car it is looking at is the car that plate was issued to:
+--- a plate on the street is whatever the car's owning client set it to.
+---
+--- @param drawn string the plate as `GetVehicleNumberPlateText` returned it
+--- @return table|nil { plate (as stored), owner, model }
+function Framework.ownedVehicleExact(drawn)
+    local config = esxData().vehicles
+    if not config or esxData().enabled == false or type(drawn) ~= 'string' then return nil end
+
+    local trimmed = drawn:match('^%s*(.-)%s*$')
+    if trimmed == '' then return nil end
+
+    local modelExpr = config.vehicleJson
+        and ('JSON_UNQUOTE(JSON_EXTRACT(`%s`, \'$.model\'))'):format(config.vehicleColumn)
+        or ('`%s`'):format(config.vehicleColumn)
+
+    local ok, rows = pcall(function()
+        return FredPD.Core.db.query(
+            ([[SELECT `%s` AS plate, `%s` AS owner, %s AS model
+                 FROM `%s` WHERE `%s` IN (?, ?) AND BINARY `%s` IN (?, ?) LIMIT 2]]):format(
+                config.plate, config.owner, modelExpr, config.table, config.plate, config.plate),
+            -- The plain IN finds the row by the primary key; BINARY then drops
+            -- what the default collation matched case- or space-insensitively.
+            { drawn, trimmed, drawn, trimmed })
+    end)
+
+    if not ok or type(rows) ~= 'table' or #rows ~= 1 then return nil end
+
+    return rows[1]
+end
+
+--- Sets whether an owned vehicle is in its owner's garage, on the one row
+--- `ownedVehicleExact` named, and only from the state `guard` allows --
+--- `{ is = v }` or `{ isnt = v }` -- so a car somebody already took out, or
+--- put back, is left as it is.
+---
+--- The one write FredPD makes into ESX's own tables (ADR-016). Column and
+--- values are config; nil `stored` turns it off.
+---
+--- @return boolean true when the row changed
+function Framework.setVehicleStored(plate, value, guard)
+    local config = esxData().vehicles
+    if not config or esxData().enabled == false or not config.stored or value == nil or not plate then
+        return false
+    end
+
+    local query = ('UPDATE `%s` SET `%s` = ? WHERE `%s` = ? AND BINARY `%s` = ?')
+        :format(config.table, config.stored, config.plate, config.plate)
+    local values = { value, plate, plate }
+
+    if guard and guard.is ~= nil then
+        query = query .. (' AND `%s` = ?'):format(config.stored)
+        values[#values + 1] = guard.is
+    elseif guard and guard.isnt ~= nil then
+        query = query .. (' AND `%s` <> ?'):format(config.stored)
+        values[#values + 1] = guard.isnt
+    end
+
+    local ok, affected = pcall(function() return FredPD.Core.db.execute(query, values) end)
+
+    if not ok then
+        print(('[fredpd] esxData.vehicles: could not set `%s` for %s (%s)')
+            :format(config.stored, plate, tostring(affected)))
+        return false
+    end
+
+    return (affected or 0) > 0
+end
+
+--- Every table and column name `esxData` interpolates, checked once at
+--- startup rather than halfway through a write.
+local function verifyIdentifiers()
+    local data = esxData()
+
+    for _, section in ipairs({ data.characters, data.vehicles }) do
+        if type(section) == 'table' then
+            for key, value in pairs(section) do
+                if type(value) == 'string' and not value:match('^[%w_]+$') then
+                    error(('[fredpd] esxData.%s = %q is not a plain table or column name'):format(key, value))
+                end
+            end
+        end
+    end
+end
+
 function Framework.verify()
+    verifyIdentifiers()
+
     if GetResourceState('es_extended') ~= 'started' then
         error('[fredpd] framework bridge: es_extended is not started.')
     end

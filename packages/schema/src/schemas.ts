@@ -2713,6 +2713,16 @@ export const schemas = {
     classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
   },
 
+  /**
+   * Impounding the car in front of you (ox_target, spec 7.15, ADR-016). The
+   * plate and model are read off the car by the server; the client names only
+   * the entity and the reason.
+   */
+  ImpoundTow: {
+    netId: { type: 'integer', required: true, min: 1 },
+    heldReasonKey: { type: 'enum', required: true, values: IMPOUND_HELD_REASONS },
+  },
+
   ImpoundAuthorize: {
     id: { type: 'integer', required: true, min: 1 },
   },

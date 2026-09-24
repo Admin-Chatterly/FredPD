@@ -410,6 +410,32 @@ FredPD.Config.server = {
         paymentWindowDays = 30,
     },
 
+    --- Impound in the world (spec 7.15, ADR-016). "Impound" on a car through
+    --- ox_target records the impound and takes the car off the street; the
+    --- owner's garage shows it as out until it is released, when it is back
+    --- in their garage.
+    impound = {
+        world = {
+            --- Delete the car when it is impounded on the spot. Never with a
+            --- player inside it.
+            despawn = true,
+            --- How close, in metres, the officer must be to the car.
+            range = 8.0,
+            --- What `esxData.vehicles.stored` is set to when a tow takes the
+            --- car, and when it is released. Only a car the tow removed, whose
+            --- garage row names the same model, is ever touched.
+            ---
+            --- 2 is a value esx_garage ignores: the car shows neither in the
+            --- garage nor at its pound, so the owner cannot pay the ESX pound
+            --- and drive off with a car FredPD still holds. Do not use 0 --
+            --- that is "out", which most pounds hand back for a flat fee.
+            --- Do not change it while cars are held: a release only hands a
+            --- car back if its row still reads this value.
+            storedWhileImpounded = 2,
+            storedOnRelease = 1,
+        },
+    },
+
     --- Billing: a citation sends a real bill (spec 7.11, 3.8).
     ---
     --- Issuing an ordningsbot citation bills the person it names -- or, for a
@@ -485,6 +511,10 @@ FredPD.Config.server = {
             --- a plain `model` column instead should set `vehicleJson = false`.
             vehicleColumn = 'vehicle',
             vehicleJson = true,
+            --- The column saying whether a car is in its owner's garage. A tow
+            --- sets it to `impound.world.storedWhileImpounded` and the release
+            --- of that impound to `storedOnRelease`. nil leaves the table alone.
+            stored = 'stored',
         },
     },
 }

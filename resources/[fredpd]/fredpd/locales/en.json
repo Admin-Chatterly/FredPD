@@ -178,7 +178,11 @@
     "callsign_format": "letters, digits, hyphens and spaces only, up to 16",
     "decider_online": "A prosecutor or judge has signed on since you opened this, so the decision is theirs now.",
     "own_chain": "You took an earlier step on this detention, so you cannot also decide this one.",
-    "stand_in_off": "Stand-in decisions are switched off on this server."
+    "stand_in_off": "Stand-in decisions are switched off on this server.",
+    "occupied": "Somebody is in the vehicle.",
+    "fleet_vehicle": "That is an emergency or agency vehicle.",
+    "in_progress": "That is already being done.",
+    "unreachable": "It could not be found from here."
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -2698,7 +2702,8 @@
       "open": "Open in MDT",
       "runPlate": "Run plate",
       "arrestUnidentified": "Arrest: identity not established",
-      "trafficStop": "Start traffic stop"
+      "trafficStop": "Start traffic stop",
+      "impound": "Impound"
     },
     "person": {
       "registered": "New to the register: added from their ID.",
@@ -2729,6 +2734,13 @@
       "body": "Officer {callsign} asks to see your ID.",
       "show": "Show ID",
       "refuse": "Refuse"
+    },
+    "impound": {
+      "title": "Why is it impounded?",
+      "confirmTitle": "Impound vehicle",
+      "confirm": "Impound {plate}? It is towed away and stays held until it is released.",
+      "towed": "Impound {number} recorded. The vehicle has been towed.",
+      "recorded": "Impound {number} recorded. The vehicle could not be towed from here."
     }
   },
   "status": {

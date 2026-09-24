@@ -40,9 +40,25 @@ function Client.showError(response)
         key = 'error.contextNeeds.' .. condition
     end
 
+    -- The field-level reason, when the server gave one the locale knows:
+    -- "Somebody is in the vehicle." says more than "That could not be done."
+    -- Two whole sentences on two lines, never one built by concatenation.
+    local description = FredPD.t(key)
+    if type(response.fields) == 'table' then
+        for name, reason in pairs(response.fields) do
+            if name ~= '_context' and type(reason) == 'string' then
+                local detail = FredPD.t('fieldError.' .. reason)
+                if detail ~= 'fieldError.' .. reason then
+                    description = description .. '\n' .. detail
+                    break
+                end
+            end
+        end
+    end
+
     lib.notify({
         title = FredPD.t('app.name'),
-        description = FredPD.t(key),
+        description = description,
         type = 'error',
     })
 end

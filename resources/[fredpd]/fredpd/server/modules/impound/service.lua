@@ -149,6 +149,17 @@ function Impound.validateRelease(input)
     return nil
 end
 
+--- Is the car on the street the model the garage row says that plate was
+--- issued to? Both are GTA model hashes; one side may have been stored signed
+--- and the other read unsigned, so they are compared modulo 2^32. Anything
+--- that is not a number cannot be vouched for and answers false.
+function Impound.sameModel(stored, onStreet)
+    local a, b = tonumber(stored), tonumber(onStreet)
+    if not a or not b or a ~= math.floor(a) or b ~= math.floor(b) then return false end
+
+    return a % 4294967296 == b % 4294967296
+end
+
 FredPD.Modules.impound = Impound
 
 return Impound

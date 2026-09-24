@@ -57,6 +57,15 @@ function Repo.latestEvent(agencyId, plate)
     )
 end
 
+--- Is this plate out on a motor-pool draw in any agency? Asked by the impound
+--- tow (ADR-016) through `FredPD.Modules.garageFleet`.
+function Repo.isDrawnAnywhere(plate)
+    local row = FredPD.Core.db.single(
+        [[SELECT action FROM fpd_motorpool_log WHERE plate = ? ORDER BY id DESC LIMIT 1]],
+        { plate })
+    return row ~= nil and row.action == 'draw'
+end
+
 -- -----------------------------------------------------------------------------
 -- The fleet editor (spec 7.31, migration 0003)
 -- -----------------------------------------------------------------------------

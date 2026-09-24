@@ -150,6 +150,7 @@ local REQUIRED_COLUMNS <const> = {
     -- 0030: who signed a lab result.
     { table = 'fpd_lab_analyses', column = 'completed_by' },
     { table = 'fpd_ordningsbot', column = 'bill_id' },
+    { table = 'fpd_impound', column = 'towed_at' },
 }
 
 --- Returns the names of any dependency that is not started.

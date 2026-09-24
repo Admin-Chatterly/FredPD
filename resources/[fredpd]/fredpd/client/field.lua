@@ -126,6 +126,37 @@ local function confirm(header, content)
     }) == 'confirm'
 end
 
+--- The reasons an impound may rest on, in the order the MDT lists them.
+local IMPOUND_REASONS <const> = { 'abandoned', 'unregistered', 'dui', 'evidence', 'investigative', 'other' }
+
+--- Impound the car in front of you: pick why, confirm, and it is towed.
+--- The server reads the plate off the car and takes it off the street.
+local function impound(netId, label)
+    local options = {}
+
+    for _, reason in ipairs(IMPOUND_REASONS) do
+        options[#options + 1] = {
+            title = FredPD.t('impound.held_reason.' .. reason),
+            onSelect = function()
+                if not confirm(FredPD.t('field.impound.confirmTitle'),
+                    FredPD.t('field.impound.confirm', { plate = core.plainText(label) }))
+                then
+                    return
+                end
+
+                local towed = call('impound.tow', { netId = netId, heldReasonKey = reason })
+                if towed then
+                    core.notify(towed.despawned and 'field.impound.towed' or 'field.impound.recorded',
+                        { number = towed.number })
+                end
+            end,
+        }
+    end
+
+    lib.registerContext({ id = 'fredpd_field_impound', title = FredPD.t('field.impound.title'), options = options })
+    lib.showContext('fredpd_field_impound')
+end
+
 --- Picks a fine from the catalogue and issues it. One citation per press.
 local function cite(subject)
     local list = call('ordningsbot.tariff.list', {})
@@ -408,6 +439,10 @@ local function runPlate(entity)
 
     local label = vehicle.plate
     options[#options + 1] = {
+        title = FredPD.t('field.action.impound'), icon = 'truck-pickup',
+        onSelect = function() impound(netId, label) end,
+    }
+    options[#options + 1] = {
         title = FredPD.t('field.action.citeOwner'), icon = 'file-invoice',
         onSelect = function()
             cite({ vehicleId = vehicle.id, personId = row and row.ownerPersonId or nil, label = label })
@@ -443,5 +478,19 @@ target.addVehicleOptions({
         distance = DISTANCE,
         canInteract = function(entity) return netIdOf(entity) ~= nil end,
         onSelect = function(data) runPlate(data and data.entity) end,
+    },
+    {
+        -- Any car, an owner's or an abandoned NPC's: the server records the
+        -- impound against whatever plate is on it.
+        name = 'fredpd_field_impound',
+        icon = 'fa-solid fa-truck-pickup',
+        label = FredPD.t('field.action.impound'),
+        distance = DISTANCE,
+        canInteract = function(entity) return netIdOf(entity) ~= nil end,
+        onSelect = function(data)
+            local entity = data and data.entity
+            local netId = netIdOf(entity)
+            if netId then impound(netId, GetVehicleNumberPlateText(entity)) end
+        end,
     },
 })

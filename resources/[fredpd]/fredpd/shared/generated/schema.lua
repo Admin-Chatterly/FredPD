@@ -1569,6 +1569,11 @@ FredPD.Schema = {
         classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
     },
 
+    ImpoundTow = {
+        netId = { type = 'integer', required = true, min = 1 },
+        heldReasonKey = { type = 'enum', required = true, values = { 'investigative', 'evidence', 'abandoned', 'dui', 'unregistered', 'other' } },
+    },
+
     ImpoundAuthorize = {
         id = { type = 'integer', required = true, min = 1 },
     },

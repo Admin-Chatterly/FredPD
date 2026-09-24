@@ -178,7 +178,11 @@
     "callsign_format": "endast bokstäver, siffror, bindestreck och mellanslag, högst 16",
     "decider_online": "En åklagare eller domare har loggat in sedan du öppnade posten, så beslutet är deras nu.",
     "own_chain": "Du har fattat ett tidigare beslut i det här frihetsberövandet och kan inte också fatta det här.",
-    "stand_in_off": "Ersättarbeslut är avstängda på den här servern."
+    "stand_in_off": "Ersättarbeslut är avstängda på den här servern.",
+    "occupied": "Någon sitter i fordonet.",
+    "fleet_vehicle": "Det är ett utryckningsfordon eller myndighetens fordon.",
+    "in_progress": "Det pågår redan.",
+    "unreachable": "Det gick inte att hitta härifrån."
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -2698,7 +2702,8 @@
       "open": "Öppna i MDT",
       "runPlate": "Slå registreringsnummer",
       "arrestUnidentified": "Grip: identiteten oklar",
-      "trafficStop": "Påbörja trafikkontroll"
+      "trafficStop": "Påbörja trafikkontroll",
+      "impound": "Beslagta fordon"
     },
     "person": {
       "registered": "Ny i registret: tillagd från legitimationen.",
@@ -2729,6 +2734,13 @@
       "body": "Polis {callsign} ber att få se din legitimation.",
       "show": "Visa legitimation",
       "refuse": "Vägra"
+    },
+    "impound": {
+      "title": "Varför beslagtas fordonet?",
+      "confirmTitle": "Beslagta fordon",
+      "confirm": "Beslagta {plate}? Fordonet bärgas bort och står kvar tills det lämnas ut.",
+      "towed": "Beslag {number} registrerat. Fordonet har bärgats.",
+      "recorded": "Beslag {number} registrerat. Fordonet kunde inte bärgas härifrån."
     }
   },
   "status": {

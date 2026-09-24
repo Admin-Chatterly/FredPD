@@ -332,7 +332,7 @@ Built (the outbound half). `server/bridges/gateway/{sha256,hmac,client,repo,serv
 | Bridge | Responsibilities | Default implementation |
 |---|---|---|
 | framework | Characters, names, DOB, phone, jobs, duty, licences | es_extended |
-| policejob | Duty state, rank, armory, cloakroom, impound | p_policejob (section 3.11) |
+| policejob | Duty state, rank, armory, cloakroom; jail handoff | p_policejob (section 3.11) |
 | society | Agency funds, society-owned vehicles | esx_society |
 | textui | In-world prompts ("Press E to open the terminal") | esx_textui |
 | menu | In-world option menus and input dialogs | esx_menu_dialog |
@@ -408,8 +408,8 @@ open it.
 ### 3.11 Coexistence with p_policejob
 
 FredPD does not replace the police job resource. `p_policejob` keeps the
-in-world job — duty toggle, armory, cloakroom, impound — and FredPD owns
-records, dispatch, evidence, lab, court, intelligence and the MDT.
+in-world job — duty toggle, armory, cloakroom, jail — and FredPD owns
+records, dispatch, evidence, lab, court, intelligence, impound (ADR-016) and the MDT.
 
 The `policejob` bridge is the only place that names it. Duty and rank are read
 through that bridge as **context conditions** (4.3), never as grants: a
@@ -421,7 +421,7 @@ Where the two overlap, the rule is one owner per concern:
 | Concern | Owner |
 |---|---|
 | Duty toggle, armory, cloakroom | `p_policejob` |
-| Impound and tow (7.15) | `p_policejob` |
+| Impound and tow (7.15) | FredPD (ADR-016, amending ADR-008) |
 | Agency motor pool (7.31) | FredPD |
 | MDT, records, CAD, evidence, court | FredPD |
 | Permissions for any of the above | FredPD, from Discord roles |
@@ -855,6 +855,19 @@ Built. Migration 0020, `server/modules/impound/`.
 - [M] Fees computed from dates, not timers: whole days held, minimum one, times the daily rate. Never re-added on the client — every read carries the server's own current figure.
 - [M] Release requires fees paid and, for an investigative or evidence hold, the investigator's release authorization.
 - [M] **Resolves a matching spaningsuppdrag** on creation, firing `fredpd:vehicleImpounded` — the same server-local event `spaning/events.lua` was already listening for before this module existed to raise it.
+- [M] **Reaches the street** (ADR-016).
+  - "Impound" on a car through ox_target (`impound.tow`) records the impound and deletes the car. It is refused when:
+    - the officer is out of range or in another routing bucket;
+    - a player is inside;
+    - the car is an emergency or motor-pool vehicle;
+    - the same car is already being towed.
+  - The owner's garage row is marked held (`storedWhileImpounded`, default 2, a value esx_garage's pound ignores) only when all of these hold:
+    - the car was actually removed;
+    - the plate matches exactly one `owned_vehicles` row;
+    - that row names the same model as the car on the street. A plate is whatever the car's owning client set it to.
+  - Only a verified tow resolves a lookout on the vehicle (`fredpd:vehicleImpounded`).
+  - Releasing that impound puts the car back in the garage. This happens only when no other open hold in any agency has it, and only if the garage row still reads as held (migration 0032).
+  - An impound made from the MDT is a record and touches nothing in the world.
 - **Not built:** a lot/location field and a formal tow-lot inventory beyond the plate and model already on the row.
 - **Permissions:** `page.impound` (patrol_basic); `impound.view`, `.create`, `.release` (patrol); `impound.authorize` (supervisor).
 
@@ -1086,8 +1099,8 @@ Built (the disciplinary file only).
 
 ### 7.31 Agency motor pool (M1)
 
-The garage officers actually use. Impound and tow stay with `p_policejob`
-(3.11); this is the station motor pool only.
+The garage officers actually use: the station motor pool. Impound and tow
+are 7.15.
 
 - [M] A motor pool is a **placement** (3.10) with a `ped` interaction, so its
   position and ped model are configured in game rather than in a config file.
@@ -1663,7 +1676,7 @@ resolve an IANA name to an offset without a tz database.
 | Discord guild ID and role IDs (ranks, units, compartments, DOJ) | Permission seed | M1 |
 | UI framework confirmation (Svelte 5 or React) | Locks in the web stack | End of M1 |
 | Phone, jail, billing, housing, appearance resources | Bridges | M2–M4 |
-| ~~Garage resource~~ | **Resolved.** FredPD owns the agency motor pool (7.31); impound stays with `p_policejob` | M1 — decided |
+| ~~Garage resource~~ | **Resolved.** FredPD owns the agency motor pool (7.31) and, since ADR-016, impound (7.15) | M1 — decided |
 | Dispatch alerts: built-in only or a ps-dispatch adapter | CAD scope | M4 |
 | Four call-log lines with no `entry_type`: `cad.log.acknowledged`, `cad.log.welfare_check`, `cad.log.report_created` (all three are features 7.16 names) and `cad.log.priority_changed` (which nothing names and no permission allows) | `ck_fpd_call_log_type` has eleven values and none of them fits these four, so either the CHECK grows, the lines ride on an existing value, or the strings go. Until it is settled they are keys no line can carry (7.16.1) | M4 |
 | Map tile source | Map module | M4 |

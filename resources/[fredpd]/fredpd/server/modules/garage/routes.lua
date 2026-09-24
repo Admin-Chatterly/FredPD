@@ -382,3 +382,11 @@ route.define({
         return { id = input.id, model = existing.model }
     end,
 })
+
+--- Is this plate an agency car out on a motor-pool draw, in any agency?
+--- Asked by the impound tow (ADR-016): a patrol car left at the kerb during a
+--- foot pursuit is not somebody's abandoned vehicle.
+FredPD.Modules.garageFleet = {
+    isOut = function(plate) return repo.isDrawnAnywhere(plate) end,
+}
+
