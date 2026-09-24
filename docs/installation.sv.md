@@ -21,8 +21,8 @@ länkar till sitt eget avsnitt nedan.
 
 1. **Kopiera** `resources/[fredpd]/fredpd` till servern och bygg gränssnittet
    ([avsnitt 2](#2-steg-1--hämta-och-bygg)).
-2. **Köra SQL:en** — `database/combined/fredpd_all.sql` i ett svep, eller
-   migrationerna en och en ([avsnitt 3](#3-steg-2--databas)).
+2. **Köra SQL:en** — `database/combined/fredpd_all.sql` i ett svep
+   ([avsnitt 3](#3-steg-2--databas)).
 3. **Lägg till resursen** i `server.cfg` ([avsnitt 4](#4-steg-3--servercfg)).
 4. **Fyll i `config/server.lua`** — Discord-token, guild-ID, myndighet
    ([avsnitt 5](#5-steg-4--konfigurationsfilen)). Testar du bara lokalt kan du
@@ -96,18 +96,27 @@ Kopiera sedan mappen `resources/[fredpd]/` till serverns resursmapp.
 
 ## 3. Steg 2 — Databas
 
-Kör hela mappen i nummerordning, migrationerna först och seed-filerna sedan.
-Inget händer om en migration körs igen, så det går bra att köra om det här
-kommandot efter en uppdatering:
+Kör **`database/combined/fredpd_all.sql`** mot ditt ESX-schema, i ett svep —
+i HeidiSQL: *Arkiv → Kör SQL-fil*, eller från kommandoraden:
 
 ```bash
-for f in database/migrations/*.sql; do mysql -u root DITT_ESX_SCHEMA < "$f"; done
-for f in database/seeds/*.sql;      do mysql -u root DITT_ESX_SCHEMA < "$f"; done
+mysql -u root DITT_ESX_SCHEMA < database/combined/fredpd_all.sql
 ```
 
-Migrationerna är **append-only**: en fil som en gång körts ändras aldrig, den
-rättas med en ny migration. Seed-filen går att köra om hur många gånger som
-helst utan att det blir dubbletter.
+Filen innehåller alla migrationer och seeds i rätt ordning. Den är säker att
+köra om: kör den igen efter varje uppdatering, också på en databas där en
+tidigare körning stannade halvvägs — den fortsätter där den tog slut. CI kör den
+mot MariaDB 11.4 två gånger i rad på varje ändring, så den går igenom utan fel.
+
+Kör **inte** migrationerna en och en. Fyra av dem (`0026`, `0033`, `0035`,
+`0037`) har en sats som MariaDB inte kan köra. Migrationerna är
+**append-only** — en fil som en gång levererats ändras aldrig — så de satserna
+är rättade i huvudfilen när den sätts ihop, inte i källfilerna (ADR-024). Fick du
+``SQL-fel (1064) … FOREIGN KEY (`loadout_id`)`` från en äldre version av
+huvudfilen: kör den nya, den rättar det.
+
+Seed-filerna går att köra om hur många gånger som helst utan att det blir
+dubbletter.
 
 Alla tabeller heter `fpd_*`. FredPD läser ESX:s egna tabeller och skriver i två
 av dem, och databasanvändaren FredPD ansluter med behöver då de rättigheterna:

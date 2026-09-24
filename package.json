@@ -21,8 +21,10 @@
     "i18n:check": "tsx tools/i18n-check.ts",
     "wiring:check": "tsx tools/wiring-check.ts",
     "enum:check": "tsx tools/enum-check.ts",
+    "sql:combine": "tsx tools/combine-sql.ts --write",
+    "sql:check": "tsx tools/combine-sql.ts",
     "schema:gen": "pnpm --filter @fredpd/schema build",
-    "check": "pnpm lint && pnpm typecheck && pnpm svelte-check && pnpm i18n:check && pnpm wiring:check && pnpm enum:check",
+    "check": "pnpm lint && pnpm typecheck && pnpm svelte-check && pnpm i18n:check && pnpm wiring:check && pnpm enum:check && pnpm sql:check",
     "verify": "pnpm check && pnpm lint:lua && pnpm test:lua && pnpm test && pnpm build && pnpm test:e2e",
     "test:lua": "busted",
     "lint:lua": "luacheck resources/"

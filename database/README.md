@@ -3,6 +3,25 @@
 MariaDB 11.4 LTS or newer, InnoDB, `utf8mb4_unicode_ci` — the same database the
 ESX server already uses (spec 3.3).
 
+## The master SQL — what an operator runs
+
+**`combined/fredpd_all.sql`** is every migration and every seed, in order, in
+one file. It is what the installation guide tells an operator to run
+(`docs/installation.sv.md`, step 2), and it is safe to run again: after every
+update, and on a database where an earlier run stopped halfway.
+
+- It is **generated**: `pnpm sql:combine` writes it (`tools/combine-sql.ts`),
+  and `pnpm sql:check`, part of `pnpm check` and CI, fails when it is stale.
+  Add a migration or a seed, run `pnpm sql:combine`, commit both.
+- It **corrects** four shipped migrations whose statements MariaDB cannot run
+  (`0026`, `0033`, `0037`: a foreign key's `IF NOT EXISTS` in the wrong place;
+  `0035`: a CHECK MariaDB forbids). The migrations stay as they shipped
+  (invariant 8); the correction is made as the file is combined, marked
+  `[combine-sql]` where it happens, and listed in `CORRECTIONS` (ADR-024).
+- CI applies it to MariaDB 11.4 twice on every change.
+
+Applying the migrations one by one is not supported: those four fail.
+
 ## Migrations
 
 **The current migration is `0041_cameras.sql`. Apply every file up to and

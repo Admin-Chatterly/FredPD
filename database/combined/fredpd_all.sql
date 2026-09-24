@@ -3,6 +3,7 @@
 -- redigera källfilerna i database/migrations/ och database/seeds/ och slå ihop på nytt.
 -- Körs mot samma schema som ESX. Säker att köra om (migrationerna har IF NOT EXISTS,
 -- seeds är upsert/INSERT IGNORE).
+-- Satser som MariaDB inte kan köra är rättade här, inte i källfilerna: sök på [combine-sql].
 
 -- ============================================================
 -- 0001_fredpd.sql
@@ -5848,7 +5849,8 @@ ALTER TABLE `fpd_officers`
     ADD COLUMN IF NOT EXISTS `loadout_id` BIGINT UNSIGNED NULL AFTER `division`;
 
 ALTER TABLE `fpd_officers`
-    ADD CONSTRAINT IF NOT EXISTS `fk_fpd_officers_loadout` FOREIGN KEY (`loadout_id`)
+-- [combine-sql] Rättat vid sammanslagningen (ADR-024): MariaDB läser IF NOT EXISTS efter FOREIGN KEY; efter ADD CONSTRAINT gäller det bara CHECK (fel 1064).
+    ADD CONSTRAINT `fk_fpd_officers_loadout` FOREIGN KEY IF NOT EXISTS (`loadout_id`)
         REFERENCES `fpd_personnel_loadout` (`id`) ON DELETE SET NULL;
 
 -- ============================================================
@@ -6121,7 +6123,8 @@ ALTER TABLE `fpd_atal`
         COMMENT 'When the sentence was handed to the jail' AFTER `jail_minutes`;
 
 ALTER TABLE `fpd_atal`
-    ADD CONSTRAINT IF NOT EXISTS `fk_fpd_atal_person` FOREIGN KEY (`person_id`)
+-- [combine-sql] Rättat vid sammanslagningen (ADR-024): MariaDB läser IF NOT EXISTS efter FOREIGN KEY; efter ADD CONSTRAINT gäller det bara CHECK (fel 1064).
+    ADD CONSTRAINT `fk_fpd_atal_person` FOREIGN KEY IF NOT EXISTS (`person_id`)
         REFERENCES `fpd_persons` (`id`) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS `idx_fpd_atal_jail`
@@ -6287,10 +6290,10 @@ CREATE TABLE IF NOT EXISTS `fpd_fi_cards` (
         ('suspicious_behaviour', 'matches_description', 'known_associate', 'area_check',
          'gang_activity', 'drug_activity', 'other')),
     CONSTRAINT `ck_fpd_fi_cards_class` CHECK (`classification` IN
-        ('open', 'internal', 'restricted', 'confidential', 'secret')),
-    -- A card about nobody and nothing is not a card.
-    CONSTRAINT `ck_fpd_fi_cards_subject` CHECK (`person_id` IS NOT NULL OR `vehicle_id` IS NOT NULL
-        OR `narrative` IS NOT NULL)
+-- [combine-sql] Rättat vid sammanslagningen (ADR-024): ck_fpd_fi_cards_subject borttagen: en CHECK får inte läsa kolumner som en ON DELETE SET NULL-nyckel ändrar (fel 1901).
+        ('open', 'internal', 'restricted', 'confidential', 'secret'))
+    -- A card about nobody and nothing is not a card: `Interviews.hasSubject`
+    -- refuses one when it is written.
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- Who the subject was with. Person records, never typed names, so each
@@ -6419,7 +6422,8 @@ ALTER TABLE `fpd_impound`
 ALTER TABLE `fpd_impound`
     ADD CONSTRAINT IF NOT EXISTS `ck_fpd_impound_keys` CHECK (`keys_location` IN
         ('in_vehicle', 'lot_safe', 'with_owner', 'none')),
-    ADD CONSTRAINT IF NOT EXISTS `fk_fpd_impound_lot` FOREIGN KEY (`lot_id`)
+-- [combine-sql] Rättat vid sammanslagningen (ADR-024): MariaDB läser IF NOT EXISTS efter FOREIGN KEY; efter ADD CONSTRAINT gäller det bara CHECK (fel 1064).
+    ADD CONSTRAINT `fk_fpd_impound_lot` FOREIGN KEY IF NOT EXISTS (`lot_id`)
         REFERENCES `fpd_placements` (`id`) ON DELETE SET NULL;
 
 -- ============================================================

@@ -60,7 +60,15 @@ pnpm test:lua         # Lua unit tests (busted)
 pnpm lint:lua         # luacheck over the resources
 pnpm test:e2e         # Playwright against the mock bridge
 pnpm schema:gen       # regenerate the Lua schema; commit the result
+pnpm sql:combine      # regenerate database/combined/fredpd_all.sql; commit the result
 ```
+
+`database/combined/fredpd_all.sql` is the master SQL an operator runs: every
+migration and seed in one file that applies cleanly, and again. Keep it working:
+regenerate it with every migration or seed change (`pnpm check` fails when it is
+stale), keep its format (Swedish header, one `====` block per file, seeds as
+`seed: …`), and fix a statement MariaDB cannot run in the generator's
+`CORRECTIONS`, never in a shipped migration (ADR-024).
 
 `pnpm verify` exists because the gate used to live in somebody's head, and a
 gate that is remembered drifts from the one CI runs. `test:e2e` is not part of
@@ -84,4 +92,5 @@ and `build` were all green. Run the one command.
 
 Spec acceptance criteria met · invariants respected · tests added and passing ·
 `en` and `sv` complete · permissions added to Appendix B and the seed ·
+master SQL regenerated ·
 ADR written if a decision changed.

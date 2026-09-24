@@ -63,6 +63,12 @@ jobs:
       - name: Code values match their CHECK constraints
         run: pnpm enum:check
 
+      # The master SQL is what an operator runs (docs/installation.sv.md). A
+      # migration or seed added without regenerating it would reach them as a
+      # file silently missing it.
+      - name: Master SQL is current
+        run: pnpm sql:check
+
       - name: Generated schema is current
         run: |
           pnpm schema:gen
@@ -219,15 +225,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Apply every migration to an empty database
-        run: |
-          for file in database/migrations/*.sql; do
-            echo "applying $file"
-            mysql --host=127.0.0.1 --user=root --password=ci fredpd < "$file"
-          done
+      # What an operator runs: the master file, in one go (ADR-024). Four
+      # shipped migrations carry a statement MariaDB cannot run; the master
+      # file corrects them as it is combined, so it -- not the raw migrations
+      # one by one -- is what has to apply cleanly.
+      - name: Apply the master SQL to an empty database
+        run: mysql --host=127.0.0.1 --user=root --password=ci fredpd < database/combined/fredpd_all.sql
 
-      - name: Re-apply to prove migrations are idempotent
-        run: |
-          for file in database/migrations/*.sql; do
-            mysql --host=127.0.0.1 --user=root --password=ci fredpd < "$file"
-          done
+      - name: Re-apply it, to prove it is safe to run again
+        run: mysql --host=127.0.0.1 --user=root --password=ci fredpd < database/combined/fredpd_all.sql
