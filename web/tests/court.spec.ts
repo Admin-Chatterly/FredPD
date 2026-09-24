@@ -62,7 +62,9 @@ test('charges a referral', async ({ page }) => {
 
   const form = page.locator('form').filter({ hasText: 'Choose a decision' });
 
-  await form.getByPlaceholder('Catalogue ids, one per count').fill('11');
+  // Ticked from the catalogue, not typed as ids.
+  await form.getByRole('searchbox', { name: /Find an offence/ }).fill('aggravated');
+  await form.getByRole('checkbox', { name: /Aggravated theft/ }).check();
   await form.getByRole('button', { name: 'Decide the referral' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Decide the referral' }).click();
 

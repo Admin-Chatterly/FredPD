@@ -831,7 +831,9 @@
     "action": {
       "giveReason": "Give a reason",
       "confirm": "Confirm the hit",
-      "log": "My recent queries"
+      "log": "My recent queries",
+      "fine": "Issue a fine",
+      "arrest": "Record an arrest"
     },
     "log": {
       "title": "My recent queries",
@@ -1898,7 +1900,9 @@
       "frigiv": "Release",
       "underratta": "Record notice of suspicion",
       "log": "Add to the custody log",
-      "newGripande": "Record an arrest"
+      "newGripande": "Record an arrest",
+      "editCharges": "Change charges",
+      "book": "Book this person in"
     },
     "column": {
       "number": "Reference",
@@ -2354,7 +2358,6 @@
       "beslutChoose": "Choose a decision",
       "beslutGrundChoose": "Choose a ground",
       "brottIds": "Charges",
-      "brottIdsHelp": "Catalogue ids, one per count",
       "disposition": "Disposition",
       "dispositionChoose": "Choose a disposition",
       "sentenceMonths": "Sentence (months)",
@@ -2493,8 +2496,9 @@
       "openOnly": "In custody only"
     },
     "field": {
-      "frihetId": "Frihetsberövande id",
-      "cell": "Cell"
+      "frihetId": "Custody",
+      "cell": "Cell",
+      "chooseCustody": "Choose who is being booked"
     },
     "action": {
       "book": "Book in",
@@ -2683,5 +2687,19 @@
       "selfInitiate": "FredPD: raise a call here",
       "clear": "FredPD: clear my call"
     }
+  },
+  "picker": {
+    "person": {
+      "placeholder": "Name or person number"
+    },
+    "vehicle": {
+      "placeholder": "Plate"
+    },
+    "charges": {
+      "filter": "Find an offence by name or section",
+      "count": "{count} of at most {max} chosen"
+    },
+    "withheld": "Some records were withheld. Search in Query with a reason to see them.",
+    "chosen": "A record is chosen"
   }
 }

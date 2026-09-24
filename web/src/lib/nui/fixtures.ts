@@ -4234,6 +4234,30 @@ export const fixtures: FixtureSet = {
       };
     },
 
+    'frihet.charges.set': (input) => {
+      const { id, brottIds } = (input ?? {}) as { id?: number; brottIds?: string[] };
+      const row = frihetsberovanden.find((entry) => entry.id === id);
+
+      if (!row) return refuse('not_found');
+      if (row.status === 'frigiven') return refuse('conflict', { status: 'already_released' });
+
+      const chosen = (brottIds ?? []).map(Number);
+      const rows = brottskatalog.filter((entry) => chosen.includes(entry.id));
+      if (rows.length !== chosen.length) return refuse('not_found', { brottIds: 'unknown' });
+
+      row.brott = rows.map((entry, index) => ({
+        id: 900 + index,
+        brottId: entry.id,
+        code: entry.code,
+        labelKey: entry.labelKey,
+        citation: `${entry.balk} ${entry.kapitel}:${entry.paragraf}`,
+        grad: entry.grad,
+        stage: 'fullbordat',
+      }));
+
+      return { id: row.id, count: row.brott.length };
+    },
+
     'frihet.get': (input) => {
       const { id } = (input ?? {}) as { id?: number };
       const row = frihetsberovanden.find((entry) => entry.id === id);

@@ -7,6 +7,8 @@
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
   import LoadMore from '../shared/LoadMore.svelte';
   import { isStub, type Maybe, type Restricted } from './types';
+  import PersonPicker from '../shared/PersonPicker.svelte';
+  import VehiclePicker from '../shared/VehiclePicker.svelte';
 
   /**
    * Spaningsuppdrag — the patrol lookout (spec 7.13).
@@ -343,7 +345,12 @@
     >
       <label class="flex flex-col gap-1 text-xs">
         {t('spaning.column.target')}
-        <select bind:value={form.targetKind} class="border border-[var(--color-border)] px-2 py-1">
+        <!-- A new kind clears the record: a person's id is not a vehicle's. -->
+        <select
+          bind:value={form.targetKind}
+          onchange={() => (form.targetId = '')}
+          class="border border-[var(--color-border)] px-2 py-1"
+        >
           {#each SPANING_TARGETS as target (target)}
             <option value={target}>{t(`spaning.target.${target}`)}</option>
           {/each}
@@ -351,14 +358,21 @@
       </label>
 
       {#if takesTargetId}
-        <label class="flex flex-col gap-1 text-xs">
-          {t('spaning.field.targetId')}
-          <input
-            bind:value={form.targetId}
-            inputmode="numeric"
-            class="w-24 border border-[var(--color-border)] px-2 py-1"
-          />
-        </label>
+        <div class="flex w-64 flex-col gap-1 text-xs">
+          <span id="spaning-target-label">{t('spaning.field.targetId')}</span>
+          {#if form.targetKind === 'person'}
+            <PersonPicker bind:value={form.targetId} labelledby="spaning-target-label" />
+          {:else if form.targetKind === 'vehicle'}
+            <VehiclePicker bind:value={form.targetId} labelledby="spaning-target-label" />
+          {:else}
+            <input
+              bind:value={form.targetId}
+              inputmode="numeric"
+              aria-labelledby="spaning-target-label"
+              class="w-24 border border-[var(--color-border)] px-2 py-1"
+            />
+          {/if}
+        </div>
       {/if}
 
       <label class="flex flex-1 flex-col gap-1 text-xs">

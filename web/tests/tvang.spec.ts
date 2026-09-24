@@ -73,7 +73,9 @@ test('refuses a bodily examination as not this officer’s decision', async ({ p
   const form = page.locator('form').filter({ hasText: 'Record id' });
 
   await form.getByLabel('Measure').selectOption('kroppsbesiktning');
-  await form.getByLabel('Record id').fill('2');
+  // A measure on a person is aimed by picking the person, not typing an id.
+  await form.getByLabel('Record id').fill('ellen');
+  await page.getByRole('option', { name: /Doe, Ellen/ }).click();
   await form.getByLabel('Ground').selectOption('skalig_misstanke');
   await form.getByRole('button', { name: 'Record a decision' }).click();
 

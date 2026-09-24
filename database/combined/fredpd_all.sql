@@ -6368,6 +6368,19 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('domare', 'page.court'),
     ('command', 'page.court'),
 
+    -- Reading the catalogue and the two registers the prosecutor's and the
+    -- court's own forms pick from: charges are chosen from the brottskatalog
+    -- (ChargePicker), and a measure or a wanted notice names a person or a
+    -- vehicle by searching for it (PersonPicker, VehiclePicker). Without
+    -- these the forms could not be filled in at all by the people they are
+    -- for. Read-only; searches are logged like everyone else's (7.2).
+    ('aklagare', 'rms.brott.view'),
+    ('aklagare', 'rms.person.view'),
+    ('aklagare', 'rms.vehicle.view'),
+    ('domare', 'rms.brott.view'),
+    ('domare', 'rms.person.view'),
+    ('domare', 'rms.vehicle.view'),
+
     -- The two field-level grants of spec 4.5. Without a group holding them the
     -- fields are not protected, they are invisible: the routes read the
     -- permission on every path that returns the field, so a department that

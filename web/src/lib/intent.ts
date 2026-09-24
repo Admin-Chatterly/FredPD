@@ -16,6 +16,16 @@ export interface Intent {
   tab?: string;
   term?: string;
   type?: string;
+  /**
+   * A record handed over from another screen ("Issue a fine" on a query
+   * row): the form it lands on opens filled in with it. Ids the officer was
+   * already shown, re-checked by the route that uses them.
+   */
+  personId?: number;
+  vehicleId?: number;
+  frihetId?: number;
+  /** How to name it on the form, so a filled-in field says who it holds. */
+  subjectLabel?: string;
 }
 
 type Listener = (intent: Intent) => void;
@@ -40,6 +50,14 @@ export function parseIntent(value: unknown): Intent | null {
   if (tab !== undefined) intent.tab = tab;
   if (term !== undefined) intent.term = term;
   if (type !== undefined) intent.type = type;
+
+  for (const key of ['personId', 'vehicleId', 'frihetId'] as const) {
+    const value = raw[key];
+    if (typeof value === 'number' && Number.isInteger(value) && value > 0) intent[key] = value;
+  }
+
+  const subjectLabel = text('subjectLabel');
+  if (subjectLabel !== undefined) intent.subjectLabel = subjectLabel;
 
   return intent;
 }

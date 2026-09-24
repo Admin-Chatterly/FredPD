@@ -170,14 +170,42 @@ local function captureTenPrint()
         return
     end
 
-    local input = lib.inputDialog(FredPD.t('fingerprintScanner.tenPrint.title'), {
-        { type = 'input', label = FredPD.t('fingerprintScanner.tenPrint.numberLabel'), required = true },
-    })
+    -- The open bookings, to pick from rather than typing a number off the
+    -- MDT. Typing stays as the fallback when the list cannot be read.
+    local number
+    local open = FredPD.Client.core.call('booking.list', { open = true, limit = 25 })
+    local choices = {}
 
-    if not input or not input[1] then return end
+    for _, row in ipairs(open.ok and open.data and open.data.bookings or {}) do
+        if row.number then
+            choices[#choices + 1] = {
+                value = row.number,
+                label = row.cell and ('%s — %s'):format(row.number, row.cell) or row.number,
+            }
+        end
+    end
+
+    if #choices > 0 then
+        local input = lib.inputDialog(FredPD.t('fingerprintScanner.tenPrint.title'), {
+            {
+                type = 'select', label = FredPD.t('fingerprintScanner.tenPrint.numberLabel'),
+                options = choices, required = true, default = choices[1].value,
+            },
+        })
+
+        number = input and input[1]
+    else
+        local input = lib.inputDialog(FredPD.t('fingerprintScanner.tenPrint.title'), {
+            { type = 'input', label = FredPD.t('fingerprintScanner.tenPrint.numberLabel'), required = true },
+        })
+
+        number = input and input[1]
+    end
+
+    if not number then return end
 
     local response = FredPD.Client.core.call('booking.tenPrint.capture', {
-        number = input[1],
+        number = number,
         targetId = targetId,
         placementId = terminal.id,
     })

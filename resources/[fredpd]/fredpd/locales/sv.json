@@ -831,7 +831,9 @@
     "action": {
       "giveReason": "Ange skäl",
       "confirm": "Bekräfta träffen",
-      "log": "Mina senaste slagningar"
+      "log": "Mina senaste slagningar",
+      "fine": "Utfärda ordningsbot",
+      "arrest": "Registrera gripande"
     },
     "log": {
       "title": "Mina senaste slagningar",
@@ -1898,7 +1900,9 @@
       "frigiv": "Frige",
       "underratta": "Registrera underrättelse om misstanke",
       "log": "Lägg till i arrestjournalen",
-      "newGripande": "Registrera gripande"
+      "newGripande": "Registrera gripande",
+      "editCharges": "Ändra brott",
+      "book": "Skriv in personen"
     },
     "column": {
       "number": "Diarienummer",
@@ -2354,7 +2358,6 @@
       "beslutChoose": "Välj beslut",
       "beslutGrundChoose": "Välj grund",
       "brottIds": "Åtalspunkter",
-      "brottIdsHelp": "Katalog-id, ett per åtalspunkt",
       "disposition": "Dom",
       "dispositionChoose": "Välj dom",
       "sentenceMonths": "Påföljd (månader)",
@@ -2493,8 +2496,9 @@
       "openOnly": "Endast intagna"
     },
     "field": {
-      "frihetId": "Frihetsberövande-id",
-      "cell": "Cell"
+      "frihetId": "Frihetsberövande",
+      "cell": "Cell",
+      "chooseCustody": "Välj vem som skrivs in"
     },
     "action": {
       "book": "Skriv in",
@@ -2683,5 +2687,19 @@
       "selfInitiate": "FredPD: skapa händelse här",
       "clear": "FredPD: avsluta min händelse"
     }
+  },
+  "picker": {
+    "person": {
+      "placeholder": "Namn eller personnummer"
+    },
+    "vehicle": {
+      "placeholder": "Registreringsnummer"
+    },
+    "charges": {
+      "filter": "Sök brott på rubrik eller lagrum",
+      "count": "{count} av högst {max} valda"
+    },
+    "withheld": "Vissa poster hölls inne. Sök i Slagning med ett ärende för att se dem.",
+    "chosen": "En post är vald"
   }
 }

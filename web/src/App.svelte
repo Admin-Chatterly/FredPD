@@ -2,7 +2,8 @@
   import { nui } from './lib/nui';
   import { t, isLocale, setLocale } from './lib/i18n';
   import { setDepartmentTimezone } from './lib/time';
-  import { parseIntent, setIntent } from './lib/intent';
+  import { onIntent, parseIntent, setIntent } from './lib/intent';
+  import { setAllowedModules } from './lib/modules';
   import type { ErrorCode } from '@fredpd/schema';
   import type { Session } from './lib/types';
   import RoleMap from './modules/admin/RoleMap.svelte';
@@ -73,6 +74,7 @@
 
     if (response.ok) {
       session = response.data;
+      setAllowedModules(response.data.modules);
       error = null;
       // Before anything renders a timestamp: every screen formats in the
       // department's zone, not in the one the player's machine is set to.
@@ -107,6 +109,14 @@
     };
   });
 
+  // A screen handing over to another module ("Book this person" on a
+  // custody chain): switch to it, if this session may open it at all.
+  $effect(() =>
+    onIntent((intent) => {
+      if (session?.modules.includes(intent.module)) current = intent.module;
+    }),
+  );
+
   $effect(() =>
     nui.on('fredpd:open', (message) => {
       // A field action's "Open in MDT" names the screen outright; a terminal
@@ -132,6 +142,7 @@
       if (!session || !Array.isArray(modules)) return;
 
       session = { ...session, modules: modules as string[] };
+      setAllowedModules(session.modules);
 
       if (current !== null && !session.modules.includes(current)) {
         current = session.modules[0] ?? null;

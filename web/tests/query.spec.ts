@@ -170,3 +170,33 @@ test('a field check opened in the MDT lands on the query, already run', async ({
   await expect(page.getByRole('textbox', { name: 'Search' })).toHaveValue('john');
   await expect(page.getByRole('alert').filter({ hasText: 'WANTED' })).toBeVisible();
 });
+
+test('a result hands its record to the next form, filled in', async ({ page }) => {
+  await page.goto('/?locale=en');
+  await page.locator('nav').first().getByRole('button', { name: 'Records' }).click();
+
+  await page.getByRole('textbox', { name: 'Search' }).fill('petrov');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+
+  // No retyping: the fine form opens holding the person the officer found.
+  await page.getByRole('button', { name: 'Issue a fine' }).first().click();
+
+  const form = page.locator('form').filter({ hasText: 'Fine' });
+  await expect(form).toContainText('Petrov');
+
+  await form.getByLabel('Fine').selectOption('2');
+  await form.getByRole('button', { name: 'Issue citation' }).click();
+  await expect(page.getByRole('status')).toContainText('issued');
+});
+
+test('a person result opens the arrest form holding them', async ({ page }) => {
+  await page.goto('/?locale=en');
+  await page.locator('nav').first().getByRole('button', { name: 'Records' }).click();
+
+  await page.getByRole('textbox', { name: 'Search' }).fill('petrov');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Record an arrest' }).first().click();
+
+  const form = page.locator('form').filter({ hasText: 'Where' });
+  await expect(form).toContainText('Petrov');
+});

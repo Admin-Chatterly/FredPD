@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { nui } from '../../lib/nui';
-  import { onIntent, peekIntent, takeIntent } from '../../lib/intent';
+  import { onIntent, peekIntent, setIntent, takeIntent } from '../../lib/intent';
   import { t } from '../../lib/i18n';
   import { formatMoment } from '../../lib/time';
   import { fieldList, type Failure } from '../shared/failure';
@@ -294,6 +294,12 @@
     return surname || given || row.personNumber || t('records.person.unnamed');
   }
 
+  /** How a row is named on the form it is handed to (the pickers' format). */
+  function handover(row: Result): string {
+    const number = detailOf(row);
+    return number ? `${label(row)} (${number})` : label(row);
+  }
+
   /** The second line: enough to tell two rows apart, and no more. */
   function detailOf(row: Result): string {
     if (row.kind === 'vehicle') return row.model ?? '';
@@ -541,6 +547,42 @@
                   {/if}
                 </div>
               {/each}
+
+              {#if row.kind === 'person' || row.kind === 'vehicle'}
+                <!-- The next step, with the record already filled in: a fine
+                     or an arrest opens on its tab holding this row. After the
+                     hit banners, so a hit is read (and confirmed) first. -->
+                <div class="mt-1 flex flex-wrap gap-1 text-xs">
+                  <button
+                    type="button"
+                    class="border border-[var(--color-border)] px-2 py-0.5 hover:bg-[var(--color-surface)]"
+                    onclick={() =>
+                      setIntent({
+                        module: 'records',
+                        tab: 'ordningsbot',
+                        subjectLabel: handover(row),
+                        ...(row.kind === 'person' ? { personId: row.id } : { vehicleId: row.id }),
+                      })}
+                  >
+                    {t('query.action.fine')}
+                  </button>
+                  {#if row.kind === 'person'}
+                    <button
+                      type="button"
+                      class="border border-[var(--color-border)] px-2 py-0.5 hover:bg-[var(--color-surface)]"
+                      onclick={() =>
+                        setIntent({
+                          module: 'records',
+                          tab: 'frihet',
+                          personId: row.id,
+                          subjectLabel: handover(row),
+                        })}
+                    >
+                      {t('query.action.arrest')}
+                    </button>
+                  {/if}
+                </div>
+              {/if}
             {/if}
           </li>
         {/each}

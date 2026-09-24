@@ -824,7 +824,7 @@
            field, who sends nobody and whose job on this card is the status
            buttons and "Attach to call" above; open at the console. -->
       <details class="border-t border-[var(--color-border)] px-3 py-2" open={consolePlacement() !== null}>
-        <summary class="cursor-pointer text-xs font-semibold">{t('cad.dispatch.title')}</summary>
+        <summary class="cursor-pointer"><h3 class="inline text-xs font-semibold">{t('cad.dispatch.title')}</h3></summary>
         <p class="mt-1 text-xs text-[var(--color-ink-muted)]">{t('cad.dispatch.intro')}</p>
 
         {#if consolePlacement() === null}

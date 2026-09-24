@@ -1,5 +1,6 @@
 <script generics="T" lang="ts">
   import { t } from '../../lib/i18n';
+  import { PickerRefusal, type PickerResult } from './picker-result';
 
   /**
    * A search-as-you-type box for attaching an *existing* record to another
@@ -27,7 +28,7 @@
     /** Runs on every debounced keystroke, including an empty term -- whether
      *  that means "browse everything" or "nothing to search yet" is the
      *  caller's route to decide, not this component's. */
-    search: (term: string) => Promise<T[]>;
+    search: (term: string) => Promise<PickerResult<T>>;
     /** The line an officer reads to tell one result from the next. */
     label: (item: T) => string;
     /** A second, muted line -- "the owner, model, plate etc" the officer
@@ -46,6 +47,10 @@
     /** Clears the caller's own selection. Omitted, the confirmation line
      *  carries no clear button -- some callers have nothing to reset it to. */
     onClear?: () => void;
+    /** The id of the visible caption that names this box. */
+    labelledby?: string | undefined;
+    /** Announced as required; the server still refuses an empty field. */
+    required?: boolean;
   }
 
   let {
@@ -59,13 +64,21 @@
     debounceMs = 250,
     selectedLabel = null,
     onClear,
+    labelledby,
+    required = false,
   }: Props = $props();
+
+  // Unique per instance: two pickers on one form must not share a listbox.
+  const uid = $props.id();
+  const listId = `${uid}-listbox`;
 
   let term = $state('');
   let results = $state<T[]>([]);
   let open = $state(false);
   let busy = $state(false);
   let highlighted = $state(-1);
+  let refusal = $state<string | null>(null);
+  let note = $state<string | null>(null);
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   // Bumped on every call so a slow answer to an earlier keystroke cannot
@@ -76,10 +89,27 @@
     const id = ++requestId;
     busy = true;
 
-    const found = await search(term);
+    let found: T[] = [];
+    let refused: string | null = null;
+    let said: string | null = null;
+
+    try {
+      const answer = await search(term);
+      if (Array.isArray(answer)) {
+        found = answer;
+      } else {
+        found = answer.items;
+        said = answer.note ?? null;
+      }
+    } catch (error) {
+      refused = error instanceof PickerRefusal ? error.code : 'internal';
+    }
+
     if (id !== requestId) return;
 
     results = found;
+    refusal = refused;
+    note = said;
     highlighted = found.length > 0 ? 0 : -1;
     open = true;
     busy = false;
@@ -135,7 +165,10 @@
     role="combobox"
     aria-expanded={open}
     aria-autocomplete="list"
-    aria-controls="entity-picker-listbox"
+    aria-controls={listId}
+    aria-activedescendant={open && highlighted >= 0 ? `${uid}-option-${highlighted}` : undefined}
+    aria-labelledby={labelledby}
+    aria-required={required ? 'true' : undefined}
     class="w-full border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1"
     {placeholder}
     {disabled}
@@ -150,21 +183,28 @@
 
   {#if open}
     <ul
-      id="entity-picker-listbox"
+      id={listId}
       role="listbox"
       class="absolute z-10 mt-0.5 max-h-48 w-full overflow-y-auto border border-[var(--color-border)] bg-[var(--color-panel)] text-xs"
     >
       {#if busy}
         <li class="px-2 py-1 text-[var(--color-ink-muted)]">{t('form.searching')}</li>
+      {:else if refusal}
+        <li class="px-2 py-1 text-[var(--color-caution)]">{t(`error.${refusal}`)}</li>
       {:else if results.length === 0}
         <li class="px-2 py-1 text-[var(--color-ink-muted)]">{t('form.noMatches')}</li>
       {:else}
         {#each results as item, index (getKey(item))}
-          <li role="option" aria-selected={index === highlighted}>
+          <li id={`${uid}-option-${index}`} role="option" aria-selected={index === highlighted}>
             <button
               type="button"
+              tabindex="-1"
               class="block w-full px-2 py-1 text-left hover:bg-[var(--color-surface)]"
               class:bg-[var(--color-surface)]={index === highlighted}
+              class:outline={index === highlighted}
+              class:outline-2={index === highlighted}
+              class:-outline-offset-2={index === highlighted}
+              class:outline-[var(--color-focus)]={index === highlighted}
               onmousedown={(event) => event.preventDefault()}
               onclick={() => choose(item)}
             >
@@ -175,6 +215,9 @@
             </button>
           </li>
         {/each}
+      {/if}
+      {#if note && !busy}
+        <li class="border-t border-[var(--color-border)] px-2 py-1 text-[var(--color-ink-muted)]">{note}</li>
       {/if}
     </ul>
   {/if}

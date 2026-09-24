@@ -7,6 +7,8 @@
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
   import LoadMore from '../shared/LoadMore.svelte';
   import { isStub, type Maybe, type Restricted } from './types';
+  import PersonPicker from '../shared/PersonPicker.svelte';
+  import VehiclePicker from '../shared/VehiclePicker.svelte';
 
   /**
    * Tvångsmedel — coercive measures under RB 27–28 (spec 7.12).
@@ -398,23 +400,39 @@
 
       <label class="flex flex-col gap-1 text-xs">
         {t('tvang.column.target')}
-        <select bind:value={form.targetKind} class="border border-[var(--color-border)] px-2 py-1">
+        <!-- A new kind clears the record: a person's id is not a vehicle's. -->
+        <select
+          bind:value={form.targetKind}
+          onchange={() => (form.targetId = '')}
+          class="border border-[var(--color-border)] px-2 py-1"
+        >
           {#each targetOptions as target (target)}
             <option value={target}>{t(`tvang.target.${target}`)}</option>
           {/each}
         </select>
       </label>
 
-      <label class="flex flex-col gap-1 text-xs">
-        <span>{t('tvang.field.targetId')} <span aria-hidden="true">{REQUIRED_MARK}</span></span>
-        <input
-          bind:value={form.targetId}
-          inputmode="numeric"
-          required
-          aria-required="true"
-          class="w-24 border border-[var(--color-border)] px-2 py-1"
-        />
-      </label>
+      {#if form.targetKind === 'person' || form.targetKind === 'vehicle'}
+        <div class="flex w-64 flex-col gap-1 text-xs">
+          <span id="tvang-target-label">{t('tvang.field.targetId')} <span aria-hidden="true">{REQUIRED_MARK}</span></span>
+          {#if form.targetKind === 'person'}
+            <PersonPicker bind:value={form.targetId} labelledby="tvang-target-label" required />
+          {:else}
+            <VehiclePicker bind:value={form.targetId} labelledby="tvang-target-label" required />
+          {/if}
+        </div>
+      {:else}
+        <label class="flex flex-col gap-1 text-xs">
+          <span>{t('tvang.field.targetId')} <span aria-hidden="true">{REQUIRED_MARK}</span></span>
+          <input
+            bind:value={form.targetId}
+            inputmode="numeric"
+            required
+            aria-required="true"
+            class="w-24 border border-[var(--color-border)] px-2 py-1"
+          />
+        </label>
+      {/if}
 
       <label class="flex flex-col gap-1 text-xs">
         {t('tvang.field.targetLabel')}

@@ -5,6 +5,7 @@
   import { fieldList, type Failure } from '../shared/failure';
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
   import { isStub, type Maybe, type Restricted } from '../records/types';
+  import { onIntent, peekIntent, takeIntent } from '../../lib/intent';
 
   /**
    * Booking: inskrivning i arrest — cell assignment, property inventory and
@@ -80,6 +81,51 @@
     busy = false;
   }
 
+  /**
+   * Who is being held right now, for the booking form to pick from: nobody
+   * types a custody chain's internal id any more. `null` when this session
+   * may not list custody (`frihet.view`); the form then takes the id typed.
+   */
+  interface OpenCustody {
+    id: number;
+    number: string;
+    personNumber: string | null;
+    status: string;
+  }
+
+  /** `undefined` while loading, `null` when refused, the list otherwise. */
+  let custody = $state<OpenCustody[] | null | undefined>(undefined);
+
+  async function loadCustody(): Promise<void> {
+    // `frihet.open`: the server's own open-custody list, not the latest
+    // fifty chains of any status.
+    const response = await nui.call<{ frihetsberovanden: Maybe<OpenCustody>[] }>('frihet.open', {
+      limit: 200,
+    });
+
+    custody = response.ok
+      ? (response.data.frihetsberovanden ?? []).filter((row): row is OpenCustody => !isStub(row))
+      : null;
+  }
+
+  $effect(() => {
+    void loadCustody();
+  });
+
+  /** "Book this person" on a custody chain (lib/intent.ts): pre-selected. */
+  function followIntent(): void {
+    const intent = peekIntent();
+    if (!intent || intent.module !== 'booking' || !intent.frihetId) return;
+
+    takeIntent();
+    bookForm = { frihetId: String(intent.frihetId), cell: '' };
+  }
+
+  $effect(() => {
+    followIntent();
+    return onIntent(() => followIntent());
+  });
+
   async function open(id: number): Promise<void> {
     busy = true;
 
@@ -112,7 +158,7 @@
       failure = null;
       status = t('booking.booked', { number: response.data.number });
       bookForm = { frihetId: '', cell: '' };
-      await Promise.all([load(), open(response.data.id)]);
+      await Promise.all([load(), open(response.data.id), loadCustody()]);
     } else {
       failure = response;
     }
@@ -219,7 +265,20 @@
   <form class="flex flex-wrap items-end gap-2 border border-[var(--color-border)] p-3" onsubmit={book}>
     <label class="flex flex-col gap-1 text-xs">
       <span>{t('booking.field.frihetId')} <span aria-hidden="true">*</span></span>
-      <input bind:value={bookForm.frihetId} required inputmode="numeric" class="w-28 border border-[var(--color-border)] px-2 py-1" />
+      {#if custody === undefined}
+        <span class="px-2 py-1 text-[var(--color-ink-muted)]">{t('form.searching')}</span>
+      {:else if custody !== null}
+        <select bind:value={bookForm.frihetId} required class="border border-[var(--color-border)] px-2 py-1">
+          <option value="">{t('booking.field.chooseCustody')}</option>
+          {#each custody as chain (chain.id)}
+            <option value={String(chain.id)}>
+              {chain.number} — {chain.personNumber ?? '—'} ({t(`frihet.status.${chain.status}`)})
+            </option>
+          {/each}
+        </select>
+      {:else}
+        <input bind:value={bookForm.frihetId} required inputmode="numeric" class="w-28 border border-[var(--color-border)] px-2 py-1" />
+      {/if}
     </label>
     <label class="flex flex-col gap-1 text-xs">
       {t('booking.field.cell')}

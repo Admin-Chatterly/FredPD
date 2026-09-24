@@ -5,6 +5,9 @@
   import { fieldList, type Failure } from '../shared/failure';
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
   import { isStub, type Maybe, type Restricted } from './types';
+  import PersonPicker from '../shared/PersonPicker.svelte';
+  import VehiclePicker from '../shared/VehiclePicker.svelte';
+  import { onIntent, peekIntent, takeIntent } from '../../lib/intent';
 
   /**
    * Ordningsbot: on-the-spot fines against a versioned tariff (spec 7.11).
@@ -60,6 +63,30 @@
   let status = $state('');
 
   let issueForm = $state({ tariffId: '', personId: '', vehicleId: '' });
+
+  /**
+   * "Issue a fine" from a query row (lib/intent.ts): the form opens holding
+   * that person or vehicle, named, and the officer only picks the fine.
+   */
+  let subjectLabel = $state<string | null>(null);
+
+  function followIntent(): void {
+    const intent = peekIntent();
+    if (!intent || intent.tab !== 'ordningsbot' || !(intent.personId || intent.vehicleId)) return;
+
+    takeIntent();
+    issueForm = {
+      tariffId: '',
+      personId: intent.personId ? String(intent.personId) : '',
+      vehicleId: intent.vehicleId ? String(intent.vehicleId) : '',
+    };
+    subjectLabel = intent.subjectLabel ?? null;
+  }
+
+  $effect(() => {
+    followIntent();
+    return onIntent(() => followIntent());
+  });
   let voidReasonKey = $state(VOID_REASONS[0]);
   let confirmingVoid = $state(false);
   let trigger: HTMLButtonElement | null = null;
@@ -241,14 +268,22 @@
         {/each}
       </select>
     </label>
-    <label class="flex flex-col gap-1 text-xs">
-      {t('ordningsbot.field.person')}
-      <input bind:value={issueForm.personId} inputmode="numeric" class="w-24 border border-[var(--color-border)] px-2 py-1" />
-    </label>
-    <label class="flex flex-col gap-1 text-xs">
-      {t('ordningsbot.field.vehicle')}
-      <input bind:value={issueForm.vehicleId} inputmode="numeric" class="w-24 border border-[var(--color-border)] px-2 py-1" />
-    </label>
+    <div class="flex w-64 flex-col gap-1 text-xs">
+      <span id="ordningsbot-person-label">{t('ordningsbot.field.person')}</span>
+      <PersonPicker
+        bind:value={issueForm.personId}
+        initialLabel={issueForm.personId ? subjectLabel : null}
+        labelledby="ordningsbot-person-label"
+      />
+    </div>
+    <div class="flex w-56 flex-col gap-1 text-xs">
+      <span id="ordningsbot-vehicle-label">{t('ordningsbot.field.vehicle')}</span>
+      <VehiclePicker
+        bind:value={issueForm.vehicleId}
+        initialLabel={issueForm.vehicleId ? subjectLabel : null}
+        labelledby="ordningsbot-vehicle-label"
+      />
+    </div>
     <button type="submit" class="border border-[var(--color-border)] px-3 py-1 text-xs" disabled={busy}>
       {t('ordningsbot.action.issue')}
     </button>

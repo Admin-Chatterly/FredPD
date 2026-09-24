@@ -1830,6 +1830,8 @@ row, and a supervisor cannot add them with `unit.manage`.
 hold it — supervisor, command, dispatch — are exactly the ones who may give the
 acknowledgement.
 
+**Prosecutor and judge reads (seeded).** `aklagare` and `domare` hold `rms.brott.view`, `rms.person.view` and `rms.vehicle.view`: their own forms pick charges from the brottskatalog and name the person or vehicle of a measure or a wanted notice by searching the registers, and without these grants those forms could not be filled in. Read-only, and every search is logged (7.2).
+
 ## Appendix C — Default role template
 
 Discord role names are examples; the mapping uses role IDs.

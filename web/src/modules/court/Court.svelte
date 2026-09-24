@@ -5,6 +5,7 @@
   import { fieldList, type Failure } from '../shared/failure';
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
   import { isStub, type Maybe, type Restricted } from '../records/types';
+  import ChargePicker from '../shared/ChargePicker.svelte';
 
   /**
    * Åtal och dom — the prosecutor's charging decision and the court's
@@ -85,7 +86,7 @@
   let openId = $state<number | null>(null);
 
   let deciding = $state<PendingFu | null>(null);
-  let decideForm = $state({ beslut: 'atalad', beslutGrund: '', brottIds: '' });
+  let decideForm = $state({ beslut: 'atalad', beslutGrund: '', brottIds: [] as number[] });
 
   let confirmingDecide = $state(false);
   let confirmingDisposition = $state(false);
@@ -173,10 +174,8 @@
     busy = true;
     const fu = deciding;
 
-    const brottIds = decideForm.brottIds
-      .split(',')
-      .map((value) => value.trim())
-      .filter((value) => value !== '');
+    // Picked from the catalogue (ChargePicker), sent as the route takes them.
+    const brottIds = decideForm.brottIds.map(String);
 
     const response = await nui.call<{ id: number; number: string }>('court.referral.decide', {
       fuId: fu.id,
@@ -193,7 +192,7 @@
         decideForm.beslut === 'atalad'
           ? t('court.charged', { number: response.data.number })
           : t('court.declined', { number: response.data.number });
-      decideForm = { beslut: 'atalad', beslutGrund: '', brottIds: '' };
+      decideForm = { beslut: 'atalad', beslutGrund: '', brottIds: [] as number[] };
       await Promise.all([load(), loadPending(), open(response.data.id)]);
     } else {
       failure = response;
@@ -306,7 +305,7 @@
                 class="border border-[var(--color-border)] px-2 py-0.5"
                 onclick={() => {
                   deciding = fu;
-                  decideForm = { beslut: 'atalad', beslutGrund: '', brottIds: '' };
+                  decideForm = { beslut: 'atalad', beslutGrund: '', brottIds: [] as number[] };
                   confirmingDecide = false;
                   failure = null;
                 }}
@@ -342,16 +341,14 @@
           </label>
 
           {#if decideForm.beslut === 'atalad'}
-            <label class="flex flex-1 flex-col gap-1 text-xs">
-              <span>{t('court.field.brottIds')} <span aria-hidden="true">{REQUIRED_MARK}</span></span>
-              <input
-                bind:value={decideForm.brottIds}
-                placeholder={t('court.field.brottIdsHelp')}
+            <div class="min-w-64 flex-1">
+              <ChargePicker
+                bind:selected={decideForm.brottIds}
+                legend={t('court.field.brottIds')}
                 required
-                aria-required="true"
-                class="border border-[var(--color-border)] px-2 py-1"
+                disabled={busy}
               />
-            </label>
+            </div>
           {:else}
             <label class="flex flex-col gap-1 text-xs">
               <span>{t('court.field.beslutGrundChoose')} <span aria-hidden="true">{REQUIRED_MARK}</span></span>

@@ -86,11 +86,12 @@ test('issues a notice', async ({ page }) => {
 
   const form = page.locator('form').filter({ hasText: 'Person id' });
 
-  await form.getByLabel('Person id').fill('5');
+  await form.getByLabel('Person id').fill('petrov');
+  await page.getByRole('option', { name: /Petrov, Marko/ }).click();
   await form.getByLabel('Ground').selectOption('haktad_i_franvaro');
   await form.getByRole('button', { name: 'Issue a wanted notice' }).click();
 
-  const row = page.getByRole('row').filter({ hasText: 'P-001005' });
+  const row = page.getByRole('row').filter({ hasText: 'P-001003' });
 
   await expect(row).toContainText('Remanded in absentia');
   // Häktad i sin frånvaro is the second of the two detain-on-sight grounds.

@@ -32,7 +32,8 @@ test('issues a citation against the fine schedule', async ({ page }) => {
 
   const form = page.locator('form').filter({ hasText: 'Fine' });
   await form.getByLabel('Fine').selectOption('2');
-  await form.getByLabel('Person id').fill('9');
+  await form.getByLabel('Person id').fill('petrov');
+  await page.getByRole('option', { name: /Petrov, Marko/ }).click();
   await form.getByRole('button', { name: 'Issue citation' }).click();
 
   await expect(page.getByRole('status')).toContainText('issued');

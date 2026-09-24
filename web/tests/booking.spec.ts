@@ -64,3 +64,12 @@ test('renders the module in Swedish', async ({ page }) => {
 
   await expect(page.getByRole('button', { name: 'B26-00042' })).toBeVisible();
 });
+
+test('books somebody picked from who is held, not by a typed id', async ({ page }) => {
+  await openBooking(page);
+
+  // The chains currently open, by number and person, rather than an internal
+  // id copied off the custody screen.
+  const custody = page.getByRole('combobox', { name: /Custody/ });
+  await expect(custody.locator('option').filter({ hasText: /A26-/ }).first()).toBeAttached();
+});

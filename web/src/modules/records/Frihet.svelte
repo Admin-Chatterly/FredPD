@@ -6,6 +6,10 @@
   import { FRIHET_STATUSES } from '@fredpd/schema';
   import { fieldList, type Failure } from '../shared/failure';
   import { isStub, type Maybe, type Moment, type Restricted } from './types';
+  import PersonPicker from '../shared/PersonPicker.svelte';
+  import ChargePicker from '../shared/ChargePicker.svelte';
+  import { onIntent, peekIntent, setIntent, takeIntent } from '../../lib/intent';
+  import { mayOpen } from '../../lib/modules';
 
   /**
    * Frihetsberövande — the gripande → anhållande → häktningsframställan →
@@ -196,6 +200,27 @@
   let arresting = $state(false);
   let arrest = $state({ personId: '', grund: '', plats: '' });
 
+  /**
+   * "Record an arrest" from a query row (lib/intent.ts): the arrest form
+   * opens holding that person, named.
+   */
+  let arrestLabel = $state<string | null>(null);
+
+  function followIntent(): void {
+    const intent = peekIntent();
+    if (!intent || intent.tab !== 'frihet' || !intent.personId) return;
+
+    takeIntent();
+    arrest = { personId: String(intent.personId), grund: '', plats: '' };
+    arrestLabel = intent.subjectLabel ?? null;
+    arresting = true;
+  }
+
+  $effect(() => {
+    followIntent();
+    return onIntent(() => followIntent());
+  });
+
   let rows = $state<Maybe<FrihetRow>[]>([]);
   let detail = $state<Detail | null>(null);
   let failure = $state<Failure | null>(null);
@@ -207,6 +232,47 @@
   let grund = $state('');
   let logKind = $state(LOG_KINDS[0]);
   let logNote = $state('');
+
+  /**
+   * What the person is held for, edited as a checklist of the catalogue
+   * (`frihet.charges.set`). The route has always existed; nothing called it,
+   * so a chain could never say what it was for.
+   */
+  let editingCharges = $state(false);
+  let chargeIds = $state<number[]>([]);
+  let chargesButton = $state<HTMLButtonElement | null>(null);
+
+  /** Closes the editor and gives focus back to the button that opened it. */
+  function stopCharges(): void {
+    editingCharges = false;
+    queueMicrotask(() => chargesButton?.focus());
+  }
+
+  function startCharges(): void {
+    chargeIds = (detail?.brott ?? []).map((charge) => charge.brottId);
+    editingCharges = true;
+  }
+
+  async function saveCharges(): Promise<void> {
+    if (!record) return;
+
+    busy = true;
+    const id = record.id;
+
+    const response = await nui.call('frihet.charges.set', {
+      id,
+      brottIds: chargeIds.map(String),
+    });
+
+    if (response.ok) {
+      failure = null;
+      await open(id);
+      stopCharges();
+    } else {
+      failure = response;
+      busy = false;
+    }
+  }
 
   /**
    * The confirmation dialog, and the button that opened it.
@@ -312,6 +378,7 @@
     confirming = null;
     grund = '';
     logNote = '';
+    editingCharges = false;
 
     const response = await nui.call<Detail>('frihet.get', { id });
 
@@ -630,16 +697,15 @@
       class="flex flex-wrap items-end gap-2 border border-[var(--color-border)] p-3"
       onsubmit={(event) => void gripande(event)}
     >
-      <label class="flex flex-col gap-1 text-xs">
-        <span>{t('frihet.field.personId')} <span aria-hidden="true">{REQUIRED_MARK}</span></span>
-        <input
+      <div class="flex w-64 flex-col gap-1 text-xs">
+        <span id="frihet-arrest-person-label">{t('frihet.field.personId')} <span aria-hidden="true">{REQUIRED_MARK}</span></span>
+        <PersonPicker
           bind:value={arrest.personId}
-          inputmode="numeric"
+          initialLabel={arrestLabel}
+          labelledby="frihet-arrest-person-label"
           required
-          aria-required="true"
-          class="w-24 border border-[var(--color-border)] px-2 py-1"
         />
-      </label>
+      </div>
 
       <label class="flex flex-col gap-1 text-xs">
         <span>{t('frihet.column.grund')} <span aria-hidden="true">{REQUIRED_MARK}</span></span>
@@ -933,12 +999,56 @@
               </button>
             {/if}
           </p>
+
+          {#if record.status !== 'frigiven' && mayOpen('booking')}
+            <!-- The next step in the building: booking, with this chain
+                 already chosen. Offered only to a session the server lets
+                 open Booking. -->
+            <button
+              type="button"
+              class="mt-2 border border-[var(--color-border)] px-2 py-0.5 text-xs hover:bg-[var(--color-surface)]"
+              onclick={() => setIntent({ module: 'booking', frihetId: record.id })}
+            >
+              {t('frihet.action.book')}
+            </button>
+          {/if}
         </section>
 
         <!-- What they are held for -->
         <section class="mb-3">
-          <h3 class="mb-1 text-xs font-semibold">{t('frihet.section.brott')}</h3>
-          {#if detail.brott.length === 0}
+          <div class="mb-1 flex items-center gap-2">
+            <h3 class="text-xs font-semibold">{t('frihet.section.brott')}</h3>
+            {#if record && record.status !== 'frigiven' && !editingCharges}
+              <button
+                type="button"
+                class="border border-[var(--color-border)] px-2 py-0.5 text-xs hover:bg-[var(--color-surface)]"
+                bind:this={chargesButton}
+                onclick={startCharges}
+              >
+                {t('frihet.action.editCharges')}
+              </button>
+            {/if}
+          </div>
+          {#if editingCharges}
+            <ChargePicker bind:selected={chargeIds} legend={t('frihet.section.brott')} disabled={busy} />
+            <div class="mt-1 flex gap-2 text-xs">
+              <button
+                type="button"
+                class="border border-[var(--color-border)] px-3 py-1 font-semibold hover:bg-[var(--color-surface)]"
+                disabled={busy}
+                onclick={() => void saveCharges()}
+              >
+                {t('form.save')}
+              </button>
+              <button
+                type="button"
+                class="border border-[var(--color-border)] px-3 py-1 hover:bg-[var(--color-surface)]"
+                onclick={stopCharges}
+              >
+                {t('form.cancel')}
+              </button>
+            </div>
+          {:else if detail.brott.length === 0}
             <p class="text-xs text-[var(--color-ink-muted)]">{t('frihet.brott.empty')}</p>
           {:else}
             <ul class="text-xs">

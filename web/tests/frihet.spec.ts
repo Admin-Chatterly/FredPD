@@ -302,7 +302,9 @@ test('records a gripande, which is how a chain starts at all', async ({ page }) 
 
   const form = page.locator('form').filter({ hasText: 'Where' });
 
-  await form.getByLabel('Person id').fill('1');
+  // Picked by name, not typed as an internal id nobody can see.
+  await form.getByLabel('Person id').fill('john');
+  await page.getByRole('option', { name: /Doe, John/ }).click();
   await form.getByLabel('Ground').selectOption('pa_bar_garning');
   await form.getByLabel('Where').fill('Kvarngatan 3B, outside the stairwell');
   await form.getByRole('button', { name: 'Record the arrest' }).click();
@@ -329,7 +331,8 @@ test('an arrest takes down the wanted notice that asked for it', async ({ page }
   await page.getByRole('button', { name: 'Record an arrest' }).click();
 
   const form = page.locator('form').filter({ hasText: 'Where' });
-  await form.getByLabel('Person id').fill('1');
+  await form.getByLabel('Person id').fill('john');
+  await page.getByRole('option', { name: /Doe, John/ }).click();
   await form.getByLabel('Ground').selectOption('efterlyst');
   await form.getByRole('button', { name: 'Record the arrest' }).click();
 
@@ -339,4 +342,28 @@ test('an arrest takes down the wanted notice that asked for it', async ({ page }
   // stops believing the banners.
   await page.getByRole('button', { name: 'Wanted notices', exact: true }).click();
   await expect(page.getByRole('cell', { name: 'W26-00115' })).toHaveCount(0);
+});
+
+test('says what somebody is held for, picked from the catalogue', async ({ page }) => {
+  await openCustody(page);
+
+  await page.getByRole('button', { name: 'A26-00041' }).click();
+  await page.getByRole('button', { name: 'Change charges' }).click();
+
+  // Found by name, ticked, saved: no comma-typed list of catalogue ids.
+  await page.getByRole('searchbox', { name: /Find an offence/ }).fill('aggravated');
+  await page.getByRole('checkbox', { name: /Aggravated theft/ }).check();
+  await page.getByRole('button', { name: 'Save' }).click();
+
+  await expect(page.getByRole('listitem').filter({ hasText: 'Aggravated theft' })).toBeVisible();
+});
+
+test('goes straight to booking with the chain already chosen', async ({ page }) => {
+  await openCustody(page);
+
+  await page.getByRole('button', { name: 'A26-00041' }).click();
+  await page.getByRole('button', { name: 'Book this person in' }).click();
+
+  const custody = page.getByRole('combobox', { name: /Custody/ });
+  await expect(custody.locator('option:checked')).toContainText('A26-00041');
 });

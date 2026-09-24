@@ -7,6 +7,7 @@
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
   import LoadMore from '../shared/LoadMore.svelte';
   import { isStub, type Maybe, type Restricted } from './types';
+  import PersonPicker from '../shared/PersonPicker.svelte';
 
   /**
    * Efterlysning — wanted notices (spec 7.13).
@@ -271,16 +272,10 @@
       class="flex flex-wrap items-end gap-2 border border-[var(--color-border)] p-3"
       onsubmit={(event) => void issue(event)}
     >
-      <label class="flex flex-col gap-1 text-xs">
-        <span>{t('efterlysning.field.personId')} <span aria-hidden="true">{REQUIRED_MARK}</span></span>
-        <input
-          bind:value={form.personId}
-          inputmode="numeric"
-          required
-          aria-required="true"
-          class="w-24 border border-[var(--color-border)] px-2 py-1"
-        />
-      </label>
+      <div class="flex w-64 flex-col gap-1 text-xs">
+        <span id="efterlysning-person-label">{t('efterlysning.field.personId')} <span aria-hidden="true">{REQUIRED_MARK}</span></span>
+        <PersonPicker bind:value={form.personId} labelledby="efterlysning-person-label" required />
+      </div>
 
       <label class="flex flex-col gap-1 text-xs">
         <span>{t('efterlysning.column.grund')} <span aria-hidden="true">{REQUIRED_MARK}</span></span>

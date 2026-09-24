@@ -1,3 +1,11 @@
+<script module lang="ts">
+  /**
+   * The Records tab the officer was last on, kept while the MDT is open so
+   * coming back to Records does not drop them on Query every time.
+   */
+  let rememberedTab: string | null = null;
+</script>
+
 <script lang="ts">
   import { nui } from '../../lib/nui';
   import Query from './Query.svelte';
@@ -42,6 +50,7 @@
     type VehicleResult,
     type VehicleSearchResult,
   } from './types';
+  import PersonPicker from '../shared/PersonPicker.svelte';
 
   /**
    * Records — the master name index and the two registers (spec 7.2–7.5).
@@ -144,7 +153,11 @@
     fromParty: 'records.firearm.transfer.fromParty',
   };
 
-  let tab = $state<Tab>('query');
+  let tab = $state<Tab>((rememberedTab as Tab | null) ?? 'query');
+
+  $effect(() => {
+    rememberedTab = tab;
+  });
   let failure = $state<Failure | null>(null);
   let busy = $state(false);
 
@@ -2990,14 +3003,10 @@
             {t('records.firearm.transfer.intro')}
           </p>
 
-          <label class="flex flex-col gap-1 text-xs">
-            <span>{t('records.firearm.transfer.toPersonId')}</span>
-            <input
-              class="w-28 border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1 font-[family-name:var(--font-mono)]"
-              bind:value={transferPersonId}
-              inputmode="numeric"
-            />
-          </label>
+          <div class="flex w-64 flex-col gap-1 text-xs">
+            <span id="firearm-transfer-person-label">{t('records.firearm.transfer.toPersonId')}</span>
+            <PersonPicker bind:value={transferPersonId} labelledby="firearm-transfer-person-label" />
+          </div>
 
           <label class="flex flex-col gap-1 text-xs">
             <span>{t('records.firearm.transfer.toIdentifier')}</span>
