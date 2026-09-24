@@ -39,12 +39,14 @@
    * Three further things the server decides and this renders rather than
    * second-guesses:
    *
-   *   * **Which decisions are offered comes from the chain's status**, and the
-   *     capacity to take them comes from the session's permissions on the
-   *     server. An officer who may not anhålla still sees the button and is
-   *     refused by the server; the refusal is drawn, and `wrong_capacity` reads
-   *     as "that decision is not yours to take" rather than as a role problem
-   *     (invariant 4, spec 6.4).
+   *   * **Which decisions are offered is the server's answer**, in
+   *     `decisions`: the chain's status, the session's capacity, and whether
+   *     it may stand in for an åklagare or domare nobody is playing tonight
+   *     (7.9.1). A button the officer could only be refused on is not drawn.
+   *     The routes still check, and a refusal that arrives anyway — the
+   *     prosecutor signed on between the read and the press — is drawn as
+   *     itself: `wrong_capacity` reads as "that decision is not yours to
+   *     take", never as a role problem (invariant 4, spec 6.4).
    *   * **A chain the reader may not open arrives as a stub with no `id`**
    *     (4.5), drawn as the module's restricted row.
    *   * **`needsAttention` is the server's judgement**, generously drawn: the
@@ -134,8 +136,16 @@
     loggedAt: Moment;
   }
 
+  /**
+   * How this session may take a decision: in its own capacity, or standing in
+   * for a role nobody holding it is signed on to fill (7.9.1). Absent when it
+   * may not take it at all.
+   */
+  type Standing = 'self' | 'standIn';
+
   interface Detail {
     frihetsberovande: FrihetRow;
+    decisions?: Partial<Record<Decision, Standing>>;
     brott: Charge[];
     straffskala?: Straffskala | null;
     log: LogEntry[];
@@ -341,7 +351,56 @@
 
   const record = $derived(detail?.frihetsberovande ?? null);
 
-  const available = $derived(record ? (AVAILABLE[record.status] ?? []) : []);
+  const available = $derived(
+    record
+      ? (AVAILABLE[record.status] ?? []).filter((action) => detail?.decisions?.[action] !== undefined)
+      : [],
+  );
+
+  /**
+   * The refusals that mean "this decision is not yours to take, from here, now"
+   * — not a missing grant. Headed as a decision not taken rather than as a
+   * Discord role problem, and followed by a re-read so the offered buttons
+   * catch up with whatever changed (a prosecutor signing on, most often).
+   */
+  const DECISION_REFUSALS = new Set([
+    'wrong_capacity',
+    'out_of_order',
+    'already_released',
+    'decider_online',
+    'own_chain',
+    'stand_in_off',
+  ]);
+
+  const decisionRefused = $derived(DECISION_REFUSALS.has(failure?.fields?.status ?? ''));
+
+  /**
+   * One muted line when the chain waits on a decision this session is not
+   * offered, so an officer looking at their own arrest sees why there is no
+   * anhållande button. It describes the chain, not an access decision.
+   */
+  const WAITING_ON: Partial<Record<string, { action: Decision; role: string }>> = {
+    gripen: { action: 'anhallande', role: 'aklagare' },
+    anhallen: { action: 'framstallan', role: 'aklagare' },
+    framstalld: { action: 'haktning', role: 'domare' },
+  };
+
+  const waitingOn = $derived.by(() => {
+    const next = record ? WAITING_ON[record.status] : undefined;
+    return next && detail?.decisions?.[next.action] === undefined ? next.role : null;
+  });
+
+  /** Stand-in decisions go to their own routes, which the audit trail names as such. */
+  function standingFor(action: Decision | null): Standing | undefined {
+    return action ? detail?.decisions?.[action] : undefined;
+  }
+
+  /** The verb on a decision's button: a stand-in's says so. */
+  function actionLabel(action: Decision): string {
+    return standingFor(action) === 'standIn'
+      ? t(`frihet.standIn.action.${action}`)
+      : t(`frihet.action.${action}`);
+  }
 
   /** The ground box only appears for the two decisions that require one. */
   const grundList = $derived(confirming ? GRUND_FOR[confirming] : undefined);
@@ -410,7 +469,10 @@
 
     const id = record.id;
 
-    const response = await nui.call(`frihet.${action}`, {
+    const route =
+      standingFor(action) === 'standIn' ? `frihet.fallback.${action}` : `frihet.${action}`;
+
+    const response = await nui.call(route, {
       id,
       version: record.version,
       grund: grund || undefined,
@@ -420,6 +482,11 @@
       failure = null;
       await open(id);
       await load();
+    } else if (DECISION_REFUSALS.has(response.fields?.status ?? '')) {
+      // Re-read first, so the button that was just refused is not offered
+      // again; `open` clears the failure, so it is set after.
+      await open(id);
+      failure = response;
     } else {
       failure = response;
       busy = false;
@@ -743,7 +810,7 @@
 
   {#if failure}
     <div class="border border-[var(--color-alert)] px-3 py-2 text-sm" role="alert">
-      <p>{t(`error.${failure.err}`)}</p>
+      <p>{decisionRefused ? t('frihet.refused') : t(`error.${failure.err}`)}</p>
       {#if messages.length > 0}
         <ul class="mt-1 text-xs text-[var(--color-ink-muted)]">
           {#each messages as message (message.name)}
@@ -1078,6 +1145,9 @@
         </section>
 
         <!-- The decisions -->
+        {#if waitingOn}
+          <p class="mb-2 text-xs text-[var(--color-ink-muted)]">{t(`frihet.waiting.${waitingOn}`)}</p>
+        {/if}
         {#if available.length > 0}
           <section class="mb-3 border-t border-[var(--color-border)] pt-3">
             {#if confirming}
@@ -1099,7 +1169,10 @@
                 bind:this={confirmBox}
                 role="dialog"
                 aria-modal="true"
-                aria-label={t(`frihet.action.${confirming}`)}
+                aria-label={actionLabel(confirming)}
+                aria-describedby={standingFor(confirming) === 'standIn'
+                  ? 'frihet-confirm-text frihet-standin-text'
+                  : 'frihet-confirm-text'}
                 tabindex="-1"
                 class="border border-[var(--color-border)] px-2 py-2 text-xs"
                 onkeydown={(event) => {
@@ -1110,7 +1183,17 @@
                   cancelConfirm();
                 }}
               >
-                <p>{t(`frihet.confirm.${confirming}`)}</p>
+                <p id="frihet-confirm-text">{t(`frihet.confirm.${confirming}`)}</p>
+                {#if standingFor(confirming) === 'standIn'}
+                  <!--
+                    7.9.1: said before the button, not after. The officer is
+                    about to take a decision that is not theirs by rank, and the
+                    record will say so.
+                  -->
+                  <p id="frihet-standin-text" class="mt-1 font-semibold">
+                    {t(`frihet.standIn.confirm.${confirming}`)}
+                  </p>
+                {/if}
 
                 {#if grundList}
                   <!--
@@ -1156,7 +1239,7 @@
                     disabled={busy}
                     onclick={() => void decide(confirming as Decision)}
                   >
-                    {t(`frihet.action.${confirming}`)}
+                    {actionLabel(confirming)}
                   </button>
                   <button
                     type="button"
@@ -1180,7 +1263,7 @@
                       grund = '';
                     }}
                   >
-                    {t(`frihet.action.${action}`)}
+                    {actionLabel(action)}
                   </button>
                 {/each}
               </div>

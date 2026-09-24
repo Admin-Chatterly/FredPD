@@ -487,6 +487,36 @@ function Session.all()
     return sessions
 end
 
+--- How many signed-on sessions in an agency could take a decision that needs
+--- this permission, not counting `except` (spec 7.9.1).
+---
+--- The question the stand-in rules ask is "is anybody playing the åklagare
+--- tonight?", and two kinds of session hold the grant without answering yes:
+---
+---   * **A superuser**, whose `'*'` satisfies every key. It is an
+---     administrator's console grant, not a prosecutor; counting it would
+---     mean an admin idling on the server blocked every stand-in decision.
+---   * **A stale snapshot** (spec 4.2), which the route wrapper would refuse
+---     for the very `sensitive` decision in question. A prosecutor who cannot
+---     decide is not a prosecutor who is available.
+function Session.countHolding(permission, agencyId, except)
+    local count = 0
+
+    for src, other in pairs(sessions) do
+        if src ~= except
+            and other.agencyId == agencyId
+            and not other.superuser
+            and not other.permissions['*']
+            and FredPD.Core.perms.satisfies(other.permissions, permission)
+            and not Session.isStale(other)
+        then
+            count = count + 1
+        end
+    end
+
+    return count
+end
+
 AddEventHandler('playerDropped', function()
     Session.drop(source)
 end)

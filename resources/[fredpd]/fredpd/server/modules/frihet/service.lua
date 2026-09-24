@@ -141,6 +141,19 @@ function Frihet.isLogKind(value)
     return type(value) == 'string' and value:match(LOG_KIND_PATTERN) ~= nil
 end
 
+--- Is this a kind an officer may write by hand?
+---
+--- The stand-in kinds (`frihet.logKind.stand_in_*`) are written by the server
+--- when a stand-in decision is taken (7.9.1), and only then. An entry of that
+--- kind added through the log would read, to the åklagare reviewing the chain
+--- in the morning, as a decision nobody took.
+local RESERVED_LOG_PREFIX <const> = 'frihet.logKind.stand_in_'
+
+function Frihet.isOfficerLogKind(value)
+    return Frihet.isLogKind(value)
+        and value:sub(1, #RESERVED_LOG_PREFIX) ~= RESERVED_LOG_PREFIX
+end
+
 -- -----------------------------------------------------------------------------
 -- The clocks
 -- -----------------------------------------------------------------------------
@@ -451,6 +464,91 @@ local NEXT_DECISION <const> = {
 
 function Frihet.nextDecisionPermission(status)
     return NEXT_DECISION[status]
+end
+
+-- -----------------------------------------------------------------------------
+-- Standing in (spec 7.9.1)
+-- -----------------------------------------------------------------------------
+
+--- The permission that lets somebody stand in for each capacity when nobody
+--- holding it is signed on.
+---
+--- The roles stay real. An åklagare decides an anhållande when one is on; the
+--- stand-in exists for the night nobody plays the prosecutor, when the chain
+--- would otherwise sit at `gripen` until the person had to be released for want
+--- of anyone to decide. A stand-in decision is marked as one in the custody log
+--- and the audit trail, so it can be reviewed by the real role afterwards.
+local FALLBACK_PERMISSION <const> = {
+    aklagare = 'frihet.fallback.aklagare',
+    domare = 'frihet.fallback.domare',
+}
+
+--- Which earlier stamps on the chain disqualify a stand-in for each action.
+---
+--- The separation RB builds in does not go away because the decision-maker is
+--- a stand-in: the officer who made the arrest does not also decide whether it
+--- holds, and whoever anhöll or sent the framställan does not then sit as the
+--- court on it. A real åklagare or domare is somebody else by construction; a
+--- supervisor standing in is not, so it is checked here.
+local CONFLICTS <const> = {
+    anhall = { 'gripenBy' },
+    framstall = { 'gripenBy' },
+    hakta = { 'gripenBy', 'anhallenBy', 'framstallanBy' },
+}
+
+--- Did this person take an earlier step on the chain that bars them from
+--- taking this decision as the court? Checked on the ordinary häktning too:
+--- somebody holding both a domare's grant and a stand-in åklagare's grant
+--- could otherwise anhålla as the stand-in and then häkta as themselves.
+local COURT_CONFLICTS <const> = { hakta = { 'anhallenBy', 'framstallanBy' } }
+
+function Frihet.actedOn(row, action, discordId)
+    for _, field in ipairs(COURT_CONFLICTS[action] or {}) do
+        if row[field] ~= nil and row[field] == discordId then return true end
+    end
+
+    return false
+end
+
+function Frihet.fallbackPermission(capacity)
+    return FALLBACK_PERMISSION[capacity]
+end
+
+--- The capacity a session may stand in with for this action, or nil and why.
+---
+--- @param row table the chain, with its `*By` stamps
+--- @param action string anhall | framstall | hakta
+--- @param capacity string the session's own capacity (`capacityOf`)
+--- @param holds fun(permission: string): boolean the session's grants
+--- @param deciderOnline boolean somebody holding the real capacity is on
+--- @param discordId string the session's own Discord id
+--- @return string|nil capacity to decide in
+--- @return string|nil reason: not_needed, wrong_capacity, a `canDecide`
+---   refusal, decider_online or own_chain
+function Frihet.fallbackCapacity(row, action, capacity, holds, deciderOnline, discordId)
+    local required = Frihet.deciderFor(action)
+
+    -- Release needs nobody; a session that already holds the capacity uses the
+    -- ordinary route, where its decision is not a stand-in's.
+    if not required or capacity == required then return nil, 'not_needed' end
+
+    local permission = FALLBACK_PERMISSION[required]
+    if not permission or not holds(permission) then return nil, 'wrong_capacity' end
+
+    -- The court does not stand in for the prosecutor. A domare who could also
+    -- anhålla would be deciding, a day later, on their own anhållande.
+    if required == 'aklagare' and capacity == 'domare' then return nil, 'wrong_capacity' end
+
+    local ok, why = Frihet.canDecide(row, action, required)
+    if not ok then return nil, why end
+
+    if deciderOnline then return nil, 'decider_online' end
+
+    for _, field in ipairs(CONFLICTS[action] or {}) do
+        if row[field] ~= nil and row[field] == discordId then return nil, 'own_chain' end
+    end
+
+    return required
 end
 
 FredPD.Modules.frihet = Frihet

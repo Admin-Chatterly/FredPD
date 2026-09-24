@@ -11,11 +11,10 @@ import type { Page } from '@playwright/test';
  *     been anhållen for four days with no häktningsframställan, so RB 24:12's
  *     noon is long past. If that row reads like every other row, the screen has
  *     failed at the one thing it is for.
- *   * **A refusal says which kind of refusal it is.** An officer is not an
- *     åklagare, so `anhållande` comes back `wrong_capacity` — "that decision is
- *     not yours to take", never a message about Discord roles. And a häktning
- *     from `gripen` is `out_of_order`, not the validator's "not an allowed
- *     value": the status is real, it is the step from it that is not.
+ *   * **Only the decisions this officer may take are offered.** An officer is
+ *     not an åklagare, so the anhållande is not drawn — unless nobody playing
+ *     the åklagare is signed on, when a supervisor may take it as a stand-in
+ *     (7.9.1), labelled and logged as one, and never on their own arrest.
  *   * **The countdown counts.** It ticks from the server's `remaining`, not
  *     from its `at`, so this asserts the number moves rather than asserting any
  *     particular number — the fixture's clocks are relative and a fixed
@@ -151,7 +150,7 @@ test('Escape closes the confirmation, not the whole interface', async ({ page })
   await openCustody(page);
 
   await page.getByRole('button', { name: 'A26-00041' }).click();
-  await page.getByRole('button', { name: 'Detain (prosecutor)' }).click();
+  await page.getByRole('button', { name: 'Release', exact: true }).click();
 
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
@@ -195,37 +194,86 @@ test('counts down, rather than printing a number the server sent once', async ({
   await expect(deadline).not.toHaveText(before ?? '');
 });
 
-test('refuses an anhållande as not this officer’s decision to take', async ({ page }) => {
+test('does not offer a decision this officer may not take', async ({ page }) => {
   await openCustody(page);
 
+  // A26-00041 is this officer's own arrest. The anhållande is the åklagare's,
+  // and a supervisor standing in for one may not decide on their own arrest,
+  // so the button is not drawn at all; release always is. A häktning from
+  // here is a detention with no legal basis and is not drawn either.
   await page.getByRole('button', { name: 'A26-00041' }).click();
 
-  // 6.4: a legal action asks first, with a verb label.
-  await page.getByRole('button', { name: 'Detain (prosecutor)' }).click();
-  await expect(page.getByText(/Anhållande is the prosecutor/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Release', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Detain/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Remand/ })).toHaveCount(0);
 
-  await page.getByLabel('Ground').selectOption('flyktfara');
-  await page.getByRole('button', { name: 'Detain (prosecutor)' }).click();
-
-  const panel = page.getByRole('alert');
-
-  // The capacity refusal reads as itself. An officer told "your Discord roles
-  // do not grant access" goes and asks for a rank; the truth is that this
-  // decision belongs to a prosecutor whatever rank they hold.
-  await expect(panel).toContainText('That decision is not yours to take.');
-  await expect(panel).not.toContainText('wrong_capacity');
+  // …and says what the chain is waiting on, rather than leaving a gap.
+  await expect(page.getByText("Waiting on the prosecutor's decision.")).toBeVisible();
 });
 
-test('does not offer a decision the chain has not reached', async ({ page }) => {
+test('a prosecutor signing on mid-decision is a decision not taken, not a role problem', async ({
+  page,
+}) => {
   await openCustody(page);
 
-  await page.getByRole('button', { name: 'A26-00041' }).click();
+  await page.getByRole('button', { name: 'A26-00039' }).click();
+  await page.getByRole('button', { name: 'File remand application as stand-in' }).click();
 
-  // Somebody gripen can be anhållen or released. A häktning from here is a
-  // detention with no legal basis, so the button is not drawn at all.
-  await expect(page.getByRole('button', { name: 'Detain (prosecutor)' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Release', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Remand in custody' })).toHaveCount(0);
+  // A prosecutor signs on between the read and the press.
+  await page.evaluate(() => {
+    (window as unknown as { __fixtureProsecutorOnline?: boolean }).__fixtureProsecutorOnline = true;
+  });
+
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'File remand application as stand-in' })
+    .click();
+
+  const panel = page.getByRole('alert').filter({ hasText: 'This decision was not taken.' });
+  await expect(panel).toContainText('This decision was not taken.');
+  await expect(panel).toContainText('A prosecutor or judge has signed on');
+  await expect(panel).not.toContainText('Discord');
+
+  // Re-read: the stand-in button is gone now that the decision is theirs.
+  await expect(
+    page.getByRole('button', { name: 'File remand application as stand-in' }),
+  ).toHaveCount(0);
+});
+
+test('lets a supervisor stand in for the prosecutor, and says so on the record', async ({
+  page,
+}) => {
+  await openCustody(page);
+
+  // Somebody else's arrest, anhållen, with no prosecutor signed on.
+  await page.getByRole('button', { name: 'A26-00039' }).click();
+  await page.getByRole('button', { name: 'File remand application as stand-in' }).click();
+
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('No prosecutor is signed on');
+
+  await dialog.getByRole('button', { name: 'File remand application as stand-in' }).click();
+
+  // The chain moved, and the custody log says who decided it and how.
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(
+    page.getByText('Häktningsframställan by stand-in (no prosecutor signed on)'),
+  ).toBeVisible();
+
+  // The court's decision is next, and this officer holds no stand-in grant
+  // for the domare.
+  await expect(page.getByRole('button', { name: /^Remand/ })).toHaveCount(0);
+});
+
+test('offers the stand-in decision in Swedish', async ({ page }) => {
+  await page.goto('/?locale=sv');
+
+  await page.locator('nav').first().getByRole('button', { name: 'Register' }).click();
+  await page.getByRole('button', { name: 'Frihetsberövanden', exact: true }).click();
+  await page.getByRole('button', { name: 'A26-00039' }).click();
+
+  await page.getByRole('button', { name: 'Lämna häktningsframställan som ersättare' }).click();
+  await expect(page.getByRole('dialog')).toContainText('Ingen åklagare är inloggad');
 });
 
 test('records the RB 24:9 notice once, and stops offering it', async ({ page }) => {

@@ -6316,6 +6316,15 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('domare', 'frihet.haktning'),
     ('domare', 'frihet.frigiv'),
 
+    -- Standing in (spec 7.9.1). Not the capacity itself: a stand-in grant
+    -- takes a decision only while nobody holding the real one is signed on,
+    -- never on a chain its holder arrested or anhöll, and every decision it
+    -- takes is marked as a stand-in's on the custody record. A supervisor may
+    -- stand in for the åklagare; command, which inherits that, also for the
+    -- domare. `frihet.fallback = false` in config/server.lua turns it off.
+    ('supervisor', 'frihet.fallback.aklagare'),
+    ('command', 'frihet.fallback.domare'),
+
     -- Tvångsmedel (spec 7.12). Reading them is ordinary work -- an officer
     -- about to force a door has to be able to see what authorises it. Deciding
     -- one is the förundersökningsledare's, which on the police side means a

@@ -76,6 +76,58 @@ local function capacityOf(session)
     return 'polis'
 end
 
+--- Is anybody signed on who could take the decision this action needs?
+---
+--- Counts sessions holding the real capacity's permission (spec 7.9.1), less
+--- the caller, superusers and stale snapshots -- `Session.countHolding` says
+--- why each is left out. The stand-in rules turn on this answer.
+local DECISION_PERMISSION <const> = {
+    aklagare = 'frihet.anhallande',
+    domare = 'frihet.haktning',
+}
+
+local CAPACITY_OF_PERMISSION <const> = {
+    ['frihet.anhallande'] = 'aklagare',
+    ['frihet.haktning'] = 'domare',
+}
+
+local function deciderOnline(session, capacity)
+    local permission = DECISION_PERMISSION[capacity]
+    if not permission then return false end
+
+    return FredPD.Core.session.countHolding(permission, session.agencyId, session.src) > 0
+end
+
+--- The name each decision's route and locale keys use, and the permission
+--- its ordinary route asks for.
+local DECISION_NAME <const> = {
+    anhall = 'anhallande', framstall = 'framstallan', hakta = 'haktning', frigiv = 'frigiv',
+}
+
+local ROUTE_PERMISSION <const> = {
+    anhall = 'frihet.anhallande', framstall = 'frihet.anhallande',
+    hakta = 'frihet.haktning', frigiv = 'frihet.frigiv',
+}
+
+local function fallbackEnabled()
+    local config = FredPD.Config.server.frihet
+    return config ~= nil and config.fallback == true
+end
+
+--- The capacity this session may stand in with for `action` on `row`.
+local function standInCapacity(session, row, action)
+    if not fallbackEnabled() then return nil, 'stand_in_off' end
+
+    local required = service.deciderFor(action)
+
+    return service.fallbackCapacity(row, action, capacityOf(session),
+        function(permission)
+            return FredPD.Core.perms.satisfies(session.permissions, permission)
+        end,
+        required ~= nil and deciderOnline(session, required),
+        session.discordId)
+end
+
 --- Reads a chain the session is allowed to see, or refuses.
 local function readable(session, id)
     local row = repo.byId(id, session.agencyId)
@@ -127,12 +179,31 @@ local function announceNext(session, id)
     local permission = service.nextDecisionPermission(row.status)
     if not permission then return end
 
-    FredPD.Core.push.notifyPermission(permission, NOTICE_FOR[permission], { number = row.number },
-        { type = 'warning' },
-        function(other)
-            return other.agencyId == session.agencyId and other.src ~= session.src
-                and access.mayBeToldOf(other, FRIHET, row)
-        end)
+    local function tellable(other)
+        return other.agencyId == session.agencyId and other.src ~= session.src
+            and access.mayBeToldOf(other, FRIHET, row)
+    end
+
+    FredPD.Core.push.notifyPermission(permission, NOTICE_FOR[permission],
+        { number = row.number }, { type = 'warning' }, tellable)
+
+    -- Nobody holding the real capacity was told, so nobody is going to decide:
+    -- tell whoever may stand in (spec 7.9.1). The superusers the first pass
+    -- reached do not count as somebody deciding.
+    if fallbackEnabled()
+        and FredPD.Core.session.countHolding(permission, session.agencyId, nil) == 0
+    then
+        local capacity = CAPACITY_OF_PERMISSION[permission]
+        local fallback = service.fallbackPermission(capacity)
+
+        FredPD.Core.push.notifyPermission(fallback, 'frihet.notify.needsStandIn.' .. capacity,
+            { number = row.number }, { type = 'warning' },
+            function(other)
+                return tellable(other) and not other.superuser
+                    and not other.permissions['*']
+                    and not FredPD.Core.perms.satisfies(other.permissions, permission)
+            end)
+    end
 end
 
 route.define({
@@ -188,7 +259,26 @@ route.define({
             charges[index].citation = brott.citation(charges[index])
         end
 
+        -- Which decisions this session may take right now, and whether in
+        -- its own capacity or as a stand-in, so the screen offers only the
+        -- buttons that would be accepted. The routes check again; this is a
+        -- courtesy, not the control (invariant 4).
+        local decisions = {}
+        local capacity = capacityOf(session)
+
+        for action, name in pairs(DECISION_NAME) do
+            if FredPD.Core.perms.satisfies(session.permissions, ROUTE_PERMISSION[action])
+                and service.canDecide(row, action, capacity)
+                and not service.actedOn(row, action, session.discordId)
+            then
+                decisions[name] = 'self'
+            elseif standInCapacity(session, row, action) then
+                decisions[name] = 'standIn'
+            end
+        end
+
         return {
+            decisions = decisions,
             frihetsberovande = withClocks(row, os.time(), timezoneOffset()),
             brott = charges,
             straffskala = #skalor > 0 and brott.gemensamStraffskala(skalor) or nil,
@@ -277,18 +367,36 @@ route.define({
 --- Declared out longhand below rather than built by a factory, because
 --- `tools/wiring-check.ts` reads route names as string literals and a route it
 --- cannot see is a route whose permission can quietly be granted to nobody.
-local function runDecision(session, input, action)
+local function refuseDecision(why)
+    return route.refuse(
+        (why == 'already_released' or why == 'out_of_order')
+            and FredPD.ErrorCode.CONFLICT
+            or FredPD.ErrorCode.FORBIDDEN,
+        { status = why })
+end
+
+local function runDecision(session, input, action, standIn)
     local row, refusal = readable(session, input.id)
     if not row then return refusal end
 
-    local ok, why = service.canDecide(row, action, capacityOf(session))
-    if not ok then
-        return route.refuse(
-            (why == 'already_released' or why == 'out_of_order')
-                and FredPD.ErrorCode.CONFLICT
-                or FredPD.ErrorCode.FORBIDDEN,
-            { status = why })
+    local ok, why
+
+    if standIn then
+        -- The capacity comes from the stand-in rules, never from the input:
+        -- nobody holding the real one is on, this session holds the stand-in
+        -- grant, and it took no earlier decision on this chain (7.9.1).
+        ok, why = standInCapacity(session, row, action)
+    else
+        ok, why = service.canDecide(row, action, capacityOf(session))
+
+        -- The reverse of the stand-in rule: a domare who stood in as the
+        -- åklagare on this chain does not then sit as the court on it.
+        if ok and service.actedOn(row, action, session.discordId) then
+            ok, why = false, 'own_chain'
+        end
     end
+
+    if not ok then return refuseDecision(why) end
 
     local toStatus = service.nextStatus(row.status, action)
 
@@ -298,8 +406,21 @@ local function runDecision(session, input, action)
         return route.refuse(FredPD.ErrorCode.INVALID, { grund = 'required' })
     end
 
-    if repo.decide(row.id, session.agencyId, toStatus, session.discordId,
-                   input.grund, input.version) == 0 then
+    local decided
+
+    if standIn then
+        -- On the face of the custody record, not only in the audit trail:
+        -- whoever reads the chain afterwards -- the åklagare coming on in the
+        -- morning -- sees that this decision was taken by a stand-in, and by
+        -- whom. Written in the decision's own transaction.
+        decided = repo.decideAsStandIn(row.id, session.agencyId, toStatus, session.discordId,
+            input.grund, input.version, 'frihet.logKind.stand_in_' .. action)
+    else
+        decided = repo.decide(row.id, session.agencyId, toStatus, session.discordId,
+            input.grund, input.version)
+    end
+
+    if decided == 0 then
         return route.refuse(FredPD.ErrorCode.CONFLICT)
     end
 
@@ -363,6 +484,56 @@ route.define({
     subjectType = FRIHET,
     handler = function(session, input)
         return runDecision(session, input, 'frigiv')
+    end,
+})
+
+-- -----------------------------------------------------------------------------
+-- Standing in (spec 7.9.1)
+-- -----------------------------------------------------------------------------
+--
+-- The same three decisions, taken by a supervisor for the åklagare or by
+-- command for the domare, and only while nobody holding the real capacity is
+-- signed on. Separate routes rather than a flag on the ordinary ones, so the
+-- permission a route needs is still readable from the route, and so the audit
+-- trail names a stand-in decision as one without anybody reading its detail.
+-- `frihet.fallback = false` in `config/server.lua` turns all three off.
+
+route.define({
+    name = 'frihet.fallback.anhallande',
+    perm = 'frihet.fallback.aklagare',
+    schema = 'FrihetDecision',
+    writes = true,
+    sensitive = true,
+    audit = 'frihet.fallback.anhallande',
+    subjectType = FRIHET,
+    handler = function(session, input)
+        return runDecision(session, input, 'anhall', true)
+    end,
+})
+
+route.define({
+    name = 'frihet.fallback.framstallan',
+    perm = 'frihet.fallback.aklagare',
+    schema = 'FrihetDecision',
+    writes = true,
+    sensitive = true,
+    audit = 'frihet.fallback.framstallan',
+    subjectType = FRIHET,
+    handler = function(session, input)
+        return runDecision(session, input, 'framstall', true)
+    end,
+})
+
+route.define({
+    name = 'frihet.fallback.haktning',
+    perm = 'frihet.fallback.domare',
+    schema = 'FrihetDecision',
+    writes = true,
+    sensitive = true,
+    audit = 'frihet.fallback.haktning',
+    subjectType = FRIHET,
+    handler = function(session, input)
+        return runDecision(session, input, 'hakta', true)
     end,
 })
 
@@ -443,7 +614,7 @@ route.define({
         -- Checked here because the NUI draws it with `t()`, which prints an
         -- unknown key as itself: without this the field was a way to put an
         -- arbitrary sentence on the face of a custody record (invariant 6).
-        if not service.isLogKind(input.kind) then
+        if not service.isOfficerLogKind(input.kind) then
             return route.refuse(FredPD.ErrorCode.INVALID, { kind = 'not_a_key' })
         end
 

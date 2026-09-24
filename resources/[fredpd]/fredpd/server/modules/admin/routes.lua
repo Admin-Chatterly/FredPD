@@ -324,6 +324,7 @@ local PERMISSION_CATALOGUE <const> = {
     -- Frihetsberövande (spec 7.9): the three decisions of RB.
     'frihet.view', 'frihet.gripande', 'frihet.anhallande',
     'frihet.haktning', 'frihet.frigiv',
+    'frihet.fallback.aklagare', 'frihet.fallback.domare',
 
     -- Tvångsmedel och efterlysning (spec 7.12, 7.13).
     'tvang.view', 'tvang.decide', 'tvang.decide.aklagare', 'tvang.decide.domare',

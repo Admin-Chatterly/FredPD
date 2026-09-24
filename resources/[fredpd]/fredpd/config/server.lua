@@ -144,6 +144,17 @@ FredPD.Config.server = {
     --- Longer is better than shorter. The wait is the mechanic -- it is what
     --- makes a lab request a decision about which items matter rather than a
     --- button pressed on everything collected.
+    frihet = {
+        --- Standing in for the åklagare and the domare (spec 7.9.1). When
+        --- nobody holding `frihet.anhallande` is signed on, a session holding
+        --- `frihet.fallback.aklagare` (supervisor, by the seed) may anhålla
+        --- and send the framställan; when nobody holding `frihet.haktning` is
+        --- on, `frihet.fallback.domare` (command) may decide the häktning.
+        --- Logged as a stand-in decision on the custody record and in the
+        --- audit trail. Set to false to leave every decision to the real role.
+        fallback = true,
+    },
+
     lab = {
         --- The automatic lab. When no lab analyst is signed on, a request
         --- waiting longer than `autoStartAfterSeconds` is taken on by the

@@ -511,4 +511,123 @@ describe('frihet', function()
             assert.is_false(frihet.needsAttention({ status = 'frigiven' }, 1, UTC))
         end)
     end)
+
+    describe('standing in', function()
+        local function holding(...)
+            local set = {}
+            for _, key in ipairs({ ... }) do set[key] = true end
+            return function(permission) return set[permission] == true end
+        end
+
+        local gripen = { status = 'gripen', gripenBy = 'arrester' }
+        local framstalld = {
+            status = 'framstalld', gripenBy = 'arrester',
+            anhallenBy = 'standin', framstallanBy = 'standin',
+        }
+
+        it('lets a supervisor anhålla when no åklagare is on', function()
+            local capacity = frihet.fallbackCapacity(gripen, 'anhall', 'polis',
+                holding('frihet.fallback.aklagare'), false, 'supervisor')
+
+            assert.are.equal('aklagare', capacity)
+        end)
+
+        it('refuses while an åklagare is signed on', function()
+            local capacity, why = frihet.fallbackCapacity(gripen, 'anhall', 'polis',
+                holding('frihet.fallback.aklagare'), true, 'supervisor')
+
+            assert.is_nil(capacity)
+            assert.are.equal('decider_online', why)
+        end)
+
+        it('refuses somebody without the stand-in grant', function()
+            local capacity, why = frihet.fallbackCapacity(gripen, 'anhall', 'polis',
+                holding(), false, 'officer')
+
+            assert.is_nil(capacity)
+            assert.are.equal('wrong_capacity', why)
+        end)
+
+        it('does not let a prosecutor stand-in sit as the court', function()
+            local capacity, why = frihet.fallbackCapacity(framstalld, 'hakta', 'polis',
+                holding('frihet.fallback.aklagare'), false, 'supervisor')
+
+            assert.is_nil(capacity)
+            assert.are.equal('wrong_capacity', why)
+        end)
+
+        it('lets command stand in for the domare', function()
+            local capacity = frihet.fallbackCapacity(framstalld, 'hakta', 'polis',
+                holding('frihet.fallback.domare'), false, 'command')
+
+            assert.are.equal('domare', capacity)
+        end)
+
+        it('refuses the arresting officer deciding on their own arrest', function()
+            local capacity, why = frihet.fallbackCapacity(gripen, 'anhall', 'polis',
+                holding('frihet.fallback.aklagare'), false, 'arrester')
+
+            assert.is_nil(capacity)
+            assert.are.equal('own_chain', why)
+        end)
+
+        it('refuses whoever anhöll sitting as the court on it', function()
+            local capacity, why = frihet.fallbackCapacity(framstalld, 'hakta', 'aklagare',
+                holding('frihet.fallback.domare'), false, 'standin')
+
+            assert.is_nil(capacity)
+            assert.are.equal('own_chain', why)
+        end)
+
+        it('is not needed by somebody who holds the capacity', function()
+            local capacity, why = frihet.fallbackCapacity(gripen, 'anhall', 'aklagare',
+                holding('frihet.fallback.aklagare'), false, 'prosecutor')
+
+            assert.is_nil(capacity)
+            assert.are.equal('not_needed', why)
+        end)
+
+        it('is not needed to release', function()
+            local capacity, why = frihet.fallbackCapacity(gripen, 'frigiv', 'polis',
+                holding('frihet.fallback.aklagare'), false, 'supervisor')
+
+            assert.is_nil(capacity)
+            assert.are.equal('not_needed', why)
+        end)
+
+        it('still refuses a decision out of order', function()
+            local capacity, why = frihet.fallbackCapacity(gripen, 'hakta', 'polis',
+                holding('frihet.fallback.domare'), false, 'command')
+
+            assert.is_nil(capacity)
+            assert.are.equal('out_of_order', why)
+        end)
+
+        it('does not let the court stand in for the prosecutor', function()
+            local capacity, why = frihet.fallbackCapacity(gripen, 'anhall', 'domare',
+                holding('frihet.fallback.aklagare'), false, 'judge')
+
+            assert.is_nil(capacity)
+            assert.are.equal('wrong_capacity', why)
+        end)
+
+        it('bars whoever anhöll from then sitting as the court', function()
+            assert.is_true(frihet.actedOn(framstalld, 'hakta', 'standin'))
+            assert.is_false(frihet.actedOn(framstalld, 'hakta', 'judge'))
+            assert.is_false(frihet.actedOn(framstalld, 'frigiv', 'standin'))
+        end)
+
+        it('keeps the stand-in log kinds for the server', function()
+            assert.is_true(frihet.isLogKind('frihet.logKind.stand_in_anhall'))
+            assert.is_false(frihet.isOfficerLogKind('frihet.logKind.stand_in_anhall'))
+            assert.is_true(frihet.isOfficerLogKind('frihet.logKind.forhor'))
+            assert.is_false(frihet.isOfficerLogKind('Somebody decided this'))
+        end)
+
+        it('names the stand-in grant for each capacity', function()
+            assert.are.equal('frihet.fallback.aklagare', frihet.fallbackPermission('aklagare'))
+            assert.are.equal('frihet.fallback.domare', frihet.fallbackPermission('domare'))
+            assert.is_nil(frihet.fallbackPermission('polis'))
+        end)
+    end)
 end)

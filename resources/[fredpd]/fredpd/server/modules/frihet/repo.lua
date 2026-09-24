@@ -205,7 +205,7 @@ local STAMPS <const> = {
 --- should resolve by last-write-wins.
 ---
 --- @return number rows affected; 0 means the version moved
-function Repo.decide(id, agencyId, toStatus, discordId, grund, expectedVersion)
+local function decideStatement(id, agencyId, toStatus, discordId, grund, expectedVersion)
     local stamp = STAMPS[toStatus]
     assert(stamp, 'no stamp for status: ' .. tostring(toStatus))
 
@@ -236,10 +236,55 @@ function Repo.decide(id, agencyId, toStatus, discordId, grund, expectedVersion)
     values[#values + 1] = agencyId
     values[#values + 1] = expectedVersion
 
-    return FredPD.Core.db.execute(
-        ('UPDATE fpd_frihetsberovande SET %s WHERE id = ? AND agency_id = ? AND version = ?')
+    return {
+        query = ('UPDATE fpd_frihetsberovande SET %s WHERE id = ? AND agency_id = ? AND version = ?')
             :format(table.concat(sets, ', ')),
-        values)
+        values = values,
+    }, stamp
+end
+
+function Repo.decide(id, agencyId, toStatus, discordId, grund, expectedVersion)
+    local statement = decideStatement(id, agencyId, toStatus, discordId, grund, expectedVersion)
+
+    return FredPD.Core.db.execute(statement.query, statement.values)
+end
+
+--- Takes a decision as a stand-in (spec 7.9.1), with the custody-log entry
+--- that says so, in one transaction.
+---
+--- The two writes stand or fall together: a stand-in decision whose marker
+--- failed to write would read, on the custody record, as the åklagare's own.
+--- The INSERT selects from the row it marks, and only when that row is now at
+--- the version this UPDATE produced and carries this decider's stamp, so a
+--- lost optimistic-lock race writes neither. A transaction cannot report the
+--- UPDATE's affected rows, so the row is read back to say whether it won.
+---
+--- @return number 1 when the decision was taken, 0 when it was not
+function Repo.decideAsStandIn(id, agencyId, toStatus, discordId, grund, expectedVersion, logKind)
+    local statement, stamp = decideStatement(id, agencyId, toStatus, discordId, grund, expectedVersion)
+
+    local committed = FredPD.Core.db.transaction({
+        statement,
+        {
+            query = ('INSERT INTO fpd_frihet_log (frihet_id, kind, note, logged_by) '
+                .. 'SELECT id, ?, NULL, ? FROM fpd_frihetsberovande '
+                .. 'WHERE id = ? AND agency_id = ? AND version = ? AND `%s` = ?'):format(stamp.by),
+            values = { logKind, discordId, id, agencyId, expectedVersion + 1, discordId },
+        },
+    })
+
+    if not committed then return 0 end
+
+    local row = FredPD.Core.db.single(
+        ('SELECT version, `%s` AS decidedBy FROM fpd_frihetsberovande WHERE id = ? AND agency_id = ?')
+            :format(stamp.by),
+        { id, agencyId })
+
+    if row and row.version == expectedVersion + 1 and row.decidedBy == discordId then
+        return 1
+    end
+
+    return 0
 end
 
 --- Records that the gripne was told what they are suspected of (RB 24:9).

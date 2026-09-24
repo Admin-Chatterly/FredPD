@@ -770,7 +770,18 @@ A chain of three decisions taken by three different people, not one arrest recor
 - [M] An append-only custody log: förhör, försvarare, måltider, the calls a detainee is entitled to.
 - [M] What somebody is held for is its own charge list, separate from the anmälan's: a prosecutor anhåller for two of the five offences reported, and the chain has to say which two.
 - [M] **Inskrivning i arrest** (M6). Built. Migration 0018, `server/modules/booking/`. Cell assignment and a property inventory, picking up from a `frihetsberövande` row still open; release requires a reason from a closed list, checked server-side the same way every other closed-list ground in this suite is. Mugshot and ten-print capture are not built — they need the media pipeline (section 3.2), which has no NUI wiring yet either. Fires `fredpd:arrestBooked` for the jail bridge (section 4.2 in its M6 state) to pick up.
-- **Permissions:** `frihet.view`, `frihet.gripande`, `frihet.frigiv` (patrol); `frihet.anhallande` (åklagare); `frihet.haktning` (domare); `booking.view` (patrol_basic), `booking.intake`, `booking.release` (patrol).
+- **Permissions:** `frihet.view`, `frihet.gripande`, `frihet.frigiv` (patrol); `frihet.anhallande` (åklagare); `frihet.haktning` (domare); `frihet.fallback.aklagare` (supervisor), `frihet.fallback.domare` (command); `booking.view` (patrol_basic), `booking.intake`, `booking.release` (patrol).
+
+#### 7.9.1 Standing in when the role is not played
+
+Built. The roles stay real: an åklagare decides the anhållande whenever one is signed on. A server with nobody playing the prosecutor or the judge tonight would otherwise leave every chain at `gripen` until the person had to be released, so:
+
+- [M] **`frihet.fallback.aklagare`** (supervisor) may take the anhållande and send the framställan, and **`frihet.fallback.domare`** (command) may decide the häktning — each **only while no session in the agency holds the real capacity** (`frihet.anhallande` / `frihet.haktning`). A superuser's `*` and a session whose Discord snapshot is stale do not count as somebody holding it (`Session.countHolding`).
+- [M] **Never on a chain the stand-in already acted on.** A stand-in åklagare cannot be the officer who made the gripande; a stand-in domare cannot be whoever made the gripande, the anhållande or the framställan. A real åklagare is somebody else by construction; a supervisor is not, so the service checks it (`Frihet.fallbackCapacity`, busted-tested). The court never stands in for the prosecutor, and the ordinary häktning refuses whoever anhöll or sent the framställan on the chain, so one person holding both a domare's grant and a stand-in grant cannot anhålla and then häkta the same person (`Frihet.actedOn`).
+- [M] Separate routes — `frihet.fallback.anhallande`, `.framstallan`, `.haktning` — so the permission is readable from the route and the audit trail names a stand-in decision as one. Each also writes a `frihet.logKind.stand_in_*` entry on the custody log in the decision's own transaction (`Repo.decideAsStandIn`), a kind the officer's own `frihet.log.add` refuses so it cannot be forged.
+- [M] `frihet.get` answers `decisions`: which decisions this session may take on the chain, and whether in its own capacity (`self`) or as a stand-in (`standIn`). The screen draws only those, says what the chain is waiting on when it offers none, and re-reads after a refusal such as `decider_online` (the prosecutor signed on between the read and the press); the routes check again.
+- [M] When a chain waits on a decision nobody holding the real role is signed on to take, the notice goes to the stand-ins instead (`frihet.notify.needsStandIn`).
+- `frihet.fallback = false` in `config/server.lua` turns all of it off.
 
 ### 7.10 Brottskatalogen och straffskalan (M2)
 
@@ -1751,7 +1762,7 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Records | `rms.person.view`, `rms.person.edit`, `rms.person.photo.upload`, `rms.person.caution.edit`, `rms.vehicle.view`, `rms.vehicle.edit`, `rms.vehicle.flag`, `rms.firearm.view`, `rms.firearm.edit`, `rms.firearm.trace`, `rms.brott.view`, `rms.location.view`, `rms.location.hazard.edit` |
 | Anmälan | `rms.anmalan.view`, `rms.anmalan.create`, `rms.anmalan.edit.any`, `rms.anmalan.approve`, `rms.anmalan.view.<type>` |
 | Förundersökning | `inv.fu.view`, `inv.fu.open`, `inv.fu.lead`, `inv.fu.assign` |
-| Frihetsberövande | `frihet.view`, `frihet.gripande`, `frihet.anhallande`, `frihet.haktning`, `frihet.frigiv` |
+| Frihetsberövande | `frihet.view`, `frihet.gripande`, `frihet.anhallande`, `frihet.haktning`, `frihet.frigiv`, `frihet.fallback.aklagare`, `frihet.fallback.domare` |
 | Tvångsmedel | `tvang.view`, `tvang.decide`, `tvang.decide.aklagare`, `tvang.decide.domare`, `tvang.verkstall`, `efterlysning.issue` |
 | Spaning | `spaning.view`, `spaning.create` |
 | Enforcement | `rms.arrest.create`, `rms.citation.issue`, `rms.citation.void`, `rms.fi.create`, `rms.stops.create`, `rms.impound.create`, `rms.impound.release`, `rms.impound.hold.release`, `rms.warrant.serve` |
@@ -1838,6 +1849,8 @@ row, and a supervisor cannot add them with `unit.manage`.
 `cad.unit.manage` rather than an acknowledgement key of its own: the groups that
 hold it — supervisor, command, dispatch — are exactly the ones who may give the
 acknowledgement.
+
+**Stand-in grants (seeded).** `frihet.fallback.aklagare` (supervisor, so command too) and `frihet.fallback.domare` (command) are not the capacity: they take the åklagare's or domare's decision only while nobody holding it is signed on, never on a chain the holder already acted on, and every such decision is marked on the custody record (7.9.1).
 
 **Prosecutor and judge reads (seeded).** `aklagare` and `domare` hold `rms.brott.view`, `rms.person.view` and `rms.vehicle.view`: their own forms pick charges from the brottskatalog and name the person or vehicle of a measure or a wanted notice by searching the registers, and without these grants those forms could not be filled in. Read-only, and every search is logged (7.2).
 

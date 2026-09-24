@@ -175,7 +175,10 @@
     "already_linked": "Redan kopplad till en annan underrättelsepost",
     "gated": "Du har inte den roll eller grupp som krävs",
     "gate_required": "Ange en grupp eller Discord-roll som krävs",
-    "callsign_format": "endast bokstäver, siffror, bindestreck och mellanslag, högst 16"
+    "callsign_format": "endast bokstäver, siffror, bindestreck och mellanslag, högst 16",
+    "decider_online": "En åklagare eller domare har loggat in sedan du öppnade posten, så beslutet är deras nu.",
+    "own_chain": "Du har fattat ett tidigare beslut i det här frihetsberövandet och kan inte också fatta det här.",
+    "stand_in_off": "Ersättarbeslut är avstängda på den här servern."
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -1968,7 +1971,10 @@
       "maltid": "Måltid",
       "samtal": "Telefonsamtal",
       "lakare": "Läkarvård",
-      "annan": "Annat"
+      "annan": "Annat",
+      "stand_in_anhall": "Anhållande av ersättare (ingen åklagare inloggad)",
+      "stand_in_framstall": "Häktningsframställan av ersättare (ingen åklagare inloggad)",
+      "stand_in_hakta": "Häktning av ersättare (ingen domare inloggad)"
     },
     "empty": "Ingen är frihetsberövad.",
     "attention": "En lagstadgad frist kräver åtgärd.",
@@ -2028,7 +2034,28 @@
     "notify": {
       "needsDecision": "Frihetsberövande {number} väntar på åklagarens beslut.",
       "needsHaktning": "Frihetsberövande {number}: en häktningsframställan väntar på rätten.",
-      "deadline": "Frihetsberövande {number}: {deadline} löper ut inom en timme."
+      "deadline": "Frihetsberövande {number}: {deadline} löper ut inom en timme.",
+      "needsStandIn": {
+        "aklagare": "Frihetsberövande {number} väntar på åklagarens beslut och ingen åklagare är inloggad. Du kan fatta beslutet som ersättare.",
+        "domare": "Frihetsberövande {number}: en häktningsframställan väntar på rätten och ingen domare är inloggad. Du kan fatta beslutet som ersättare."
+      }
+    },
+    "standIn": {
+      "action": {
+        "anhallande": "Anhåll som ersättare för åklagaren",
+        "framstallan": "Lämna häktningsframställan som ersättare",
+        "haktning": "Häkta som ersättare för domaren"
+      },
+      "confirm": {
+        "anhallande": "Ingen åklagare är inloggad, så du fattar beslutet i åklagarens ställe. Arrestjournalen och loggboken visar att det var ett ersättarbeslut, och att det var ditt.",
+        "framstallan": "Ingen åklagare är inloggad, så du lämnar framställan i åklagarens ställe. Arrestjournalen och loggboken visar att det var ett ersättarbeslut, och att det var ditt.",
+        "haktning": "Ingen domare är inloggad, så du fattar rättens beslut i domarens ställe. Arrestjournalen och loggboken visar att det var ett ersättarbeslut, och att det var ditt."
+      }
+    },
+    "refused": "Beslutet fattades inte.",
+    "waiting": {
+      "aklagare": "Väntar på åklagarens beslut.",
+      "domare": "Väntar på rättens beslut."
     }
   },
   "tvang": {

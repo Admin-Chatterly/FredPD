@@ -2319,6 +2319,7 @@ interface FixtureFrihet {
   frigivenAgo?: number;
   gripenBy?: string;
   anhallenBy?: string;
+  framstallanBy?: string;
   haktadBy?: string;
   frigivenBy?: string;
   underrattadAgo?: number;
@@ -2553,8 +2554,51 @@ function withFixtureClocks(row: FixtureFrihet): Record<string, unknown> {
  * `anhallande` and `haktning` are refused — which is the refusal path the
  * screen has to draw as "that decision is not yours to take" rather than as a
  * Discord role problem.
+ *
+ * The viewer is also a supervisor with nobody playing the åklagare tonight, so
+ * it may stand in for one (7.9.1) — on any chain it did not arrest or anhålla
+ * itself. It holds no stand-in grant for the domare.
  */
 const FIXTURE_CAPACITY = 'polis';
+const FIXTURE_STAND_IN: Record<string, boolean> = { aklagare: true, domare: false };
+
+/** The earlier stamps that bar a stand-in from each decision, as the server has them. */
+const STAND_IN_CONFLICTS: Record<string, (keyof FixtureFrihet)[]> = {
+  anhallande: ['gripenBy'],
+  framstallan: ['gripenBy'],
+  haktning: ['gripenBy', 'anhallenBy', 'framstallanBy'],
+};
+
+/** Why this viewer may not stand in for `action` on `row`, or null when it may. */
+function standInRefusal(row: FixtureFrihet, action: string): string | null {
+  const required = CAPACITY_FOR[action];
+  if (!required || required === FIXTURE_CAPACITY) return 'not_needed';
+  if (!FIXTURE_STAND_IN[required]) return 'wrong_capacity';
+  if (row.status === 'frigiven') return 'already_released';
+  if (!NEXT_STATUS[row.status]?.[action]) return 'out_of_order';
+
+  // A test sets this to play a prosecutor signing on between the read and the
+  // press (`decider_online`).
+  const online = (globalThis as { __fixtureProsecutorOnline?: boolean }).__fixtureProsecutorOnline;
+  if (online && required === 'aklagare') return 'decider_online';
+
+  const own = (STAND_IN_CONFLICTS[action] ?? []).some((field) => row[field] === FIXTURE_VIEWER);
+  return own ? 'own_chain' : null;
+}
+
+/** What `frihet.get` answers in `decisions`: how the viewer may take each one. */
+function frihetDecisions(row: FixtureFrihet): Record<string, 'self' | 'standIn'> {
+  const out: Record<string, 'self' | 'standIn'> = {};
+
+  for (const action of Object.keys(NEXT_STATUS[row.status] ?? {})) {
+    const required = CAPACITY_FOR[action];
+
+    if (!required || required === FIXTURE_CAPACITY) out[action] = 'self';
+    else if (standInRefusal(row, action) === null) out[action] = 'standIn';
+  }
+
+  return out;
+}
 
 const NEXT_STATUS: Record<string, Record<string, string>> = {
   gripen: { anhallande: 'anhallen', frigiv: 'frigiven' },
@@ -2563,24 +2607,38 @@ const NEXT_STATUS: Record<string, Record<string, string>> = {
   haktad: { frigiv: 'frigiven' },
 };
 
+const STAND_IN_LOG: Record<string, string> = {
+  anhallande: 'anhall',
+  framstallan: 'framstall',
+  haktning: 'hakta',
+};
+
 const CAPACITY_FOR: Record<string, string> = {
   anhallande: 'aklagare',
   framstallan: 'aklagare',
   haktning: 'domare',
 };
 
-function decideFrihet(input: unknown, action: string): unknown {
+function decideFrihet(input: unknown, action: string, standIn = false): unknown {
   const { id, grund } = (input ?? {}) as { id?: number; grund?: string };
   const row = frihetsberovanden.find((entry) => entry.id === id);
 
   if (!row) return refuse('not_found');
+
+  if (standIn) {
+    const why = standInRefusal(row, action);
+    if (why) {
+      const state = why === 'already_released' || why === 'out_of_order';
+      return refuse(state ? 'conflict' : 'forbidden', { status: why });
+    }
+  }
   if (row.status === 'frigiven') return refuse('conflict', { status: 'already_released' });
 
   const to = NEXT_STATUS[row.status]?.[action];
   if (!to) return refuse('conflict', { status: 'out_of_order' });
 
   const required = CAPACITY_FOR[action];
-  if (required && required !== FIXTURE_CAPACITY) {
+  if (!standIn && required && required !== FIXTURE_CAPACITY) {
     return refuse('forbidden', { status: 'wrong_capacity' });
   }
 
@@ -2593,13 +2651,30 @@ function decideFrihet(input: unknown, action: string): unknown {
 
   if (to === 'anhallen') {
     row.anhallenAgo = 0;
+    row.anhallenBy = FIXTURE_VIEWER;
     if (grund) row.anhallandeGrund = grund;
   }
-  if (to === 'framstalld') row.framstallanAgo = 0;
+  if (to === 'framstalld') {
+    row.framstallanAgo = 0;
+    row.framstallanBy = FIXTURE_VIEWER;
+  }
   if (to === 'haktad') row.haktadAgo = 0;
   if (to === 'frigiven') {
     row.frigivenAgo = 0;
     if (grund) row.frigivenGrund = grund;
+  }
+
+  // The server writes this entry itself, so the chain says to whoever reads it
+  // next that the decision was a stand-in's (7.9.1).
+  if (standIn) {
+    row.log.push({
+      id: 300 + row.log.length,
+      kind: `frihet.logKind.stand_in_${STAND_IN_LOG[action]}`,
+      note: null,
+      loggedByCallsign: '1-ADAM-12',
+      loggedByName: 'Berg',
+      loggedAgo: 0,
+    });
   }
 
   return { id: row.id, status: to };
@@ -4291,6 +4366,7 @@ export const fixtures: FixtureSet = {
       const now = Date.now();
 
       return {
+        decisions: frihetDecisions(row),
         frihetsberovande: withFixtureClocks(row),
         brott: row.brott,
         straffskala: row.brott.length > 0 ? { boter: false, min: 6, max: 72 } : null,
@@ -4355,6 +4431,9 @@ export const fixtures: FixtureSet = {
     'frihet.framstallan': (input) => decideFrihet(input, 'framstallan'),
     'frihet.haktning': (input) => decideFrihet(input, 'haktning'),
     'frihet.frigiv': (input) => decideFrihet(input, 'frigiv'),
+    'frihet.fallback.anhallande': (input) => decideFrihet(input, 'anhallande', true),
+    'frihet.fallback.framstallan': (input) => decideFrihet(input, 'framstallan', true),
+    'frihet.fallback.haktning': (input) => decideFrihet(input, 'haktning', true),
 
     'frihet.underratta': (input) => {
       const { id } = (input ?? {}) as { id?: number };

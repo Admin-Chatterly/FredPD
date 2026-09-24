@@ -175,7 +175,10 @@
     "already_linked": "Already tied to a different intelligence subject",
     "gated": "You do not hold the role or group this requires",
     "gate_required": "Set a required group or Discord role",
-    "callsign_format": "letters, digits, hyphens and spaces only, up to 16"
+    "callsign_format": "letters, digits, hyphens and spaces only, up to 16",
+    "decider_online": "A prosecutor or judge has signed on since you opened this, so the decision is theirs now.",
+    "own_chain": "You took an earlier step on this detention, so you cannot also decide this one.",
+    "stand_in_off": "Stand-in decisions are switched off on this server."
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -1968,7 +1971,10 @@
       "maltid": "Meal",
       "samtal": "Telephone call",
       "lakare": "Medical attention",
-      "annan": "Other"
+      "annan": "Other",
+      "stand_in_anhall": "Anhållande by stand-in (no prosecutor signed on)",
+      "stand_in_framstall": "Häktningsframställan by stand-in (no prosecutor signed on)",
+      "stand_in_hakta": "Häktning by stand-in (no judge signed on)"
     },
     "empty": "Nobody is being held.",
     "attention": "A statutory deadline needs attention.",
@@ -2028,7 +2034,28 @@
     "notify": {
       "needsDecision": "Custody {number} is waiting on a prosecutor's decision.",
       "needsHaktning": "Custody {number}: a remand application is waiting on the court.",
-      "deadline": "Custody {number}: {deadline} is due within the hour."
+      "deadline": "Custody {number}: {deadline} is due within the hour.",
+      "needsStandIn": {
+        "aklagare": "Custody {number} is waiting on the prosecutor's decision and no prosecutor is signed on. You may decide it as a stand-in.",
+        "domare": "Custody {number}: a remand application is waiting on the court and no judge is signed on. You may decide it as a stand-in."
+      }
+    },
+    "standIn": {
+      "action": {
+        "anhallande": "Detain as stand-in prosecutor",
+        "framstallan": "File remand application as stand-in",
+        "haktning": "Remand as stand-in judge"
+      },
+      "confirm": {
+        "anhallande": "No prosecutor is signed on, so you are taking this decision in their place. The custody record and the audit log will show it was a stand-in decision, and yours.",
+        "framstallan": "No prosecutor is signed on, so you are filing this in their place. The custody record and the audit log will show it was a stand-in decision, and yours.",
+        "haktning": "No judge is signed on, so you are taking the court's decision in their place. The custody record and the audit log will show it was a stand-in decision, and yours."
+      }
+    },
+    "refused": "This decision was not taken.",
+    "waiting": {
+      "aklagare": "Waiting on the prosecutor's decision.",
+      "domare": "Waiting on the court's decision."
     }
   },
   "tvang": {

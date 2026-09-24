@@ -174,6 +174,12 @@ const REASONS = new Set([
   // `t()`, which prints an unknown key verbatim, so a free string here put
   // arbitrary prose on the face of a record (invariant 6).
   'not_a_key',
+  // Standing in for the åklagare or domare (7.9.1): the real role signed on
+  // between the read and the press, the stand-in took an earlier step on the
+  // chain, or the server does not allow stand-ins at all.
+  'decider_online',
+  'own_chain',
+  'stand_in_off',
 
   // Tvångsmedel (7.12). A measure aimed at the wrong kind of target, and the
   // three ways one stops authorising anything.
