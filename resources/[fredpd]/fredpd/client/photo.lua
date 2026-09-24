@@ -100,9 +100,12 @@ RegisterNUICallback('fredpd:photoCapture', function(data, cb)
         return
     end
 
-    -- A few frames for the NUI to hide and the camera to settle.
+    -- A few frames for the NUI to hide and the camera to settle. Taken
+    -- inside a pcall: whatever the screenshot resource does, the view and
+    -- the MDT come back.
     Wait(250)
-    local image = screenshot.capture()
+    local ok, image = pcall(screenshot.capture)
+    if not ok then image = nil end
 
     if restore then restore() end
     DisplayRadar(not radarWasHidden)

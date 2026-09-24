@@ -49,6 +49,12 @@ function Api.beginPhoto(session, personId, kind)
         return nil, route.refuse(FredPD.ErrorCode.CONFLICT, { _input = 'gateway_off' })
     end
 
+    -- Begun and never finished is a file on the gateway's disk nobody will
+    -- attach: a handful at a time is a slow hand, more is somebody filling it.
+    if repo.pendingCount(session.agencyId, session.discordId, service.PENDING_SECONDS) >= service.MAX_PENDING then
+        return nil, route.refuse(FredPD.ErrorCode.RATE_LIMITED)
+    end
+
     local ok, token = gateway().requestUploadToken('image')
     if not ok or not service.isRef(token.mediaRef) or type(token.uploadUrl) ~= 'string' then
         return nil, route.refuse(FredPD.ErrorCode.CONFLICT, { _input = 'gateway_unavailable' })

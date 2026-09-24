@@ -189,10 +189,10 @@
     "needs_subject": "a card needs a person, a vehicle or a note",
     "not_image": "the file is not a photograph",
     "unsafe": "the file failed the virus scan",
-    "gateway_off": "photographs need the media gateway, which is turned off on this server",
-    "gateway_unavailable": "the media gateway did not answer; try again",
-    "no_screenshot": "the picture could not be taken (screenshot-basic is not running)",
-    "not_uploaded": "the picture never reached the media gateway",
+    "gateway_off": "the photo service is not available on this server",
+    "gateway_unavailable": "the photo service did not answer; try again",
+    "no_screenshot": "the picture could not be taken on this server",
+    "not_uploaded": "the picture never reached the photo service",
     "identity_mismatch": "the person at the terminal is not the person this booking names",
     "no_character": "the person at the terminal has no character loaded"
   },
@@ -1085,12 +1085,14 @@
         "location": "Body location",
         "taken": "Taken",
         "image": "Photograph",
-        "enlarge": "Show the {kind} at full size",
+        "enlarge": "{name} — show at full size",
         "take": "Take photograph",
         "takeHint": "The MDT is hidden for a moment while the picture is taken.",
         "taken_ok": "Photograph added to the record.",
         "file": "File",
-        "captureKind": "Kind of photograph"
+        "captureKind": "Kind of photograph",
+        "name": "{kind}, {taken}",
+        "failed": "The photograph was not taken."
       },
       "photos": "Photographs",
       "search": {
@@ -2638,6 +2640,9 @@
     "mugshot": {
       "take": "Take mugshot",
       "taken": "Mugshot filed with booking {number}."
+    },
+    "capture": {
+      "failed": "Nothing was filed."
     }
   },
   "comms": {

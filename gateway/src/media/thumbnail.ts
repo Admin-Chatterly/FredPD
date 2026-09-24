@@ -1,5 +1,7 @@
 import sharp from 'sharp';
 
+import { MAX_INPUT_PIXELS, withDecodeSlot } from './image.js';
+
 /**
  * WebP thumbnails (spec 12.2: "Media: WebP thumbnails, lazy-loaded images,
  * long cache headers").
@@ -17,13 +19,15 @@ export async function makeThumbnail(
   input: Buffer,
   maxDimension = 320,
 ): Promise<Buffer | null> {
-  try {
-    return await sharp(input)
-      .rotate()
-      .resize({ width: maxDimension, height: maxDimension, fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 80 })
-      .toBuffer();
-  } catch {
-    return null;
-  }
+  return withDecodeSlot(async () => {
+    try {
+      return await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS })
+        .rotate()
+        .resize({ width: maxDimension, height: maxDimension, fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toBuffer();
+    } catch {
+      return null;
+    }
+  });
 }

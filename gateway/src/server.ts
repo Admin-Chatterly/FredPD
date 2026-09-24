@@ -28,7 +28,18 @@ export interface ServerDeps {
 
 export function createServer(config: GatewayConfig, deps: ServerDeps = {}): FastifyInstance {
   const app = Fastify({
-    logger: { level: config.env === 'production' ? 'info' : 'debug' },
+    logger: {
+      level: config.env === 'production' ? 'info' : 'debug',
+      // A media URL's query string is its token (ADR-019): logged, it would
+      // be a working link to a photograph for whoever reads the log.
+      serializers: {
+        req: (request) => ({
+          method: request.method,
+          url: request.url.replace(/\?.*$/, ''),
+          remoteAddress: request.ip,
+        }),
+      },
+    },
     // The body has to be verified byte-for-byte as it arrived, so signature
     // checking happens before anything parses or re-serializes it. Media
     // uploads bypass this cap entirely -- see `media/routes.ts`, which

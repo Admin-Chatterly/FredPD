@@ -15,18 +15,53 @@ import sharp from 'sharp';
 const MAX_DIMENSION = 2048;
 
 /** Decompression-bomb guard: sharp refuses more pixels than this on input. */
-const MAX_INPUT_PIXELS = 40_000_000;
+export const MAX_INPUT_PIXELS = 16_000_000;
+
+/**
+ * The formats a photograph arrives in. screenshot-basic writes JPEG; PNG and
+ * WebP are what a browser would hand over. SVG, TIFF, HEIF and the rest of
+ * what libvips can read are refused before a decoder is reached for them.
+ */
+const ACCEPTED_FORMATS = new Set(['jpeg', 'png', 'webp']);
+
+/**
+ * At most this many images decoded at once. Each decode can hold tens of
+ * megabytes, and every officer with an upload link can start one.
+ */
+const MAX_CONCURRENT_DECODES = 2;
+let running = 0;
+const waiting: Array<() => void> = [];
+
+/** Runs `task` once a decode slot is free. */
+export async function withDecodeSlot<T>(task: () => Promise<T>): Promise<T> {
+  if (running >= MAX_CONCURRENT_DECODES) {
+    await new Promise<void>((resolve) => waiting.push(resolve));
+  }
+
+  running += 1;
+  try {
+    return await task();
+  } finally {
+    running -= 1;
+    waiting.shift()?.();
+  }
+}
 
 export async function reencodeImage(input: Buffer): Promise<Buffer | null> {
-  try {
-    return await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS })
-      .rotate()
-      .resize({ width: MAX_DIMENSION, height: MAX_DIMENSION, fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 85 })
-      .toBuffer();
-  } catch {
-    return null;
-  }
+  return withDecodeSlot(async () => {
+    try {
+      const { format } = await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
+      if (!format || !ACCEPTED_FORMATS.has(format)) return null;
+
+      return await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS })
+        .rotate()
+        .resize({ width: MAX_DIMENSION, height: MAX_DIMENSION, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 85 })
+        .toBuffer();
+    } catch {
+      return null;
+    }
+  });
 }
 
 /**

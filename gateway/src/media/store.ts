@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, open, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { link, mkdir, open, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { join, resolve } from 'node:path';
 
@@ -20,13 +20,20 @@ const REF_PATTERN = /^media_[0-9a-f-]{36}$/;
 
 export interface MediaStore {
   /**
-   * Streams a request body to disk, capped at `maxBytes`. Once only: a ref
-   * that already exists, or one another upload is writing right now, is
-   * refused with `AlreadyStoredError`.
+   * Streams a request body to disk, capped at `maxBytes`, and publishes it
+   * under the ref only once `options.accept` has passed it -- the scan, and
+   * for a photograph the re-encode, run against the unpublished part, so
+   * nothing is ever servable that was not accepted.
+   *
+   * Once only: a ref that already holds a file, another upload is writing
+   * right now, or was refused before, is refused with `AlreadyStoredError`.
    */
-  save(mediaRef: string, stream: NodeJS.ReadableStream, maxBytes: number): Promise<{ bytes: number }>;
-  /** Replaces a stored file's bytes, atomically (the re-encoded image). */
-  replace(mediaRef: string, bytes: Buffer): Promise<void>;
+  save(
+    mediaRef: string,
+    stream: NodeJS.ReadableStream,
+    maxBytes: number,
+    options?: SaveOptions,
+  ): Promise<{ bytes: number }>;
   /** The first bytes of a stored file, for telling what it is. */
   head(mediaRef: string, length: number): Promise<Buffer>;
   /** The absolute path of a stored file, once it exists. */
@@ -53,7 +60,24 @@ class AlreadyStoredError extends Error {
   }
 }
 
-export { AlreadyStoredError, TooLargeError };
+/** An upload `accept` refused; the reason is what the caller answers with. */
+class RefusedError extends Error {
+  constructor(readonly reason: string) {
+    super(`upload refused: ${reason}`);
+    this.name = 'RefusedError';
+  }
+}
+
+export interface SaveOptions {
+  /**
+   * Passed the received file (its unpublished path and bytes) before it is
+   * published. Returns the bytes to publish -- the same, or a replacement
+   * such as a re-encoded image -- or a refusal reason.
+   */
+  accept?: (partPath: string, bytes: Buffer) => Promise<{ bytes: Buffer } | { refused: string }>;
+}
+
+export { AlreadyStoredError, RefusedError, TooLargeError };
 
 export function createDiskStore(directory: string): MediaStore {
   const root = resolve(directory);
@@ -67,6 +91,20 @@ export function createDiskStore(directory: string): MediaStore {
   function finalPath(mediaRef: string): string {
     assertRef(mediaRef);
     return join(root, mediaRef);
+  }
+
+  function tombstonePath(mediaRef: string): string {
+    assertRef(mediaRef);
+    return join(root, `${mediaRef}.refused`);
+  }
+
+  async function pathExists(path: string): Promise<boolean> {
+    try {
+      await stat(path);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   function partPath(mediaRef: string): string {
@@ -108,19 +146,22 @@ export function createDiskStore(directory: string): MediaStore {
     },
 
     /**
-     * Written to a `.part` file first and renamed into place only once the
+     * Written to a `.part` file first and linked into place only once the
      * whole body has arrived within the size cap. A reader that raced the
      * write would otherwise see a truncated file with no way to tell it apart
-     * from a genuinely short one -- the rename is what makes "exists" mean
+     * from a genuinely short one -- the link is what makes "exists" mean
      * "complete".
      */
-    async save(mediaRef, stream, maxBytes) {
+    async save(mediaRef, stream, maxBytes, options) {
       await mkdir(root, { recursive: true });
 
-      // An upload token is good for one file. A ref that already holds one
-      // is not written again, and 'wx' makes a second upload racing the first
-      // fail on the `.part` file rather than interleave with it.
-      if (await this.exists(mediaRef)) throw new AlreadyStoredError();
+      // An upload token is good for one file. A ref that already holds one,
+      // or was refused once (the tombstone), is not written again, and 'wx'
+      // makes a second upload racing the first fail on the `.part` file
+      // rather than interleave with it.
+      if ((await this.exists(mediaRef)) || (await pathExists(tombstonePath(mediaRef)))) {
+        throw new AlreadyStoredError();
+      }
 
       const tmp = partPath(mediaRef);
       let handle;
@@ -152,15 +193,35 @@ export function createDiskStore(directory: string): MediaStore {
         if (!complete) await unlink(tmp).catch(() => undefined);
       }
 
-      await rename(tmp, finalPath(mediaRef));
+      try {
+        let published = bytes;
 
-      return { bytes };
-    },
+        if (options?.accept) {
+          const verdict = await options.accept(tmp, await readFile(tmp));
 
-    async replace(mediaRef, bytes) {
-      const tmp = `${partPath(mediaRef)}.replace`;
-      await writeFile(tmp, bytes);
-      await rename(tmp, finalPath(mediaRef));
+          if ('refused' in verdict) {
+            // The token is spent: a refused ref is not tried again.
+            await writeFile(tombstonePath(mediaRef), verdict.refused);
+            throw new RefusedError(verdict.refused);
+          }
+
+          await writeFile(tmp, verdict.bytes);
+          published = verdict.bytes.length;
+        }
+
+        // `link` refuses an existing name where `rename` would overwrite it:
+        // whatever raced this upload in, the file already published stays.
+        try {
+          await link(tmp, finalPath(mediaRef));
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new AlreadyStoredError();
+          throw error;
+        }
+
+        return { bytes: published };
+      } finally {
+        await unlink(tmp).catch(() => undefined);
+      }
     },
 
     async head(mediaRef, length) {

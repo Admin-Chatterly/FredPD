@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import type { GatewayConfig } from '../config.js';
 import { deriveKey } from '../config.js';
 import { newMediaRef, signMediaToken, verifyMediaToken } from './tokens.js';
-import { AlreadyStoredError, TooLargeError, type MediaStore } from './store.js';
+import { AlreadyStoredError, RefusedError, TooLargeError, type MediaStore } from './store.js';
 import { makeThumbnail } from './thumbnail.js';
 import { contentTypeOf, reencodeImage } from './image.js';
 import type { Scanner } from './scan.js';
@@ -30,6 +30,13 @@ import type { Scanner } from './scan.js';
  */
 
 const UPLOAD_PURPOSE = 'media-upload';
+
+/**
+ * A stored file never changes, but who may see it does: a photograph of a
+ * person stays in a reader's cache no longer than the link that fetched it
+ * lived (15 minutes, ADR-019), so revoked access is not undone by the disk.
+ */
+const CACHE_CONTROL = 'private, max-age=900, immutable';
 const DOWNLOAD_PURPOSE = 'media-download';
 
 export interface MediaDeps {
@@ -169,53 +176,48 @@ export const registerPublicMediaRoutes: (config: GatewayConfig, deps: MediaDeps)
       }
 
       try {
-        const { bytes } = await deps.store.save(
-          mediaRef,
-          request.raw,
-          config.media.maxBytes,
-        );
+        // The scan, and for a photograph the re-encode, run on the received
+        // part before anything is published: a file that fails either, or a
+        // gateway that dies in between, leaves nothing servable (ADR-019).
+        const { bytes } = await deps.store.save(mediaRef, request.raw, config.media.maxBytes, {
+          accept: async (partPath, received) => {
+            const scan = await deps.scanner(partPath);
 
-        const scan = await deps.scanner(deps.store.pathFor(mediaRef));
+            if (scan.reason === 'not_configured') {
+              request.log.warn({ mediaRef }, 'no virus scanner configured; this upload was stored unscanned');
+            }
 
-        if (scan.reason === 'not_configured') {
-          request.log.warn(
-            { mediaRef },
-            'no virus scanner configured; this upload was stored unscanned',
-          );
-        }
+            if (!scan.clean) {
+              request.log.warn({ mediaRef, reason: scan.reason }, 'upload failed the virus scan');
+              return { refused: 'unsafe' };
+            }
 
-        if (!scan.clean) {
-          await deps.store.remove(mediaRef);
-          request.log.warn({ mediaRef, reason: scan.reason }, 'upload failed the virus scan');
-          return reply.code(422).send({ ok: false, err: 'invalid', fields: { file: 'unsafe' } });
-        }
+            if (!image) return { bytes: received };
 
-        // A photograph is decoded and written out again (`image.ts`): what
-        // is kept is sharp's own JPEG, never the bytes as sent.
-        if (image) {
-          const chunks: Buffer[] = [];
-          for await (const chunk of deps.store.read(mediaRef) as AsyncIterable<Buffer>) chunks.push(chunk);
+            const encoded = await reencodeImage(received);
+            if (!encoded) {
+              request.log.warn({ mediaRef }, 'upload refused: not an image');
+              return { refused: 'not_image' };
+            }
 
-          const encoded = await reencodeImage(Buffer.concat(chunks));
-          if (!encoded) {
-            await deps.store.remove(mediaRef);
-            request.log.warn({ mediaRef }, 'upload refused: not an image');
-            return reply.code(422).send({ ok: false, err: 'invalid', fields: { file: 'not_image' } });
-          }
-
-          await deps.store.replace(mediaRef, encoded);
-          return { ok: true, mediaRef, bytes: encoded.length };
-        }
+            return { bytes: encoded };
+          },
+        });
 
         return { ok: true, mediaRef, bytes };
       } catch (error) {
+        if (error instanceof RefusedError) {
+          return reply.code(422).send({ ok: false, err: 'invalid', fields: { file: error.reason } });
+        }
+
         if (error instanceof AlreadyStoredError) {
           request.log.warn({ mediaRef }, 'upload refused: the ref already holds a file');
           return reply.code(409).send({ ok: false, err: 'conflict' });
         }
 
         if (error instanceof TooLargeError) {
-          await deps.store.remove(mediaRef);
+          // The part is gone already (`store.save`); a file published under
+          // this ref by an earlier upload is not this upload's to remove.
           return reply.code(413).send({ ok: false, err: 'invalid', fields: { file: 'too_large' } });
         }
 
@@ -240,7 +242,7 @@ export const registerPublicMediaRoutes: (config: GatewayConfig, deps: MediaDeps)
       // successful fetch may be cached for as long as the browser likes. The
       // token in the URL is what limits how long the *link* itself works, not
       // this header.
-      reply.header('cache-control', 'private, max-age=31536000, immutable');
+      reply.header('cache-control', CACHE_CONTROL);
       // Named from the file's own first bytes, and never sniffed further by
       // the browser: a stored file is what this gateway says it is or an
       // opaque download, nothing in between.
@@ -271,7 +273,7 @@ export const registerPublicMediaRoutes: (config: GatewayConfig, deps: MediaDeps)
         return reply.code(404).send({ ok: false, err: 'not_found' });
       }
 
-      reply.header('cache-control', 'private, max-age=31536000, immutable');
+      reply.header('cache-control', CACHE_CONTROL);
       return reply.type('image/webp').send(thumbnail);
     });
   };

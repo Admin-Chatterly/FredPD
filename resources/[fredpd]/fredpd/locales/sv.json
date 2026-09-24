@@ -189,10 +189,10 @@
     "needs_subject": "ett kort behöver en person, ett fordon eller en anteckning",
     "not_image": "filen är inte ett fotografi",
     "unsafe": "filen stoppades av virusskanningen",
-    "gateway_off": "fotografier kräver mediegatewayen, som är avstängd på den här servern",
-    "gateway_unavailable": "mediegatewayen svarade inte; försök igen",
-    "no_screenshot": "bilden kunde inte tas (screenshot-basic körs inte)",
-    "not_uploaded": "bilden kom aldrig fram till mediegatewayen",
+    "gateway_off": "bildtjänsten är inte tillgänglig på den här servern",
+    "gateway_unavailable": "bildtjänsten svarade inte; försök igen",
+    "no_screenshot": "bilden kunde inte tas på den här servern",
+    "not_uploaded": "bilden kom aldrig fram till bildtjänsten",
     "identity_mismatch": "personen vid terminalen är inte den person inskrivningen gäller",
     "no_character": "personen vid terminalen har ingen karaktär inläst"
   },
@@ -1085,12 +1085,14 @@
         "location": "Placering på kroppen",
         "taken": "Tagen",
         "image": "Fotografi",
-        "enlarge": "Visa {kind} i full storlek",
+        "enlarge": "{name} — visa i full storlek",
         "take": "Ta fotografi",
         "takeHint": "MDT:n döljs ett ögonblick medan bilden tas.",
         "taken_ok": "Fotografiet är tillagt i registret.",
         "file": "Fil",
-        "captureKind": "Typ av fotografi"
+        "captureKind": "Typ av fotografi",
+        "name": "{kind}, {taken}",
+        "failed": "Fotografiet togs inte."
       },
       "photos": "Fotografier",
       "search": {
@@ -1106,7 +1108,7 @@
     "photoKind": {
       "field": "Fältfoto",
       "mark": "Märke",
-      "mugshot": "Anhållningsfoto",
+      "mugshot": "Signalementsfoto",
       "scar": "Ärr",
       "tattoo": "Tatuering"
     },
@@ -2638,6 +2640,9 @@
     "mugshot": {
       "take": "Ta signalementsfoto",
       "taken": "Signalementsfotot är sparat på inskrivning {number}."
+    },
+    "capture": {
+      "failed": "Ingenting sparades."
     }
   },
   "comms": {

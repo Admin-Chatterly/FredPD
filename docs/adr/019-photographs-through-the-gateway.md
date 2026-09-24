@@ -34,7 +34,14 @@ FiveM side called it, and the gateway itself had gaps:
     side at 2048 px, and refuses decompression bombs.
   - An image upload is its own token action (`upload_image`), so a
     photograph token cannot be spent as a plain upload.
-  - Every upload token is single-use.
+  - Every upload token is single-use:
+    - the file is linked into place, never renamed over an existing one;
+    - a refused upload leaves a tombstone, so the same link cannot try again.
+  - The scan and the re-encode run on the unpublished part file. Nothing is
+    servable that sharp did not produce.
+  - Only JPEG, PNG and WebP reach the decoder. Input is capped at 16 M
+    pixels, and at most two images are decoded at once.
+  - Request logs drop the query string, which is the token.
   - Downloads are served with their real content type and `nosniff`.
   - CORS allows the NUI's origin (`https://cfx-nui-fredpd`, configurable)
     and nothing else.
@@ -60,6 +67,14 @@ FiveM side called it, and the gateway itself had gaps:
   closed, so no form loses what was typed.
 
 ## Consequences
+
+- The server cannot prove the uploaded bytes are an in-game screenshot. An
+  officer holding an upload link can PUT any picture; the gateway guarantees
+  only that what it keeps is a re-encoded image. The commit, the audit entry
+  and the identity checks at the terminal are what bind it to a person.
+- Each officer may have five uploads begun and not committed at a time. A
+  commit that loses a race with another commit of the same ref is refused,
+  not reported as its own.
 
 - Photographs need the gateway on, `VITE_MEDIA_HOST` set to its public media
   address at NUI build time (the CSP), and screenshot-basic installed. Without

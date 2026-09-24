@@ -31,10 +31,14 @@ root.hidden = !nui.isMock;
 
 nui.on('fredpd:open', () => {
   root.hidden = false;
+  // A photograph whose "show again" never arrived must not leave the MDT
+  // invisible for good (client/photo.lua).
+  root.style.visibility = '';
 });
 
 nui.on('fredpd:close', () => {
   root.hidden = true;
+  root.style.visibility = '';
 });
 
 // Out of the picture while a photograph is taken (client/photo.lua), without
@@ -44,8 +48,9 @@ nui.on('fredpd:photo', (message) => {
 });
 
 // Escape asks the client to close, so focus and visibility change in one place.
+// Not while a photograph is being taken: the MDT is only out of the picture.
 window.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') void nui.call('fredpd:close');
+  if (event.key === 'Escape' && root.style.visibility !== 'hidden') void nui.call('fredpd:close');
 });
 
 mount(App, { target: root });

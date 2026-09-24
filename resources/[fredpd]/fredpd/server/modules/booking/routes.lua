@@ -287,7 +287,8 @@ route.define({
 -- -----------------------------------------------------------------------------
 
 --- The first step of a mugshot: the same terminal, range and identity rules
---- as the ten-print above, then an upload begun for the person the booking
+--- as the ten-print above (the identifier conflict and the unidentified
+--- arrestee's recorded character both), then an upload begun for the person the booking
 --- already names -- never a person the client names. The client then points
 --- a camera at the target's face, and the NUI uploads and commits
 --- (`media/routes.lua`).
@@ -324,6 +325,13 @@ route.define({
         end
 
         if personsRepo.identifierConflict(session.agencyId, booking.personId, identifier) then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { targetId = 'identity_mismatch' })
+        end
+
+        -- An arrestee booked as unidentified has a character recorded out of
+        -- sight (0028): only that character's face goes on the booking, as
+        -- only their prints do above -- not a bystander at the terminal.
+        if personsRepo.pendingIdentityMatches(session.agencyId, booking.personId, identifier) == false then
             return route.refuse(FredPD.ErrorCode.CONFLICT, { targetId = 'identity_mismatch' })
         end
 

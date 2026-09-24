@@ -19,6 +19,7 @@
 </script>
 
 <script lang="ts">
+  import { tick } from 'svelte';
   import { nui } from '../../lib/nui';
   import { t } from '../../lib/i18n';
   import { formatMoment } from '../../lib/time';
@@ -78,16 +79,20 @@
 
 
   let mugshotBusy = $state(false);
+  /** What a mugshot or ten-print said, drawn under the booking's own header. */
+  let captureFailure = $state<Failure | null>(null);
+  let captureStatus = $state('');
+  const captureMessages = $derived(fieldList(captureFailure, {}));
 
   /**
    * Ten-print of whoever stands at the terminal (8.8), filed against this
    * booking: the same route `/fredpd tenprint` calls, from the screen the
    * officer already has open.
    */
-  async function takeTenPrint(): Promise<void> {
+  async function takeTenPrint(trigger: HTMLButtonElement): Promise<void> {
     if (!detail || mugshotBusy) return;
     mugshotBusy = true;
-    status = '';
+    captureStatus = '';
 
     const number = detail.number;
     const nearest = await nui.call<{ targetId: number }>('fredpd:photoNearest', {});
@@ -100,15 +105,18 @@
       : nearest;
 
     if (response.ok) {
-      failure = null;
-      status = response.data.identifiedAs
+      captureFailure = null;
+      captureStatus = response.data.identifiedAs
         ? t('fingerprintScanner.tenPrint.identified', { number, person: response.data.identifiedAs })
         : t('fingerprintScanner.tenPrint.captured', { number });
     } else {
-      failure = response;
+      captureFailure = response;
     }
 
     mugshotBusy = false;
+    // Once the button is enabled again: a disabled one cannot take focus.
+    await tick();
+    trigger.focus();
   }
 
   /**
@@ -116,10 +124,10 @@
    * booking names (ADR-019): the client finds them and frames their face, the
    * server checks the range and that they are who the booking says.
    */
-  async function takeMugshot(): Promise<void> {
+  async function takeMugshot(trigger: HTMLButtonElement): Promise<void> {
     if (!detail || mugshotBusy) return;
     mugshotBusy = true;
-    status = '';
+    captureStatus = '';
 
     const number = detail.number;
     const nearest = await nui.call<{ targetId: number }>('fredpd:photoNearest', {});
@@ -135,13 +143,17 @@
       : nearest;
 
     if (response.ok) {
-      failure = null;
-      status = t('booking.mugshot.taken', { number });
+      captureFailure = null;
+      captureStatus = t('booking.mugshot.taken', { number });
     } else {
-      failure = response;
+      captureFailure = response;
     }
 
     mugshotBusy = false;
+    // The button lost focus when the MDT hid for the picture.
+    // Once the button is enabled again: a disabled one cannot take focus.
+    await tick();
+    trigger.focus();
   }
 
   const messages = $derived(fieldList(failure, FIELD_LABELS));
@@ -217,6 +229,11 @@
 
   async function open(id: number): Promise<void> {
     busy = true;
+    // What a capture said belongs to the booking it was taken for.
+    if (detail?.id !== id) {
+      captureFailure = null;
+      captureStatus = '';
+    }
 
     const response = await nui.call<{ booking: BookingRow }>('booking.get', { id });
 
@@ -439,12 +456,12 @@
             </p>
           </div>
           {#if !detail.releasedAt}
-            <div class="flex gap-2">
+            <div class="flex flex-wrap justify-end gap-2">
             <button
               type="button"
               class="border border-[var(--color-border)] px-3 py-1 text-xs focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
               disabled={mugshotBusy}
-              onclick={() => void takeMugshot()}
+              onclick={(event) => void takeMugshot(event.currentTarget)}
             >
               {t('booking.mugshot.take')}
             </button>
@@ -452,7 +469,7 @@
               type="button"
               class="border border-[var(--color-border)] px-3 py-1 text-xs focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
               disabled={mugshotBusy}
-              onclick={() => void takeTenPrint()}
+              onclick={(event) => void takeTenPrint(event.currentTarget)}
             >
               {t('fingerprintScanner.tenPrint.title')}
             </button>
@@ -472,6 +489,18 @@
             </div>
           {/if}
         </header>
+
+        {#if captureFailure}
+          <div class="mb-3 border border-[var(--color-alert)] px-2 py-1 text-xs" role="alert">
+            <p>{captureMessages.length > 0 ? t('booking.capture.failed') : t(`error.${captureFailure.err}`)}</p>
+            {#each captureMessages as message (message.name)}
+              <p class="text-[var(--color-ink-muted)]">{message.reason}</p>
+            {/each}
+          </div>
+        {/if}
+        {#if captureStatus}
+          <p class="mb-3 text-xs text-[var(--color-ink-muted)]" role="status">{captureStatus}</p>
+        {/if}
 
         {#if detail.releasedAt && detail.releaseReasonKey}
           <p class="mb-3 border border-[var(--color-border)] px-2 py-1 text-xs">

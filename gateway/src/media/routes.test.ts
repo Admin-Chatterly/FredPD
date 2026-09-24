@@ -343,4 +343,41 @@ describe('media', () => {
 
     await app.close();
   });
+
+  it('spends a photograph token on a refusal: the same link cannot be tried again', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'fredpd-media-'));
+    const config = baseConfig(dir);
+    config.media.maxBytes = 1024 * 1024;
+    const app = createServer(config);
+
+    const { uploadPath } = await imageUpload(app, config);
+    const refused = await app.inject({ method: 'PUT', url: uploadPath, payload: Buffer.from('not an image') });
+    expect(refused.statusCode).toBe(422);
+
+    const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#000' } })
+      .png()
+      .toBuffer();
+    const retried = await app.inject({ method: 'PUT', url: uploadPath, payload: png });
+    expect(retried.statusCode).toBe(409);
+
+    await app.close();
+  });
+
+  it('refuses an image format a photograph never comes in', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'fredpd-media-'));
+    const config = baseConfig(dir);
+    config.media.maxBytes = 1024 * 1024;
+    const app = createServer(config);
+
+    const svg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8"/></svg>',
+    );
+    const { mediaRef, uploadPath } = await imageUpload(app, config);
+    const upload = await app.inject({ method: 'PUT', url: uploadPath, payload: svg });
+
+    expect(upload.statusCode).toBe(422);
+    expect((await download(app, config, mediaRef)).statusCode).toBe(404);
+
+    await app.close();
+  });
 });

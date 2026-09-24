@@ -29,6 +29,29 @@ export interface PhotoCommitted {
   photoId: number;
 }
 
+/**
+ * What a refused upload says, from the gateway's own envelope when it sent
+ * one (`{ err, fields: { file } }`), otherwise from the status: a spent or
+ * expired link is not "not a photograph", and neither is a gateway fault.
+ */
+async function uploadRefusal(response: Response): Promise<RouteResponse<never>> {
+  try {
+    const body = (await response.json()) as { fields?: Record<string, string> };
+    if (body.fields && typeof body.fields['file'] === 'string') {
+      return { ok: false, err: 'invalid', fields: { file: body.fields['file'] } };
+    }
+  } catch {
+    // Not JSON: fall through to the status.
+  }
+
+  if (response.status === 413) return { ok: false, err: 'invalid', fields: { file: 'too_large' } };
+  if (response.status === 401 || response.status === 403 || response.status === 409) {
+    return { ok: false, err: 'conflict', fields: { _input: 'expired' } };
+  }
+
+  return { ok: false, err: 'conflict', fields: { _input: 'gateway_unavailable' } };
+}
+
 export async function takePhoto(
   begin: () => Promise<RouteResponse<PhotoBegun>>,
 ): Promise<RouteResponse<PhotoCommitted>> {
@@ -53,9 +76,7 @@ export async function takePhoto(
         body: blob,
       });
 
-      if (!response.ok) {
-        return { ok: false, err: 'invalid', fields: { file: response.status === 413 ? 'too_large' : 'not_image' } };
-      }
+      if (!response.ok) return uploadRefusal(response);
     } catch {
       return { ok: false, err: 'conflict', fields: { _input: 'gateway_unavailable' } };
     }

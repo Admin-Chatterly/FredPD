@@ -12,6 +12,9 @@ local Media = {}
 --- time is never refused at the last step for being slow.
 Media.PENDING_SECONDS = 900
 
+--- Uploads one officer may have begun and not committed at once.
+Media.MAX_PENDING = 5
+
 local PHOTO_KINDS <const> = { mugshot = true, field = true, scar = true, mark = true, tattoo = true }
 
 function Media.isPhotoKind(kind)

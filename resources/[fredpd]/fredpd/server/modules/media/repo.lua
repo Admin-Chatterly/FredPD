@@ -28,34 +28,45 @@ function Repo.pending(mediaRef, agencyId, discordId, seconds)
         { mediaRef, agencyId, discordId, seconds })
 end
 
+--- How many uploads this officer has begun and not committed, recently.
+function Repo.pendingCount(agencyId, discordId, seconds)
+    return db().scalar(
+        [[SELECT COUNT(*) FROM fpd_media
+           WHERE agency_id = ? AND created_by = ? AND status = 'pending'
+             AND created_at >= DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL ? SECOND)]],
+        { agencyId, discordId, seconds }) or 0
+end
+
 --- Attaches an uploaded photograph to a person, once.
 ---
---- The ledger row is flipped first and the photo row is written only when
---- that flip changed a row (`ROW_COUNT()`, held in a session variable): two
---- commits of the same ref racing each other wait on the ledger row's lock,
---- and the second finds it already committed and writes nothing.
+--- The ledger row is flipped on its own first, and its affected-row count is
+--- the one answer to "did this call commit it": two commits of the same ref
+--- racing each other wait on the row's lock, and the second changes nothing
+--- and is refused -- rather than finding the first one's photo and reporting
+--- it as its own. A photo row that then fails to write puts the flip back.
 ---
---- @return number|nil the photo's id
+--- @return number|nil the photo's id, nil when another commit got there first
 function Repo.commitPhoto(mediaRef, agencyId, personId, kind, discordId)
-    local committed = db().transaction({
-        {
-            query = [[UPDATE fpd_media SET status = 'committed', committed_at = CURRENT_TIMESTAMP(3)
-                       WHERE media_ref = ? AND agency_id = ? AND status = 'pending']],
-            values = { mediaRef, agencyId },
-        },
-        { query = 'SET @fpd_media_flipped = ROW_COUNT()' },
-        {
-            query = [[INSERT INTO fpd_person_photos (agency_id, person_id, kind, media_ref, taken_at, created_by)
-                      SELECT ?, ?, ?, ?, CURRENT_TIMESTAMP(3), ? FROM DUAL WHERE @fpd_media_flipped = 1]],
-            values = { agencyId, personId, kind, mediaRef, discordId },
-        },
-    })
+    local flipped = db().execute(
+        [[UPDATE fpd_media SET status = 'committed', committed_at = CURRENT_TIMESTAMP(3)
+           WHERE media_ref = ? AND agency_id = ? AND status = 'pending']],
+        { mediaRef, agencyId })
+    if flipped ~= 1 then return nil end
 
-    if not committed then return nil end
+    local id = db().insert(
+        [[INSERT INTO fpd_person_photos (agency_id, person_id, kind, media_ref, taken_at, created_by)
+          VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP(3), ?)]],
+        { agencyId, personId, kind, mediaRef, discordId })
 
-    return db().scalar(
-        'SELECT id FROM fpd_person_photos WHERE media_ref = ? AND agency_id = ? AND person_id = ? LIMIT 1',
-        { mediaRef, agencyId, personId })
+    if not id then
+        db().execute(
+            [[UPDATE fpd_media SET status = 'pending', committed_at = NULL
+               WHERE media_ref = ? AND agency_id = ? AND status = 'committed']],
+            { mediaRef, agencyId })
+        return nil
+    end
+
+    return id
 end
 
 FredPD.Repo.media = Repo

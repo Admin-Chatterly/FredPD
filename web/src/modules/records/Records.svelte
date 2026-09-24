@@ -7,6 +7,7 @@
 </script>
 
 <script lang="ts">
+  import { tick } from 'svelte';
   import { nui } from '../../lib/nui';
   import Query from './Query.svelte';
   import Anmalan from './Anmalan.svelte';
@@ -417,6 +418,53 @@
     void loadPersons(applied);
   });
 
+  /** A photograph for the open record (ADR-019): the kind chosen, the one enlarged. */
+  let photoKind = $state<'field' | 'scar' | 'mark' | 'tattoo'>('field');
+  let photoBusy = $state(false);
+  let photoFailure = $state<Failure | null>(null);
+  let photoStatus = $state('');
+  let enlargedPhoto = $state<number | null>(null);
+  /** Whether this record's links were already refreshed once after one expired. */
+  let photoLinksRefreshed = false;
+  const photoMessages = $derived(
+    fieldList(photoFailure, { file: 'records.person.photo.file', _input: 'records.person.photos' }),
+  );
+
+  async function capturePhoto(personId: number, trigger: HTMLButtonElement): Promise<void> {
+    if (photoBusy) return;
+    photoBusy = true;
+    photoStatus = '';
+
+    const response = await takePhoto(() =>
+      nui.call('person.photo.begin', { personId, kind: photoKind }),
+    );
+
+    // The officer may have opened somebody else meanwhile: this answer is
+    // about the person it was taken for, and only redraws that one.
+    if (selectedPersonId === personId) {
+      if (response.ok) {
+        photoFailure = null;
+        photoStatus = t('records.person.photo.taken_ok');
+        await loadPerson(personId);
+      } else {
+        photoFailure = response;
+      }
+    }
+
+    photoBusy = false;
+    // The button lost focus when the MDT hid for the picture.
+    // Once the button is enabled again: a disabled one cannot take focus.
+    await tick();
+    trigger.focus();
+  }
+
+  /** A signed link runs out (ADR-019): the first broken image reloads the record once for fresh ones. */
+  function photoLinkFailed(personId: number): void {
+    if (photoLinksRefreshed) return;
+    photoLinksRefreshed = true;
+    void loadPerson(personId);
+  }
+
   /**
    * The record, and the editor seeded from it.
    *
@@ -426,34 +474,6 @@
    * untouched field is not sent at all, so a save that changes nothing is
    * refused as `nothing_to_change` rather than bumping the version for nobody.
    */
-  /** A photograph for the open record (ADR-019): the kind chosen, the one enlarged. */
-  let photoKind = $state<'field' | 'scar' | 'mark' | 'tattoo'>('field');
-  let photoBusy = $state(false);
-  let photoFailure = $state<Failure | null>(null);
-  let photoStatus = $state('');
-  let enlargedPhoto = $state<number | null>(null);
-  const photoMessages = $derived(fieldList(photoFailure, { file: 'records.person.photo.file', _input: 'records.person.photos' }));
-
-  async function capturePhoto(personId: number): Promise<void> {
-    if (photoBusy) return;
-    photoBusy = true;
-    photoStatus = '';
-
-    const response = await takePhoto(() =>
-      nui.call('person.photo.begin', { personId, kind: photoKind }),
-    );
-
-    if (response.ok) {
-      photoFailure = null;
-      photoStatus = t('records.person.photo.taken_ok');
-      await loadPerson(personId);
-    } else {
-      photoFailure = response;
-    }
-
-    photoBusy = false;
-  }
-
   async function loadPerson(id: number): Promise<void> {
     const response = await nui.call<PersonDetail>('person.get', { id });
 
@@ -498,6 +518,14 @@
   $effect(() => {
     const id = selectedPersonId;
     if (id === null) return;
+
+    // A different person: nothing said about the last one's photographs
+    // carries over.
+    photoFailure = null;
+    photoStatus = '';
+    enlargedPhoto = null;
+    photoKind = 'field';
+    photoLinksRefreshed = false;
 
     void loadPerson(id);
   });
@@ -1660,6 +1688,10 @@
               </thead>
               <tbody>
                 {#each personDetail.photos ?? [] as photo (photo.id)}
+                  {@const photoName = t('records.person.photo.name', {
+                    kind: t(`records.photoKind.${photo.kind}`),
+                    taken: formatMoment(photo.takenAt),
+                  })}
                   <tr class="border-b border-[var(--color-border)] last:border-b-0">
                     <td class="px-3 py-2">
                       {#if photo.thumbnailUrl}
@@ -1667,16 +1699,20 @@
                           type="button"
                           class="block focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
                           aria-expanded={enlargedPhoto === photo.id}
-                          aria-label={t('records.person.photo.enlarge', { kind: t(`records.photoKind.${photo.kind}`) })}
+                          aria-controls={`person-photo-${photo.id}`}
+                          aria-label={t('records.person.photo.enlarge', { name: photoName })}
                           onclick={() => (enlargedPhoto = enlargedPhoto === photo.id ? null : photo.id)}
                         >
                           <img
                             src={photo.thumbnailUrl}
-                            alt={t(`records.photoKind.${photo.kind}`)}
+                            alt={photoName}
                             loading="lazy"
                             class="h-12 w-12 border border-[var(--color-border)] object-cover"
+                            onerror={() => photoLinkFailed(openPerson.id)}
                           />
                         </button>
+                      {:else}
+                        <span class="text-[var(--color-ink-muted)]">—</span>
                       {/if}
                     </td>
                     <td class="px-3 py-2">{t(`records.photoKind.${photo.kind}`)}</td>
@@ -1688,12 +1724,16 @@
                     </td>
                   </tr>
                   {#if enlargedPhoto === photo.id && photo.url}
-                    <tr class="border-b border-[var(--color-border)]">
+                    <tr class="border-b border-[var(--color-border)]" id={`person-photo-${photo.id}`}>
                       <td class="px-3 py-2" colspan="6">
                         <img
                           src={photo.url}
-                          alt={t(`records.photoKind.${photo.kind}`)}
+                          alt={t('records.person.photo.name', {
+                            kind: t(`records.photoKind.${photo.kind}`),
+                            taken: formatMoment(photo.takenAt),
+                          })}
                           class="max-h-96 max-w-full border border-[var(--color-border)]"
+                          onerror={() => photoLinkFailed(openPerson.id)}
                         />
                       </td>
                     </tr>
@@ -1713,7 +1753,7 @@
             <div class="mt-2 flex flex-wrap items-end gap-2 text-xs">
               <label class="flex flex-col gap-1">
                 {t('records.person.photo.captureKind')}
-                <select bind:value={photoKind} class="border border-[var(--color-border)] px-2 py-1">
+                <select bind:value={photoKind} class="border border-[var(--color-border)] px-2 py-1 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]">
                   {#each ['field', 'scar', 'mark', 'tattoo'] as kind (kind)}
                     <option value={kind}>{t(`records.photoKind.${kind}`)}</option>
                   {/each}
@@ -1723,7 +1763,7 @@
                 type="button"
                 class="border border-[var(--color-border)] px-3 py-1 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
                 disabled={photoBusy}
-                onclick={() => void capturePhoto(openPerson.id)}
+                onclick={(event) => void capturePhoto(openPerson.id, event.currentTarget)}
               >
                 {t('records.person.photo.take')}
               </button>
@@ -1731,8 +1771,10 @@
             </div>
           {/if}
           {#if photoFailure}
+            <!-- Its own headline: a refused photograph is not "somebody else
+                 changed this record", which is what `conflict` says. -->
             <div class="mt-2 border border-[var(--color-alert)] px-2 py-1 text-xs" role="alert">
-              <p>{t(`error.${photoFailure.err}`)}</p>
+              <p>{photoMessages.length > 0 ? t('records.person.photo.failed') : t(`error.${photoFailure.err}`)}</p>
               {#each photoMessages as message (message.name)}
                 <p class="text-[var(--color-ink-muted)]">{message.reason}</p>
               {/each}

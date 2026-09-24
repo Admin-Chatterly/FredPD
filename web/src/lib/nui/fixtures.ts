@@ -6508,7 +6508,9 @@ export const fixtures: FixtureSet = {
         biometrics: [],
         vehicles: [],
         firearms: [],
-        photoCapture: true,
+        // Marko Petrov's record is read by an officer who may not photograph:
+        // the controls are the server's to offer.
+        photoCapture: person.id !== 3,
       };
     },
 
@@ -6525,6 +6527,12 @@ export const fixtures: FixtureSet = {
       const booking = bookings.find((row) => row.number === number);
       if (!booking) return refuse('not_found', { number: 'unknown' });
       if (booking.releasedAgo !== undefined) return refuse('conflict', { number: 'already_released' });
+
+      // Somebody else at the terminal than the booking names (the server's
+      // `identifierConflict`), on request from a test.
+      if ((globalThis as { __fixtureWrongFace?: boolean }).__fixtureWrongFace) {
+        return refuse('conflict', { targetId: 'identity_mismatch' });
+      }
 
       const chain = frihetsberovanden.find((row) => row.id === booking.frihetId);
       return { ...beginFixturePhoto(chain?.personId ?? 1, 'mugshot'), targetId };
