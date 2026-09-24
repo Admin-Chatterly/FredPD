@@ -1161,6 +1161,8 @@ fired something, never what.
 - [S] Scene release with a checklist before the perimeter is removed.
 - **Permissions:** `forensics.scene.create`, `forensics.scene.release`, `forensics.evidence.collect`, `forensics.tools.use`.
 
+- **Evidence finds its case.** `evidence.collect` files an item under, in order: the case number given; the scene named; the open scene the officer is standing in (which also becomes the item's scene); the open FU behind the call the officer is working; the open FU the officer leads; the case of the officer's last collected item. Evidence on no case never reaches the FU's evidence panel.
+
 ### 8.5 Evidence items and packaging (M3)
 
 - [M] Packaging types as items: evidence bag, envelope, swab box, lift card, firearm box, drug bag, phone bag, large-item tag.
@@ -1197,6 +1199,10 @@ fired something, never what.
 - [S] Serial number restoration (section 8.9), toxicology and blood alcohol from medical samples, phone extraction.
 - **Based on:** LIMS workflows (JusticeTrax LIMS-plus, STARLIMS); evidences laptop apps.
 - **Permissions:** `lab.request.create`, `lab.queue.view`, `lab.analysis.perform`, `lab.analysis.review`, `lab.report.release`.
+
+- **Any analyst finishes.** Work whose turnaround has run out can be completed by any holder of `lab.analysis.perform`, not only the one who started it; who signed is on the row and in the audit.
+- **The automatic lab** (`lab.auto`, default on). With no analyst signed on in the agency, a request waiting longer than `lab.autoStartAfterSeconds` is started by the lab itself (`system`) on the normal turnaround, and finished when due; an analyst's own overdue work is finished `lab.autoCompleteGraceSeconds` after its due time. Same code path as the route; audited with `automatic = true`.
+- **Candidates name a lead.** A print comparison or search that hits a reference records which master-index person it points at (0030, resolved in the database from the index identifier). A reader who may see results and may read that person sees "candidate — a lead to follow up, not an identification"; others see a count. The requester and the case's FU-ledare are notified that a candidate exists, never who.
 
 ### 8.8 Forensic databases and identification (M3)
 

@@ -144,6 +144,20 @@ function Repo.getScene(agencyId, id)
     )
 end
 
+--- The open scene the officer is standing in, if any (8.4): the nearest one
+--- whose radius contains the point. An officer who collects inside a taped-off
+--- scene is collecting for it, whether or not they opened the scene form.
+function Repo.openSceneAt(agencyId, x, y)
+    return db().single(
+        ([[SELECT %s FROM fpd_scenes s
+            WHERE s.agency_id = ? AND s.status = 'open'
+              AND POW(s.x - ?, 2) + POW(s.y - ?, 2) <= POW(s.radius, 2)
+            ORDER BY POW(s.x - ?, 2) + POW(s.y - ?, 2)
+            LIMIT 1]]):format(SCENE_COLUMNS),
+        { agencyId, x, y, x, y }
+    )
+end
+
 --- Releases a scene, once.
 ---
 --- The `status = 'open'` in the WHERE clause is what makes it once: a second
@@ -537,6 +551,7 @@ local ANALYSIS_COLUMNS <const> = [[
     a.id, a.request_id AS requestId, a.evidence_id AS evidenceId,
     a.analysis, a.status, a.assigned_to AS assignedTo,
     a.started_at AS startedAt, a.due_at AS dueAt, a.completed_at AS completedAt,
+    a.completed_by AS completedBy,
     a.result_code AS resultCode, a.observations,
     r.priority, r.case_number AS caseNumber,
     e.evidence_number AS evidenceNumber
@@ -733,6 +748,57 @@ function Repo.indexHits(agencyId, indexKind, profile, referencesOnly)
     return db().scalar(query, { agencyId, indexKind, profile }) or 0
 end
 
+--- Records who a fingerprint search pointed at (0030): the master-index
+--- persons whose reference entries carry this profile. Resolved entirely in
+--- the database -- index entry to `fpd_persons` by identifier -- so no
+--- profile or identifier comes back into Lua. At most five: a search that
+--- matches more is a broken index, not five leads.
+---
+--- @return number rows written
+function Repo.fileCandidates(agencyId, analysisId, indexKind, profile)
+    if not profile then return 0 end
+
+    return db().execute(
+        [[INSERT IGNORE INTO fpd_lab_candidates (analysis_id, person_id, agency_id)
+          SELECT DISTINCT ?, p.id, p.agency_id
+            FROM fpd_forensic_index i
+            JOIN fpd_persons p ON p.agency_id = i.agency_id AND p.identifier = i.identifier
+           WHERE i.agency_id = ? AND i.index_kind = ? AND i.profile = ?
+             AND i.identifier IS NOT NULL AND i.removed_at IS NULL
+           LIMIT 5]],
+        { analysisId, agencyId, indexKind, profile }
+    ) or 0
+end
+
+--- The candidates of a set of analyses, as analysisId -> list of person ids.
+--- The caller decides which of them the reader may see (`readPerson`).
+function Repo.candidatesFor(agencyId, analysisIds)
+    local out = {}
+    if #analysisIds == 0 then return out end
+
+    local placeholders, values = {}, { agencyId }
+    for index = 1, #analysisIds do
+        placeholders[index] = '?'
+        values[#values + 1] = analysisIds[index]
+    end
+
+    local rows = db().query(
+        ([[SELECT analysis_id AS analysisId, person_id AS personId
+             FROM fpd_lab_candidates
+            WHERE agency_id = ? AND analysis_id IN (%s)
+            ORDER BY analysis_id, person_id]]):format(table.concat(placeholders, ',')),
+        values
+    ) or {}
+
+    for index = 1, #rows do
+        local list = out[rows[index].analysisId] or {}
+        list[#list + 1] = rows[index].personId
+        out[rows[index].analysisId] = list
+    end
+
+    return out
+end
+
 --- Files the profile a DNA analysis obtained in the trace index (8.8).
 ---
 --- The profile is copied from `fpd_biometrics` to `fpd_forensic_index` inside
@@ -854,19 +920,20 @@ end
 --- in Lua on purpose: the turnaround is the mechanic (8.7, 4), and the database
 --- is the only clock that cannot be argued with. An analyst whose timer has not
 --- elapsed updates no rows and is told the analysis is not ready.
-function Repo.completeAnalysis(agencyId, id, resultCode, observations)
+function Repo.completeAnalysis(agencyId, id, resultCode, observations, completedBy)
     local committed = db().transaction({
         {
             query = [[UPDATE fpd_lab_analyses a
                         JOIN fpd_lab_requests r ON r.id = a.request_id
                          SET a.status = 'complete',
                              a.completed_at = CURRENT_TIMESTAMP(3),
+                             a.completed_by = ?,
                              a.result_code = ?,
                              a.observations = ?
                        WHERE a.id = ? AND a.status = 'in_progress'
                          AND a.due_at IS NOT NULL AND a.due_at <= CURRENT_TIMESTAMP(3)
                          AND r.agency_id = ?]],
-            values = { resultCode, observations, id, agencyId },
+            values = { completedBy, resultCode, observations, id, agencyId },
         },
         {
             -- The correlated NOT EXISTS reads `fpd_lab_analyses`, which the
@@ -891,6 +958,38 @@ function Repo.completeAnalysis(agencyId, id, resultCode, observations)
            WHERE a.id = ? AND r.agency_id = ? AND a.status = 'complete' AND a.result_code = ?]],
         { id, agencyId, resultCode }
     ) or 0
+end
+
+--- Queued analyses the automatic lab may take (evidence/events.lua): waiting
+--- longer than `olderThanSeconds`, oldest and most urgent first.
+function Repo.autoStartable(agencyId, olderThanSeconds, limit)
+    return db().query(
+        [[SELECT a.id, a.analysis, r.priority
+            FROM fpd_lab_analyses a
+            JOIN fpd_lab_requests r ON r.id = a.request_id
+           WHERE r.agency_id = ? AND a.status = 'queued'
+             AND r.requested_at <= CURRENT_TIMESTAMP(3) - INTERVAL ? SECOND
+           ORDER BY FIELD(r.priority, 'urgent', 'expedited', 'routine'), r.requested_at
+           LIMIT ?]],
+        { agencyId, olderThanSeconds, limit }
+    ) or {}
+end
+
+--- In-progress analyses whose clock has run out: at once for the automatic
+--- lab's own (`assigned_to = 'system'`), and `graceSeconds` later for an
+--- analyst's, who may still be writing up their observations.
+function Repo.autoCompletable(agencyId, graceSeconds, limit)
+    return db().query(
+        [[SELECT a.id, a.analysis
+            FROM fpd_lab_analyses a
+            JOIN fpd_lab_requests r ON r.id = a.request_id
+           WHERE r.agency_id = ? AND a.status = 'in_progress' AND a.due_at IS NOT NULL
+             AND a.due_at <= CURRENT_TIMESTAMP(3)
+                 - INTERVAL (CASE WHEN a.assigned_to = 'system' THEN 0 ELSE ? END) SECOND
+           ORDER BY a.due_at
+           LIMIT ?]],
+        { agencyId, graceSeconds, limit }
+    ) or {}
 end
 
 FredPD.Repo.evidence = Repo

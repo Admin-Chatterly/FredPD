@@ -100,6 +100,64 @@ local function canSeeResults(session)
     return FredPD.Core.perms.satisfies(session.permissions, 'lab.queue.view')
 end
 
+--- May this session be told about the investigation a case number names?
+--- True for a number that is no förundersökning at all (free text from before
+--- M2, a scene's own number): there is nothing behind it to protect.
+local function caseReadable(session, caseNumber)
+    if not caseNumber then return true end
+
+    local fu = FredPD.Repo.anmalan.fuByNumber(session.agencyId, caseNumber)
+    if not fu then return true end
+
+    return FredPD.Repo.access.mayBeToldOf(session, 'case', fu)
+end
+
+--- The people a candidate match points at (0030), as far as this reader may
+--- read them: each through `readPerson`, which audits a restricted read and
+--- refuses what the reader may not see. What is refused is counted, never
+--- named -- the lead exists, and the reader is told somebody else holds it.
+local function attachCandidates(rows, session)
+    local ids = {}
+    for index = 1, #rows do
+        if rows[index].resultCode == 'candidate_match' then ids[#ids + 1] = rows[index].id end
+    end
+    if #ids == 0 then return end
+
+    local byAnalysis = repo.candidatesFor(session.agencyId, ids)
+
+    for index = 1, #rows do
+        local personIds = byAnalysis[rows[index].id]
+
+        -- Who a print points at is a fact about the case as much as about the
+        -- person: a reader shut out of the investigation (a compartment, a
+        -- seal) is told only that candidates exist.
+        if personIds and not caseReadable(session, rows[index].caseNumber) then
+            rows[index].candidates = {}
+            rows[index].candidatesWithheld = #personIds
+        elseif personIds then
+            local shown, withheld = {}, 0
+
+            for position = 1, #personIds do
+                local person = FredPD.Repo.persons.readPerson(session, personIds[position])
+
+                if person then
+                    shown[#shown + 1] = {
+                        id = person.id,
+                        personNumber = person.personNumber,
+                        firstName = person.firstName,
+                        lastName = person.lastName,
+                    }
+                else
+                    withheld = withheld + 1
+                end
+            end
+
+            rows[index].candidates = shown
+            rows[index].candidatesWithheld = withheld
+        end
+    end
+end
+
 --- Shapes a list of analyses for one reader.
 local function analysesFor(rows, session)
     local visible = canSeeResults(session)
@@ -107,6 +165,9 @@ local function analysesFor(rows, session)
     for index = 1, #rows do
         rows[index] = service.analysisPublic(rows[index], visible)
     end
+
+    -- Only a reader who may see results may see who a result points at.
+    if visible then attachCandidates(rows, session) end
 
     return rows
 end
@@ -400,7 +461,7 @@ local function writeCollected(session, input, scene, trace)
     -- dead here and at `lab.analysis.complete`. 8.4's entry log is an
     -- unimplemented [M], not a wired feature, and the read stays because the
     -- query is what the log will feed, not because it reports anything today.
-    local contaminated = repo.unprotectedEntries(input.sceneId) > 0
+    local contaminated = repo.unprotectedEntries(scene and scene.id or nil) > 0
 
     -- `outdoors` is the grid's: `Grid.place` sets it from a server-side interior
     -- test at the position the trace was filed at, and the claim carries it
@@ -419,15 +480,36 @@ local function writeCollected(session, input, scene, trace)
         contaminated = contaminated,
     })
 
-    -- Named by the call, then the scene, then whatever case this officer's own
-    -- last piece of evidence was under -- so a trace picked up mid-investigation
-    -- lands on the same case without being typed in again each time.
-    local caseNumber = text(input.caseNumber)
-        or (scene and scene.caseNumber)
-        or repo.latestCaseNumberFor(session.agencyId, session.discordId)
+    -- Nobody types a case number (8.4): named by the call, then the scene, then
+    -- the call the officer is working, then the investigation they lead, then
+    -- whatever case their own last piece of evidence was under. Evidence on no
+    -- case never reaches the FU's evidence panel, which is where it is used.
+    --
+    -- A number found for the officer is used only if they may read the
+    -- investigation behind it; otherwise the next source is asked.
+    local function readable(number)
+        return number and caseReadable(session, number) and number or nil
+    end
+
+    if text(input.caseNumber) and not caseReadable(session, text(input.caseNumber)) then
+        return route.refuse(FredPD.ErrorCode.FORBIDDEN, { caseNumber = 'over_clearance' })
+    end
+
+    local caseNumber = service.resolveCase({
+        function() return text(input.caseNumber) end,
+        function() return readable(scene and scene.caseNumber) end,
+        function()
+            local cad = FredPD.Repo.cad
+            local assignment = cad and cad.activeAssignment(session.agencyId, session.discordId)
+            return readable(assignment
+                and FredPD.Repo.anmalan.openFuNumberForCall(session.agencyId, assignment.callId))
+        end,
+        function() return FredPD.Repo.anmalan.latestOpenFuNumberLedBy(session.agencyId, session.discordId) end,
+        function() return repo.latestCaseNumberFor(session.agencyId, session.discordId) end,
+    })
 
     local item, committed = repo.insertEvidence(session.agencyId, {
-        sceneId = input.sceneId,
+        sceneId = scene and scene.id or nil,
         caseNumber = caseNumber,
         -- From the grid, never from the call.
         type = trace.type,
@@ -491,6 +573,11 @@ route.define({
             if scene.status ~= 'open' then
                 return route.refuse(FredPD.ErrorCode.CONFLICT, { sceneId = 'scene_released' })
             end
+        else
+            -- Standing inside a taped-off scene is collecting for it (8.4).
+            local ped = GetPlayerPed(session.src)
+            local at = ped and ped ~= 0 and GetEntityCoords(ped) or nil
+            if at then scene = repo.openSceneAt(session.agencyId, at.x, at.y) end
         end
 
         -- A trace out of the grid, or the residue off a suspect's hands (8.2).
@@ -854,6 +941,12 @@ route.define({
             end
         end
 
+        -- A case this session may not read is not one it may file lab work
+        -- under -- nor aim the lead investigator's notices at.
+        if text(input.caseNumber) and not caseReadable(session, text(input.caseNumber)) then
+            return route.refuse(FredPD.ErrorCode.FORBIDDEN, { caseNumber = 'over_clearance' })
+        end
+
         local id = repo.createLabRequest(session.agencyId, {
             caseNumber = text(input.caseNumber),
             priority = input.priority or 'routine',
@@ -923,6 +1016,152 @@ route.define({
     end,
 })
 
+--- Computes and records the result of one in-progress analysis whose
+--- turnaround has elapsed (8.7). The body of `lab.analysis.complete` and of
+--- the automatic lab (evidence/events.lua), which is why it takes an agency
+--- and a signer rather than a session: the automatic lab has neither.
+---
+--- Refusals come back in the route's own `route.refuse` shape, so the route
+--- returns them as they are and the timer only has to see `__err`.
+---
+--- @param agencyId string
+--- @param discordId string who signs the result: the analyst, or `system`
+--- @param id number the analysis
+--- @param observations string|nil
+local function finishAnalysis(agencyId, discordId, id, observations)
+    -- Hidden truth (8.1). Everything below reads from `facts` to reach a
+    -- result code; nothing derived from it is returned, audited or pushed.
+    local facts = repo.hiddenFacts(agencyId, id)
+    if not facts then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+
+    if facts.status ~= 'in_progress' then
+        return route.refuse(FredPD.ErrorCode.CONFLICT, { status = facts.status })
+    end
+
+    local lookup = ANALYSIS_INDEX[facts.analysis]
+    local referenceHits, indexHits = 0, 0
+
+    if lookup then
+        -- The profiles are compared inside the database and only a count
+        -- comes back, so no hidden value is ever in a variable a response
+        -- could pick up by accident.
+        local hits = repo.indexHits(
+            agencyId, lookup.kind, facts[lookup.profile], lookup.referencesOnly
+        )
+
+        if lookup.referencesOnly then
+            referenceHits = hits
+        else
+            indexHits = hits
+        end
+
+        -- Who the hit points at, for the investigation to follow (0030).
+        -- Filed before the result, and harmless if the result then fails to
+        -- write: a candidate row on an analysis that is not complete is never
+        -- shown (`attachCandidates` reads only `candidate_match` rows).
+        if hits > 0 and lookup.kind == 'fingerprint' and not lookup.referencesOnly then
+            repo.fileCandidates(agencyId, id, lookup.kind, facts[lookup.profile])
+        end
+    end
+
+    local result = service.resultFor(facts.analysis, {
+        quality = facts.quality,
+        -- Zero on every scene until 8.4's entry log is written by something;
+        -- see the same read in `evidence.collect` for why.
+        contaminated = repo.unprotectedEntries(facts.sceneId) > 0,
+        referenceHits = referenceHits,
+        indexHits = indexHits,
+        -- Read by no rule in `service.lua` today: the GSR rule that used to
+        -- ask for it now measures the residue level instead, which is the
+        -- only fact a swab carries (8.2, and the note on `ANALYSIS_RESULT
+        -- .gsr`). Passed on because it is hidden truth about the item that a
+        -- future rule would ask for by this name, and it costs one nil test.
+        hasWeapon = facts.weaponSerial ~= nil,
+    })
+
+    if not result then
+        return route.refuse(FredPD.ErrorCode.INVALID, { analysis = 'not_supported' })
+    end
+
+    -- The timer is checked in the UPDATE against the database's clock, so an
+    -- analyst who calls this early changes nothing and is told to wait.
+    if repo.completeAnalysis(agencyId, id, result, observations, discordId) == 0 then
+        -- Three conditions in one statement, so zero rows does not say
+        -- which. An analysis cancelled under the analyst, or finished by
+        -- the automatic mode while they were writing, must not be reported
+        -- as a turnaround that has not elapsed: that is a wait which will
+        -- never end, and they would sit there for it.
+        local blocker = repo.completionBlocker(agencyId, id)
+
+        if not blocker then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+
+        if blocker.status ~= 'in_progress' then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { status = blocker.status })
+        end
+
+        -- MariaDB answers a boolean expression with 1 and 0.
+        if not (blocker.elapsed == true or blocker.elapsed == 1) then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { dueAt = 'not_elapsed' })
+        end
+
+        -- In progress, due, and still nothing written: the transaction did
+        -- not commit. That is a server fault and is reported as one rather
+        -- than as something the analyst did wrong.
+        return route.refuse(FredPD.ErrorCode.INTERNAL)
+    end
+
+    -- 8.8: the profile the lab obtained joins the trace index as an
+    -- unidentified crime-scene profile, which is what later correlations
+    -- and confirmations search. The copy happens inside the statement, so
+    -- the profile itself never reaches this file.
+    local indexKind = service.traceIndexFor(facts.analysis, result)
+
+    if indexKind then
+        repo.indexTraceProfile(agencyId, facts.evidenceId, indexKind, discordId)
+    end
+
+    -- The officer who asked hears it is done, wherever they are.
+    -- The officer who asked and the lead investigator on the case hear it
+    -- is done, wherever they are; a candidate match says there is a name to
+    -- follow up, without saying whose (the MDT does, to who may read it).
+    local notice = repo.analysisNotice(agencyId, id)
+    if notice then
+        local leader = notice.caseNumber and FredPD.Repo.anmalan.fuLeaderByNumber(agencyId, notice.caseNumber)
+
+        local params = {
+            analysis = FredPD.t('lab.analysis.' .. tostring(notice.analysis)),
+            item = notice.evidenceNumber,
+            case = notice.caseNumber or '—',
+        }
+
+        local function recipient(other)
+            return other.agencyId == agencyId
+                and (other.discordId == notice.requestedBy or (leader ~= nil and other.discordId == leader))
+        end
+
+        -- Whether there is a candidate is itself a result (8.11): only a
+        -- recipient who may see results is told; the rest hear it is done.
+        local function seesResults(other)
+            return FredPD.Core.perms.satisfies(other.permissions, 'lab.queue.view')
+        end
+
+        local candidate = result == 'candidate_match'
+
+        FredPD.Core.push.notifyWhere(function(other)
+            return recipient(other) and candidate and seesResults(other)
+        end, 'lab.notify.candidate', params, { type = 'success' })
+
+        FredPD.Core.push.notifyWhere(function(other)
+            return recipient(other) and not (candidate and seesResults(other))
+        end, 'lab.notify.completed', params, { type = 'success' })
+    end
+
+    return { id = id, analysis = facts.analysis, resultCode = result }
+end
+
+-- For the automatic lab (evidence/events.lua).
+FredPD.Evidence.finishAnalysis = finishAnalysis
+
 route.define({
     name = 'lab.analysis.complete',
     perm = 'lab.analysis.perform',
@@ -942,108 +1181,11 @@ route.define({
         return { analysis = result.analysis }
     end,
     handler = function(session, input)
-        -- Hidden truth (8.1). Everything below reads from `facts` to reach a
-        -- result code; nothing derived from it is returned, audited or pushed.
-        local facts = repo.hiddenFacts(session.agencyId, input.id)
-        if not facts then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+        -- Any analyst may finish work whose clock has run out, not only the
+        -- one who started it: an analyst who went off shift used to leave
+        -- their queue stuck until they came back. Who signs is in the audit
+        -- entry and on the row.
+        return finishAnalysis(session.agencyId, session.discordId, input.id, text(input.observations))
 
-        if facts.status ~= 'in_progress' then
-            return route.refuse(FredPD.ErrorCode.CONFLICT, { status = facts.status })
-        end
-
-        -- The analyst who took the work signs the result. Technical review by a
-        -- second analyst is a separate permission and a later route (8.7); this
-        -- is not it, and finishing somebody else's analysis is not review.
-        if facts.assignedTo ~= session.discordId then
-            return route.refuse(FredPD.ErrorCode.FORBIDDEN)
-        end
-
-        local lookup = ANALYSIS_INDEX[facts.analysis]
-        local referenceHits, indexHits = 0, 0
-
-        if lookup then
-            -- The profiles are compared inside the database and only a count
-            -- comes back, so no hidden value is ever in a variable a response
-            -- could pick up by accident.
-            local hits = repo.indexHits(
-                session.agencyId, lookup.kind, facts[lookup.profile], lookup.referencesOnly
-            )
-
-            if lookup.referencesOnly then
-                referenceHits = hits
-            else
-                indexHits = hits
-            end
-        end
-
-        local result = service.resultFor(facts.analysis, {
-            quality = facts.quality,
-            -- Zero on every scene until 8.4's entry log is written by something;
-            -- see the same read in `evidence.collect` for why.
-            contaminated = repo.unprotectedEntries(facts.sceneId) > 0,
-            referenceHits = referenceHits,
-            indexHits = indexHits,
-            -- Read by no rule in `service.lua` today: the GSR rule that used to
-            -- ask for it now measures the residue level instead, which is the
-            -- only fact a swab carries (8.2, and the note on `ANALYSIS_RESULT
-            -- .gsr`). Passed on because it is hidden truth about the item that a
-            -- future rule would ask for by this name, and it costs one nil test.
-            hasWeapon = facts.weaponSerial ~= nil,
-        })
-
-        if not result then
-            return route.refuse(FredPD.ErrorCode.INVALID, { analysis = 'not_supported' })
-        end
-
-        -- The timer is checked in the UPDATE against the database's clock, so an
-        -- analyst who calls this early changes nothing and is told to wait.
-        if repo.completeAnalysis(session.agencyId, input.id, result, text(input.observations)) == 0 then
-            -- Three conditions in one statement, so zero rows does not say
-            -- which. An analysis cancelled under the analyst, or finished by
-            -- the automatic mode while they were writing, must not be reported
-            -- as a turnaround that has not elapsed: that is a wait which will
-            -- never end, and they would sit there for it.
-            local blocker = repo.completionBlocker(session.agencyId, input.id)
-
-            if not blocker then return route.refuse(FredPD.ErrorCode.NOT_FOUND) end
-
-            if blocker.status ~= 'in_progress' then
-                return route.refuse(FredPD.ErrorCode.CONFLICT, { status = blocker.status })
-            end
-
-            -- MariaDB answers a boolean expression with 1 and 0.
-            if not (blocker.elapsed == true or blocker.elapsed == 1) then
-                return route.refuse(FredPD.ErrorCode.CONFLICT, { dueAt = 'not_elapsed' })
-            end
-
-            -- In progress, due, and still nothing written: the transaction did
-            -- not commit. That is a server fault and is reported as one rather
-            -- than as something the analyst did wrong.
-            return route.refuse(FredPD.ErrorCode.INTERNAL)
-        end
-
-        -- 8.8: the profile the lab obtained joins the trace index as an
-        -- unidentified crime-scene profile, which is what later correlations
-        -- and confirmations search. The copy happens inside the statement, so
-        -- the profile itself never reaches this file.
-        local indexKind = service.traceIndexFor(facts.analysis, result)
-
-        if indexKind then
-            repo.indexTraceProfile(session.agencyId, facts.evidenceId, indexKind, session.discordId)
-        end
-
-        -- The officer who asked hears it is done, wherever they are.
-        local notice = repo.analysisNotice(session.agencyId, input.id)
-        if notice then
-            FredPD.Core.push.notifyWhere(function(other)
-                return other.discordId == notice.requestedBy and other.agencyId == session.agencyId
-            end, 'lab.notify.completed', {
-                analysis = FredPD.t('lab.analysis.' .. tostring(notice.analysis)),
-                item = notice.evidenceNumber,
-                case = notice.caseNumber or '—',
-            }, { type = 'success' })
-        end
-
-        return { id = input.id, analysis = facts.analysis, resultCode = result }
     end,
 })

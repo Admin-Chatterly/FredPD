@@ -54,7 +54,7 @@ end
 --- the answer is.
 local ANALYSIS_FIELDS <const> = {
     'id', 'requestId', 'evidenceId', 'evidenceNumber', 'analysis', 'status',
-    'assignedTo', 'startedAt', 'dueAt', 'completedAt', 'priority', 'caseNumber',
+    'assignedTo', 'startedAt', 'dueAt', 'completedAt', 'completedBy', 'priority', 'caseNumber',
 }
 
 --- Strips a lab analysis row down to what this reader may see (8.11).
@@ -550,6 +550,29 @@ end
 --- than a comparison at each call site so the rule is in one place.
 function Evidence.isCourtGrade(resultCode)
     return resultCode == 'identification' or resultCode == 'exclusion'
+end
+
+--- The first case number a list of sources gives, in order, asking each only
+--- if every one before it had none (8.4). Each source is a function, so a
+--- source that costs a query is not asked when an earlier one answered.
+---
+--- Evidence that lands on no case never reaches the FU's evidence panel, so
+--- the order is "what the officer said, where they are standing, what they
+--- are working, what they lead, what they last collected for".
+---
+--- @param sources table list of functions returning a string or nil
+--- @return string|nil
+function Evidence.resolveCase(sources)
+    for index = 1, #(sources or {}) do
+        local value = sources[index]()
+
+        if type(value) == 'string' then
+            local trimmed = value:match('^%s*(.-)%s*$')
+            if trimmed ~= '' then return trimmed end
+        end
+    end
+
+    return nil
 end
 
 FredPD.Modules.evidence = Evidence

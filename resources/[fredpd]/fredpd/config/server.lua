@@ -145,6 +145,17 @@ FredPD.Config.server = {
     --- makes a lab request a decision about which items matter rather than a
     --- button pressed on everything collected.
     lab = {
+        --- The automatic lab. When no lab analyst is signed on, a request
+        --- waiting longer than `autoStartAfterSeconds` is taken on by the
+        --- lab itself and finished when its time is up, so a case does not
+        --- stall because nobody is playing the analyst tonight. An analyst's
+        --- own work their clock has run out on is finished for them
+        --- `autoCompleteGraceSeconds` later. The turnaround below still
+        --- applies either way; set `auto = false` to leave it all to people.
+        auto = true,
+        autoStartAfterSeconds = 120,
+        autoCompleteGraceSeconds = 900,
+
         analysisMinutes = {
             dna = 45,
             print_comparison = 20,

@@ -624,4 +624,43 @@ function Repo.fuAssign(id, agencyId, fuLedare, ledareKind, expectedVersion)
         { fuLedare, ledareKind, id, agencyId, expectedVersion })
 end
 
+--- The open förundersökning a call's anmälan belongs to, by number, for the
+--- evidence an officer collects while working that call (8.4, 7.8).
+function Repo.openFuNumberForCall(agencyId, callId)
+    if not callId then return nil end
+
+    return FredPD.Core.db.scalar(
+        [[SELECT f.number FROM fpd_anmalan a
+            JOIN fpd_forundersokning f ON f.id = a.fu_id AND f.agency_id = a.agency_id
+           WHERE a.agency_id = ? AND a.call_id = ? AND f.status IN ('inledd', 'slutdelgiven')
+           ORDER BY a.id DESC LIMIT 1]],
+        { agencyId, callId })
+end
+
+--- The most recently opened förundersökning this officer leads that is
+--- still open, by number.
+function Repo.latestOpenFuNumberLedBy(agencyId, discordId)
+    return FredPD.Core.db.scalar(
+        [[SELECT number FROM fpd_forundersokning
+           WHERE agency_id = ? AND fu_ledare = ? AND status IN ('inledd', 'slutdelgiven')
+           ORDER BY opened_at DESC LIMIT 1]],
+        { agencyId, discordId })
+end
+
+--- A förundersökning by its number, with the columns an access check reads
+--- (classification, agency). Nil when the number is not an FU's.
+function Repo.fuByNumber(agencyId, number)
+    return FredPD.Core.db.single(
+        FU_SELECT .. ' WHERE agency_id = ? AND number = ? LIMIT 1', { agencyId, number })
+end
+
+--- The förundersökningsledare of an investigation, by its number, for a
+--- notice about evidence filed under it. Discord id; never returned to a
+--- client.
+function Repo.fuLeaderByNumber(agencyId, number)
+    return FredPD.Core.db.scalar(
+        'SELECT fu_ledare FROM fpd_forundersokning WHERE agency_id = ? AND number = ? LIMIT 1',
+        { agencyId, number })
+end
+
 FredPD.Repo.anmalan = Repo

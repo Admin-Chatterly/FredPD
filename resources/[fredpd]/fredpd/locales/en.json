@@ -447,7 +447,13 @@
       "no_match": "No match"
     },
     "notify": {
-      "completed": "Lab result ready: {analysis} on {item} (case {case}). Open Evidence or the case to read it."
+      "completed": "Lab result ready: {analysis} on {item} (case {case}). Open Evidence or the case to read it.",
+      "candidate": "Lab result: {analysis} on {item} (case {case}) found a candidate to follow up. Open the evidence to see who."
+    },
+    "candidate": {
+      "title": "Candidate — a lead to follow up",
+      "withheld": "{count} more you may not see; ask the investigation lead.",
+      "confirm": "Not an identification. Confirm with a fresh reference sample."
     }
   },
   "intel": {

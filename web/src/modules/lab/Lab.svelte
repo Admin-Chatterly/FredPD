@@ -31,6 +31,7 @@
   import { LAB_ANALYSES, LAB_ANALYSIS_STATUSES } from '@fredpd/schema';
   import { fieldList, type Failure } from '../shared/failure';
   import type { LabAnalysis } from './types';
+  import Candidates from './Candidates.svelte';
 
   /**
    * The forensic lab (spec 8.7).
@@ -282,7 +283,10 @@
         <dd>{when(selected.completedAt)}</dd>
 
         <dt class="text-[var(--color-ink-muted)]">{t('lab.column.result')}</dt>
-        <dd>{selected.resultCode ? t(`lab.result.${selected.resultCode}`) : ''}</dd>
+        <dd>
+          {selected.resultCode ? t(`lab.result.${selected.resultCode}`) : ''}
+          <Candidates candidates={selected.candidates} withheld={selected.candidatesWithheld} />
+        </dd>
       </dl>
 
       {#if selected.observations}

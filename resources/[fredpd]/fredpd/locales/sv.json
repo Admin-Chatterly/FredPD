@@ -447,7 +447,13 @@
       "no_match": "Ingen träff"
     },
     "notify": {
-      "completed": "Labbsvar klart: {analysis} på {item} (ärende {case}). Öppna Beslag eller ärendet för att läsa det."
+      "completed": "Labbsvar klart: {analysis} på {item} (ärende {case}). Öppna Beslag eller ärendet för att läsa det.",
+      "candidate": "Labbsvar: {analysis} på {item} (ärende {case}) gav en kandidat att följa upp. Öppna beslaget för att se vem."
+    },
+    "candidate": {
+      "title": "Kandidat — ett spaningsuppslag att följa upp",
+      "withheld": "{count} till som du inte får se; fråga förundersökningsledaren.",
+      "confirm": "Ingen identifiering. Bekräfta med ett nytt jämförelseprov."
     }
   },
   "intel": {

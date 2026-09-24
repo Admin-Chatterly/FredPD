@@ -780,12 +780,32 @@ let labQueue: LabAnalysis[] = [
     resultCode: 'candidate_match',
     observations: 'Barrel marks legible; correlated against the open file.',
   },
+  {
+    // A print search that hit a reference: the candidate it points at is
+    // named for a reader who may read that person (0030), and one more is
+    // withheld from this one.
+    id: 4,
+    requestId: 1,
+    evidenceId: 1,
+    evidenceNumber: 'LSPD-2026-000127',
+    analysis: 'print_search',
+    status: 'complete',
+    assignedTo: 'system',
+    startedAt: '2026-09-17T13:30:00.000Z',
+    dueAt: '2026-09-17T13:55:00.000Z',
+    completedAt: '2026-09-17T13:56:00.000Z',
+    priority: 'routine',
+    caseNumber: 'LSPD-C26-00045',
+    resultCode: 'candidate_match',
+    candidates: [{ id: 3, personNumber: 'P-000588', firstName: 'Marko', lastName: 'Petrov' }],
+    candidatesWithheld: 1,
+  },
 ];
 
 let nextEvidenceId = 4;
 let nextSceneId = 3;
 let nextCustodyId = 6;
-let nextAnalysisId = 4;
+let nextAnalysisId = 5;
 let nextRequestId = 2;
 
 /** Where a transfer destination leaves an item, mirroring the server's table. */

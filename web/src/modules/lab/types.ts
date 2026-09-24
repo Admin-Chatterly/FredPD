@@ -25,4 +25,18 @@ export interface LabAnalysis {
   caseNumber: string | null;
   resultCode?: string | null;
   observations?: string | null;
+  /**
+   * Who a candidate match points at (0030), as far as this reader may read
+   * them. A lead, never an identification (8.1.3).
+   */
+  candidates?: LabCandidate[];
+  /** How many more candidates exist that this reader may not see. */
+  candidatesWithheld?: number;
+}
+
+export interface LabCandidate {
+  id: number;
+  personNumber: string;
+  firstName: string | null;
+  lastName: string | null;
 }

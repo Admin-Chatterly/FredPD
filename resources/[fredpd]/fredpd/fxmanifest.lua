@@ -198,6 +198,9 @@ server_scripts {
     'server/modules/evidence/service.lua',
     'server/modules/evidence/repo.lua',
     'server/modules/evidence/routes.lua',
+    -- The automatic lab, on a timer. After the routes: it calls the
+    -- completion they publish on `FredPD.Evidence`.
+    'server/modules/evidence/events.lua',
     'server/modules/intel/service.lua',
     'server/modules/intel/repo.lua',
     'server/modules/intel/routes.lua',

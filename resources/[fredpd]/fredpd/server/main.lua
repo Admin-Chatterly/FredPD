@@ -129,6 +129,9 @@ local REQUIRED_TABLES <const> = {
     -- because without it the first arrest of somebody who refused ID fails at
     -- the roadside rather than here.
     'fpd_person_pending_identity',
+
+    -- Migration 0030. Who a print search points at (8.8).
+    'fpd_lab_candidates',
 }
 
 --- Columns a migration added to a table that already existed, which the table
@@ -143,6 +146,9 @@ local REQUIRED_COLUMNS <const> = {
 
     -- 0024: the payment due date a citation's overdue state is read from.
     { table = 'fpd_ordningsbot', column = 'due_at' },
+
+    -- 0030: who signed a lab result.
+    { table = 'fpd_lab_analyses', column = 'completed_by' },
 }
 
 --- Returns the names of any dependency that is not started.

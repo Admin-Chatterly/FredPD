@@ -45,6 +45,7 @@
   import { fieldList, type Failure } from '../shared/failure';
   import type { CustodyEntry, EvidenceItem, Scene } from './types';
   import type { LabAnalysis } from '../lab/types';
+  import Candidates from '../lab/Candidates.svelte';
 
   /**
    * Evidence and property room (spec 8.4-8.6).
@@ -586,6 +587,7 @@
                     <td class="px-3 py-2">{when(analysis.dueAt)}</td>
                     <td class="px-3 py-2">
                       {analysis.resultCode ? t(`lab.result.${analysis.resultCode}`) : ''}
+                      <Candidates candidates={analysis.candidates} withheld={analysis.candidatesWithheld} />
                     </td>
                   </tr>
                 {:else}

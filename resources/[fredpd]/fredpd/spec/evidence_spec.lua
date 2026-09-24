@@ -580,6 +580,12 @@ describe('evidence routes', function()
 
             hiddenFacts = function() return state.facts end,
             analysisNotice = function() return state.notice end,
+            openSceneAt = function() return state.sceneAt end,
+            fileCandidates = function(_agencyId, analysisId, indexKind)
+                state.candidatesFiled[#state.candidatesFiled + 1] = { analysisId = analysisId, kind = indexKind }
+                return 1
+            end,
+            candidatesFor = function() return state.candidates or {} end,
             indexHits = function() return state.indexHits end,
             completeAnalysis = function() return state.completedRows end,
             completionBlocker = function() return state.blocker end,
@@ -613,6 +619,7 @@ describe('evidence routes', function()
             inserted = {},
             indexed = {},
             notified = {},
+            candidatesFiled = {},
             notice = {
                 requestedBy = '100000000000000001', caseNumber = 'FU26-00001',
                 evidenceNumber = 'LSPD-2026-000001', analysis = 'dna',
@@ -683,14 +690,29 @@ describe('evidence routes', function()
         }
         FredPD.t = function(key) return key end
 
-        FredPD.Repo = { evidence = fakeRepo() }
+        FredPD.Repo = {
+            evidence = fakeRepo(),
+            cad = { activeAssignment = function() return state.assignment end },
+            anmalan = {
+                openFuNumberForCall = function() return state.fuForCall end,
+                latestOpenFuNumberLedBy = function() return state.fuLed end,
+                fuLeaderByNumber = function() return state.fuLeader end,
+                fuByNumber = function(_agencyId, number) return (state.fus or {})[number] end,
+            },
+            access = {
+                mayBeToldOf = function(_session, _type, fu) return not fu.closedToReader end,
+            },
+        }
         FredPD.Evidence = { claimTrace = function() return state.trace end }
+        _G.GetPlayerPed = function() return 1 end
+        _G.GetEntityCoords = function() return { x = 0, y = 0, z = 0 } end
 
         loadInto('server/modules/evidence/routes')
     end)
 
     after_each(function()
         _G.print = realPrint
+        _G.GetPlayerPed, _G.GetEntityCoords = nil, nil
     end)
 
     describe('evidence.transfer', function()
@@ -824,6 +846,58 @@ describe('evidence routes', function()
 
             assert.are.equal('LSPD-2026-000001', state.inserted[1].input.caseNumber)
         end)
+
+        it('files evidence collected inside an open scene under that scene', function()
+            state.latestCaseNumber = 'LSPD-2026-000004'
+            state.sceneAt = { id = 8, status = 'open', caseNumber = 'LSPD-C26-00008' }
+
+            call('evidence.collect', helper.session(), { traceKey = 'g:12:4' })
+
+            assert.are.equal('LSPD-C26-00008', state.inserted[1].input.caseNumber)
+            assert.are.equal(8, state.inserted[1].input.sceneId)
+        end)
+
+        it("uses the investigation behind the officer's call before their own history", function()
+            state.latestCaseNumber = 'LSPD-2026-000004'
+            state.assignment = { callId = 3 }
+            state.fuForCall = 'LSPD-C26-00031'
+            state.fuLed = 'LSPD-C26-00099'
+
+            call('evidence.collect', helper.session(), { traceKey = 'g:12:4' })
+
+            assert.are.equal('LSPD-C26-00031', state.inserted[1].input.caseNumber)
+        end)
+
+        it("skips the call's investigation when the officer may not read it", function()
+            state.latestCaseNumber = 'LSPD-2026-000004'
+            state.assignment = { callId = 3 }
+            state.fuForCall = 'LSPD-C26-00031'
+            state.fus = { ['LSPD-C26-00031'] = { number = 'LSPD-C26-00031', closedToReader = true } }
+
+            call('evidence.collect', helper.session(), { traceKey = 'g:12:4' })
+
+            assert.are.equal('LSPD-2026-000004', state.inserted[1].input.caseNumber)
+        end)
+
+        it('refuses an explicit case the officer may not read', function()
+            state.fus = { ['LSPD-C26-00031'] = { number = 'LSPD-C26-00031', closedToReader = true } }
+
+            local result = call('evidence.collect', helper.session(), {
+                traceKey = 'g:12:4', caseNumber = 'LSPD-C26-00031',
+            })
+
+            assert.are.equal('forbidden', result.__err)
+            assert.are.same({}, state.inserted)
+        end)
+
+        it('falls back to the investigation the officer leads', function()
+            state.latestCaseNumber = 'LSPD-2026-000004'
+            state.fuLed = 'LSPD-C26-00099'
+
+            call('evidence.collect', helper.session(), { traceKey = 'g:12:4' })
+
+            assert.are.equal('LSPD-C26-00099', state.inserted[1].input.caseNumber)
+        end)
     end)
 
     describe('evidence.list', function()
@@ -954,6 +1028,49 @@ describe('evidence routes', function()
 
             assert.are.equal('candidate_match', result.resultCode)
             assert.are.same({}, state.indexed)
+        end)
+
+        it('records who a print search points at, and says there is somebody to follow up', function()
+            state.facts.analysis = 'print_search'
+            state.facts.fingerprint = 'opaque'
+            state.indexHits = 1
+
+            call('lab.analysis.complete', analyst(), { id = 5 })
+
+            assert.are.equal(5, state.candidatesFiled[1].analysisId)
+            assert.are.equal('fingerprint', state.candidatesFiled[1].kind)
+            assert.are.equal('lab.notify.candidate', state.notified[1].key)
+        end)
+
+        it('files no candidate when nothing was hit', function()
+            state.facts.analysis = 'print_search'
+            state.facts.fingerprint = 'opaque'
+            state.indexHits = 0
+
+            call('lab.analysis.complete', analyst(), { id = 5 })
+
+            assert.are.same({}, state.candidatesFiled)
+        end)
+
+        it('lets another analyst finish work whose clock has run out', function()
+            -- The analyst who started it went off shift; the queue must not
+            -- stall until they come back.
+            local result = call('lab.analysis.complete',
+                helper.session({ discordId = '100000000000000077' }), { id = 5 })
+
+            assert.is_nil(result.__err)
+            assert.are.equal('profile_obtained', result.resultCode)
+        end)
+
+        it('tells the lead investigator on the case as well as the requester', function()
+            state.fuLeader = '100000000000000001'
+            state.notice.requestedBy = '100000000000000055'
+
+            call('lab.analysis.complete', analyst(), { id = 5 })
+
+            -- The fake session list has the leader signed on (src 2).
+            assert.are.equal(1, #state.notified)
+            assert.are.equal('100000000000000001', state.notified[1].discordId)
         end)
     end)
 
