@@ -164,9 +164,11 @@ end
 -- The lot (0037)
 -- -----------------------------------------------------------------------------
 
---- An agency's lots, numbered in the order they were placed: a lot has no
---- name of its own (a placement is named by a locale key), so "lot 2" is what
---- the screen and the tow both call it.
+--- An agency's lots. A lot has no name of its own (a placement is named by a
+--- locale key), so it is called by its placement id: "lot 57" is lot 57 for
+--- as long as the record exists, whatever lots are added or removed around
+--- it -- a number from the lot's position in a list would move under every
+--- tow notice ever sent.
 ---
 --- @param placements table id -> placement, as the placement cache holds them
 --- @param usable fun(placement): boolean whether this agency may use it
@@ -183,7 +185,7 @@ function Impound.lots(placements, usable)
     end
 
     table.sort(list, function(a, b) return a.id < b.id end)
-    for index, lot in ipairs(list) do lot.number = index end
+    for _, lot in ipairs(list) do lot.number = lot.id end
 
     return list
 end

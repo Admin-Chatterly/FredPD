@@ -261,11 +261,20 @@
     return t('records.restricted.contact', { unit: t(`access.unit.${row.contact}`) });
   }
 
-  /** Ctrl+Enter sends the form from anywhere in it, the narrative included. */
-  function submitOnCtrlEnter(event: KeyboardEvent): void {
-    if (event.key !== 'Enter' || !event.ctrlKey) return;
-    event.preventDefault();
-    (event.currentTarget as HTMLFormElement).requestSubmit();
+  /**
+   * Ctrl+Enter sends the form from anywhere in it, the narrative included.
+   * Escape closes the form, not the MDT: `main.ts` closes the whole NUI on an
+   * Escape that reaches `window`, which would throw away a half-written card.
+   */
+  function formKeys(event: KeyboardEvent, close: () => void): void {
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      event.preventDefault();
+      close();
+    } else if (event.key === 'Enter' && event.ctrlKey) {
+      event.preventDefault();
+      (event.currentTarget as HTMLFormElement).requestSubmit();
+    }
   }
 
   void loadCards();
@@ -341,13 +350,13 @@
       {/if}
 
       {#if writing}
-        <!-- Ctrl+Enter submits from any field in the form: a shortcut on the
-             form itself, not a click target. -->
+        <!-- Ctrl+Enter submits and Escape closes, from any field in the form:
+             shortcuts on the form itself, not a click target. -->
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <form
           class="flex flex-wrap items-end gap-2 border border-[var(--color-border)] p-3"
           onsubmit={writeCard}
-          onkeydown={submitOnCtrlEnter}
+          onkeydown={(event) => formKeys(event, () => (writing = false))}
         >
           <p class="w-full text-xs text-[var(--color-ink-muted)]">{t('fi.hint.needs')}</p>
           <div class="flex w-56 flex-col gap-1 text-xs">
@@ -571,13 +580,13 @@
       {/if}
 
       {#if recording}
-        <!-- Ctrl+Enter submits from any field in the form: a shortcut on the
-             form itself, not a click target. -->
+        <!-- Ctrl+Enter submits and Escape closes, from any field in the form:
+             shortcuts on the form itself, not a click target. -->
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <form
           class="flex flex-wrap items-end gap-2 border border-[var(--color-border)] p-3"
           onsubmit={recordStop}
-          onkeydown={submitOnCtrlEnter}
+          onkeydown={(event) => formKeys(event, () => (recording = false))}
         >
           <label class="flex flex-col gap-1 text-xs">
             {t('stop.field.kind')}

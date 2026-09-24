@@ -58,6 +58,13 @@
   /** This agency's lots, as the server numbered them. */
   let lots = $state<Lot[]>([]);
   let inventoryOpen = $state(false);
+  let inventoryTrigger = $state<HTMLButtonElement | null>(null);
+  let lotSelect = $state<HTMLSelectElement | null>(null);
+  let bayInput = $state<HTMLInputElement | null>(null);
+  /** A refusal of the inventory, drawn at its own form rather than the page top. */
+  let inventoryFailure = $state<Failure | null>(null);
+
+  const FOCUS = 'focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]';
   let inventoryForm = $state({ lotId: '', bay: '', keys: '', condition: '', contents: '' });
   let detail = $state<ImpoundRow | null>(null);
   let failure = $state<Failure | null>(null);
@@ -71,6 +78,7 @@
   let trigger: HTMLButtonElement | null = null;
 
   const messages = $derived(fieldList(failure, FIELD_LABELS));
+  const inventoryMessages = $derived(fieldList(inventoryFailure, FIELD_LABELS));
 
   async function load(): Promise<void> {
     busy = true;
@@ -177,7 +185,31 @@
       contents: detail.contents ?? '',
     };
     inventoryOpen = true;
-    failure = null;
+    inventoryFailure = null;
+    // Into the form's first field: the button that opened it is gone.
+    queueMicrotask(() => (lotSelect ?? bayInput)?.focus());
+  }
+
+  function closeInventory(): void {
+    inventoryOpen = false;
+    inventoryFailure = null;
+    queueMicrotask(() => inventoryTrigger?.focus());
+  }
+
+  /**
+   * Escape closes this form, not the MDT (`main.ts` closes the whole NUI on
+   * an Escape that reaches `window`), and Ctrl+Enter saves from any field,
+   * the textareas included (6.4).
+   */
+  function inventoryKeys(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      event.preventDefault();
+      closeInventory();
+    } else if (event.key === 'Enter' && event.ctrlKey) {
+      event.preventDefault();
+      (event.currentTarget as HTMLFormElement).requestSubmit();
+    }
   }
 
   async function saveInventory(event: SubmitEvent): Promise<void> {
@@ -197,11 +229,12 @@
     });
 
     if (response.ok) {
-      failure = null;
+      inventoryFailure = null;
       status = t('impound.inventory.saved');
       await Promise.all([open(id), load()]);
+      queueMicrotask(() => inventoryTrigger?.focus());
     } else {
-      failure = response;
+      inventoryFailure = response;
       busy = false;
     }
   }
@@ -211,6 +244,12 @@
     return row.bay
       ? t('impound.lot.withBay', { number: row.lotNumber, bay: row.bay })
       : t('impound.lot.name', { number: row.lotNumber });
+  }
+
+  /** The list cell: the column header already says "Lot". */
+  function lotCell(row: { lotNumber?: number | null; bay?: string | null }): string {
+    if (!row.lotNumber) return '—';
+    return row.bay ? `${row.lotNumber} · ${row.bay}` : String(row.lotNumber);
   }
 
   function cancelConfirm(): void {
@@ -334,7 +373,7 @@
                   <td class="px-2 py-1">
                     {row.releasedAt ? t('impound.status.released') : t('impound.status.held')}
                   </td>
-                  <td class="px-2 py-1">{lotText(row)}</td>
+                  <td class="px-2 py-1 font-[family-name:var(--font-mono)]">{lotCell(row)}</td>
                 </tr>
               {/if}
             {/each}
@@ -369,46 +408,65 @@
           </div>
           <div class="flex justify-between border-t border-[var(--color-border)] py-1">
             <dt>{t('impound.field.keys')}</dt>
-            <dd>{detail.keysLocation ? t(`impound.keys.${detail.keysLocation}`) : '—'}</dd>
+            <dd>{t(`impound.keys.${detail.keysLocation ?? 'unknown'}`)}</dd>
           </div>
           <div class="border-t border-[var(--color-border)] py-1">
-            <dt>{t('impound.field.condition')}</dt>
+            <dt class="text-[var(--color-ink-muted)]">{t('impound.field.condition')}</dt>
             <dd class="whitespace-pre-wrap">{detail.conditionNote ?? '—'}</dd>
           </div>
           <div class="border-t border-[var(--color-border)] py-1">
-            <dt>{t('impound.field.contents')}</dt>
+            <dt class="text-[var(--color-ink-muted)]">{t('impound.field.contents')}</dt>
             <dd class="whitespace-pre-wrap">{detail.contents ?? '—'}</dd>
           </div>
-          {#if detail.inventoryAt}
-            <p class="border-t border-[var(--color-border)] py-1 text-[var(--color-ink-muted)]">
-              {t('impound.inventory.by', {
-                callsign: detail.inventoryByCallsign ?? '—',
-                at: formatMoment(detail.inventoryAt),
-              })}
-            </p>
-          {/if}
         </dl>
+        {#if detail.inventoryAt}
+          <p class="-mt-2 mb-3 border-t border-[var(--color-border)] py-1 text-xs text-[var(--color-ink-muted)]">
+            {t('impound.inventory.by', {
+              callsign: detail.inventoryByCallsign ?? '—',
+              at: formatMoment(detail.inventoryAt),
+            })}
+          </p>
+        {/if}
 
         {#if !detail.releasedAt}
           {#if inventoryOpen}
-            <form class="mb-3 flex flex-col gap-2 border border-[var(--color-border)] p-2" onsubmit={saveInventory}>
+            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+            <form
+              class="mb-3 flex flex-col gap-2 border border-[var(--color-border)] p-2"
+              onsubmit={saveInventory}
+              onkeydown={inventoryKeys}
+            >
+              {#if inventoryFailure}
+                <div class="border border-[var(--color-alert)] px-2 py-1 text-xs" role="alert">
+                  <p>{t(`error.${inventoryFailure.err}`)}</p>
+                  {#if inventoryMessages.length > 0}
+                    <ul class="mt-1 text-[var(--color-ink-muted)]">
+                      {#each inventoryMessages as message (message.name)}
+                        <li>{message.label} — {message.reason}</li>
+                      {/each}
+                    </ul>
+                  {/if}
+                </div>
+              {/if}
               <div class="flex flex-wrap gap-2">
-                <label class="flex flex-col gap-1 text-xs">
-                  {t('impound.field.lot')}
-                  <select bind:value={inventoryForm.lotId} class="border border-[var(--color-border)] px-2 py-1">
-                    <option value="">{t('impound.lot.none')}</option>
-                    {#each lots as lot (lot.id)}
-                      <option value={String(lot.id)}>{t('impound.lot.name', { number: lot.number })}</option>
-                    {/each}
-                  </select>
-                </label>
+                {#if lots.length > 0}
+                  <label class="flex flex-col gap-1 text-xs">
+                    {t('impound.field.lot')}
+                    <select bind:this={lotSelect} bind:value={inventoryForm.lotId} class="border border-[var(--color-border)] px-2 py-1 {FOCUS}">
+                      <option value="">{t('impound.lot.none')}</option>
+                      {#each lots as lot (lot.id)}
+                        <option value={String(lot.id)}>{t('impound.lot.name', { number: lot.number })}</option>
+                      {/each}
+                    </select>
+                  </label>
+                {/if}
                 <label class="flex flex-col gap-1 text-xs">
                   {t('impound.field.bay')}
-                  <input bind:value={inventoryForm.bay} maxlength="16" class="w-20 border border-[var(--color-border)] px-2 py-1" />
+                  <input bind:this={bayInput} bind:value={inventoryForm.bay} maxlength="16" class="w-20 border border-[var(--color-border)] px-2 py-1 {FOCUS}" />
                 </label>
                 <label class="flex flex-col gap-1 text-xs">
                   {t('impound.field.keys')}
-                  <select bind:value={inventoryForm.keys} class="border border-[var(--color-border)] px-2 py-1">
+                  <select bind:value={inventoryForm.keys} class="border border-[var(--color-border)] px-2 py-1 {FOCUS}">
                     <option value="">{t('impound.keys.unknown')}</option>
                     {#each IMPOUND_KEYS as key (key)}
                       <option value={key}>{t(`impound.keys.${key}`)}</option>
@@ -418,23 +476,29 @@
               </div>
               <label class="flex flex-col gap-1 text-xs">
                 {t('impound.field.condition')}
-                <textarea rows="2" bind:value={inventoryForm.condition} maxlength="500" class="border border-[var(--color-border)] px-2 py-1"></textarea>
+                <textarea rows="2" bind:value={inventoryForm.condition} maxlength="500" class="border border-[var(--color-border)] px-2 py-1 {FOCUS}"></textarea>
               </label>
               <label class="flex flex-col gap-1 text-xs">
                 {t('impound.field.contents')}
-                <textarea rows="3" bind:value={inventoryForm.contents} maxlength="1000" class="border border-[var(--color-border)] px-2 py-1"></textarea>
+                <textarea rows="3" bind:value={inventoryForm.contents} maxlength="1000" class="border border-[var(--color-border)] px-2 py-1 {FOCUS}"></textarea>
               </label>
               <div class="flex gap-2">
-                <button type="submit" class="border border-[var(--color-border)] px-3 py-1 text-xs">
+                <button type="submit" class="border border-[var(--color-border)] px-3 py-1 text-xs {FOCUS}">
                   {t('impound.inventory.save')}
                 </button>
-                <button type="button" class="border border-[var(--color-border)] px-3 py-1 text-xs" onclick={() => (inventoryOpen = false)}>
+                <button type="button" class="border border-[var(--color-border)] px-3 py-1 text-xs {FOCUS}" onclick={closeInventory}>
                   {t('form.cancel')}
                 </button>
               </div>
             </form>
           {:else}
-            <button type="button" class="mb-3 border border-[var(--color-border)] px-3 py-1 text-xs" disabled={busy} onclick={startInventory}>
+            <button
+              type="button"
+              bind:this={inventoryTrigger}
+              class="mb-3 border border-[var(--color-border)] px-3 py-1 text-xs {FOCUS}"
+              disabled={busy}
+              onclick={startInventory}
+            >
               {detail.inventoryAt ? t('impound.inventory.edit') : t('impound.inventory.write')}
             </button>
           {/if}

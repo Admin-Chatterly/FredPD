@@ -2781,8 +2781,8 @@
       "unknown": "Not recorded"
     },
     "inventory": {
-      "write": "Write the inventory",
-      "edit": "Edit the inventory",
+      "write": "Record inventory",
+      "edit": "Edit inventory",
       "save": "Save inventory",
       "saved": "Inventory saved.",
       "by": "Inventory by {callsign}, {at}"

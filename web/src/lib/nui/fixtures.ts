@@ -4532,8 +4532,8 @@ interface FixtureImpound {
 
 /** The agency's impound lots (0037), as `impound.list` numbers them. */
 const IMPOUND_LOTS = [
-  { id: 41, number: 1 },
-  { id: 57, number: 2 },
+  { id: 41, number: 41 },
+  { id: 57, number: 57 },
 ];
 
 const impounds: FixtureImpound[] = [
@@ -6491,7 +6491,8 @@ export const fixtures: FixtureSet = {
         return refuse('not_found', { lotId: 'unknown' });
       }
 
-      row.lotId = body.lotId;
+      // A write naming no lot keeps the one on record, as the server does.
+      if (body.lotId !== undefined) row.lotId = body.lotId;
       row.bay = body.bay;
       row.keysLocation = body.keys;
       row.conditionNote = body.condition;

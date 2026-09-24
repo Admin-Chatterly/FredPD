@@ -223,11 +223,20 @@
 
   <!-- novalidate: the server's refusal is drawn above, translated; the
        browser's own bubble is in the browser's language and names no rule. -->
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <form
     class="flex flex-wrap items-end gap-2 border-t border-[var(--color-border)] pt-3"
     onsubmit={save}
     bind:this={formTop}
     novalidate
+    onkeydown={(event) => {
+      // Escape leaves the edit, not the MDT (`main.ts` closes the NUI on an
+      // Escape that reaches `window`).
+      if (event.key !== 'Escape' || !editing) return;
+      event.stopPropagation();
+      event.preventDefault();
+      void cancelEdit();
+    }}
   >
     <p class="w-full text-xs font-semibold">
       {editing ? t('ordningsbot.tariffEditor.editing', { code: editing }) : t('ordningsbot.tariffEditor.new')}

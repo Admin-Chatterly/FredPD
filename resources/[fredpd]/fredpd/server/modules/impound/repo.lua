@@ -135,13 +135,15 @@ function Repo.markTowed(id, agencyId, garagePlate)
 end
 
 --- Where a held car stands and what it was found with (0037). Only onto a
---- row still held, at the version the writer read.
+--- row still held, at the version the writer read. A write that names no lot
+--- keeps the one on record: the lot a tow assigned is never erased by an edit
+--- that simply did not mention it.
 ---
 --- @return number rows affected -- 0 when released meanwhile or stale
 function Repo.setInventory(id, agencyId, fields, discordId, expectedVersion)
     return FredPD.Core.db.execute(
         [[UPDATE fpd_impound
-             SET lot_id = ?, bay = ?, keys_location = ?, condition_note = ?, contents = ?,
+             SET lot_id = COALESCE(?, lot_id), bay = ?, keys_location = ?, condition_note = ?, contents = ?,
                  inventory_by = ?, inventory_at = CURRENT_TIMESTAMP(3), version = version + 1
            WHERE id = ? AND agency_id = ? AND version = ? AND released_at IS NULL]],
         {

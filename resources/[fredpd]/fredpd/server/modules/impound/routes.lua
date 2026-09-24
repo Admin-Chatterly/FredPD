@@ -47,6 +47,13 @@ local function lotNumber(lots, id)
     return nil
 end
 
+--- Who impounded, authorized and released a car is shown by nobody's
+--- Discord id (spec 11.4): the screen does not use them, so they do not leave.
+local function stripIdentities(row)
+    row.impoundedBy, row.releasedBy, row.holdAuthorizedBy, row.inventoryBy = nil, nil, nil, nil
+    return row
+end
+
 local function readable(session, id)
     local row = repo.byId(id, session.agencyId)
     if not row then return nil, route.refuse(FredPD.ErrorCode.NOT_FOUND) end
@@ -73,7 +80,8 @@ route.define({
         for _, row in ipairs(impounds) do
             if row.id then
                 row.lotNumber = row.lotId and lotNumber(lots, row.lotId) or nil
-                row.lotId, row.inventoryBy = nil, nil
+                row.lotId = nil
+                stripIdentities(row)
             end
         end
 
@@ -101,7 +109,7 @@ route.define({
         row.lotNumber = row.lotId and lotNumber(lots, row.lotId) or nil
 
         -- Who did the inventory is shown by callsign, never the Discord id.
-        row.inventoryBy = nil
+        stripIdentities(row)
 
         return { impound = row, lots = lotChoices(lots) }
     end,
@@ -120,7 +128,7 @@ route.define({
     audit = 'impound.created',
     subjectType = VEHICLE,
     auditDetail = function(input)
-        return { plate = input.plate, heldReasonKey = input.heldReasonKey }
+        return { plate = input.plate, heldReasonKey = input.heldReasonKey, lotId = input.lotId }
     end,
     handler = function(session, input)
         local err, fields = service.validateCreate(input)
@@ -145,7 +153,7 @@ route.define({
             })
         end
 
-        return { id = row.id, number = row.number, impound = row }
+        return { id = row.id, number = row.number, impound = stripIdentities(row) }
     end,
 })
 
@@ -367,8 +375,19 @@ route.define({
     limit = { per = 20, window = 60 },
     audit = 'impound.inventoried',
     subjectType = VEHICLE,
+    -- The whole new state, text included: the inventory is overwritten in
+    -- place, so the audit chain is its history -- what a front desk reads to
+    -- an owner who says something is missing, and what a corrupt edit would
+    -- try to change (spec 11.1).
     auditDetail = function(input)
-        return { id = input.id, lotId = input.lotId, bay = input.bay, keys = input.keys }
+        return {
+            id = input.id,
+            lotId = input.lotId,
+            bay = input.bay,
+            keys = input.keys,
+            condition = input.condition,
+            contents = input.contents,
+        }
     end,
     handler = function(session, input)
         local row, refusal = readable(session, input.id)

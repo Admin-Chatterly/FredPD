@@ -215,7 +215,7 @@
         "motorpool": "Där en officer går fram för att kvittera ut ett fordon.",
         "evidence_bench": "Markerar en plats för bevishantering. Ingen klientfunktion är kopplad till den ännu.",
         "fingerprint_scanner": "Tar ett fingeravtryck från den som använder den.",
-        "impound_lot": "Där beslagtagna fordon står. Öppnar beslagsregistret."
+        "impound_lot": "Där bärgade och omhändertagna fordon ställs upp. Öppnar registret över omhändertagna fordon."
       },
       "newZone": "Ny här — område",
       "newProp": "Ny här — koppla till föremålet jag tittar på",
@@ -2738,7 +2738,7 @@
       "impoundedAt": "Omhändertaget",
       "feePaidConfirm": "Avgiften är betald",
       "lot": "Uppställningsplats",
-      "bay": "Plats",
+      "bay": "Ruta",
       "keys": "Nycklar",
       "condition": "Skick",
       "contents": "Kvarlämnat i fordonet"
@@ -2770,20 +2770,20 @@
     },
     "lot": {
       "name": "Uppställningsplats {number}",
-      "withBay": "Uppställningsplats {number}, plats {bay}",
+      "withBay": "Uppställningsplats {number}, ruta {bay}",
       "none": "Ingen uppställningsplats"
     },
     "keys": {
       "in_vehicle": "I fordonet",
-      "lot_safe": "I nyckelskåpet på uppställningsplatsen",
+      "lot_safe": "I nyckelskåpet",
       "with_owner": "Hos ägaren",
       "none": "Inga nycklar",
       "unknown": "Inte antecknat"
     },
     "inventory": {
-      "write": "Gör inventering",
-      "edit": "Ändra inventeringen",
-      "save": "Spara inventeringen",
+      "write": "Inventera fordonet",
+      "edit": "Ändra inventering",
+      "save": "Spara inventering",
       "saved": "Inventeringen är sparad.",
       "by": "Inventerat av {callsign}, {at}"
     }

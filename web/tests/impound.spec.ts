@@ -64,9 +64,10 @@ test('shows where a held car stands and what it was found with', async ({ page }
   await openImpound(page);
 
   const row = page.getByRole('row').filter({ has: page.getByRole('button', { name: 'ABC123' }) });
-  await expect(row.getByRole('cell', { name: 'Lot 1, bay A3' })).toBeVisible();
+  await expect(row.getByRole('cell', { name: '41 · A3' })).toBeVisible();
 
   await page.getByRole('button', { name: 'ABC123' }).click();
+  await expect(page.getByText('Lot 41, bay A3')).toBeVisible();
   await expect(page.getByText("In the lot's key safe")).toBeVisible();
   await expect(page.getByText('Gym bag (empty), two phone chargers, parking receipt.')).toBeVisible();
   await expect(page.getByText(/Inventory by 1-ADAM-12/)).toBeVisible();
@@ -76,10 +77,10 @@ test('writes the inventory: the lot, the bay, the keys, the contents', async ({ 
   await openImpound(page);
 
   await page.getByRole('button', { name: 'ABC123' }).click();
-  await page.getByRole('button', { name: 'Edit the inventory' }).click();
+  await page.getByRole('button', { name: 'Edit inventory' }).click();
 
   const form = page.locator('form').filter({ hasText: 'Left in the vehicle' });
-  await form.getByRole('combobox', { name: /^Lot/ }).selectOption({ label: 'Lot 2' });
+  await form.getByRole('combobox', { name: /^Lot/ }).selectOption({ label: 'Lot 57' });
   await form.getByLabel('Bay').fill('C1');
   await form.getByRole('combobox', { name: /^Keys/ }).selectOption('with_owner');
   await form.getByLabel('Left in the vehicle').fill('Nothing of value.');
@@ -89,7 +90,7 @@ test('writes the inventory: the lot, the bay, the keys, the contents', async ({ 
   await expect(page.getByText('With the owner')).toBeVisible();
   await expect(page.getByText('Nothing of value.')).toBeVisible();
   await expect(page.getByRole('row').filter({ has: page.getByRole('button', { name: 'ABC123' }) })).toContainText(
-    'Lot 2, bay C1',
+    '57 · C1',
   );
 });
 
@@ -99,11 +100,11 @@ test('an impound made at the desk can name its lot', async ({ page }) => {
   const form = page.locator('form').filter({ hasText: 'Plate' });
   await form.getByLabel('Plate').fill('LOT222');
   await form.getByLabel('Reason held').selectOption('abandoned');
-  await form.getByLabel('Lot').selectOption({ label: 'Lot 2' });
+  await form.getByLabel('Lot').selectOption({ label: 'Lot 57' });
   await form.getByRole('button', { name: 'Impound vehicle' }).click();
 
   await expect(page.getByRole('row').filter({ has: page.getByRole('button', { name: 'LOT222' }) })).toContainText(
-    'Lot 2',
+    '57',
   );
 });
 
@@ -112,5 +113,29 @@ test('names the lot in Swedish', async ({ page }) => {
   await page.locator('nav').first().getByRole('button', { name: 'Register' }).click();
   await page.getByRole('button', { name: 'Beslag', exact: true }).click();
 
-  await expect(page.getByRole('cell', { name: 'Uppställningsplats 1, plats A3' })).toBeVisible();
+  await page.getByRole('button', { name: 'ABC123' }).click();
+  await expect(page.getByText('Uppställningsplats 41, ruta A3')).toBeVisible();
+});
+
+test('the inventory form works from the keyboard, and Escape closes only the form', async ({ page }) => {
+  await openImpound(page);
+  await page.getByRole('button', { name: 'ABC123' }).click();
+
+  const trigger = page.getByRole('button', { name: 'Edit inventory' });
+  await trigger.focus();
+  await page.keyboard.press('Enter');
+  const form = page.locator('form').filter({ hasText: 'Left in the vehicle' });
+  await expect(form.getByRole('combobox', { name: /^Lot/ })).toBeFocused();
+
+  // Escape backs out of the form, not the MDT.
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+
+  await page.keyboard.press('Enter');
+  await page.getByLabel('Left in the vehicle').fill('A toolbox.');
+  await page.getByLabel('Left in the vehicle').press('Control+Enter');
+
+  await expect(page.getByRole('status')).toHaveText('Inventory saved.');
+  await expect(page.getByText('A toolbox.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit inventory' })).toBeFocused();
 });

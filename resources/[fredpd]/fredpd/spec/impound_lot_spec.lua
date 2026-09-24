@@ -22,12 +22,12 @@ describe('impound lots', function()
         I = helper.load({ 'server/modules/impound/service' }).Modules.impound
     end)
 
-    it('lists an agency\'s enabled lots, shared ones included, numbered by id', function()
+    it('lists an agency\'s enabled lots, shared ones included, each called by its own id', function()
         local lots = I.lots(placements, usableBy('lspd'))
 
         assert.are.equal(2, #lots)
-        assert.are.same({ 3, 1 }, { lots[1].id, lots[1].number })
-        assert.are.same({ 9, 2 }, { lots[2].id, lots[2].number })
+        assert.are.same({ 3, 3 }, { lots[1].id, lots[1].number })
+        assert.are.same({ 9, 9 }, { lots[2].id, lots[2].number })
     end)
 
     it('never offers another agency\'s lot, a disabled one, or a terminal', function()
