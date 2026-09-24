@@ -2134,29 +2134,33 @@ const registerVehicles: RegisterRow<VehicleResult>[] = [
  * is the classic case. Opening one moves it into the register above.
  */
 const populationCharacters = [
-  { identifier: 'char1:nora', firstName: 'Nora', lastName: 'Ek', dateOfBirth: '1994-03-08' },
+  { ref: 'p1', identifier: 'char1:nora', firstName: 'Nora', lastName: 'Ek', dateOfBirth: '1994-03-08' },
 ];
-const populationVehicles = [{ plate: 'NORA42', owner: 'char1:nora' }];
+const populationVehicles = [{ ref: 'v1', plate: 'NORA42', owner: 'char1:nora' }];
 
-/** Every word of the term matches a name or the identifier, as `Framework.searchCharacters` does. */
-function populationPersonsFor(term: string | undefined): typeof populationCharacters {
+/** Every word of the term matches a name, as `Framework.searchCharacters` does. Sent without the identifier. */
+function populationPersonsFor(
+  term: string | undefined,
+): { ref: string; firstName: string; lastName: string; dateOfBirth: string }[] {
   const words = (term ?? '').trim().toLowerCase().split(/\s+/).filter(Boolean);
   if (words.join('').length < 2) return [];
   const onFile = new Set(registerPersons.map((entry) => (entry.row as { identifier?: string }).identifier));
-  return populationCharacters.filter(
-    (row) =>
-      !onFile.has(row.identifier) &&
-      words.every((word) => [row.firstName, row.lastName, row.identifier].some((field) => field.toLowerCase().includes(word))),
-  );
+  return populationCharacters
+    .filter(
+      (row) =>
+        !onFile.has(row.identifier) &&
+        words.every((word) => [row.firstName, row.lastName].some((field) => field.toLowerCase().includes(word))),
+    )
+    .map(({ ref, firstName, lastName, dateOfBirth }) => ({ ref, firstName, lastName, dateOfBirth }));
 }
 
-function populationVehiclesFor(term: string | undefined): { plate: string }[] {
+function populationVehiclesFor(term: string | undefined): { ref: string; plate: string }[] {
   const needle = (term ?? '').trim().toUpperCase().replace(/\s+/g, '');
   if (needle.length < 2) return [];
   const onFile = new Set(registerVehicles.map((entry) => (entry.row as { plate?: string }).plate));
   return populationVehicles
     .filter((row) => !onFile.has(row.plate) && row.plate.includes(needle))
-    .map((row) => ({ plate: row.plate }));
+    .map((row) => ({ ref: row.ref, plate: row.plate }));
 }
 
 function matches<T extends { id: number }>(rows: RegisterRow<T>[], term: string): RegisterRow<T>[] {
@@ -7850,12 +7854,15 @@ export const fixtures: FixtureSet = {
 
     /** Creates the record from the population register, or opens the one already made. */
     'person.fromCharacter': (input) => {
-      const { identifier } = (input ?? {}) as { identifier?: string };
+      const { ref } = (input ?? {}) as { ref?: string };
+      // Only what the server offered: the reference, never an identifier.
+      const identifier = populationCharacters.find((row) => row.ref === ref)?.identifier;
+      if (!identifier) return refuse('not_found', { ref: 'unknown' });
       const existing = registerPersons.find((entry) => (entry.row as { identifier?: string }).identifier === identifier);
       if (existing && !isStub(existing.row)) return { id: existing.row.id, created: false };
 
       const character = populationCharacters.find((row) => row.identifier === identifier);
-      if (!character) return refuse('not_found', { identifier: 'unknown' });
+      if (!character) return refuse('not_found', { ref: 'unknown' });
 
       const id = Math.max(...registerPersons.map((entry) => (isStub(entry.row) ? 0 : entry.row.id))) + 1;
       registerPersons.push({
@@ -7885,12 +7892,14 @@ export const fixtures: FixtureSet = {
     },
 
     'vehicle.fromOwned': (input) => {
-      const plate = String((input as { plate?: string } | undefined)?.plate ?? '').toUpperCase().replace(/\s+/g, '');
+      const { ref } = (input ?? {}) as { ref?: string };
+      const plate = populationVehicles.find((row) => row.ref === ref)?.plate ?? '';
+      if (!plate) return refuse('not_found', { ref: 'unknown' });
       const existing = registerVehicles.find((entry) => !isStub(entry.row) && entry.row.plate === plate);
       if (existing && !isStub(existing.row)) return { id: existing.row.id, created: false };
 
       const owned = populationVehicles.find((row) => row.plate === plate);
-      if (!owned) return refuse('not_found', { plate: 'unknown' });
+      if (!owned) return refuse('not_found', { ref: 'unknown' });
 
       const id = Math.max(...registerVehicles.map((entry) => (isStub(entry.row) ? 0 : entry.row.id))) + 1;
       registerVehicles.push({

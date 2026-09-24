@@ -122,7 +122,8 @@ export interface PersonResult extends PersonRecord {
 
 /** A citizen the game knows with no record here yet (population register). */
 export interface PopulationPerson {
-  identifier: string;
+  /** The server's reference for this suggestion: opening sends it back, and nothing else. */
+  ref: string;
   firstName?: string | null;
   lastName?: string | null;
   dateOfBirth?: string | null;
@@ -130,6 +131,7 @@ export interface PopulationPerson {
 
 /** An owned car the game knows with no record here yet. */
 export interface PopulationVehicle {
+  ref: string;
   plate: string;
 }
 

@@ -36,3 +36,4 @@ When a decision changes `docs/FredPD.md`, the ADR and the spec edit go in the
 | [023](023-a-subject-route-tier.md) | A subject route tier: a sessionless caller reads only their own records, at a public desk (amends ADR-013) | Accepted |
 | [024](024-the-master-sql-corrects-what-mariadb-cannot-run.md) | The master SQL is generated, checked in CI against MariaDB, and corrects shipped statements MariaDB cannot run -- the migrations stay as shipped | Accepted |
 | [025](025-duty-is-read-from-the-job-core.md) | Duty is read from the job core (piotreq_jobcore), then p_policejob, ESX job.onDuty and FredPD's flag; `fredpd_duty` diagnoses it (amends ADR-008) | Accepted |
+| [026](026-the-population-register-in-search.md) | The population register in search: its own permission (patrol), session-bound references instead of licence identifiers, names-only matching; a hidden record's absence stays visible to holders | Accepted |

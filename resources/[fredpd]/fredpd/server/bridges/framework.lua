@@ -150,8 +150,8 @@ end
 --- character instead of retyping a name FredPD has no way to check against
 --- anything.
 ---
---- Every word of the term must match the first name, the last name or the
---- identifier, so a full name ("Anna Berg") finds the character whose first
+--- Every word of the term must match the first name or the last name, so a
+--- full name ("Anna Berg") finds the character whose first
 --- name is Anna and last name Berg -- one LIKE over each column alone never
 --- could, since neither holds the whole name. At most four words.
 ---
@@ -170,12 +170,13 @@ function Framework.searchCharacters(term, limit)
 
     local clauses, values = {}, {}
     for _, word in ipairs(words) do
-        clauses[#clauses + 1] = ('(`%s` LIKE ? OR `%s` LIKE ? OR `%s` LIKE ?)'):format(
-            config.firstName, config.lastName, config.identifier)
+        -- Names only: the identifier is a player's licence, and a fragment
+        -- of one typed into a search must not find their characters.
+        clauses[#clauses + 1] = ('(`%s` LIKE ? OR `%s` LIKE ?)'):format(config.firstName, config.lastName)
         local like = '%' .. word .. '%'
         -- One at a time: in `t[#t + 1], t[#t + 1] = a, b` every index is
         -- worked out before anything is assigned, so both land in one slot.
-        for _ = 1, 3 do values[#values + 1] = like end
+        for _ = 1, 2 do values[#values + 1] = like end
     end
     values[#values + 1] = limit or 8
 

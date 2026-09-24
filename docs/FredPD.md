@@ -719,10 +719,11 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 
 **The population register (folkbokföringen).** Searches also reach characters and owned vehicles the framework knows about but that have no record yet. This covers `person.search`, `vehicle.search` and `query.run`, the unified query. It includes the officer's own character, and any citizen no one has checked in the field.
 - **Shown below the results.** They appear as "In the population register, not yet on file", at most ten. A person shows only a name and date of birth; a vehicle shows only its plate.
-- **Opening one creates the record.** `person.fromCharacter` and `vehicle.fromOwned` build it from the framework's own data, re-read on the server by the key the suggestion carried. The creation is audited (`person.created` with `source = population_register`).
-- **Every word must match.** Each word of the term must match a first name, a last name or the identifier, so a full name finds the character.
-- **Nothing hidden is disclosed.** A key that already has a record is never offered, whatever that record's access. Opening answers through the record's own access-checked read, so a hidden record answers exactly as a missing citizen (4.5).
-- **No new permission keys.** The permission that runs the search opens the suggestion (`rms.person.view`, `rms.vehicle.view`).
+- **A suggestion carries a reference, never the framework's key.** A character identifier is a player's licence. `person.fromCharacter` and `vehicle.fromOwned` take the reference, look up what the server offered this officer (bounded, ten-minute lifetime), and re-read the character or car themselves. Only what was offered can be opened.
+- **Opening creates the record.** The creation is audited (`person.created` with `source = population_register`). A vehicle's keeper is linked only if the officer may read the keeper's record.
+- **Every word must match.** Each word of the term must match a first or last name, so a full name finds the character. Names only: a licence fragment finds nobody, and LIKE wildcards are stripped before the two-character minimum applies.
+- **Who.** It is governed by `population.search`, seeded to `patrol`. Supervisors inherit it; the read-only roles (`aklagare`, `domare`) do not get it. Opening also requires duty (`onDuty`) and is limited to five per minute.
+- **What it cannot hide (ADR-026).** A key that already has a record is never offered, whatever the record's access, and opening answers through the record's own access-checked read. But a citizen the officer knows by name, who appears neither among the results nor here, has a record the officer may not see. That is the price of listing the whole population, and it is why the list has a permission of its own.
 
 ### 7.3 Persons — master name index (M2)
 
@@ -1897,7 +1898,7 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Area | Keys |
 |---|---|
 | Pages | `page.query`, `page.dispatch`, `page.records`, `page.evidence`, `page.lab`, `page.intel`, `page.surveillance`, `page.court`, `page.personnel`, `page.stats`, `page.admin`, `page.comms` |
-| Queries | `query.run`, `query.hit.confirm`, `query.person.run`, `query.vehicle.run`, `query.firearm.run`, `query.phone.run`, `query.address.run`, `query.log.view` |
+| Queries | `query.run`, `query.hit.confirm`, `query.person.run`, `query.vehicle.run`, `query.firearm.run`, `query.phone.run`, `query.address.run`, `query.log.view`, `population.search` (7.2, ADR-026: search and open the population register; patrol) |
 | Records | `rms.person.view`, `rms.person.edit`, `rms.person.photo.upload`, `rms.person.caution.edit`, `rms.vehicle.view`, `rms.vehicle.edit`, `rms.vehicle.flag`, `rms.firearm.view`, `rms.firearm.edit`, `rms.firearm.trace`, `rms.brott.view`, `rms.location.view`, `rms.location.edit`, `rms.location.hazard.edit` |
 | Anmälan | `rms.anmalan.view`, `rms.anmalan.create`, `rms.anmalan.edit.any`, `rms.anmalan.approve`, `rms.anmalan.view.<type>` |
 | Förundersökning | `inv.fu.view`, `inv.fu.open`, `inv.fu.lead`, `inv.fu.assign` |

@@ -27,7 +27,7 @@
 
   let busy = $state(false);
   let failure = $state<Failure | null>(null);
-  const messages = $derived(fieldList(failure, { identifier: 'records.population.person', plate: 'records.population.plate' }));
+  const messages = $derived(fieldList(failure, { ref: 'records.population.person' }));
 
   function name(person: PopulationPerson): string {
     return [person.firstName, person.lastName].filter(Boolean).join(' ') || t('records.population.noName');
@@ -36,7 +36,7 @@
   async function openPerson(person: PopulationPerson): Promise<void> {
     if (busy) return;
     busy = true;
-    const response = await nui.call<{ id: number }>('person.fromCharacter', { identifier: person.identifier });
+    const response = await nui.call<{ id: number }>('person.fromCharacter', { ref: person.ref });
     busy = false;
 
     if (!response.ok) {
@@ -50,7 +50,7 @@
   async function openVehicle(vehicle: PopulationVehicle): Promise<void> {
     if (busy) return;
     busy = true;
-    const response = await nui.call<{ id: number }>('vehicle.fromOwned', { plate: vehicle.plate });
+    const response = await nui.call<{ id: number }>('vehicle.fromOwned', { ref: vehicle.ref });
     busy = false;
 
     if (!response.ok) {
@@ -80,7 +80,7 @@
     {/if}
 
     <ul class="mt-1">
-      {#each persons as person (person.identifier)}
+      {#each persons as person (person.ref)}
         <li class="flex items-center justify-between gap-3 border-t border-[var(--color-border)] py-1 first:border-t-0">
           <span>
             {name(person)}
@@ -99,7 +99,7 @@
           </button>
         </li>
       {/each}
-      {#each vehicles as vehicle (vehicle.plate)}
+      {#each vehicles as vehicle (vehicle.ref)}
         <li class="flex items-center justify-between gap-3 border-t border-[var(--color-border)] py-1 first:border-t-0">
           <span class="font-[family-name:var(--font-mono)]">{vehicle.plate}</span>
           <button

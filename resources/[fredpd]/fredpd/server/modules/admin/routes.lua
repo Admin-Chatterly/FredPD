@@ -314,6 +314,7 @@ local PERMISSION_CATALOGUE <const> = {
     'query.run', 'query.hit.confirm',
     'query.person.run', 'query.vehicle.run', 'query.firearm.run', 'query.phone.run',
     'query.address.run', 'query.log.view',
+    'population.search',
 
     -- Records
     'rms.person.view', 'rms.person.edit', 'rms.person.photo.upload', 'rms.person.caution.edit',

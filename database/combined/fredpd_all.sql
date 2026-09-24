@@ -6832,6 +6832,10 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('patrol', 'garage.vehicle.return'),
     ('patrol', 'query.person.run'),
     ('patrol', 'query.vehicle.run'),
+    -- The population register (ADR-026): citizens and cars the game knows
+    -- with no record yet, found by search and opened into a record. Patrol
+    -- meets them; the read-only roles (åklagare, domare) do not get it.
+    ('patrol', 'population.search'),
 
     -- The unified query (7.2). Running one is the most ordinary thing an
     -- officer does, and confirming a hot-file hit is part of the same act: a
