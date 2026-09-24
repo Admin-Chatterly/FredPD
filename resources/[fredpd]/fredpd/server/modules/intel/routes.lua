@@ -61,16 +61,27 @@ end
 --- A record this reader may be told of (a stub) is `restricted`; one they may
 --- not is answered exactly as one that does not exist -- the persons module's
 --- rule (`refusalCode`), so walking ids cannot find a hidden record (4.5).
-local function readable(session, recordType, row)
-    if not row then return nil, route.refuse(FredPD.ErrorCode.NOT_FOUND) end
+---
+--- `fields`, when given, is `{ [name] = true }`: the field the refusal names,
+--- as `restricted` or `unknown` to match the code.
+local function readable(session, recordType, row, fields)
+    local function refuse(stub)
+        local named
+        if fields then
+            named = {}
+            for name in pairs(fields) do named[name] = stub and 'restricted' or 'unknown' end
+        end
+        return nil, route.refuse(stub and FredPD.ErrorCode.RESTRICTED or FredPD.ErrorCode.NOT_FOUND, named)
+    end
+
+    if not row then return refuse(false) end
 
     local allowed = access().read(session, recordType, row)
     if allowed then return allowed end
 
     -- `row` still carries what `read` attached, so this decides the refusal
     -- without touching the access tables again.
-    local visibility = FredPD.Modules.access.visibility(access().reader(session), row)
-    return nil, route.refuse(visibility == 'stub' and FredPD.ErrorCode.RESTRICTED or FredPD.ErrorCode.NOT_FOUND)
+    return refuse(FredPD.Modules.access.visibility(access().reader(session), row) == 'stub')
 end
 
 --- The record a write names, when it exists and this reader may read it.
@@ -380,19 +391,30 @@ route.define({
             -- `frihet/routes.lua`'s gripande handler relies on, and for the
             -- same reason: an unchecked id would let an analyst confirm the
             -- existence of a person outside their own clearance.
+            -- A hidden person is answered as an unknown one and a stubbed one
+            -- as restricted -- the persons module's own rule (`refusalCode`).
             local person, visibility = FredPD.Repo.persons.readPerson(session, input.masterPersonId)
 
             if not person then
-                return route.refuse(
-                    visibility == 'missing' and FredPD.ErrorCode.NOT_FOUND or FredPD.ErrorCode.RESTRICTED,
-                    { masterPersonId = visibility == 'missing' and 'unknown' or 'restricted' })
+                local stub = visibility == 'stub'
+                return route.refuse(stub and FredPD.ErrorCode.RESTRICTED or FredPD.ErrorCode.NOT_FOUND,
+                    { masterPersonId = stub and 'restricted' or 'unknown' })
             end
 
             -- `uq_fpd_intel_persons_master` (0025) allows this master person
             -- exactly one linked subject; a second attempt is a conflict, not
             -- a silent takeover of the first analyst's file.
+            --
+            -- The subject already linked is read like any other: "already
+            -- linked" says an intelligence file exists on this person, so it
+            -- is said only to a reader who may read that file. Anyone else is
+            -- answered as for a person they may not see, and the attempt is
+            -- audited as a refused read (invariant 11) -- the constraint still
+            -- stops the link, so the refusal never looks like a success.
             local existing = repo.byMasterPersonId(session.agencyId, input.masterPersonId)
             if existing and existing.id ~= input.id then
+                local linked, hidden = readable(session, PERSON, existing, { masterPersonId = true })
+                if not linked then return hidden end
                 return route.refuse(FredPD.ErrorCode.CONFLICT, { masterPersonId = 'already_linked' })
             end
         end

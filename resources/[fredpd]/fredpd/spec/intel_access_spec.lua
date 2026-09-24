@@ -68,6 +68,9 @@ describe('intel access', function()
             if sql:find('AS parentId, classification, created_at', 1, true) then return copyAll(fake.notesUnder) end
             if sql:find('FROM fpd_intel_note_tags WHERE note_id IN', 1, true) then return {} end
             if sql:find('FROM fpd_intel_notes n', 1, true) then return copyAll(fake.notes) end
+            if sql:find('p.master_person_id = ?', 1, true) then
+                return fake.byMaster and copyAll({ fake.byMaster }) or {}
+            end
             if sql:find('AND p.id = ?', 1, true) then
                 for _, person in ipairs(fake.persons) do
                     if person.id == values[2] then return copyAll({ person }) end
@@ -179,6 +182,46 @@ describe('intel access', function()
                 if entry.action == 'access.read' and entry.outcome == 'denied' then refused = true end
             end
             assert.is_true(refused)
+        end)
+    end)
+
+    describe('linking a master person', function()
+        before_each(function()
+            session.permissions['intel.person.edit'] = true
+            db.persons = { person(8, { version = 3 }) }
+            FredPD.Repo.persons = {
+                readPerson = function() return { id = 500 }, 'full' end,
+            }
+        end)
+
+        it('never says a hidden intelligence file is already linked to the person', function()
+            -- Subject 7, in `sources`, is already linked to master person 500.
+            db.byMaster = person(7, { masterPersonId = 500 })
+            db.compartments.intel_person = { [7] = { 'sources' } }
+
+            local result = call('intel.person.linkMaster', { id = 8, version = 3, masterPersonId = 500 })
+
+            assert.are.equal(FredPD.ErrorCode.NOT_FOUND, result.__err)
+            assert.are.equal('unknown', result.fields.masterPersonId)
+            assert.is_false(sent('UPDATE fpd_intel_persons'))
+        end)
+
+        it('says so when the reader may read the file already linked', function()
+            db.byMaster = person(7, { masterPersonId = 500 })
+
+            local result = call('intel.person.linkMaster', { id = 8, version = 3, masterPersonId = 500 })
+
+            assert.are.equal(FredPD.ErrorCode.CONFLICT, result.__err)
+            assert.are.equal('already_linked', result.fields.masterPersonId)
+        end)
+
+        it('answers a hidden master person as an unknown one', function()
+            FredPD.Repo.persons.readPerson = function() return nil, 'hidden' end
+
+            local result = call('intel.person.linkMaster', { id = 8, version = 3, masterPersonId = 500 })
+
+            assert.are.equal(FredPD.ErrorCode.NOT_FOUND, result.__err)
+            assert.are.equal('unknown', result.fields.masterPersonId)
         end)
     end)
 
