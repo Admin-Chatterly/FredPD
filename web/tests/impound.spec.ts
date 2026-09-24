@@ -59,3 +59,58 @@ test('renders the tab in Swedish', async ({ page }) => {
 
   await expect(page.getByRole('button', { name: 'ABC123' })).toBeVisible();
 });
+
+test('shows where a held car stands and what it was found with', async ({ page }) => {
+  await openImpound(page);
+
+  const row = page.getByRole('row').filter({ has: page.getByRole('button', { name: 'ABC123' }) });
+  await expect(row.getByRole('cell', { name: 'Lot 1, bay A3' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'ABC123' }).click();
+  await expect(page.getByText("In the lot's key safe")).toBeVisible();
+  await expect(page.getByText('Gym bag (empty), two phone chargers, parking receipt.')).toBeVisible();
+  await expect(page.getByText(/Inventory by 1-ADAM-12/)).toBeVisible();
+});
+
+test('writes the inventory: the lot, the bay, the keys, the contents', async ({ page }) => {
+  await openImpound(page);
+
+  await page.getByRole('button', { name: 'ABC123' }).click();
+  await page.getByRole('button', { name: 'Edit the inventory' }).click();
+
+  const form = page.locator('form').filter({ hasText: 'Left in the vehicle' });
+  await form.getByRole('combobox', { name: /^Lot/ }).selectOption({ label: 'Lot 2' });
+  await form.getByLabel('Bay').fill('C1');
+  await form.getByRole('combobox', { name: /^Keys/ }).selectOption('with_owner');
+  await form.getByLabel('Left in the vehicle').fill('Nothing of value.');
+  await form.getByRole('button', { name: 'Save inventory' }).click();
+
+  await expect(page.getByRole('status')).toHaveText('Inventory saved.');
+  await expect(page.getByText('With the owner')).toBeVisible();
+  await expect(page.getByText('Nothing of value.')).toBeVisible();
+  await expect(page.getByRole('row').filter({ has: page.getByRole('button', { name: 'ABC123' }) })).toContainText(
+    'Lot 2, bay C1',
+  );
+});
+
+test('an impound made at the desk can name its lot', async ({ page }) => {
+  await openImpound(page);
+
+  const form = page.locator('form').filter({ hasText: 'Plate' });
+  await form.getByLabel('Plate').fill('LOT222');
+  await form.getByLabel('Reason held').selectOption('abandoned');
+  await form.getByLabel('Lot').selectOption({ label: 'Lot 2' });
+  await form.getByRole('button', { name: 'Impound vehicle' }).click();
+
+  await expect(page.getByRole('row').filter({ has: page.getByRole('button', { name: 'LOT222' }) })).toContainText(
+    'Lot 2',
+  );
+});
+
+test('names the lot in Swedish', async ({ page }) => {
+  await page.goto('/?locale=sv');
+  await page.locator('nav').first().getByRole('button', { name: 'Register' }).click();
+  await page.getByRole('button', { name: 'Beslag', exact: true }).click();
+
+  await expect(page.getByRole('cell', { name: 'Uppställningsplats 1, plats A3' })).toBeVisible();
+});

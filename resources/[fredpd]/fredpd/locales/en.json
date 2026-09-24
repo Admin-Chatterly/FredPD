@@ -214,7 +214,8 @@
         "courthouse_terminal": "Court calendar and dispositions.",
         "motorpool": "Where an officer walks up to draw a fleet vehicle.",
         "evidence_bench": "Marks a location for evidence work. No client action is wired to it yet.",
-        "fingerprint_scanner": "Collects a fingerprint from whoever uses it."
+        "fingerprint_scanner": "Collects a fingerprint from whoever uses it.",
+        "impound_lot": "Where impounded vehicles stand. Opens the impound register."
       },
       "newZone": "New here — area",
       "newProp": "New here — bind to the prop I am looking at",
@@ -233,7 +234,8 @@
       "deleted": "Placement deleted.",
       "deleteTitle": "Delete this placement?",
       "deleteBody": "{kind}, {distance} m away. This cannot be undone."
-    }
+    },
+    "impound_lot": "Impound lot"
   },
   "chat": {
     "usage": "Write a message after the command.",
@@ -2734,7 +2736,12 @@
       "feePerDay": "Fee per day",
       "feeOwed": "Fee owed",
       "impoundedAt": "Impounded",
-      "feePaidConfirm": "Fee has been paid"
+      "feePaidConfirm": "Fee has been paid",
+      "lot": "Lot",
+      "bay": "Bay",
+      "keys": "Keys",
+      "condition": "Condition",
+      "contents": "Left in the vehicle"
     },
     "action": {
       "create": "Impound vehicle",
@@ -2760,6 +2767,25 @@
       "dui": "DUI",
       "unregistered": "Unregistered",
       "other": "Other"
+    },
+    "lot": {
+      "name": "Lot {number}",
+      "withBay": "Lot {number}, bay {bay}",
+      "none": "No lot"
+    },
+    "keys": {
+      "in_vehicle": "In the vehicle",
+      "lot_safe": "In the lot's key safe",
+      "with_owner": "With the owner",
+      "none": "No keys",
+      "unknown": "Not recorded"
+    },
+    "inventory": {
+      "write": "Write the inventory",
+      "edit": "Edit the inventory",
+      "save": "Save inventory",
+      "saved": "Inventory saved.",
+      "by": "Inventory by {callsign}, {at}"
     }
   },
   "field": {
@@ -2814,7 +2840,8 @@
       "confirmTitle": "Impound vehicle",
       "confirm": "Impound {plate}? It is towed away and stays held until it is released.",
       "towed": "Impound {number} recorded. The vehicle has been towed.",
-      "recorded": "Impound {number} recorded. The vehicle could not be towed from here."
+      "recorded": "Impound {number} recorded. The vehicle could not be towed from here.",
+      "towedToLot": "Impound {number} recorded. The vehicle has been towed to lot {lot}."
     },
     "fi": {
       "reason": "Why was this person spoken to?",

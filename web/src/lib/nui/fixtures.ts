@@ -4522,7 +4522,19 @@ interface FixtureImpound {
   releasedAgo?: number;
   feePaid: boolean;
   version: number;
+  lotId?: number | undefined;
+  bay?: string | undefined;
+  keysLocation?: string | undefined;
+  conditionNote?: string | undefined;
+  contents?: string | undefined;
+  inventoryAgo?: number;
 }
+
+/** The agency's impound lots (0037), as `impound.list` numbers them. */
+const IMPOUND_LOTS = [
+  { id: 41, number: 1 },
+  { id: 57, number: 2 },
+];
 
 const impounds: FixtureImpound[] = [
   {
@@ -4536,6 +4548,12 @@ const impounds: FixtureImpound[] = [
     impoundedAgo: 2 * DAY,
     feePaid: false,
     version: 1,
+    lotId: 41,
+    bay: 'A3',
+    keysLocation: 'lot_safe',
+    conditionNote: 'Rear bumper scraped. Passenger window broken.',
+    contents: 'Gym bag (empty), two phone chargers, parking receipt.',
+    inventoryAgo: 2 * DAY - 3600,
   },
   {
     id: 2,
@@ -4574,10 +4592,18 @@ function impoundRow(row: FixtureImpound, detailed: boolean): Record<string, unkn
     releasedAt: row.releasedAgo === undefined ? null : secondsAgo(row.releasedAgo),
     feePaid: row.feePaid,
     version: row.version,
+    lotNumber: IMPOUND_LOTS.find((lot) => lot.id === row.lotId)?.number ?? null,
+    bay: row.bay ?? null,
+    keysLocation: row.keysLocation ?? null,
+    conditionNote: row.conditionNote ?? null,
+    contents: row.contents ?? null,
+    inventoryAt: row.inventoryAgo === undefined ? null : secondsAgo(row.inventoryAgo),
+    inventoryByCallsign: row.inventoryAgo === undefined ? null : '1-ADAM-12',
   };
 
   if (detailed) {
     shaped.feeOwed = days * row.feePerDay;
+    shaped.lotId = row.lotId ?? null;
   }
 
   return shaped;
@@ -6431,7 +6457,10 @@ export const fixtures: FixtureSet = {
 
       const found = impounds.filter((row) => !filter.held || row.releasedAgo === undefined);
 
-      return { impounds: [...found.map((row) => impoundRow(row, false)), ...restrictedImpounds] };
+      return {
+        impounds: [...found.map((row) => impoundRow(row, false)), ...restrictedImpounds],
+        lots: IMPOUND_LOTS,
+      };
     },
 
     'impound.get': (input) => {
@@ -6440,7 +6469,37 @@ export const fixtures: FixtureSet = {
 
       if (!row) return refuse('not_found');
 
-      return { impound: impoundRow(row, true) };
+      return { impound: impoundRow(row, true), lots: IMPOUND_LOTS };
+    },
+
+    'impound.inventory': (input) => {
+      const body = (input ?? {}) as {
+        id?: number;
+        version?: number;
+        lotId?: number;
+        bay?: string;
+        keys?: string;
+        condition?: string;
+        contents?: string;
+      };
+      const row = impounds.find((entry) => entry.id === body.id);
+
+      if (!row) return refuse('not_found');
+      if (row.releasedAgo !== undefined) return refuse('conflict', { _input: 'already_released' });
+      if (row.version !== body.version) return refuse('conflict', { _input: 'stale' });
+      if (body.lotId !== undefined && !IMPOUND_LOTS.some((lot) => lot.id === body.lotId)) {
+        return refuse('not_found', { lotId: 'unknown' });
+      }
+
+      row.lotId = body.lotId;
+      row.bay = body.bay;
+      row.keysLocation = body.keys;
+      row.conditionNote = body.condition;
+      row.contents = body.contents;
+      row.inventoryAgo = 0;
+      row.version += 1;
+
+      return { id: row.id };
     },
 
     'impound.create': (input) => {
@@ -6449,6 +6508,7 @@ export const fixtures: FixtureSet = {
         model?: string;
         heldReasonKey?: string;
         feePerDay?: number;
+        lotId?: number;
       };
 
       if (!body.plate) return refuse('invalid', { plate: 'required' });
@@ -6467,6 +6527,7 @@ export const fixtures: FixtureSet = {
         impoundedAgo: 0,
         feePaid: false,
         version: 1,
+        ...(body.lotId !== undefined ? { lotId: body.lotId } : {}),
       });
 
       return { id, number };

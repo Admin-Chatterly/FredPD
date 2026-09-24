@@ -25,6 +25,28 @@ local function world()
     return FredPD.Config.server.impound and FredPD.Config.server.impound.world or {}
 end
 
+--- This agency's impound lots (0037), numbered, from the placement cache.
+local function lotsFor(session)
+    return service.lots(FredPD.Core.placements.all(), function(placement)
+        return (FredPD.Modules.placements.isUsableBy(placement, session.agencyId))
+    end)
+end
+
+--- The lots as the screen needs them: an id and a number, never coordinates.
+local function lotChoices(lots)
+    local out = {}
+    for index, lot in ipairs(lots) do out[index] = { id = lot.id, number = lot.number } end
+    return out
+end
+
+local function lotNumber(lots, id)
+    for _, lot in ipairs(lots) do
+        if lot.id == id then return lot.number end
+    end
+
+    return nil
+end
+
 local function readable(session, id)
     local row = repo.byId(id, session.agencyId)
     if not row then return nil, route.refuse(FredPD.ErrorCode.NOT_FOUND) end
@@ -45,8 +67,17 @@ route.define({
     schema = 'ImpoundList',
     handler = function(session, input)
         local found = repo.list(session.agencyId, { held = input.held }, input.limit or 50)
+        local impounds = access.filterSearch(session, VEHICLE, found)
 
-        return { impounds = access.filterSearch(session, VEHICLE, found) }
+        local lots = lotsFor(session)
+        for _, row in ipairs(impounds) do
+            if row.id then
+                row.lotNumber = row.lotId and lotNumber(lots, row.lotId) or nil
+                row.lotId, row.inventoryBy = nil, nil
+            end
+        end
+
+        return { impounds = impounds, lots = lotChoices(lots) }
     end,
 })
 
@@ -63,7 +94,16 @@ route.define({
         -- moment it was last written.
         row.feeOwed = service.feeOwed(row, os.time())
 
-        return { impound = row }
+        -- A lot that has since been removed or given to another agency is
+        -- simply not named.
+        local lots = lotsFor(session)
+        if row.lotId and not service.isLot(lots, row.lotId) then row.lotId = nil end
+        row.lotNumber = row.lotId and lotNumber(lots, row.lotId) or nil
+
+        -- Who did the inventory is shown by callsign, never the Discord id.
+        row.inventoryBy = nil
+
+        return { impound = row, lots = lotChoices(lots) }
     end,
 })
 
@@ -85,6 +125,10 @@ route.define({
     handler = function(session, input)
         local err, fields = service.validateCreate(input)
         if err then return route.refuse(err, fields) end
+
+        if input.lotId and not service.isLot(lotsFor(session), input.lotId) then
+            return route.refuse(FredPD.ErrorCode.NOT_FOUND, { lotId = 'unknown' })
+        end
 
         local row = repo.create(input, session)
         if not row then return route.refuse(FredPD.ErrorCode.INTERNAL) end
@@ -242,7 +286,15 @@ route.define({
             if stored and not tonumber(stored) then stored = GetHashKey(stored) end
             local verified = owned ~= nil and service.sameModel(stored, model)
 
-            local fields = { plate = plate, model = tostring(model), heldReasonKey = input.heldReasonKey }
+            -- Towed to the agency's lot nearest the officer (0037).
+            local lot = service.nearestLot(lotsFor(session), coords)
+
+            local fields = {
+                plate = plate,
+                model = tostring(model),
+                heldReasonKey = input.heldReasonKey,
+                lotId = lot and lot.id or nil,
+            }
 
             local err, why = service.validateCreate(fields)
             if err then return route.refuse(err, why) end
@@ -290,13 +342,57 @@ route.define({
                 garageMarked = garageMarked,
             }
 
-            return { id = row.id, number = row.number, plate = plate, despawned = despawned }
+            return {
+                id = row.id, number = row.number, plate = plate, despawned = despawned,
+                lotNumber = lot and lot.number or nil,
+            }
         end)
 
         towing[entity] = nil
         if not ok then error(result) end
 
         return result
+    end,
+})
+
+-- -----------------------------------------------------------------------------
+-- Inventory: the lot, the bay, the keys, and what was in it (0037)
+-- -----------------------------------------------------------------------------
+
+route.define({
+    name = 'impound.inventory',
+    perm = 'impound.create',
+    schema = 'ImpoundInventory',
+    writes = true,
+    limit = { per = 20, window = 60 },
+    audit = 'impound.inventoried',
+    subjectType = VEHICLE,
+    auditDetail = function(input)
+        return { id = input.id, lotId = input.lotId, bay = input.bay, keys = input.keys }
+    end,
+    handler = function(session, input)
+        local row, refusal = readable(session, input.id)
+        if not row then return refusal end
+
+        if row.releasedAt then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { _input = 'already_released' })
+        end
+
+        if input.lotId and not service.isLot(lotsFor(session), input.lotId) then
+            return route.refuse(FredPD.ErrorCode.NOT_FOUND, { lotId = 'unknown' })
+        end
+
+        local written = repo.setInventory(row.id, session.agencyId, {
+            lotId = input.lotId,
+            bay = service.text(input.bay),
+            keys = input.keys,
+            condition = service.text(input.condition),
+            contents = service.text(input.contents),
+        }, session.discordId, input.version)
+
+        if written == 0 then return route.refuse(FredPD.ErrorCode.CONFLICT, { _input = 'stale' }) end
+
+        return { id = row.id }
     end,
 })
 

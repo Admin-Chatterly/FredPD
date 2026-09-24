@@ -288,6 +288,7 @@ local NUI_ROUTES <const> = {
     'stop.list',
     'impound.authorize',
     'impound.release',
+    'impound.inventory',
 
     -- Crime scenes, evidence and the chain of custody (spec 8).
     'scene.create',
@@ -415,6 +416,12 @@ for _, kind in ipairs({
         setOpen(true, placement)
     end)
 end
+
+--- An impound lot (7.15, 0037) opens the MDT on the impound tab: what the
+--- officer at the lot does is find the car and write down what is in it.
+FredPD.Client.placements.registerAction('impound_lot', function()
+    setOpen(true, nil, { module = 'records', tab = 'impound' })
+end)
 
 --- Permissions changed while the player was connected: a role was added or
 --- removed, or an administrator edited the role map. The shell redraws its rail

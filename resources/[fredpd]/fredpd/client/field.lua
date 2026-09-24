@@ -146,8 +146,9 @@ local function impound(netId, label)
 
                 local towed = call('impound.tow', { netId = netId, heldReasonKey = reason })
                 if towed then
-                    core.notify(towed.despawned and 'field.impound.towed' or 'field.impound.recorded',
-                        { number = towed.number })
+                    local key = towed.despawned and 'field.impound.towed' or 'field.impound.recorded'
+                    if towed.despawned and towed.lotNumber then key = 'field.impound.towedToLot' end
+                    core.notify(key, { number = towed.number, lot = towed.lotNumber })
                 end
             end,
         }

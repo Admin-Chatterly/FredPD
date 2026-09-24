@@ -166,6 +166,10 @@ local REQUIRED_COLUMNS <const> = {
     { table = 'fpd_ordningsbot', column = 'bill_id' },
     { table = 'fpd_impound', column = 'towed_at' },
     { table = 'fpd_atal', column = 'jail_minutes' },
+
+    -- 0037: the impound lot and the inventory.
+    { table = 'fpd_impound', column = 'lot_id' },
+    { table = 'fpd_impound', column = 'contents' },
 }
 
 --- Returns the names of any dependency that is not started.

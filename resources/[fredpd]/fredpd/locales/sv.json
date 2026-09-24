@@ -214,7 +214,8 @@
         "courthouse_terminal": "Domstolskalender och domar.",
         "motorpool": "Där en officer går fram för att kvittera ut ett fordon.",
         "evidence_bench": "Markerar en plats för bevishantering. Ingen klientfunktion är kopplad till den ännu.",
-        "fingerprint_scanner": "Tar ett fingeravtryck från den som använder den."
+        "fingerprint_scanner": "Tar ett fingeravtryck från den som använder den.",
+        "impound_lot": "Där beslagtagna fordon står. Öppnar beslagsregistret."
       },
       "newZone": "Ny här — område",
       "newProp": "Ny här — koppla till föremålet jag tittar på",
@@ -233,7 +234,8 @@
       "deleted": "Placeringen är borttagen.",
       "deleteTitle": "Ta bort placeringen?",
       "deleteBody": "{kind}, {distance} m härifrån. Det går inte att ångra."
-    }
+    },
+    "impound_lot": "Uppställningsplats"
   },
   "chat": {
     "usage": "Skriv ett meddelande efter kommandot.",
@@ -2734,7 +2736,12 @@
       "feePerDay": "Avgift per dygn",
       "feeOwed": "Skuldbelopp",
       "impoundedAt": "Omhändertaget",
-      "feePaidConfirm": "Avgiften är betald"
+      "feePaidConfirm": "Avgiften är betald",
+      "lot": "Uppställningsplats",
+      "bay": "Plats",
+      "keys": "Nycklar",
+      "condition": "Skick",
+      "contents": "Kvarlämnat i fordonet"
     },
     "action": {
       "create": "Beslagta fordon",
@@ -2760,6 +2767,25 @@
       "dui": "Rattfylleri",
       "unregistered": "Oregistrerat",
       "other": "Övrigt"
+    },
+    "lot": {
+      "name": "Uppställningsplats {number}",
+      "withBay": "Uppställningsplats {number}, plats {bay}",
+      "none": "Ingen uppställningsplats"
+    },
+    "keys": {
+      "in_vehicle": "I fordonet",
+      "lot_safe": "I nyckelskåpet på uppställningsplatsen",
+      "with_owner": "Hos ägaren",
+      "none": "Inga nycklar",
+      "unknown": "Inte antecknat"
+    },
+    "inventory": {
+      "write": "Gör inventering",
+      "edit": "Ändra inventeringen",
+      "save": "Spara inventeringen",
+      "saved": "Inventeringen är sparad.",
+      "by": "Inventerat av {callsign}, {at}"
     }
   },
   "field": {
@@ -2814,7 +2840,8 @@
       "confirmTitle": "Beslagta fordon",
       "confirm": "Beslagta {plate}? Fordonet bärgas bort och står kvar tills det lämnas ut.",
       "towed": "Beslag {number} registrerat. Fordonet har bärgats.",
-      "recorded": "Beslag {number} registrerat. Fordonet kunde inte bärgas härifrån."
+      "recorded": "Beslag {number} registrerat. Fordonet kunde inte bärgas härifrån.",
+      "towedToLot": "Beslag {number} registrerat. Fordonet har bärgats till uppställningsplats {lot}."
     },
     "fi": {
       "reason": "Varför kontaktades personen?",

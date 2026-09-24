@@ -56,6 +56,7 @@ FredPD.PlacementKind = {
     MOTORPOOL = 'motorpool',
     EVIDENCE_BENCH = 'evidence_bench',
     FINGERPRINT_SCANNER = 'fingerprint_scanner',
+    IMPOUND_LOT = 'impound_lot',
 }
 
 --- How a placement is reached in the world (spec 3.10).
@@ -269,7 +270,7 @@ FredPD.Schema = {
     },
 
     PlacementCreate = {
-        kind = { type = 'enum', required = true, values = { 'station_terminal', 'property_terminal', 'lab_terminal', 'booking_terminal', 'dispatch_console', 'courthouse_terminal', 'motorpool', 'evidence_bench', 'fingerprint_scanner' } },
+        kind = { type = 'enum', required = true, values = { 'station_terminal', 'property_terminal', 'lab_terminal', 'booking_terminal', 'dispatch_console', 'courthouse_terminal', 'motorpool', 'evidence_bench', 'fingerprint_scanner', 'impound_lot' } },
         interaction = { type = 'enum', required = true, values = { 'prop', 'ped', 'zone' } },
         agencyId = { type = 'string', required = false, max = 32 },
         model = { type = 'string', required = false, max = 64 },
@@ -283,7 +284,7 @@ FredPD.Schema = {
 
     PlacementUpdate = {
         id = { type = 'integer', required = true, min = 1 },
-        kind = { type = 'enum', required = false, values = { 'station_terminal', 'property_terminal', 'lab_terminal', 'booking_terminal', 'dispatch_console', 'courthouse_terminal', 'motorpool', 'evidence_bench', 'fingerprint_scanner' } },
+        kind = { type = 'enum', required = false, values = { 'station_terminal', 'property_terminal', 'lab_terminal', 'booking_terminal', 'dispatch_console', 'courthouse_terminal', 'motorpool', 'evidence_bench', 'fingerprint_scanner', 'impound_lot' } },
         interaction = { type = 'enum', required = false, values = { 'prop', 'ped', 'zone' } },
         model = { type = 'string', required = false, max = 64 },
         x = { type = 'number', required = false },
@@ -1568,6 +1569,7 @@ FredPD.Schema = {
         heldReasonKey = { type = 'enum', required = true, values = { 'investigative', 'evidence', 'abandoned', 'dui', 'unregistered', 'other' } },
         feePerDay = { type = 'integer', required = false, min = 0 },
         classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+        lotId = { type = 'integer', required = false, min = 1 },
     },
 
     FiCreate = {
@@ -1660,6 +1662,16 @@ FredPD.Schema = {
     ImpoundTow = {
         netId = { type = 'integer', required = true, min = 1 },
         heldReasonKey = { type = 'enum', required = true, values = { 'investigative', 'evidence', 'abandoned', 'dui', 'unregistered', 'other' } },
+    },
+
+    ImpoundInventory = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        lotId = { type = 'integer', required = false, min = 1 },
+        bay = { type = 'string', required = false, max = 16 },
+        keys = { type = 'enum', required = false, values = { 'in_vehicle', 'lot_safe', 'with_owner', 'none' } },
+        condition = { type = 'string', required = false, max = 500 },
+        contents = { type = 'string', required = false, max = 1000 },
     },
 
     ImpoundAuthorize = {

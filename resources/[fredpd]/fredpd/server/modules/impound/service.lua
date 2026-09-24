@@ -160,6 +160,64 @@ function Impound.sameModel(stored, onStreet)
     return a % 4294967296 == b % 4294967296
 end
 
+-- -----------------------------------------------------------------------------
+-- The lot (0037)
+-- -----------------------------------------------------------------------------
+
+--- An agency's lots, numbered in the order they were placed: a lot has no
+--- name of its own (a placement is named by a locale key), so "lot 2" is what
+--- the screen and the tow both call it.
+---
+--- @param placements table id -> placement, as the placement cache holds them
+--- @param usable fun(placement): boolean whether this agency may use it
+--- @return table list of { id, number, x, y, z }
+function Impound.lots(placements, usable)
+    local list = {}
+
+    for _, placement in pairs(placements or {}) do
+        if placement.kind == 'impound_lot' and placement.enabled ~= false and placement.enabled ~= 0
+            and usable(placement)
+        then
+            list[#list + 1] = { id = placement.id, x = placement.x, y = placement.y, z = placement.z }
+        end
+    end
+
+    table.sort(list, function(a, b) return a.id < b.id end)
+    for index, lot in ipairs(list) do lot.number = index end
+
+    return list
+end
+
+--- The lot nearest a position, or nil when the agency has none.
+function Impound.nearestLot(lots, at)
+    if not at then return nil end
+
+    local best, bestDistance = nil, math.huge
+    for _, lot in ipairs(lots) do
+        local dx, dy, dz = lot.x - at.x, lot.y - at.y, (lot.z or 0) - (at.z or 0)
+        local distance = dx * dx + dy * dy + dz * dz
+        if distance < bestDistance then best, bestDistance = lot, distance end
+    end
+
+    return best
+end
+
+--- Is this id one of the agency's lots?
+function Impound.isLot(lots, id)
+    for _, lot in ipairs(lots) do
+        if lot.id == id then return true end
+    end
+
+    return false
+end
+
+--- A free-text field trimmed, nil when it says nothing.
+function Impound.text(value)
+    if type(value) ~= 'string' then return nil end
+    local trimmed = value:match('^%s*(.-)%s*$')
+    return trimmed ~= '' and trimmed or nil
+end
+
 FredPD.Modules.impound = Impound
 
 return Impound

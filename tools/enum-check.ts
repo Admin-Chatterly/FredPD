@@ -156,6 +156,7 @@ const PAIRED: Record<string, keyof typeof enums> = {
 
   // Impound (0020, spec 7.15).
   ck_fpd_impound_reason: 'IMPOUND_HELD_REASONS',
+  ck_fpd_impound_keys: 'IMPOUND_KEYS',
 
   // Field interviews and stops (0035, spec 7.14).
   ck_fpd_fi_cards_reason: 'FI_REASONS',
@@ -270,10 +271,13 @@ function inListConstraints(source: string): Map<string, Constraint> {
   // VARCHAR(16) on another in the same migration, and taking the narrower one
   // reported a shipped, correct table as broken. A checker that cries wolf is
   // worse than no checker, because the next real finding gets waved through.
-  const blocks = clean.split(/CREATE\s+TABLE/i).slice(1);
+  // `ALTER TABLE` blocks too: a constraint added to a shipped table (0037's
+  // `ck_fpd_impound_keys`) is as much a vocabulary as one in a CREATE, and
+  // before this it was never compared with anything.
+  const blocks = clean.split(/(?:CREATE|ALTER)\s+TABLE/i).slice(1);
 
   const pattern =
-    /CONSTRAINT\s+`([a-z0-9_]+)`\s+CHECK\s*\(\s*`([a-z0-9_]+)`\s+IN\s*\(([^)]*)\)/gi;
+    /CONSTRAINT\s+(?:IF\s+NOT\s+EXISTS\s+)?`([a-z0-9_]+)`\s+CHECK\s*\(\s*`([a-z0-9_]+)`\s+IN\s*\(([^)]*)\)/gi;
 
   for (const block of blocks) {
     const widths = new Map<string, number>();

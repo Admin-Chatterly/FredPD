@@ -28,6 +28,7 @@ import {
   HOTLIST_REASONS,
   FI_REASONS,
   IMPOUND_HELD_REASONS,
+  IMPOUND_KEYS,
   LOCATION_HAZARD_KINDS,
   LOCATION_KEYHOLDER_ROLES,
   LOCATION_KINDS,
@@ -2721,13 +2722,9 @@ export const schemas = {
     heldReasonKey: { type: 'enum', required: true, values: IMPOUND_HELD_REASONS },
     feePerDay: { type: 'integer', required: false, min: 0 },
     classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+    lotId: { type: 'integer', required: false, min: 1 },
   },
 
-  /**
-   * Impounding the car in front of you (ox_target, spec 7.15, ADR-016). The
-   * plate and model are read off the car by the server; the client names only
-   * the entity and the reason.
-   */
   // --------------------------------------- field interviews and stops (7.14)
 
   /**
@@ -2836,9 +2833,28 @@ export const schemas = {
     personId: { type: 'integer', required: true, min: 1 },
   },
 
+  /**
+   * Impounding the car in front of you (ox_target, spec 7.15, ADR-016). The
+   * plate and model are read off the car by the server; the client names only
+   * the entity and the reason.
+   */
   ImpoundTow: {
     netId: { type: 'integer', required: true, min: 1 },
     heldReasonKey: { type: 'enum', required: true, values: IMPOUND_HELD_REASONS },
+  },
+
+  /**
+   * Where a held car stands and what it was found with (0037). `lotId` must
+   * be an impound_lot placement usable by the session's agency.
+   */
+  ImpoundInventory: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    lotId: { type: 'integer', required: false, min: 1 },
+    bay: { type: 'string', required: false, max: 16 },
+    keys: { type: 'enum', required: false, values: IMPOUND_KEYS },
+    condition: { type: 'string', required: false, max: 500 },
+    contents: { type: 'string', required: false, max: 1000 },
   },
 
   ImpoundAuthorize: {

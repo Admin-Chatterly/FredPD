@@ -5,6 +5,7 @@
   import { fieldList, type Failure } from '../shared/failure';
   import ConfirmDialog from '../shared/ConfirmDialog.svelte';
   import { isStub, type Maybe, type Restricted } from './types';
+  import { IMPOUND_KEYS } from '@fredpd/schema';
 
   /**
    * Vehicle impound (spec 7.15). `feeOwed` is computed server-side, fresh on
@@ -25,6 +26,20 @@
     releasedAt?: number | null;
     feePaid: boolean;
     version: number;
+    /** The lot it stands in (0037), by number; the id only on `impound.get`. */
+    lotId?: number | null;
+    lotNumber?: number | null;
+    bay?: string | null;
+    keysLocation?: string | null;
+    conditionNote?: string | null;
+    contents?: string | null;
+    inventoryAt?: number | null;
+    inventoryByCallsign?: string | null;
+  }
+
+  interface Lot {
+    id: number;
+    number: number;
   }
 
   const HELD_REASONS = ['investigative', 'evidence', 'abandoned', 'dui', 'unregistered', 'other'];
@@ -32,16 +47,25 @@
   const FIELD_LABELS: Record<string, string> = {
     plate: 'impound.field.plate',
     heldReasonKey: 'impound.field.heldReason',
+    lotId: 'impound.field.lot',
+    bay: 'impound.field.bay',
+    keys: 'impound.field.keys',
+    condition: 'impound.field.condition',
+    contents: 'impound.field.contents',
   };
 
   let rows = $state<Maybe<ImpoundRow>[]>([]);
+  /** This agency's lots, as the server numbered them. */
+  let lots = $state<Lot[]>([]);
+  let inventoryOpen = $state(false);
+  let inventoryForm = $state({ lotId: '', bay: '', keys: '', condition: '', contents: '' });
   let detail = $state<ImpoundRow | null>(null);
   let failure = $state<Failure | null>(null);
   let busy = $state(false);
   let heldOnly = $state(true);
   let status = $state('');
 
-  let createForm = $state({ plate: '', model: '', heldReasonKey: HELD_REASONS[0], feePerDay: 0 });
+  let createForm = $state({ plate: '', model: '', heldReasonKey: HELD_REASONS[0], feePerDay: 0, lotId: '' });
   let feePaid = $state(false);
   let confirmingRelease = $state(false);
   let trigger: HTMLButtonElement | null = null;
@@ -51,13 +75,14 @@
   async function load(): Promise<void> {
     busy = true;
 
-    const response = await nui.call<{ impounds: Maybe<ImpoundRow>[] }>('impound.list', {
+    const response = await nui.call<{ impounds: Maybe<ImpoundRow>[]; lots?: Lot[] }>('impound.list', {
       held: heldOnly ? true : undefined,
       limit: 100,
     });
 
     if (response.ok) {
       rows = response.data.impounds ?? [];
+      lots = response.data.lots ?? [];
       failure = null;
     } else {
       failure = response;
@@ -69,10 +94,12 @@
   async function open(id: number): Promise<void> {
     busy = true;
 
-    const response = await nui.call<{ impound: ImpoundRow }>('impound.get', { id });
+    const response = await nui.call<{ impound: ImpoundRow; lots?: Lot[] }>('impound.get', { id });
 
     if (response.ok) {
       detail = response.data.impound;
+      lots = response.data.lots ?? lots;
+      inventoryOpen = false;
       failure = null;
     } else {
       detail = null;
@@ -91,12 +118,13 @@
       model: createForm.model || undefined,
       heldReasonKey: createForm.heldReasonKey,
       feePerDay: createForm.feePerDay || undefined,
+      lotId: Number(createForm.lotId) || undefined,
     });
 
     if (response.ok) {
       failure = null;
       status = t('impound.created', { number: response.data.number });
-      createForm = { plate: '', model: '', heldReasonKey: HELD_REASONS[0], feePerDay: 0 };
+      createForm = { plate: '', model: '', heldReasonKey: HELD_REASONS[0], feePerDay: 0, lotId: '' };
       await Promise.all([load(), open(response.data.id)]);
     } else {
       failure = response;
@@ -137,6 +165,52 @@
       failure = response;
       busy = false;
     }
+  }
+
+  function startInventory(): void {
+    if (!detail) return;
+    inventoryForm = {
+      lotId: detail.lotId ? String(detail.lotId) : '',
+      bay: detail.bay ?? '',
+      keys: detail.keysLocation ?? '',
+      condition: detail.conditionNote ?? '',
+      contents: detail.contents ?? '',
+    };
+    inventoryOpen = true;
+    failure = null;
+  }
+
+  async function saveInventory(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    if (!detail || busy) return;
+
+    busy = true;
+    const id = detail.id;
+    const response = await nui.call('impound.inventory', {
+      id,
+      version: detail.version,
+      lotId: Number(inventoryForm.lotId) || undefined,
+      bay: inventoryForm.bay || undefined,
+      keys: inventoryForm.keys || undefined,
+      condition: inventoryForm.condition || undefined,
+      contents: inventoryForm.contents || undefined,
+    });
+
+    if (response.ok) {
+      failure = null;
+      status = t('impound.inventory.saved');
+      await Promise.all([open(id), load()]);
+    } else {
+      failure = response;
+      busy = false;
+    }
+  }
+
+  function lotText(row: { lotNumber?: number | null; bay?: string | null }): string {
+    if (!row.lotNumber) return '—';
+    return row.bay
+      ? t('impound.lot.withBay', { number: row.lotNumber, bay: row.bay })
+      : t('impound.lot.name', { number: row.lotNumber });
   }
 
   function cancelConfirm(): void {
@@ -204,6 +278,17 @@
       {t('impound.field.feePerDay')}
       <input type="number" bind:value={createForm.feePerDay} min="0" class="w-24 border border-[var(--color-border)] px-2 py-1" />
     </label>
+    {#if lots.length > 0}
+      <label class="flex flex-col gap-1 text-xs">
+        {t('impound.field.lot')}
+        <select bind:value={createForm.lotId} class="border border-[var(--color-border)] px-2 py-1">
+          <option value="">{t('impound.lot.none')}</option>
+          {#each lots as lot (lot.id)}
+            <option value={String(lot.id)}>{t('impound.lot.name', { number: lot.number })}</option>
+          {/each}
+        </select>
+      </label>
+    {/if}
     <button type="submit" class="border border-[var(--color-border)] px-3 py-1 text-xs" disabled={busy}>
       {t('impound.action.create')}
     </button>
@@ -223,13 +308,14 @@
             <tr>
               <th class="px-2 py-1 text-left font-semibold">{t('impound.field.plate')}</th>
               <th class="px-2 py-1 text-left font-semibold">{t('impound.status.held')}</th>
+              <th class="px-2 py-1 text-left font-semibold">{t('impound.field.lot')}</th>
             </tr>
           </thead>
           <tbody>
             {#each rows as row, index (index)}
               {#if isStub(row)}
                 <tr class="border-t border-[var(--color-border)]">
-                  <td class="px-2 py-1 text-[var(--color-ink-muted)]" colspan="2">
+                  <td class="px-2 py-1 text-[var(--color-ink-muted)]" colspan="3">
                     {t('records.restricted.title')} — {stubContact(row)}
                   </td>
                 </tr>
@@ -248,6 +334,7 @@
                   <td class="px-2 py-1">
                     {row.releasedAt ? t('impound.status.released') : t('impound.status.held')}
                   </td>
+                  <td class="px-2 py-1">{lotText(row)}</td>
                 </tr>
               {/if}
             {/each}
@@ -276,7 +363,82 @@
             <dt>{t('impound.field.feeOwed')}</dt>
             <dd>{detail.feeOwed ?? 0}</dd>
           </div>
+          <div class="flex justify-between border-t border-[var(--color-border)] py-1">
+            <dt>{t('impound.field.lot')}</dt>
+            <dd>{lotText(detail)}</dd>
+          </div>
+          <div class="flex justify-between border-t border-[var(--color-border)] py-1">
+            <dt>{t('impound.field.keys')}</dt>
+            <dd>{detail.keysLocation ? t(`impound.keys.${detail.keysLocation}`) : '—'}</dd>
+          </div>
+          <div class="border-t border-[var(--color-border)] py-1">
+            <dt>{t('impound.field.condition')}</dt>
+            <dd class="whitespace-pre-wrap">{detail.conditionNote ?? '—'}</dd>
+          </div>
+          <div class="border-t border-[var(--color-border)] py-1">
+            <dt>{t('impound.field.contents')}</dt>
+            <dd class="whitespace-pre-wrap">{detail.contents ?? '—'}</dd>
+          </div>
+          {#if detail.inventoryAt}
+            <p class="border-t border-[var(--color-border)] py-1 text-[var(--color-ink-muted)]">
+              {t('impound.inventory.by', {
+                callsign: detail.inventoryByCallsign ?? '—',
+                at: formatMoment(detail.inventoryAt),
+              })}
+            </p>
+          {/if}
         </dl>
+
+        {#if !detail.releasedAt}
+          {#if inventoryOpen}
+            <form class="mb-3 flex flex-col gap-2 border border-[var(--color-border)] p-2" onsubmit={saveInventory}>
+              <div class="flex flex-wrap gap-2">
+                <label class="flex flex-col gap-1 text-xs">
+                  {t('impound.field.lot')}
+                  <select bind:value={inventoryForm.lotId} class="border border-[var(--color-border)] px-2 py-1">
+                    <option value="">{t('impound.lot.none')}</option>
+                    {#each lots as lot (lot.id)}
+                      <option value={String(lot.id)}>{t('impound.lot.name', { number: lot.number })}</option>
+                    {/each}
+                  </select>
+                </label>
+                <label class="flex flex-col gap-1 text-xs">
+                  {t('impound.field.bay')}
+                  <input bind:value={inventoryForm.bay} maxlength="16" class="w-20 border border-[var(--color-border)] px-2 py-1" />
+                </label>
+                <label class="flex flex-col gap-1 text-xs">
+                  {t('impound.field.keys')}
+                  <select bind:value={inventoryForm.keys} class="border border-[var(--color-border)] px-2 py-1">
+                    <option value="">{t('impound.keys.unknown')}</option>
+                    {#each IMPOUND_KEYS as key (key)}
+                      <option value={key}>{t(`impound.keys.${key}`)}</option>
+                    {/each}
+                  </select>
+                </label>
+              </div>
+              <label class="flex flex-col gap-1 text-xs">
+                {t('impound.field.condition')}
+                <textarea rows="2" bind:value={inventoryForm.condition} maxlength="500" class="border border-[var(--color-border)] px-2 py-1"></textarea>
+              </label>
+              <label class="flex flex-col gap-1 text-xs">
+                {t('impound.field.contents')}
+                <textarea rows="3" bind:value={inventoryForm.contents} maxlength="1000" class="border border-[var(--color-border)] px-2 py-1"></textarea>
+              </label>
+              <div class="flex gap-2">
+                <button type="submit" class="border border-[var(--color-border)] px-3 py-1 text-xs">
+                  {t('impound.inventory.save')}
+                </button>
+                <button type="button" class="border border-[var(--color-border)] px-3 py-1 text-xs" onclick={() => (inventoryOpen = false)}>
+                  {t('form.cancel')}
+                </button>
+              </div>
+            </form>
+          {:else}
+            <button type="button" class="mb-3 border border-[var(--color-border)] px-3 py-1 text-xs" disabled={busy} onclick={startInventory}>
+              {detail.inventoryAt ? t('impound.inventory.edit') : t('impound.inventory.write')}
+            </button>
+          {/if}
+        {/if}
 
         {#if !detail.releasedAt}
           {#if needsAuthorization(detail.heldReasonKey) && !detail.holdAuthorizedAt}

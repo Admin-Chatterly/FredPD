@@ -117,6 +117,7 @@ Access points are real places or devices. Some features only work at the matchin
 | Booking terminal | Zone in booking | Full | Booking, mugshot, ten-print capture |
 | Dispatch console | Zone or command at the dispatch center | Multi-panel CAD | Call intake, dispatcher tools |
 | Courthouse terminal | Zone at the courthouse | Full | Court calendar, dispositions |
+| Impound lot (`impound_lot`, 0037) | Zone at the tow lot | Opens the impound register | — (a tow is filed at the agency's nearest lot) |
 | Web portal (later) | Browser, Discord login | Full, no in-world actions | Read, write reports, approvals |
 
 ---
@@ -883,8 +884,12 @@ Built. Migration 0020, `server/modules/impound/`.
   - Only a verified tow resolves a lookout on the vehicle (`fredpd:vehicleImpounded`).
   - Releasing that impound puts the car back in the garage. This happens only when no other open hold in any agency has it, and only if the garage row still reads as held (migration 0032).
   - An impound made from the MDT is a record and touches nothing in the world.
-- **Not built:** a lot/location field and a formal tow-lot inventory beyond the plate and model already on the row.
-- **Permissions:** `page.impound` (patrol_basic); `impound.view`, `.create`, `.release` (patrol); `impound.authorize` (supervisor).
+- [M] **The lot and the inventory** (migration 0037).
+  - A lot is a placement of kind `impound_lot`, set in the world like a terminal (3.10), and is numbered per agency by the order it was placed.
+  - A tow is filed at the agency's lot nearest the officer; an impound made from the MDT may name one.
+  - `impound.inventory` records the lot, the bay, where the keys are, the car's condition and what was left in it, with who wrote it and when. It is refused once the car is released, and on a stale version.
+  - Standing at a lot opens the MDT on the impound tab.
+- **Permissions:** `page.impound` (patrol_basic); `impound.view`, `.create` (also the inventory), `.release` (patrol); `impound.authorize` (supervisor).
 
 ### 7.16 Dispatch (CAD) (M4)
 

@@ -19,7 +19,12 @@ local IMPOUND_SELECT <const> = [[
            UNIX_TIMESTAMP(impounded_at) AS impoundedAt, impounded_by AS impoundedBy,
            UNIX_TIMESTAMP(released_at) AS releasedAt, released_by AS releasedBy,
            fee_paid AS feePaid, classification, version,
-           UNIX_TIMESTAMP(towed_at) AS towedAt, garage_plate AS garagePlate
+           UNIX_TIMESTAMP(towed_at) AS towedAt, garage_plate AS garagePlate,
+           lot_id AS lotId, bay, keys_location AS keysLocation, condition_note AS conditionNote,
+           contents, inventory_by AS inventoryBy, UNIX_TIMESTAMP(inventory_at) AS inventoryAt,
+           (SELECT o.callsign FROM fpd_officers o
+             WHERE o.discord_id = fpd_impound.inventory_by AND o.agency_id = fpd_impound.agency_id
+             LIMIT 1) AS inventoryByCallsign
       FROM fpd_impound
 ]]
 
@@ -83,13 +88,15 @@ function Repo.create(input, session)
     values[base + 6] = input.feePerDay or 0
     values[base + 7] = session.discordId
     values[base + 8] = input.classification or 'internal'
+    -- The lot, already checked by the route against the agency's own lots.
+    values[base + 9] = input.lotId
 
     local committed = FredPD.Core.db.transaction(counters.transaction(
         'impound', session.agencyId, nil, { {
             query = [[INSERT INTO fpd_impound
                           (number, agency_id, vehicle_id, plate, model, held_reason_key,
-                           fee_per_day, impounded_by, classification)
-                      VALUES (]] .. counters.numberSql() .. [[, ?, ?, ?, ?, ?, ?, ?, ?)]],
+                           fee_per_day, impounded_by, classification, lot_id)
+                      VALUES (]] .. counters.numberSql() .. [[, ?, ?, ?, ?, ?, ?, ?, ?, ?)]],
             values = values,
         } }))
 
@@ -125,6 +132,22 @@ function Repo.markTowed(id, agencyId, garagePlate)
         [[UPDATE fpd_impound SET towed_at = CURRENT_TIMESTAMP(3), garage_plate = ?
            WHERE id = ? AND agency_id = ? AND towed_at IS NULL]],
         { garagePlate, id, agencyId })
+end
+
+--- Where a held car stands and what it was found with (0037). Only onto a
+--- row still held, at the version the writer read.
+---
+--- @return number rows affected -- 0 when released meanwhile or stale
+function Repo.setInventory(id, agencyId, fields, discordId, expectedVersion)
+    return FredPD.Core.db.execute(
+        [[UPDATE fpd_impound
+             SET lot_id = ?, bay = ?, keys_location = ?, condition_note = ?, contents = ?,
+                 inventory_by = ?, inventory_at = CURRENT_TIMESTAMP(3), version = version + 1
+           WHERE id = ? AND agency_id = ? AND version = ? AND released_at IS NULL]],
+        {
+            fields.lotId, fields.bay, fields.keys, fields.condition, fields.contents,
+            discordId, id, agencyId, expectedVersion,
+        })
 end
 
 --- Is any other impound, in any agency, still holding this garage plate?
