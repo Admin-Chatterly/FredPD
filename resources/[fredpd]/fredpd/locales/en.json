@@ -215,7 +215,8 @@
     "rate_limited": "Discord asked for a pause; try again shortly",
     "discord_error": "Discord could not make the change",
     "discord_unreachable": "Discord did not answer; try again",
-    "target_stale": "their Discord roles could not be read just now; try again shortly"
+    "target_stale": "their Discord roles could not be read just now; try again shortly",
+    "not_here": "you are not at the front desk"
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -244,7 +245,8 @@
         "motorpool": "Where an officer walks up to draw a fleet vehicle.",
         "evidence_bench": "Marks a location for evidence work. No client action is wired to it yet.",
         "fingerprint_scanner": "Collects a fingerprint from whoever uses it.",
-        "impound_lot": "Where impounded vehicles stand. Opens the impound register."
+        "impound_lot": "Where impounded vehicles stand. Opens the impound register.",
+        "public_counter": "A police front desk anyone may use: their own citations and court decisions, and handing in a report."
       },
       "newZone": "New here — area",
       "newProp": "New here — bind to the prop I am looking at",
@@ -264,7 +266,8 @@
       "deleteTitle": "Delete this placement?",
       "deleteBody": "{kind}, {distance} m away. This cannot be undone."
     },
-    "impound_lot": "Impound lot"
+    "impound_lot": "Impound lot",
+    "public_counter": "Front desk"
   },
   "chat": {
     "usage": "Write a message after the command.",
@@ -1163,7 +1166,8 @@
       "ordningsbot": "Citations",
       "impound": "Impound",
       "locations": "Locations",
-      "fi": "Field interviews"
+      "fi": "Field interviews",
+      "public": "From the public"
     },
     "vehicle": {
       "alpr": {
@@ -3215,6 +3219,86 @@
       "export_restricted": "A PDF of a restricted record needs the export permission.",
       "no_paper": "The paper item is not set up on this server.",
       "pdf_off": "PDF export is not available on this server."
+    }
+  },
+  "civilian": {
+    "title": "Police front desk",
+    "visitor": "At the desk: {name}",
+    "close": "Leave the desk",
+    "tab": {
+      "mine": "My matters",
+      "report": "Hand in a report"
+    },
+    "citations": {
+      "title": "My citations",
+      "none": "You have no citations.",
+      "number": "Number",
+      "offence": "Offence",
+      "amount": "Amount",
+      "issued": "Issued",
+      "due": "Pay by",
+      "status": "Status"
+    },
+    "court": {
+      "title": "Decisions about me",
+      "none": "No prosecution decisions name you.",
+      "number": "Number",
+      "decision": "Decision",
+      "decided": "Decided",
+      "verdict": "Verdict",
+      "sentence": "Sentence",
+      "months": "{months} months",
+      "life": "Life imprisonment"
+    },
+    "reports": {
+      "title": "Reports I have handed in",
+      "none": "You have not handed in any reports.",
+      "number": "Number",
+      "kind": "Kind",
+      "status": "Status",
+      "handedIn": "Handed in"
+    },
+    "form": {
+      "kind": "What is it about?",
+      "occurredAt": "When did it happen? (if known)",
+      "place": "Where did it happen?",
+      "property": "What was taken? Include serial numbers if you have them.",
+      "description": "Describe what happened",
+      "submit": "Hand in",
+      "complaintNote": "A complaint about the police is read by internal affairs, not by the officers it concerns."
+    },
+    "received": "Your report was received. Its number is {number}."
+  },
+  "public": {
+    "kind": {
+      "stolen_property": "Stolen property",
+      "complaint": "Complaint about the police"
+    },
+    "status": {
+      "received": "Received",
+      "handled": "Handled",
+      "rejected": "Rejected"
+    },
+    "notify": {
+      "received": "A report from the public came in: {number}"
+    },
+    "inbox": {
+      "title": "Reports from the public",
+      "none": "Nothing has been handed in.",
+      "filter": "Show",
+      "all": "All",
+      "reporter": "Handed in by",
+      "unregistered": "not in the register",
+      "occurredAt": "Occurred",
+      "place": "Place",
+      "property": "Property",
+      "description": "Description",
+      "handledNote": "Note",
+      "handle": "Mark as handled",
+      "reject": "Reject",
+      "confirmHandle": "Mark {number} as handled?",
+      "confirmReject": "Reject {number}?",
+      "done": "{number} is closed."
     }
   }
 }

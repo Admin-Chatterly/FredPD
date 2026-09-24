@@ -90,6 +90,12 @@ local function readablePersoner(session, anmalanId)
     return out
 end
 
+--- For another module that links to an anmälan (the public-report inbox,
+--- 7.29): the row when this session may read it, through the same check.
+FredPD.Modules.anmalanReadable = function(session, id)
+    return (readable(session, id))
+end
+
 --- Reads a förundersökning the session is allowed to see, or refuses.
 ---
 --- The FU half had no equivalent of `readable` and its write routes went

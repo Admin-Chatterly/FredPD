@@ -145,17 +145,37 @@ end)
 -- Server feed
 -- -----------------------------------------------------------------------------
 
-RegisterNetEvent('fredpd:placements', function(payload)
-    placements = {}
+--- Two feeds, drawn as one: the officer's own (pushed with the session) and
+--- the public desks every player is told about (7.29, pulled). Neither
+--- replaces the other, so an officer who signs off still sees the desk.
+local pushed, public = {}, {}
 
-    for index = 1, #(payload.placements or {}) do
-        local placement = payload.placements[index]
-        placements[placement.id] = placement
-    end
+local function rebuild()
+    placements = {}
+    for id, placement in pairs(public) do placements[id] = placement end
+    for id, placement in pairs(pushed) do placements[id] = placement end
 
     setActive(nil)
     spawnPeds()
+end
+
+RegisterNetEvent('fredpd:placements', function(payload)
+    pushed = {}
+
+    for index = 1, #(payload.placements or {}) do
+        local placement = payload.placements[index]
+        pushed[placement.id] = placement
+    end
+
+    rebuild()
 end)
+
+--- The public desks, from `placements.public`.
+function Placements.setPublic(list)
+    public = {}
+    for index = 1, #(list or {}) do public[list[index].id] = list[index] end
+    rebuild()
+end
 
 AddEventHandler('onResourceStop', function(resource)
     if resource == GetCurrentResourceName() then

@@ -312,6 +312,30 @@ again: a helper reached from a public route has to be read with the same
 question in mind, because CI will not ask it. A third public route is a decision
 to be argued for in an ADR, not a convenience. See ADR-013.
 
+#### 3.5.2 The subject tier
+
+Civilian mode (7.29) needs a caller with no session to reach records, but only
+their own. `route.subject` (ADR-023) sits between the two tiers above:
+
+```
+route.subject   rate limit → schema → subject → handler → audit → response
+```
+
+- **The wrapper resolves the subject.** `FredPD.Core.subject.resolve(src, placementId)`
+  requires the player to be standing at a public placement, checked on the server,
+  and returns the character the framework says they are playing, plus that
+  character's person record. The handler receives this subject, never a session
+  and never a bare `src`.
+- **The handler reads only what is keyed on the subject.** Other modules supply it
+  through `*ForSubject` functions, which show only records that are not restricted:
+  open or internal, in no compartment, and not sealed.
+- **CI enforces this.** `wiring-check.ts` fails:
+  - a subject route missing from `SUBJECT_ROUTES`;
+  - a subject handler that names the session, a permission set, an access check
+    or the resolver;
+  - a subject handler that never reads `subject.`.
+- **A new subject route is a decision with an ADR.**
+
 ### 3.6 Realtime updates
 
 - Sessions subscribe to channels while a view is open: `unit:<id>`, `call:<id>`, `record:<type>:<id>`, `board:<agency>`, `map:<agency>`.
@@ -1118,6 +1142,13 @@ Built (the disciplinary file only).
 ### 7.29 Civilian and legal access (S, M6)
 
 - [S] Civilian mode: own citations, fines, court dates, complaint form, stolen-property report (based on ps-mdt v3 civilian mode).
+- **Built (0040, ADR-023)** as a police front desk, a `public_counter` placement that any player can use.
+  - **The visitor** sees their own citations (with payment status), the prosecution decisions and verdicts that name them, and the reports they have handed in. Only records that are not restricted are shown.
+  - **Handing in:** the visitor can hand in a stolen-property report or a complaint about the police (`fpd_public_reports`, numbered `{AGENCY}-M{YY}-{######}`), up to `civilian.perDay` per character.
+  - **Officers** read these on the Records tab *From the public* (`public.report.view`, patrol) and close them as handled or rejected (`public.report.handle`).
+  - **Complaints** are read and closed only with `ia.case.view` / `ia.case.manage`. Whoever may read a kind is notified when one comes in.
+  - **Not yet built:** court *dates*, because hearings are not scheduled in FredPD yet.
+- **Permissions:** `public.report.view`, `public.report.handle`.
 - [S] Defense attorney mode: assigned discovery packages only.
 
 ### 7.30 Administration and system health (M1 basic, M7 full)
@@ -1825,6 +1856,7 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Spaning | `spaning.view`, `spaning.create` |
 | Enforcement | `rms.arrest.create`, `rms.citation.issue`, `rms.citation.void`, `rms.fi.create`, `rms.fi.view`, `rms.stops.create`, `rms.stops.view`, `rms.impound.create`, `rms.impound.release`, `rms.impound.hold.release`, `rms.warrant.serve` |
 | Printing | `document.print`, `document.export.restricted` (ADR-020) |
+| Reports from the public | `public.report.view`, `public.report.handle` (7.29; complaints need `ia.case.view` / `ia.case.manage`) |
 | Ordningsbot and impound | `page.ordningsbot`, `ordningsbot.view`, `ordningsbot.issue`, `ordningsbot.contest`, `ordningsbot.pay`, `ordningsbot.void`, `ordningsbot.tariff.view`, `ordningsbot.tariff.edit` (ADR-018), `page.impound`, `impound.view`, `impound.create`, `impound.release`, `impound.authorize` — the keys 7.11 and 7.15 shipped under |
 | Investigations (intelligence cases, §10) | `inv.case.create`, `inv.case.view`, `inv.case.edit`, `inv.case.assign`, `inv.case.close` |
 | Booking | `booking.view`, `booking.intake`, `booking.release` (this row's `booking.create`/`booking.biometrics.capture` were this catalog's own initial guess at names 7.9 shipped under `booking.intake` instead — including 8.8's ten-print capture, `booking.tenPrint.capture`, which reuses it rather than adding a fifth key) |
@@ -1966,6 +1998,7 @@ row it came from.
 | Åtal | `atal` | `YYYY` | `A{YY}-{#####}` | A26-00014 |
 | Impound | `impound` | `YYYY` | `I{YY}-{#####}` | I26-00019 |
 | Printed document | `document` | `YYYY` | `{AGENCY}-D{YY}-{######}` | LSPD-D26-000004 |
+| Report from the public | `public_report` | `YYYY` | `{AGENCY}-M{YY}-{######}` | LSPD-M26-000012 |
 | Internal affairs case | `ia_case` | `YYYY` | `IA{YY}-{#####}` | IA26-00003 |
 
 **The `year` column is a scope key, not a year.** It carries `0` for a sequence

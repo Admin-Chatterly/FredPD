@@ -215,7 +215,8 @@
     "rate_limited": "Discord bad om en paus; försök igen strax",
     "discord_error": "Discord kunde inte göra ändringen",
     "discord_unreachable": "Discord svarade inte; försök igen",
-    "target_stale": "personens Discord-roller gick inte att läsa just nu; försök igen strax"
+    "target_stale": "personens Discord-roller gick inte att läsa just nu; försök igen strax",
+    "not_here": "du står inte vid receptionen"
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -244,7 +245,8 @@
         "motorpool": "Där en officer går fram för att kvittera ut ett fordon.",
         "evidence_bench": "Markerar en plats för bevishantering. Ingen klientfunktion är kopplad till den ännu.",
         "fingerprint_scanner": "Tar ett fingeravtryck från den som använder den.",
-        "impound_lot": "Där bärgade och omhändertagna fordon ställs upp. Öppnar registret över omhändertagna fordon."
+        "impound_lot": "Där bärgade och omhändertagna fordon ställs upp. Öppnar registret över omhändertagna fordon.",
+        "public_counter": "En reception som alla kan använda: egna ordningsböter och domstolsbeslut, och att lämna in en anmälan."
       },
       "newZone": "Ny här — område",
       "newProp": "Ny här — koppla till föremålet jag tittar på",
@@ -264,7 +266,8 @@
       "deleteTitle": "Ta bort placeringen?",
       "deleteBody": "{kind}, {distance} m härifrån. Det går inte att ångra."
     },
-    "impound_lot": "Uppställningsplats"
+    "impound_lot": "Uppställningsplats",
+    "public_counter": "Polisens reception"
   },
   "chat": {
     "usage": "Skriv ett meddelande efter kommandot.",
@@ -1163,7 +1166,8 @@
       "ordningsbot": "Ordningsböter",
       "impound": "Beslag",
       "locations": "Adresser",
-      "fi": "Kontaktkort"
+      "fi": "Kontaktkort",
+      "public": "Från allmänheten"
     },
     "vehicle": {
       "alpr": {
@@ -3215,6 +3219,86 @@
       "export_restricted": "En PDF av en begränsat hemlig handling kräver exportbehörighet.",
       "no_paper": "Pappersföremålet är inte konfigurerat på den här servern.",
       "pdf_off": "PDF-export är inte tillgänglig på den här servern."
+    }
+  },
+  "civilian": {
+    "title": "Polisens reception",
+    "visitor": "Vid receptionen: {name}",
+    "close": "Lämna receptionen",
+    "tab": {
+      "mine": "Mina ärenden",
+      "report": "Lämna in en anmälan"
+    },
+    "citations": {
+      "title": "Mina ordningsböter",
+      "none": "Du har inga ordningsböter.",
+      "number": "Nummer",
+      "offence": "Förseelse",
+      "amount": "Belopp",
+      "issued": "Utfärdad",
+      "due": "Betala senast",
+      "status": "Status"
+    },
+    "court": {
+      "title": "Beslut om mig",
+      "none": "Inga åtalsbeslut gäller dig.",
+      "number": "Nummer",
+      "decision": "Beslut",
+      "decided": "Beslutat",
+      "verdict": "Dom",
+      "sentence": "Påföljd",
+      "months": "{months} månader",
+      "life": "Livstids fängelse"
+    },
+    "reports": {
+      "title": "Anmälningar jag har lämnat in",
+      "none": "Du har inte lämnat in några anmälningar.",
+      "number": "Nummer",
+      "kind": "Typ",
+      "status": "Status",
+      "handedIn": "Inlämnad"
+    },
+    "form": {
+      "kind": "Vad gäller det?",
+      "occurredAt": "När hände det? (om du vet)",
+      "place": "Var hände det?",
+      "property": "Vad togs? Ange serienummer om du har dem.",
+      "description": "Beskriv vad som hände",
+      "submit": "Lämna in",
+      "complaintNote": "Ett klagomål på polisen läses av internutredningen, inte av de poliser det gäller."
+    },
+    "received": "Din anmälan har tagits emot. Den har nummer {number}."
+  },
+  "public": {
+    "kind": {
+      "stolen_property": "Stöld av egendom",
+      "complaint": "Klagomål på polisen"
+    },
+    "status": {
+      "received": "Inkommen",
+      "handled": "Handlagd",
+      "rejected": "Avvisad"
+    },
+    "notify": {
+      "received": "En anmälan från allmänheten har kommit in: {number}"
+    },
+    "inbox": {
+      "title": "Anmälningar från allmänheten",
+      "none": "Inget har lämnats in.",
+      "filter": "Visa",
+      "all": "Alla",
+      "reporter": "Inlämnad av",
+      "unregistered": "finns inte i registret",
+      "occurredAt": "Inträffade",
+      "place": "Plats",
+      "property": "Egendom",
+      "description": "Beskrivning",
+      "handledNote": "Anteckning",
+      "handle": "Markera som handlagd",
+      "reject": "Avvisa",
+      "confirmHandle": "Markera {number} som handlagd?",
+      "confirmReject": "Avvisa {number}?",
+      "done": "{number} är avslutad."
     }
   }
 }

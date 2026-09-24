@@ -362,7 +362,14 @@ Gå in i spelet och skriv `/fredpd placement`:
 
 Därefter väljer du vad placeringen ska öppna: stationsterminal, terminal i
 beslagsrummet, laboratorieterminal, terminal för inskrivning, ledningsplats,
-terminal i domstolen, fordonsdepå eller bevisbänk.
+terminal i domstolen, fordonsdepå, bevisbänk eller **polisens reception**.
+
+Receptionen är den enda placeringen som **alla spelare** kan använda, inte bara
+poliser (7.29, ADR-023). Där ser besökaren sina egna ordningsböter och de
+åtalsbeslut och domar som gäller dem, och kan lämna in en anmälan om stöld
+eller ett klagomål på polisen. Poliserna läser anmälningarna under fliken
+*Från allmänheten* i registret. Klagomål läses bara av den som har
+internutredningens behörighet.
 
 **En placering är en ingång, aldrig en behörighet.** Att koppla ett föremål till
 laboratorieterminalen ger ingen tillgång till laboratoriet — det avgörs

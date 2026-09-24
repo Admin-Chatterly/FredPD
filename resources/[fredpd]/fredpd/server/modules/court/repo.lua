@@ -30,6 +30,13 @@ function Repo.byId(id, agencyId)
         ATAL_SELECT .. ' WHERE id = ? AND agency_id = ?', { id, agencyId })
 end
 
+--- The åtal naming one person as the tilltalade, newest first (7.29).
+function Repo.forPerson(agencyId, personId, limit)
+    return FredPD.Core.db.query(
+        ATAL_SELECT .. ' WHERE agency_id = ? AND person_id = ? ORDER BY decided_at DESC LIMIT ?',
+        { agencyId, personId, limit })
+end
+
 function Repo.byFuId(fuId, agencyId)
     return FredPD.Core.db.single(
         ATAL_SELECT .. ' WHERE fu_id = ? AND agency_id = ?', { fuId, agencyId })

@@ -62,6 +62,8 @@ server_scripts {
     'server/core/counters.lua',
     'server/core/pagination.lua',
     'server/core/route.lua',
+    -- The subject tier's identity (7.29, ADR-023): resolved at call time.
+    'server/core/subject.lua',
     -- The gateway outbox (spec 3.7). After `core/db.lua`, which it reads;
     -- physically under `server/bridges/gateway/` alongside the rest of the
     -- link, but loaded here because this is the first point the database
@@ -191,6 +193,11 @@ server_scripts {
     -- Printing (7.28): after the modules whose printers it calls.
     'server/modules/documents/repo.lua',
     'server/modules/documents/routes.lua',
+    -- Civilian mode (7.29): after ordningsbot, court and anmalan, whose
+    -- `*ForSubject` and `anmalanReadable` it calls.
+    'server/modules/civilian/service.lua',
+    'server/modules/civilian/repo.lua',
+    'server/modules/civilian/routes.lua',
     -- Retention (13.3, ADR-021): the sweep on a timer, after every module
     -- whose tables it keeps in check.
     'server/modules/retention/service.lua',

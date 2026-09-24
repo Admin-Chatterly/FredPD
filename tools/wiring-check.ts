@@ -36,6 +36,11 @@ import { fileURLToPath } from 'node:url';
  *      number can write `FredPD.Core.session.get(src)` and have the session
  *      back. This check is what makes the three claims true, so weakening it
  *      silently falsifies three pieces of prose at once.
+ *      6b. The subject tier (ADR-023) is the one exception, and a narrow one:
+ *      a `route.subject` handler may read a repo, because the wrapper has
+ *      already resolved who is asking and the handler reads only what is keyed
+ *      on that subject. It must be in `SUBJECT_ROUTES`, must not name the
+ *      session, permissions or access checks, and must use `subject.`.
  *   7. a route named in `PUBLIC_ROUTES` that is declared with `route.define`.
  *      The assertions in `Route.public` already stop a public route growing a
  *      `perm`; what nothing caught was the other direction, someone converting
@@ -131,6 +136,37 @@ const PUBLIC_ROUTES: Record<string, string> = {
     '8.10: wiping, cleaning, washing and picking up are available to every player, ' +
     'and "police-only restrictions must never block criminal gameplay"',
 };
+
+/**
+ * Routes declared with `route.subject` (ADR-023), and why each exists.
+ *
+ * The subject tier reads the caller's *own* records: the wrapper establishes
+ * who the caller is -- standing at a public desk, as the framework's
+ * character -- before the handler runs. It is the one tier a sessionless
+ * caller can reach a record through, which is why it is a closed list: a
+ * route here that is not `route.subject`, or a `route.subject` not here,
+ * fails, and adding one is a decision with an ADR, as ADR-013 says of the
+ * public tier.
+ */
+const SUBJECT_ROUTES: Record<string, string> = {
+  'civilian.overview':
+    '7.29: a member of the public sees their own citations, court decisions and reports at a front desk',
+  'civilian.report.create':
+    '7.29: a member of the public hands in a stolen-property report or a complaint at a front desk',
+};
+
+/**
+ * What a `route.subject` handler may not name: everything a public handler may
+ * not, except a repo -- its records are the subject's own, keyed on the
+ * subject the wrapper resolved, and the handler must say so by using it.
+ */
+const SUBJECT_HANDLER_FORBIDDEN: readonly { readonly pattern: RegExp; readonly what: string }[] = [
+  { pattern: /\bFredPD\.Core\.session\b/, what: 'FredPD.Core.session' },
+  { pattern: /\bFredPD\.Core\.perms\b/, what: 'FredPD.Core.perms' },
+  { pattern: /\bFredPD\.Core\.access\b/, what: 'FredPD.Core.access' },
+  { pattern: /\bFredPD\.Modules\.access\b/, what: 'FredPD.Modules.access' },
+  { pattern: /\bFredPD\.Core\.subject\b/, what: 'FredPD.Core.subject (the wrapper resolves it, once)' },
+];
 
 /**
  * What a `route.public` handler may not name.
@@ -485,6 +521,8 @@ if (nuiRoutes.size === 0) fail('client/: found no route registrations or calls a
 
 /** Names from `PUBLIC_ROUTES` that a `routes.lua` was found to declare at all. */
 const requiredPublicSeen = new Set<string>();
+/** Subject routes found, to report one listed in SUBJECT_ROUTES that no file declares. */
+const subjectSeen = new Set<string>();
 
 for (const file of await walk(core)) {
   if (!file.endsWith('routes.lua')) continue;
@@ -500,7 +538,7 @@ for (const file of await walk(core)) {
   // envelope, same schema table (ADR-013). The only difference that reaches
   // here is that a public route declares no `perm`, which the grant check below
   // already treats as "nothing to look up".
-  const defines = [...source.matchAll(/route\.(define|public)\(\{([\s\S]*?)handler\s*=/g)];
+  const defines = [...source.matchAll(/route\.(define|public|subject)\(\{([\s\S]*?)handler\s*=/g)];
 
   for (let index = 0; index < defines.length; index += 1) {
     const define = defines[index];
@@ -594,6 +632,35 @@ for (const file of await walk(core)) {
       }
     }
 
+    // 6b. The subject tier (ADR-023): a closed list, and handlers that read
+    //     only what is keyed on the subject the wrapper resolved.
+    if (tier === 'subject') {
+      subjectSeen.add(name);
+
+      if (SUBJECT_ROUTES[name] === undefined) {
+        fail(
+          `${shown}: route '${name}' is declared with route.subject but is not in SUBJECT_ROUTES — ` +
+            `the subject tier is the one way a sessionless caller reaches a record, and each ` +
+            `route on it is a decision with an ADR (ADR-023)`,
+        );
+      }
+
+      for (const { pattern, what } of SUBJECT_HANDLER_FORBIDDEN) {
+        if (pattern.test(handlerBody)) {
+          fail(`${shown}: subject route '${name}' names ${what} in its handler (ADR-023)`);
+        }
+      }
+
+      if (!/\bsubject\./.test(handlerBody)) {
+        fail(
+          `${shown}: subject route '${name}' never reads the subject it was handed — a subject ` +
+            `handler reads only what is keyed on the caller the wrapper resolved (ADR-023)`,
+        );
+      }
+    } else if (SUBJECT_ROUTES[name] !== undefined) {
+      fail(`${shown}: route '${name}' must be declared with route.subject (ADR-023), not route.${tier}`);
+    }
+
     // 7. The conversion back, which is spec 8.10's bug returning.
     const mustBePublic = PUBLIC_ROUTES[name];
 
@@ -612,6 +679,10 @@ for (const file of await walk(core)) {
   }
 }
 
+for (const [name, why] of Object.entries(SUBJECT_ROUTES)) {
+  if (!subjectSeen.has(name)) fail(`routes: '${name}' is in SUBJECT_ROUTES and no routes.lua declares it — ${why}`);
+}
+
 for (const [name, why] of Object.entries(PUBLIC_ROUTES)) {
   if (requiredPublicSeen.has(name)) continue;
 
@@ -626,7 +697,7 @@ const defined = new Set<string>();
 for (const file of await walk(core)) {
   if (!file.endsWith('.lua')) continue;
   const source = await readFile(file, 'utf8');
-  for (const match of source.matchAll(/route\.(?:define|public)\(\{[\s\S]*?\bname\s*=\s*'([^']+)'/g)) {
+  for (const match of source.matchAll(/route\.(?:define|public|subject)\(\{[\s\S]*?\bname\s*=\s*'([^']+)'/g)) {
     defined.add(match[1] ?? '');
   }
 }
@@ -637,7 +708,7 @@ for (const name of nuiRoutes) {
   if (name.startsWith('fredpd:')) continue;
 
   if (!defined.has(name)) {
-    fail(`client/: '${name}' is registered or called, but no route.define or route.public declares it`);
+    fail(`client/: '${name}' is registered or called, but no route.define, route.public or route.subject declares it`);
   }
 }
 

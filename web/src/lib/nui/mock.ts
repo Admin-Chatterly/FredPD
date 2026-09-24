@@ -40,7 +40,8 @@ export function createMockBridge(): NuiBridge {
   const handlers = new Map<string, Set<MessageHandler>>();
 
   /**
-   * A paper copy is being read (7.28). The client answers `fredpd:close` by
+   * A paper copy is being read (7.28), or a front desk is open (7.29). The
+   * client answers `fredpd:close` by
    * letting go of the focus and saying `fredpd:close` back, which is what
    * puts the paper away; the mock does the same, only while a paper is
    * open, so Escape elsewhere in the browser does not blank the page.
@@ -83,8 +84,10 @@ export function createMockBridge(): NuiBridge {
   // forwarding those here too would deliver them twice.
   window.addEventListener('message', (event: MessageEvent<NuiMessage>) => {
     const type = event.data?.type;
-    if (type === 'fredpd:open' || type === 'fredpd:close' || type === 'fredpd:paper') emit(event.data);
-    if (type === 'fredpd:paper') paperOpen = true;
+    if (type === 'fredpd:open' || type === 'fredpd:close' || type === 'fredpd:paper' || type === 'fredpd:civilian') {
+      emit(event.data);
+    }
+    if (type === 'fredpd:paper' || type === 'fredpd:civilian') paperOpen = true;
     if (type === 'fredpd:open' || type === 'fredpd:close') paperOpen = false;
   });
 

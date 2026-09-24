@@ -440,6 +440,13 @@ FredPD.Config.server = {
         },
     },
 
+    --- Civilian mode (spec 7.29): a police front desk anybody may use (a
+    --- `public_counter` placement, set up in game). `perDay` is how many
+    --- reports one character may hand in over a day.
+    civilian = {
+        perDay = 5,
+    },
+
     --- Discord role actions (ADR-022): hire, promote, demote and dismiss
     --- from the roster, as a Discord role change the gateway makes with a bot
     --- of its own. Off by default, and needs the gateway (3.7).

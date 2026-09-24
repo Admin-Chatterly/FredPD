@@ -362,6 +362,9 @@ local PERMISSION_CATALOGUE <const> = {
     'document.print',
     'document.export.restricted',
 
+    -- Reports from the public (7.29): the front-desk inbox.
+    'public.report.view', 'public.report.handle',
+
     -- Investigations
     'inv.case.create', 'inv.case.view', 'inv.case.edit', 'inv.case.assign', 'inv.case.close',
 

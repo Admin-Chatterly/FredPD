@@ -357,3 +357,39 @@ route.define({
         return { id = row.id, jailMinutes = jailMinutes }
     end,
 })
+
+-- -----------------------------------------------------------------------------
+-- The front desk (7.29)
+-- -----------------------------------------------------------------------------
+
+--- What a tilltalad is told about the cases against them, at a front desk: the
+--- number, the prosecutor's decision and, once there is one, the verdict and
+--- sentence. Never the reasoning, the note or who decided.
+---
+--- An åtal is read through its förundersökning's access control (it has
+--- none of its own here), and one whose investigation is restricted is not
+--- shown: the desk is not a way round a seal or a compartment.
+---
+--- @return table list of { number, beslut, decidedAt, disposition, sentenceMonths, sentenceLivstid, dispositionAt }
+function FredPD.Modules.courtForSubject(agencyId, personId)
+    if not personId then return {} end
+
+    local out = {}
+    for _, row in ipairs(repo.forPerson(agencyId, personId, 25)) do
+        local control = access.attachControl('case', { { id = row.fuId, classification = row.classification } })[1]
+
+        if control and not accessRules.isRestricted(control) then
+            out[#out + 1] = {
+                number = row.number,
+                beslut = row.beslut,
+                decidedAt = row.decidedAt,
+                disposition = row.disposition,
+                sentenceMonths = row.sentenceMonths,
+                sentenceLivstid = row.sentenceLivstid == 1 or row.sentenceLivstid == true,
+                dispositionAt = row.dispositionAt,
+            }
+        end
+    end
+
+    return out
+end

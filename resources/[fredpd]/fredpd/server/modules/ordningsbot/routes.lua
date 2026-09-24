@@ -169,6 +169,38 @@ end
 
 FredPD.Modules.ordningsbotLicence = Licence
 
+--- A person's own citations, as the front desk shows them to that person
+--- (7.29). No session: the caller has resolved who is standing at the desk
+--- from the server's own identity lookup. Only a citation that is not
+--- restricted -- open or internal, in no compartment, not sealed -- is
+--- shown, the same line a paper copy draws (ADR-020): the subject is told
+--- what a citation handed to them would have said, nothing more.
+---
+--- @return table list of { number, offence, amount, issuedAt, dueAt, status }
+function FredPD.Modules.ordningsbotForSubject(agencyId, personId)
+    if not personId then return {} end
+
+    local rows = access.attachControl(ORDNINGSBOT, repo.forPerson(agencyId, personId, 50))
+    local now = os.time()
+    local out = {}
+
+    for _, row in ipairs(rows) do
+        if not accessRules.isRestricted(row) then
+            local tariff = repo.tariffById(row.tariffId, agencyId)
+            out[#out + 1] = {
+                number = row.number,
+                offence = tariff and (tariff.label or FredPD.t(tariff.labelKey)) or '',
+                amount = tariff and tariff.amount or 0,
+                issuedAt = row.issuedAt,
+                dueAt = row.dueAt,
+                status = service.paymentStatus(row, now),
+            }
+        end
+    end
+
+    return out
+end
+
 -- -----------------------------------------------------------------------------
 -- Reads
 -- -----------------------------------------------------------------------------

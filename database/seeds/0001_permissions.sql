@@ -941,3 +941,17 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
 INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('command', 'personnel.hire'),
     ('command', 'personnel.promote');
+
+-- -----------------------------------------------------------------------------
+-- Reports from the public (spec 7.29, 0040)
+--
+-- A stolen-property report handed in at a front desk is read and closed by
+-- patrol. A complaint about the police is read by internal affairs alone
+-- (`ia.case.view` / `ia.case.manage`), which is why `public.report.view` is
+-- also granted to those who hold the IA keys: it is the door to the inbox,
+-- and the kind decides what is behind it.
+-- -----------------------------------------------------------------------------
+
+INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
+    ('patrol', 'public.report.view'),
+    ('patrol', 'public.report.handle');

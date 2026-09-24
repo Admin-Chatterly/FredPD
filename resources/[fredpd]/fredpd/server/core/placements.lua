@@ -100,4 +100,44 @@ function Placements.playerIsAt(src, placementId, expectedKind)
     return FredPD.Modules.placements.isWithin(placement, position.x, position.y, position.z)
 end
 
+-- -----------------------------------------------------------------------------
+-- Public placements (7.29)
+--
+-- A front desk is the one entrance that is not for officers. Every player is
+-- sent the enabled desks -- geometry only, as every placement is (ADR-006) --
+-- and standing at one is checked here without a session, because the player
+-- standing there usually has none.
+-- -----------------------------------------------------------------------------
+
+local PUBLIC_KINDS <const> = { public_counter = true }
+
+--- The enabled public placements, as a client draws them.
+function Placements.public()
+    local list = {}
+
+    for _, placement in pairs(byId) do
+        if PUBLIC_KINDS[placement.kind] and placement.enabled ~= false then
+            list[#list + 1] = FredPD.Modules.placements.forClient(placement)
+        end
+    end
+
+    return list
+end
+
+--- Is this player -- officer or not -- standing at this public placement?
+--- @return table|nil the placement
+function Placements.publicAt(src, placementId, expectedKind)
+    local placement = byId[placementId]
+    if not placement or not PUBLIC_KINDS[placement.kind] or placement.enabled == false then return nil end
+    if expectedKind and placement.kind ~= expectedKind then return nil end
+
+    local ped = GetPlayerPed(src)
+    if ped == 0 then return nil end
+
+    local position = GetEntityCoords(ped)
+    if not FredPD.Modules.placements.isWithin(placement, position.x, position.y, position.z) then return nil end
+
+    return placement
+end
+
 FredPD.Core.placements = Placements

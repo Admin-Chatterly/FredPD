@@ -181,6 +181,12 @@ function Repo.byId(id, agencyId)
     return db().single(CITATION_SELECT .. ' WHERE id = ? AND agency_id = ?', { id, agencyId })
 end
 
+--- A person's own citations, newest first (7.29, the front desk).
+function Repo.forPerson(agencyId, personId, limit)
+    return db().query(CITATION_SELECT .. ' WHERE agency_id = ? AND person_id = ? ORDER BY issued_at DESC LIMIT ?',
+        { agencyId, personId, limit })
+end
+
 function Repo.list(agencyId, filter, limit)
     local clauses = { 'agency_id = ?' }
     local values = { agencyId }

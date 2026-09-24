@@ -57,6 +57,7 @@ FredPD.PlacementKind = {
     EVIDENCE_BENCH = 'evidence_bench',
     FINGERPRINT_SCANNER = 'fingerprint_scanner',
     IMPOUND_LOT = 'impound_lot',
+    PUBLIC_COUNTER = 'public_counter',
 }
 
 --- How a placement is reached in the world (spec 3.10).
@@ -270,7 +271,7 @@ FredPD.Schema = {
     },
 
     PlacementCreate = {
-        kind = { type = 'enum', required = true, values = { 'station_terminal', 'property_terminal', 'lab_terminal', 'booking_terminal', 'dispatch_console', 'courthouse_terminal', 'motorpool', 'evidence_bench', 'fingerprint_scanner', 'impound_lot' } },
+        kind = { type = 'enum', required = true, values = { 'station_terminal', 'property_terminal', 'lab_terminal', 'booking_terminal', 'dispatch_console', 'courthouse_terminal', 'motorpool', 'evidence_bench', 'fingerprint_scanner', 'impound_lot', 'public_counter' } },
         interaction = { type = 'enum', required = true, values = { 'prop', 'ped', 'zone' } },
         agencyId = { type = 'string', required = false, max = 32 },
         model = { type = 'string', required = false, max = 64 },
@@ -284,7 +285,7 @@ FredPD.Schema = {
 
     PlacementUpdate = {
         id = { type = 'integer', required = true, min = 1 },
-        kind = { type = 'enum', required = false, values = { 'station_terminal', 'property_terminal', 'lab_terminal', 'booking_terminal', 'dispatch_console', 'courthouse_terminal', 'motorpool', 'evidence_bench', 'fingerprint_scanner', 'impound_lot' } },
+        kind = { type = 'enum', required = false, values = { 'station_terminal', 'property_terminal', 'lab_terminal', 'booking_terminal', 'dispatch_console', 'courthouse_terminal', 'motorpool', 'evidence_bench', 'fingerprint_scanner', 'impound_lot', 'public_counter' } },
         interaction = { type = 'enum', required = false, values = { 'prop', 'ped', 'zone' } },
         model = { type = 'string', required = false, max = 64 },
         x = { type = 'number', required = false },
@@ -1579,6 +1580,36 @@ FredPD.Schema = {
 
     DocumentCapabilities = {
 
+    },
+
+    PlacementsPublic = {
+
+    },
+
+    CivilianOverview = {
+        placementId = { type = 'integer', required = true, min = 1 },
+    },
+
+    CivilianReportCreate = {
+        placementId = { type = 'integer', required = true, min = 1 },
+        kind = { type = 'enum', required = true, values = { 'stolen_property', 'complaint' } },
+        description = { type = 'string', required = true, min = 10, max = 2000 },
+        place = { type = 'string', required = false, max = 191 },
+        property = { type = 'string', required = false, max = 500 },
+        occurredAt = { type = 'integer', required = false, min = 1 },
+    },
+
+    PublicReportList = {
+        status = { type = 'enum', required = false, values = { 'received', 'handled', 'rejected' } },
+        limit = { type = 'integer', required = false, min = 1, max = 100 },
+    },
+
+    PublicReportHandle = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        outcome = { type = 'enum', required = true, values = { 'handled', 'rejected' } },
+        note = { type = 'string', required = false, max = 500 },
+        anmalanId = { type = 'integer', required = false, min = 1 },
     },
 
     DocumentPreview = {

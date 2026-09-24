@@ -95,6 +95,8 @@ local KINDS <const> = {
     ia_case = true,
     -- A printed document (7.28, 0039): its own number, printed on every page.
     document = true,
+    -- A report handed in at a front desk (7.29, 0040).
+    public_report = true,
 }
 
 --- The `year` value for a sequence that is not year-scoped.

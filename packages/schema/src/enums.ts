@@ -150,6 +150,11 @@ export const PLACEMENT_KINDS = [
   'fingerprint_scanner',
   /** A tow lot (7.15): where an impounded car stands. */
   'impound_lot',
+  /**
+   * A police front desk (7.29): the one placement any player may use, officer
+   * or not, to see their own citations and hand in a report.
+   */
+  'public_counter',
 ] as const;
 
 export type PlacementKind = (typeof PLACEMENT_KINDS)[number];
@@ -1263,3 +1268,13 @@ export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
 export const DOCUMENT_COPIES = ['paper', 'pdf'] as const;
 
 export type DocumentCopy = (typeof DOCUMENT_COPIES)[number];
+
+/** `ck_fpd_public_reports_kind` (spec 7.29, 0040) -- what a member of the public hands in. */
+export const PUBLIC_REPORT_KINDS = ['stolen_property', 'complaint'] as const;
+
+export type PublicReportKind = (typeof PUBLIC_REPORT_KINDS)[number];
+
+/** `ck_fpd_public_reports_status` (0040). */
+export const PUBLIC_REPORT_STATUSES = ['received', 'handled', 'rejected'] as const;
+
+export type PublicReportStatus = (typeof PUBLIC_REPORT_STATUSES)[number];

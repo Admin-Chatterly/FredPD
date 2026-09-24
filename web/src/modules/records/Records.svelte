@@ -21,6 +21,7 @@
   import Impound from './Impound.svelte';
   import Locations from './Locations.svelte';
   import FieldWork from './FieldWork.svelte';
+  import PublicReports from './PublicReports.svelte';
   import { takePhoto } from '../../lib/photo';
   import { t } from '../../lib/i18n';
   import { formatDate, formatMoment } from '../../lib/time';
@@ -104,7 +105,8 @@
     | 'ordningsbot'
     | 'impound'
     | 'locations'
-    | 'fi';
+    | 'fi'
+    | 'public';
 
   /** Which form's label a rejected field belongs to (spec 3.5). */
   const FIELD_LABELS: Record<string, string> = {
@@ -1275,6 +1277,8 @@
     'locations',
     // Field interview cards and stop data (7.14).
     'fi',
+    // What the public handed in at a front desk (7.29).
+    'public',
   ];
 
   /**
@@ -3469,6 +3473,13 @@
     <Impound />
   {:else if tab === 'locations'}
     <Locations />
+  {:else if tab === 'public'}
+    <PublicReports
+      onOpenPerson={(id) => {
+        tab = 'persons';
+        selectedPersonId = id;
+      }}
+    />
   {:else if tab === 'fi'}
     <FieldWork
       onOpenPerson={(id) => {

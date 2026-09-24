@@ -4032,6 +4032,56 @@ const officers: FixtureOfficer[] = [
   },
 ];
 
+/** Reports handed in at a front desk (7.29, 0040). */
+interface FixturePublicReport {
+  id: number;
+  number: string;
+  kind: 'stolen_property' | 'complaint';
+  reporterName: string;
+  reporterPersonId?: number;
+  occurredAgo?: number;
+  place?: string;
+  description: string;
+  property?: string;
+  status: 'received' | 'handled' | 'rejected';
+  handledNote?: string;
+  version: number;
+  createdAgo: number;
+  /** The fixture desk's own player: whose "my reports" this is. */
+  mine: boolean;
+}
+
+const publicReports: FixturePublicReport[] = [
+  {
+    id: 1,
+    number: 'LSPD-M26-000012',
+    kind: 'stolen_property',
+    reporterName: 'Anna Svensson',
+    reporterPersonId: 1,
+    occurredAgo: 26 * HOUR,
+    place: 'Vespucci Beach parking',
+    description: 'My bicycle was taken from the rack while I was swimming.',
+    property: 'Red Whippet racing bike, frame number WH-44812',
+    status: 'received',
+    version: 1,
+    createdAgo: 20 * HOUR,
+    mine: true,
+  },
+  {
+    id: 2,
+    number: 'LSPD-M26-000013',
+    kind: 'complaint',
+    reporterName: 'Jon Berg',
+    description: 'The officer who stopped me did not give me his number when I asked for it.',
+    status: 'received',
+    version: 1,
+    createdAgo: 3 * HOUR,
+    mine: false,
+  },
+];
+
+let nextPublicReport = 14;
+
 /** The roles role actions may manage (ADR-022), and who holds them. */
 const MANAGED_ROLES = [
   { id: '700000000000000001', kind: 'hire' as const, name: 'Polis' },
@@ -5795,6 +5845,105 @@ export const fixtures: FixtureSet = {
       if (!row) return refuse('not_found');
 
       return { officer: officerRow(row, true) };
+    },
+
+    // ------------------------------------------------------------ civilian mode (7.29)
+
+    'placements.public': () => ({ placements: [] }),
+
+    'civilian.overview': (input) => {
+      const { placementId } = (input ?? {}) as { placementId?: number };
+      if (placementId !== 1) return refuse('conflict', { placementId: 'not_here' });
+
+      return {
+        name: 'Anna Svensson',
+        citations: [
+          {
+            number: 'LSPD-T26-000287',
+            offence: 'Speeding, up to 10 km/h over',
+            amount: 1500,
+            issuedAt: secondsAgo(10 * DAY),
+            dueAt: secondsAgo(-20 * DAY),
+            status: 'unpaid',
+          },
+        ],
+        court: [
+          {
+            number: 'A26-00014',
+            beslut: 'atalad',
+            decidedAt: secondsAgo(40 * DAY),
+            disposition: 'guilty',
+            sentenceMonths: 2,
+            sentenceLivstid: false,
+            dispositionAt: secondsAgo(12 * DAY),
+          },
+        ],
+        reports: publicReports
+          .filter((row) => row.mine)
+          .map((row) => ({ number: row.number, kind: row.kind, status: row.status, createdAt: secondsAgo(row.createdAgo) })),
+      };
+    },
+
+    'civilian.report.create': (input) => {
+      const body = (input ?? {}) as { placementId?: number; kind?: string; description?: string; property?: string; place?: string };
+      if (body.placementId !== 1) return refuse('conflict', { placementId: 'not_here' });
+      if (body.kind !== 'stolen_property' && body.kind !== 'complaint') return refuse('invalid', { kind: 'unknown' });
+      if (!body.description || body.description.trim().length < 10) return refuse('invalid', { description: 'too_short' });
+
+      const number = `LSPD-M26-0000${nextPublicReport++}`;
+      publicReports.unshift({
+        id: publicReports.length + 1,
+        number,
+        kind: body.kind,
+        reporterName: 'Anna Svensson',
+        reporterPersonId: 1,
+        description: body.description.trim(),
+        ...(body.place ? { place: body.place } : {}),
+        ...(body.property ? { property: body.property } : {}),
+        status: 'received',
+        version: 1,
+        createdAgo: 0,
+        mine: true,
+      });
+
+      return { number };
+    },
+
+    'public.report.list': (input) => {
+      const { status } = (input ?? {}) as { status?: string };
+
+      return {
+        reports: publicReports
+          .filter((row) => !status || row.status === status)
+          .map((row) => ({
+            id: row.id,
+            number: row.number,
+            kind: row.kind,
+            reporterName: row.reporterName,
+            reporterPersonId: row.reporterPersonId ?? null,
+            occurredAt: row.occurredAgo === undefined ? null : secondsAgo(row.occurredAgo),
+            place: row.place ?? null,
+            description: row.description,
+            property: row.property ?? null,
+            status: row.status,
+            handledNote: row.handledNote ?? null,
+            version: row.version,
+            createdAt: secondsAgo(row.createdAgo),
+          })),
+      };
+    },
+
+    'public.report.handle': (input) => {
+      const body = (input ?? {}) as { id?: number; version?: number; outcome?: 'handled' | 'rejected'; note?: string };
+      const row = publicReports.find((entry) => entry.id === body.id);
+      if (!row) return refuse('not_found');
+      if (row.version !== body.version || row.status !== 'received') return refuse('conflict', { version: 'stale' });
+
+      row.status = body.outcome ?? 'handled';
+      if (body.note) row.handledNote = body.note;
+      row.version += 1;
+
+      return { id: row.id, number: row.number };
     },
 
     'personnel.roles.get': (input) => {

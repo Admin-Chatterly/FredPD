@@ -1,6 +1,6 @@
 # ADR-013: A public route tier, for the actions spec 8.10 gives to every player
 
-- **Status:** Accepted
+- **Status:** Accepted (amended by ADR-023: a subject tier for a caller's own records)
 - **Date:** 2026-09-18
 - **Spec:** 8.10, 8.3.4, 3.5, 4.1; invariant 3; narrows nothing, adds a second
   tier beside the one ADR-011 relies on

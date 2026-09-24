@@ -14,6 +14,8 @@ import {
   CLASSIFICATIONS,
   DOCUMENT_COPIES,
   DOCUMENT_KINDS,
+  PUBLIC_REPORT_KINDS,
+  PUBLIC_REPORT_STATUSES,
   EVIDENCE_DESTINATIONS,
   EVIDENCE_PACKAGING,
   EVIDENCE_STATUSES,
@@ -2750,6 +2752,42 @@ export const schemas = {
   },
 
   DocumentCapabilities: {},
+
+  // ------------------------------------------------------------ civilian mode (7.29)
+
+  /** Where the public front desks are: geometry only, for every player. */
+  PlacementsPublic: {},
+
+  /** What the player at a front desk is shown of their own records. */
+  CivilianOverview: {
+    placementId: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
+   * A report handed in at a front desk. Who hands it in is never a field:
+   * the server resolves it from the player (invariant 1).
+   */
+  CivilianReportCreate: {
+    placementId: { type: 'integer', required: true, min: 1 },
+    kind: { type: 'enum', required: true, values: PUBLIC_REPORT_KINDS },
+    description: { type: 'string', required: true, min: 10, max: 2000 },
+    place: { type: 'string', required: false, max: 191 },
+    property: { type: 'string', required: false, max: 500 },
+    occurredAt: { type: 'integer', required: false, min: 1 },
+  },
+
+  PublicReportList: {
+    status: { type: 'enum', required: false, values: PUBLIC_REPORT_STATUSES },
+    limit: { type: 'integer', required: false, min: 1, max: 100 },
+  },
+
+  PublicReportHandle: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    outcome: { type: 'enum', required: true, values: ['handled', 'rejected'] },
+    note: { type: 'string', required: false, max: 500 },
+    anmalanId: { type: 'integer', required: false, min: 1 },
+  },
 
   /** What a print would show, and which copies may be made; keeps nothing. */
   DocumentPreview: {

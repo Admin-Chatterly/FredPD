@@ -165,6 +165,9 @@ const PAIRED: Record<string, keyof typeof enums> = {
   // Printed documents (0039).
   ck_fpd_documents_kind: 'DOCUMENT_KINDS',
   ck_fpd_documents_class: 'CLASSIFICATIONS',
+  // Reports from the public (0040, spec 7.29).
+  ck_fpd_public_reports_kind: 'PUBLIC_REPORT_KINDS',
+  ck_fpd_public_reports_status: 'PUBLIC_REPORT_STATUSES',
 
   // Field interviews and stops (0035, spec 7.14).
   ck_fpd_fi_cards_reason: 'FI_REASONS',

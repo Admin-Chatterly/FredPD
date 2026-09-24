@@ -23,6 +23,7 @@
   import Booking from './modules/booking/Booking.svelte';
   import Comms from './modules/comms/Comms.svelte';
   import PaperViewer from './modules/documents/PaperViewer.svelte';
+  import CivilianDesk from './modules/civilian/CivilianDesk.svelte';
   import { parsePaper, type PaperDocument } from './lib/paper';
 
   /**
@@ -311,6 +312,20 @@
   $effect(() => nui.on('fredpd:paper', (message) => (paper = parsePaper(message['document']))));
   $effect(() => nui.on('fredpd:close', () => (paper = null)));
   $effect(() => nui.on('fredpd:open', () => (paper = null)));
+
+  /**
+   * A police front desk (7.29): opened by standing at one, by anybody. Like
+   * a paper copy, it is not the MDT, which stays mounted and hidden beneath.
+   */
+  let desk = $state<number | null>(null);
+  $effect(() =>
+    nui.on('fredpd:civilian', (message) => {
+      const id = Number(message['placementId']);
+      desk = Number.isInteger(id) && id > 0 ? id : null;
+    }),
+  );
+  $effect(() => nui.on('fredpd:close', () => (desk = null)));
+  $effect(() => nui.on('fredpd:open', () => (desk = null)));
 </script>
 
 {#if paper}
@@ -324,7 +339,17 @@
   />
 {/if}
 
-<div class="fredpd-stage" hidden={paper !== null}>
+{#if desk !== null}
+  <CivilianDesk
+    placementId={desk}
+    onClose={() => {
+      // The client's own `fredpd:close` puts it away, as for a paper copy.
+      void nui.call('fredpd:close');
+    }}
+  />
+{/if}
+
+<div class="fredpd-stage" hidden={paper !== null || desk !== null}>
 <div
   class="fredpd-device flex flex-col bg-[var(--color-panel)] text-[var(--color-ink)]"
   class:fredpd-device--expanded={expanded}

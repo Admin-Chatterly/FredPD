@@ -303,6 +303,11 @@ local NUI_ROUTES <const> = {
     'document.capabilities',
     'document.print',
     'document.preview',
+    -- Civilian mode (7.29): the front desk, and the officers' inbox.
+    'civilian.overview',
+    'civilian.report.create',
+    'public.report.list',
+    'public.report.handle',
 
     -- Crime scenes, evidence and the chain of custody (spec 8).
     'scene.create',
@@ -456,6 +461,23 @@ FredPD.Client.placements.registerAction('impound_lot', function()
     setOpen(true, nil, { module = 'records', tab = 'impound' })
 end)
 
+--- A police front desk (7.29): the one entrance for everybody, officer or
+--- not. It opens the desk, not the MDT; who is standing there is the server's
+--- to work out.
+FredPD.Client.placements.registerAction('public_counter', function(placement)
+    isOpen = true
+    SetNuiFocus(true, true)
+    SendNUIMessage({ type = 'fredpd:civilian', placementId = placement.id })
+end)
+
+--- Where the front desks are: asked for by every player, session or not.
+local function loadPublicPlacements()
+    local response = FredPD.Client.core.call('placements.public', {})
+    if type(response) == 'table' and response.ok and type(response.data) == 'table' then
+        FredPD.Client.placements.setPublic(response.data.placements)
+    end
+end
+
 --- Permissions changed while the player was connected: a role was added or
 --- removed, or an administrator edited the role map. The shell redraws its rail
 --- from what the server now allows (spec 4.2).
@@ -466,6 +488,7 @@ end)
 --- Ask for world geometry once the session exists on the server.
 AddEventHandler('playerSpawned', function()
     TriggerServerEvent('fredpd:requestPlacements')
+    CreateThread(loadPublicPlacements)
 end)
 
 CreateThread(function()
@@ -473,6 +496,7 @@ CreateThread(function()
     -- playerSpawned has long since fired.
     Wait(2000)
     TriggerServerEvent('fredpd:requestPlacements')
+    loadPublicPlacements()
 end)
 
 --- Never leave a player stuck with NUI focus and no NUI.

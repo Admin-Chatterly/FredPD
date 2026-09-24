@@ -73,6 +73,8 @@ const REASONS = new Set([
   'exceeds_own',
   'outranks',
   'target_stale',
+  // Civilian mode (7.29).
+  'not_here',
   'role_actions_off',
   'role_not_allowed',
   'member_not_found',

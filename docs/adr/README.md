@@ -23,7 +23,7 @@ When a decision changes `docs/FredPD.md`, the ADR and the spec edit go in the
 | [010](010-discord-sync-in-fxserver.md) | Discord role sync runs in FXServer, not in the gateway | Accepted (role actions amended by 022) |
 | [011](011-evidence-records-live-in-the-core.md) | Evidence records live in the core; satellites hold only in-world mechanics | Accepted |
 | [012](012-record-numbers-from-a-locked-counter.md) | Record numbers come from a locked counter row, not from MAX() of the target table | Accepted |
-| [013](013-a-public-route-tier.md) | A public route tier, for the actions spec 8.10 gives to every player | Accepted |
+| [013](013-a-public-route-tier.md) | A public route tier, for the actions spec 8.10 gives to every player | Accepted (amended by 023: the subject tier) |
 | [014](014-swedish-procedure.md) | Swedish procedure, not US workflows with Swedish labels | Accepted |
 | [015](015-citations-send-real-bills.md) | A citation sends a real bill through esx_billing, and learns it was paid | Accepted |
 | [016](016-impound-reaches-the-street.md) | An impound takes the car off the street and out of the garage (amends ADR-008) | Accepted |
@@ -33,3 +33,4 @@ When a decision changes `docs/FredPD.md`, the ADR and the spec edit go in the
 | [020](020-printed-documents.md) | Printed documents are copies: a paper item carries its own content, a PDF is optional | Accepted |
 | [021](021-retention-runs-in-fxserver.md) | Retention runs inside FXServer, on a timer, with floors and bounded deletes | Accepted |
 | [022](022-discord-role-actions.md) | Discord role actions (hire, promote, demote, dismiss) through a bot of their own, with two allowlists (amends ADR-010) | Accepted |
+| [023](023-a-subject-route-tier.md) | A subject route tier: a sessionless caller reads only their own records, at a public desk (amends ADR-013) | Accepted |

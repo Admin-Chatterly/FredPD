@@ -238,6 +238,9 @@ local SESSION_ONLY <const> = {
 ---
 ---   shape -> rate limit -> schema -> handler (pcall) -> response
 ---
+--- (A caller reading their *own* records is the subject tier below, ADR-023,
+--- not this one.)
+---
 --- The handler receives the numeric `src`, not a session, so it cannot reach for
 --- `session.agencyId` or `session.officerId` and cannot touch a record: every
 --- record path in this codebase needs a session for the agency and the access
@@ -371,6 +374,101 @@ function Route.public(definition)
         end
 
         -- 4. Response.
+        return { ok = true, data = FredPD.markArrays(result) }
+    end)
+end
+
+--- Declares a route for the caller's own records (spec 7.29, ADR-023).
+---
+--- The third tier. A civilian has no session, so `Route.define` cannot serve
+--- them; and a public handler must never reach a record (ADR-013), so
+--- `Route.public` cannot either. What sits between the two is a caller whose
+--- identity the *wrapper* establishes, from the server's own sources, before
+--- the handler runs:
+---
+---   shape -> rate limit -> schema -> subject -> handler (pcall) -> audit -> response
+---
+--- `subject` is `FredPD.Core.subject.resolve(src, input.placementId)`: the
+--- player must be standing at a public placement, and is who the framework
+--- says their character is. The handler receives that subject, never `src` on
+--- its own, and reads only what is keyed on it -- its own citations, its own
+--- reports. `tools/wiring-check.ts` holds the handler to that: no session, no
+--- permission set, no access check, and a reference to `subject` itself; and
+--- every subject route is named, with its reason, in the check's allowlist.
+---
+--- @param definition table
+---   name    string
+---   schema  string   required; must declare `placementId`
+---   limit   table    { per, window }; required
+---   audit   string|nil an action written on success, attributed to no officer
+---   auditDetail function(input, result, subject)|nil
+---   handler function(subject, input) -> data
+function Route.subject(definition)
+    assert(definition.name, 'subject route needs a name')
+    assert(definition.handler, 'subject route needs a handler: ' .. tostring(definition.name))
+    assert(
+        type(definition.limit) == 'table'
+            and type(definition.limit.per) == 'number'
+            and type(definition.limit.window) == 'number',
+        'subject route needs an explicit limit { per, window }: ' .. tostring(definition.name)
+    )
+    assert(type(definition.schema) == 'string', 'subject route needs a schema: ' .. tostring(definition.name))
+
+    for _, field in ipairs({ 'perm', 'context', 'writes', 'sensitive' }) do
+        assert(
+            definition[field] == nil,
+            ('subject route %s declares %s, which needs a session it will never have')
+                :format(definition.name, field)
+        )
+    end
+
+    assert(not registered[definition.name], 'route defined twice: ' .. definition.name)
+    registered[definition.name] = definition
+
+    local limit = definition.limit
+
+    lib.callback.register('fredpd:' .. definition.name, function(src, input)
+        if input ~= nil and type(input) ~= 'table' then
+            return { ok = false, err = FredPD.ErrorCode.INVALID, fields = { _input = 'type' } }
+        end
+
+        if not FredPD.Core.ratelimit.take(src, definition.name, limit) then
+            return { ok = false, err = FredPD.ErrorCode.RATE_LIMITED }
+        end
+
+        local cleaned, fields = FredPD.Core.validate.check(definition.schema, input)
+        if not cleaned then
+            return { ok = false, err = FredPD.ErrorCode.INVALID, fields = fields }
+        end
+
+        -- The subject: who, established here and nowhere else.
+        local subject, why = FredPD.Core.subject.resolve(src, cleaned.placementId)
+        if not subject then
+            return { ok = false, err = FredPD.ErrorCode.CONFLICT, fields = { placementId = why } }
+        end
+
+        local ok, result = pcall(definition.handler, subject, cleaned)
+        if not ok then
+            print(('[fredpd] subject route %s failed: %s'):format(definition.name, tostring(result)))
+            return { ok = false, err = FredPD.ErrorCode.INTERNAL }
+        end
+
+        if type(result) == 'table' and result.__err then
+            return { ok = false, err = result.__err, fields = result.fields }
+        end
+
+        -- Attributed to no officer, because none acted; the detail says what
+        -- happened, never what the subject wrote (11.2).
+        if definition.audit then
+            FredPD.Core.audit.write({
+                action = definition.audit,
+                agencyId = subject.agencyId,
+                subjectType = definition.subjectType,
+                subjectId = type(result) == 'table' and result.id and tostring(result.id) or nil,
+                detail = definition.auditDetail and definition.auditDetail(cleaned, result, subject) or nil,
+            })
+        end
+
         return { ok = true, data = FredPD.markArrays(result) }
     end)
 end
