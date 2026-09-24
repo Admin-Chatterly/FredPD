@@ -87,7 +87,6 @@
 
   let disposition = $state<string>(FIRST_DISPOSITION);
   let closingNote = $state('');
-  let selfAssignArmed = $state(false);
 
   let failure = $state<Failure | null>(null);
   let busy = $state(false);
@@ -164,7 +163,6 @@
     lead = '';
     closingNote = '';
     disposition = FIRST_DISPOSITION;
-    selfAssignArmed = false;
     failure = null;
     clearSearch();
   });
@@ -334,7 +332,6 @@
     if (!card) return;
 
     await send('call.self_assign', { callId: card.id });
-    selfAssignArmed = false;
   }
 
   async function acknowledge(): Promise<void> {
@@ -823,9 +820,11 @@
         </form>
       </section>
 
-      <!-- Dispatching (7.16). -->
-      <section class="border-t border-[var(--color-border)] px-3 py-2">
-        <h3 class="text-xs font-semibold">{t('cad.dispatch.title')}</h3>
+      <!-- Dispatching (7.16). Folded away for an officer on the MDT in the
+           field, who sends nobody and whose job on this card is the status
+           buttons and "Attach to call" above; open at the console. -->
+      <details class="border-t border-[var(--color-border)] px-3 py-2" open={consolePlacement() !== null}>
+        <summary class="cursor-pointer text-xs font-semibold">{t('cad.dispatch.title')}</summary>
         <p class="mt-1 text-xs text-[var(--color-ink-muted)]">{t('cad.dispatch.intro')}</p>
 
         {#if consolePlacement() === null}
@@ -931,7 +930,7 @@
             {t('cad.dispatch.submit')}
           </button>
         </form>
-      </section>
+      </details>
 
       <!-- What the unit on the call does with it. -->
       <section class="flex flex-wrap items-start gap-3 border-t border-[var(--color-border)] px-3 py-2">
@@ -954,34 +953,17 @@
         <div class="flex flex-col gap-1 text-xs">
           <span class="text-[var(--color-ink-muted)]">{t('cad.selfAssign.action')}</span>
 
-          {#if selfAssignArmed}
-            <span class="flex items-center gap-2">
-              <span>{t('cad.selfAssign.confirm', { number: card.call.callNumber })}</span>
-              <button
-                type="button"
-                class="border border-[var(--color-border)] px-3 py-1 font-semibold hover:bg-[var(--color-surface)]"
-                disabled={busy}
-                onclick={() => void selfAssign()}
-              >
-                {t('cad.selfAssign.action')}
-              </button>
-              <button
-                type="button"
-                class="border border-[var(--color-border)] px-3 py-1 hover:bg-[var(--color-surface)]"
-                onclick={() => (selfAssignArmed = false)}
-              >
-                {t('form.cancel')}
-              </button>
-            </span>
-          {:else}
-            <button
-              type="button"
-              class="self-start border border-[var(--color-border)] px-3 py-1 hover:bg-[var(--color-surface)]"
-              onclick={() => (selfAssignArmed = true)}
-            >
-              {t('cad.selfAssign.action')}
-            </button>
-          {/if}
+          <!-- One press: taking a call is going to it, so the server attaches
+               the unit and sets it en route together. The confirm step this
+               had cost a second click on every call a patrol officer took. -->
+          <button
+            type="button"
+            class="self-start border border-[var(--color-border)] px-3 py-1 hover:bg-[var(--color-surface)]"
+            disabled={busy}
+            onclick={() => void selfAssign()}
+          >
+            {t('cad.selfAssign.action')}
+          </button>
         </div>
 
         {#if card.call.source === 'panic' && !card.call.acknowledgedAt && card.mayAcknowledge === true}

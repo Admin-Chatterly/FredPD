@@ -1489,7 +1489,6 @@
     },
     "selfAssign": {
       "action": "Attach to call",
-      "confirm": "Attach your unit to call {number}?",
       "done": "Attached to {number}."
     },
     "status": {
@@ -1593,7 +1592,8 @@
       "phone": "Phone call",
       "export": "Raised by {resource}",
       "panic": "Emergency button",
-      "alpr": "Plate read"
+      "alpr": "Plate read",
+      "officer": "Raised by the unit"
     },
     "noCallsign": "You have no callsign, so you are not on the unit board. Ask a supervisor to set one under Personnel.",
     "notify": {
@@ -2634,7 +2634,8 @@
       "prints": "Scan fingerprints",
       "open": "Open in MDT",
       "runPlate": "Run plate",
-      "arrestUnidentified": "Arrest: identity not established"
+      "arrestUnidentified": "Arrest: identity not established",
+      "trafficStop": "Start traffic stop"
     },
     "person": {
       "registered": "New to the register: added from their ID.",
@@ -2665,6 +2666,22 @@
       "body": "Officer {callsign} asks to see your ID.",
       "show": "Show ID",
       "refuse": "Refuse"
+    }
+  },
+  "status": {
+    "done": "Status: {status}",
+    "selfInitiated": "Call {number} raised. You are on scene.",
+    "selfInitiateTitle": "Raise a call here",
+    "clearTitle": "Clear your call as",
+    "cleared": "Call cleared. You are available.",
+    "attached": "Attached to {number}. You are on scene.",
+    "key": {
+      "enRoute": "FredPD: en route",
+      "onScene": "FredPD: on scene",
+      "available": "FredPD: available",
+      "attach": "FredPD: attach to the nearest call",
+      "selfInitiate": "FredPD: raise a call here",
+      "clear": "FredPD: clear my call"
     }
   }
 }

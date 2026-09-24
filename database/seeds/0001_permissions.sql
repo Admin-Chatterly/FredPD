@@ -453,6 +453,9 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     -- `rms.person.view` would (invariant 4), and a department that wants field
     -- units narrating calls without touching the master name index can say so.
     ('patrol', 'cad.call.self_assign'),
+    -- Raising your own call from the field -- a traffic stop, something seen
+    -- on patrol -- without the console (7.16, `call.self_initiate`).
+    ('patrol', 'cad.call.self_initiate'),
     ('patrol', 'cad.call.clear'),
     ('patrol', 'cad.call.note'),
     ('patrol', 'cad.call.link'),

@@ -29,6 +29,38 @@ describe('cad', function()
     end)
 
     -- -------------------------------------------------------------------------
+    -- From the field (attach to nearest, raising a call)
+    -- -------------------------------------------------------------------------
+
+    describe('nearestCall', function()
+        local calls = {
+            { id = 1, x = 100, y = 0 },
+            { id = 2, x = 40, y = 0 },
+            { id = 3 },
+        }
+
+        it('picks the nearest call inside the radius', function()
+            assert.are.equal(2, cad.nearestCall(calls, 0, 0, 150).id)
+        end)
+
+        it('finds nothing when every call is too far', function()
+            assert.is_nil(cad.nearestCall(calls, 1000, 1000, 150))
+        end)
+
+        it('never picks a call with no position', function()
+            assert.is_nil(cad.nearestCall({ { id = 3 } }, 0, 0, 150))
+        end)
+    end)
+
+    describe('SELF_INITIATED_TYPES', function()
+        it('lets an officer raise a traffic stop but not an officer emergency', function()
+            assert.is_true(cad.SELF_INITIATED_TYPES.traffic_stop)
+            assert.is_nil(cad.SELF_INITIATED_TYPES.officer_emergency)
+            assert.is_nil(cad.SELF_INITIATED_TYPES.backup)
+        end)
+    end)
+
+    -- -------------------------------------------------------------------------
     -- Configuration
     -- -------------------------------------------------------------------------
 

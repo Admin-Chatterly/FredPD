@@ -940,6 +940,20 @@ FredPD.Schema = {
         callId = { type = 'integer', required = true, min = 1 },
     },
 
+    CallAttachNearest = {
+
+    },
+
+    CallSelfInitiate = {
+        type = { type = 'enum', required = true, values = { 'alarm', 'assault', 'backup', 'burglary', 'disturbance', 'domestic', 'drugs', 'missing_person', 'officer_emergency', 'pursuit', 'robbery', 'shots_fired', 'stolen_vehicle', 'suspicious', 'theft', 'traffic_collision', 'traffic_stop', 'warrant_service', 'weapons', 'welfare_check', 'other' } },
+        netId = { type = 'integer', required = false, min = 1 },
+        streetLabel = { type = 'string', required = false, max = 96 },
+    },
+
+    CallClearMine = {
+        disposition = { type = 'enum', required = true, values = { 'report_taken', 'arrest_made', 'citation_issued', 'warning_given', 'handled_on_scene', 'assistance_rendered', 'gone_on_arrival', 'unable_to_locate', 'unfounded', 'referred', 'duplicate', 'cancelled' } },
+    },
+
     CallStatus = {
         callId = { type = 'integer', required = true, min = 1 },
         status = { type = 'enum', required = true, values = { 'en_route', 'on_scene' } },

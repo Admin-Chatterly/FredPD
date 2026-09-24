@@ -1157,4 +1157,40 @@ function Cad.boloCheck(plate, now)
     return { agencyId = flag.agencyId, classification = flag.classification, caseNumber = flag.caseNumber }
 end
 
+--- The open call nearest a position, within `radius` metres, for an officer
+--- who drives up to something and presses "attach to nearest". Calls with no
+--- position (a phone call filed as location text) are skipped: there is no
+--- honest distance to one.
+---
+--- @param calls table rows with `id`, `x`, `y`
+--- @param x number
+--- @param y number
+--- @param radius number
+--- @return table|nil the call
+function Cad.nearestCall(calls, x, y, radius)
+    local best, bestDistance
+
+    for index = 1, #(calls or {}) do
+        local call = calls[index]
+
+        if call.x and call.y then
+            local dx, dy = call.x - x, call.y - y
+            local distance = dx * dx + dy * dy
+
+            if distance <= radius * radius and (not bestDistance or distance < bestDistance) then
+                best, bestDistance = call, distance
+            end
+        end
+    end
+
+    return best
+end
+
+--- The call types an officer may raise themselves from the field (7.16):
+--- what they come across on patrol, never what someone phones in.
+Cad.SELF_INITIATED_TYPES = {
+    traffic_stop = true, suspicious = true, disturbance = true,
+    drugs = true, weapons = true, welfare_check = true, other = true,
+}
+
 FredPD.Modules.cad = Cad

@@ -1489,7 +1489,6 @@
     },
     "selfAssign": {
       "action": "Knyt till händelsen",
-      "confirm": "Knyta din enhet till händelse {number}?",
       "done": "Knuten till {number}."
     },
     "status": {
@@ -1593,7 +1592,8 @@
       "phone": "Inringd",
       "export": "Upprättad av {resource}",
       "panic": "Nödlarm",
-      "alpr": "Skyltavläsning"
+      "alpr": "Skyltavläsning",
+      "officer": "Skapad av enheten"
     },
     "noCallsign": "Du har ingen anropssignal och syns därför inte på enhetstavlan. Be ett befäl lägga in en under Personal.",
     "notify": {
@@ -2634,7 +2634,8 @@
       "prints": "Skanna fingeravtryck",
       "open": "Öppna i MDT",
       "runPlate": "Slå registreringsnummer",
-      "arrestUnidentified": "Grip: identiteten oklar"
+      "arrestUnidentified": "Grip: identiteten oklar",
+      "trafficStop": "Påbörja trafikkontroll"
     },
     "person": {
       "registered": "Ny i registret: tillagd från legitimationen.",
@@ -2665,6 +2666,22 @@
       "body": "Polis {callsign} ber att få se din legitimation.",
       "show": "Visa legitimation",
       "refuse": "Vägra"
+    }
+  },
+  "status": {
+    "done": "Status: {status}",
+    "selfInitiated": "Händelse {number} skapad. Du är på plats.",
+    "selfInitiateTitle": "Skapa händelse här",
+    "clearTitle": "Avsluta din händelse som",
+    "cleared": "Händelsen avslutad. Du är tillgänglig.",
+    "attached": "Kopplad till {number}. Du är på plats.",
+    "key": {
+      "enRoute": "FredPD: på väg",
+      "onScene": "FredPD: på plats",
+      "available": "FredPD: tillgänglig",
+      "attach": "FredPD: koppla till närmaste händelse",
+      "selfInitiate": "FredPD: skapa händelse här",
+      "clear": "FredPD: avsluta min händelse"
     }
   }
 }

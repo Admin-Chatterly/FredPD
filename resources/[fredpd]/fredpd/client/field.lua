@@ -426,6 +426,17 @@ end
 
 target.addVehicleOptions({
     {
+        name = 'fredpd_field_traffic_stop',
+        icon = 'fa-solid fa-car-on',
+        label = FredPD.t('field.action.trafficStop'),
+        distance = DISTANCE,
+        canInteract = function(entity) return netIdOf(entity) ~= nil end,
+        onSelect = function(data)
+            local netId = netIdOf(data and data.entity)
+            if netId and FredPD.Client.status then FredPD.Client.status.selfInitiate('traffic_stop', netId) end
+        end,
+    },
+    {
         name = 'fredpd_field_run_plate',
         icon = 'fa-solid fa-car',
         label = FredPD.t('field.action.runPlate'),

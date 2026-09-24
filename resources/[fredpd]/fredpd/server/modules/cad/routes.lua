@@ -1082,6 +1082,56 @@ route.define({
     end,
 })
 
+--- Attaches the session's own unit to a call (7.16), and moves it straight
+--- to `progress` (`en_route` or `on_scene`) when given. The body of
+--- `call.self_assign` and of `call.attach_nearest`.
+local function selfAssign(session, callId, progress)
+    local unit, refusal = ownUnit(session, 'callId')
+    if refusal then return refusal end
+
+    local call
+    call, refusal = openCall(session, callId)
+    if refusal then return refusal end
+
+    if repo.isAssigned(session.agencyId, callId, session.discordId) then
+        return route.refuse(FredPD.ErrorCode.CONFLICT, { callId = 'already_assigned' })
+    end
+
+    -- Before the write, for the reason `call.dispatch` reads it there: this
+    -- is the third caller of `assignUnits` and so the third place the divert
+    -- runs. An officer who takes a second call off the queue is taken off
+    -- the first one, which is a write to a call nobody here named.
+    local diverted = divertedFrom({ unit }, callId)
+
+    -- A `unit_joined` row either way; `selfAssigned` is what makes the line
+    -- read `cad.log.self_assigned` instead (7.16.1), because a unit that took
+    -- a call and a unit that was sent to one are different facts and the log
+    -- is read back to tell them apart.
+    local committed = repo.assignUnits(session.agencyId, callId, { unit }, {
+        assignedBy = session.discordId,
+        selfAssigned = true,
+        actor = actorOf(session, unit),
+    })
+
+    if not committed then
+        return route.refuse(FredPD.ErrorCode.CONFLICT, { callId = 'already_assigned' })
+    end
+
+    -- Taking a call means going to it: the unit is en route (or on scene,
+    -- for the call it is standing at) in the same press, instead of a second
+    -- button nobody remembers to press. `reportProgress` stamps the call and
+    -- writes the narrative line the status button would have.
+    if progress then repo.reportProgress(session.agencyId, callId, progress, unit) end
+
+    board.unitChanged(session.agencyId, repo.getUnit(session.agencyId, session.officerId))
+    local fresh = repo.getCall(session.agencyId, callId)
+    board.callChanged(session.agencyId, fresh)
+    callsChanged(session.agencyId, diverted)
+    tellAssigned(fresh, { unit })
+
+    return { id = callId, callNumber = call.callNumber }
+end
+
 route.define({
     name = 'call.self_assign',
     perm = 'cad.call.self_assign',
@@ -1103,44 +1153,192 @@ route.define({
     audit = 'cad.call.self_assigned',
     subjectType = 'call',
     handler = function(session, input)
-        local unit, refusal = ownUnit(session, 'callId')
-        if refusal then return refusal end
+        return selfAssign(session, input.callId, 'en_route')
 
-        local call
-        call, refusal = openCall(session, input.callId)
-        if refusal then return refusal end
+    end,
+})
 
-        if repo.isAssigned(session.agencyId, input.callId, session.discordId) then
-            return route.refuse(FredPD.ErrorCode.CONFLICT, { callId = 'already_assigned' })
+--- How far, in metres, "attach to nearest" looks for an open call.
+local NEAREST_RADIUS <const> = 150.0
+
+route.define({
+    name = 'call.attach_nearest',
+    -- Taking a call is `call.self_assign`'s act and key; this only chooses
+    -- which call by where the officer is standing, read on the server.
+    perm = 'cad.call.self_assign',
+    schema = 'CallAttachNearest',
+    writes = true,
+    audit = 'cad.call.self_assigned',
+    subjectType = 'call',
+    handler = function(session)
+        local ped = GetPlayerPed(session.src)
+        if not ped or ped == 0 then return route.refuse(FredPD.ErrorCode.CONTEXT) end
+
+        local at = GetEntityCoords(ped)
+
+        -- Only calls this session may read, by the same filter `map.view`
+        -- uses (the dispatch read key as well as clearance): a call it may
+        -- not know about is not "nearest", it is not there.
+        local readable = board.readable(session, repo.listCalls(session.agencyId, { limit = 200 }) or {})
+
+        local call = service.nearestCall(readable, at.x, at.y, NEAREST_RADIUS)
+        if not call then return route.refuse(FredPD.ErrorCode.NOT_FOUND, { callId = 'none_nearby' }) end
+
+        -- Standing at it: the unit is on scene, not on its way.
+        return selfAssign(session, call.id, 'on_scene')
+    end,
+})
+
+route.define({
+    name = 'call.self_initiate',
+    -- A traffic stop or anything else an officer comes across: the call is
+    -- theirs from the start, raised where they stand. Not pinned to the
+    -- console -- that is the point -- and a key of its own so a server can
+    -- keep it from trainees.
+    perm = 'cad.call.self_initiate',
+    schema = 'CallSelfInitiate',
+    writes = true,
+    -- Tight: a traffic stop every couple of minutes is a busy shift; more
+    -- than that is somebody filling the queue.
+    limit = { per = 3, window = 300 },
+    audit = 'cad.call.self_initiated',
+    subjectType = 'call',
+    auditDetail = function(input, result)
+        return { type = input.type, number = result and result.callNumber or nil }
+    end,
+    handler = function(session, input)
+        if not service.SELF_INITIATED_TYPES[input.type] then
+            return route.refuse(FredPD.ErrorCode.INVALID, { type = 'not_allowed' })
         end
 
-        -- Before the write, for the reason `call.dispatch` reads it there: this
-        -- is the third caller of `assignUnits` and so the third place the divert
-        -- runs. An officer who takes a second call off the queue is taken off
-        -- the first one, which is a write to a call nobody here named.
-        local diverted = divertedFrom({ unit }, input.callId)
+        local unit, refusal = ownUnit(session, 'type')
+        if refusal then return refusal end
 
-        -- A `unit_joined` row either way; `selfAssigned` is what makes the line
-        -- read `cad.log.self_assigned` instead (7.16.1), because a unit that took
-        -- a call and a unit that was sent to one are different facts and the log
-        -- is read back to tell them apart.
-        local committed = repo.assignUnits(session.agencyId, input.callId, { unit }, {
+        -- Where the officer is, read off their own ped (invariant 1). The
+        -- street label is the officer's game naming that spot, kept as text.
+        local ped = GetPlayerPed(session.src)
+        if not ped or ped == 0 then return route.refuse(FredPD.ErrorCode.CONTEXT) end
+        local at = GetEntityCoords(ped)
+
+        -- A traffic stop names the car: its plate read by the server off the
+        -- entity beside the officer, never typed or claimed by the client.
+        local details
+        if input.netId then
+            local entity = NetworkGetEntityFromNetworkId(input.netId)
+
+            if entity and entity ~= 0 and DoesEntityExist(entity) and GetEntityType(entity) == 2 then
+                local car = GetEntityCoords(entity)
+                local dx, dy = car.x - at.x, car.y - at.y
+
+                if dx * dx + dy * dy <= 30 * 30 then
+                    details = text(GetVehicleNumberPlateText(entity))
+                end
+            end
+        end
+
+        local beat = service.beatFor(repo.listBeats(session.agencyId), at.x, at.y)
+        local actor = actorOf(session, unit)
+
+        local created = repo.createCall(session.agencyId, {
+            type = input.type,
+            priority = 3,
+            source = 'officer',
+            locationText = text(type(input.streetLabel) == 'string'
+                and input.streetLabel:gsub("[^%w %-%./',&]", '') or nil),
+            x = at.x,
+            y = at.y,
+            z = at.z,
+            beatId = beat and beat.id or nil,
+            details = details,
+        }, actor)
+
+        if not created then return route.refuse(FredPD.ErrorCode.INTERNAL) end
+
+        -- The officer who raised it is on it, leading it, and already there.
+        local diverted = divertedFrom({ unit }, created.id)
+
+        if not repo.assignUnits(session.agencyId, created.id, { unit }, {
             assignedBy = session.discordId,
             selfAssigned = true,
-            actor = actorOf(session, unit),
-        })
-
-        if not committed then
-            return route.refuse(FredPD.ErrorCode.CONFLICT, { callId = 'already_assigned' })
+            actor = actor,
+        }) then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { type = 'already_assigned' })
         end
 
-        board.unitChanged(session.agencyId, repo.getUnit(session.agencyId, session.officerId))
-        local fresh = repo.getCall(session.agencyId, input.callId)
-        board.callChanged(session.agencyId, fresh)
-        callsChanged(session.agencyId, diverted)
-        tellAssigned(fresh, { unit })
+        repo.setLead(session.agencyId, created.id, unit, actor)
+        repo.reportProgress(session.agencyId, created.id, 'on_scene', unit)
 
-        return { id = input.callId, callNumber = call.callNumber }
+        board.unitChanged(session.agencyId, repo.getUnit(session.agencyId, session.officerId))
+        board.callChanged(session.agencyId, repo.getCall(session.agencyId, created.id))
+        callsChanged(session.agencyId, diverted)
+
+        TriggerEvent('fredpd:callCreated', {
+            id = created.id,
+            agencyId = session.agencyId,
+            callNumber = created.callNumber,
+            type = input.type,
+            priority = 3,
+        })
+
+        return { id = created.id, callNumber = created.callNumber }
+    end,
+})
+
+route.define({
+    name = 'unit.progress',
+    -- The status keys (client/status.lua): en route and on scene report
+    -- progress on the call the unit is on, exactly as `call.status` does from
+    -- the card; with no call, or for any other status, it is `unit.status`.
+    perm = 'cad.unit.status',
+    schema = 'UnitStatus',
+    writes = true,
+    audit = 'cad.unit.status',
+    subjectType = 'unit',
+    -- The call too, when the press moved one: an auditor asking who moved a
+    -- call finds the key presses beside the card's.
+    auditDetail = function(input, result)
+        return { status = input.status, callId = result and result.callId or nil }
+    end,
+    handler = function(session, input)
+        local unit, refusal = ownUnit(session, 'status')
+        if refusal then return refusal end
+
+        local assignment = repo.activeAssignment(session.agencyId, session.discordId)
+
+        if assignment and (input.status == 'en_route' or input.status == 'on_scene') then
+            -- The checks `call.status` makes from the card: a call above this
+            -- session's clearance, or one already closed, is not moved.
+            local _, callRefusal = openCall(session, assignment.callId)
+            if callRefusal then return callRefusal end
+
+            if not repo.reportProgress(session.agencyId, assignment.callId, input.status, unit) then
+                return route.refuse(FredPD.ErrorCode.CONFLICT)
+            end
+
+            board.unitChanged(session.agencyId, repo.getUnit(session.agencyId, session.officerId))
+            board.callChanged(session.agencyId, repo.getCall(session.agencyId, assignment.callId))
+
+            TriggerEvent('fredpd:unitStatusChanged', {
+                agencyId = session.agencyId, officerId = session.officerId,
+                callsign = unit.callsign, status = input.status, callId = assignment.callId,
+            })
+
+            return { id = session.officerId, status = input.status, callId = assignment.callId }
+        end
+
+        if repo.setUnitStatus(session.agencyId, session.officerId, input.status) == 0 then
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { status = 'nothing_to_change' })
+        end
+
+        local callId = logUnitStatus(session.agencyId, unit, input.status, actorOf(session, unit))
+        board.unitChanged(session.agencyId, repo.getUnit(session.agencyId, session.officerId))
+
+        TriggerEvent('fredpd:unitStatusChanged', {
+            agencyId = session.agencyId, officerId = session.officerId,
+            callsign = unit.callsign, status = input.status, callId = callId,
+        })
+
+        return { id = session.officerId, status = input.status }
     end,
 })
 
@@ -1194,6 +1392,123 @@ route.define({
     end,
 })
 
+--- Clears or cancels a call with a disposition (7.16). The body of
+--- `call.clear` and of `call.clear_mine`.
+local function clearCall(session, input)
+    local call, refusal = openCall(session, input.callId)
+    if refusal then return refusal end
+
+    -- Clearing your own call is not clearing somebody else's. `patrol` holds
+    -- `cad.call.clear` so a unit can close what they attended; closing a call
+    -- nobody on it asked to close is supervisory, and `cad.unit.manage` is
+    -- the key those three groups already hold.
+    if not repo.isAssigned(session.agencyId, input.callId, session.discordId)
+        and not supervises(session)
+    then
+        return route.refuse(FredPD.ErrorCode.FORBIDDEN, { callId = 'not_assigned' })
+    end
+
+    -- 7.16: an emergency call "cannot be cleared without supervisor
+    -- acknowledgement". `ck_fpd_calls_panic_ack` enforces it in the database
+    -- and the repo's WHERE closes the race; refusing here is what turns an
+    -- `internal` error into something the card can read out
+    -- (`cad.clear.needsAcknowledgement`). Cancelling is refused by the same
+    -- CHECK for the same reason -- otherwise the way to clear an
+    -- unacknowledged panic call would be to cancel it -- which is why this
+    -- test is on the call and not on the disposition.
+    if call.source == EMERGENCY.source and not call.acknowledgedAt then
+        return route.refuse(FredPD.ErrorCode.CONFLICT, { callId = 'needs_acknowledgement' })
+    end
+
+    -- `duplicate` and `cancelled` close the call as `cancelled`; everything
+    -- else closes it as `cleared`, and 7.16.1 pairs the log line with the
+    -- same two. `service.closureFor` owns that mapping, so the status, the
+    -- line and the label can never disagree about which of the two happened.
+    local status = service.closureFor(input.disposition)
+
+    -- Kept in a local instead of being passed straight in, because this list
+    -- is needed twice: `clearCall` frees these units, and every one of them
+    -- is a board row on every open console that has to be told.
+    --
+    -- It is exactly the right list. `clearCall` stamps `left_at` on the rows
+    -- this read selected and runs `freeWorked` against these officer ids, so
+    -- "the rows the clear changed" and "the rows read here" are the same set
+    -- by construction rather than by coincidence.
+    local onCall = liveUnits(session.agencyId, input.callId)
+
+    repo.clearCall(session.agencyId, input.callId, {
+        status = status,
+        disposition = input.disposition,
+        note = text(input.note),
+    }, onCall, actorOf(session))
+
+    -- The transaction reports only that it committed, and its UPDATE matches
+    -- no rows if somebody closed the call between the read above and the
+    -- write. So the call is read back: this is a conflict rather than a
+    -- quiet success, or the second officer would believe they closed it.
+    --
+    -- **What it is read back for is the signature, not the status.** Asking
+    -- whether the call is closed is the one question that cannot tell the
+    -- two apart: losing the race means it is closed *by definition*, so
+    -- `CLOSED[after.status]` is true precisely when this handler changed
+    -- nothing, and the guard let the loser through every time. It only ever
+    -- fired for a row that had vanished. What the loser then returned was
+    -- their own disposition, which was never stored -- and `route.define`'s
+    -- declarative entry wrote `cad.call.cleared` naming them as having
+    -- closed the call with it, into a log that is append-only (invariant
+    -- 11) and cannot be corrected afterwards. Their own console reloads and
+    -- shows the winner's disposition, so nothing on screen contradicts it.
+    --
+    -- `cleared_by` and `disposition` are written by the same guarded UPDATE
+    -- in the same statement, and nothing else in the module writes either,
+    -- so a row carrying this session's Discord id and the disposition they
+    -- sent is this session's write and no other's. The repo's transaction
+    -- cannot answer it directly: `Db.transaction` reports commitment and
+    -- not row counts, and `@fpd_changed` is a connection variable that does
+    -- not survive the connection going back to the pool.
+    local after = repo.getCall(session.agencyId, input.callId)
+
+    if not after
+        or not CLOSED[after.status]
+        or after.clearedBy ~= session.discordId
+        or after.disposition ~= input.disposition
+    then
+        return route.refuse(FredPD.ErrorCode.CONFLICT, { callId = 'call_cleared' })
+    end
+
+    -- Every unit on the call came free, and this route used to say so to
+    -- nobody. It pushed the call and only the call, and the NUI's handler
+    -- for `fredpd:cad:call` merges the queue row and refetches the card --
+    -- it never reloads the board. So on every console but the one that
+    -- pressed Clear, the unit stayed `on_scene`, still carrying the closed
+    -- call's number, priority and status, with its time in status counting
+    -- up from before the clear. Nothing corrected it: the console does not
+    -- poll, and `reload()` runs only on the client that made the write, so
+    -- the row was wrong for the rest of the shift. `CallCard` then never
+    -- offered the unit that had just come free, and dispatch's welfare timer
+    -- went on climbing for somebody sitting at the station.
+    --
+    -- On a panic call it is worse than a stale row. `Cad.CALL_ENDED` is the
+    -- only rule that frees `emergency`, so closing the call is the one event
+    -- that takes an officer out of distress -- and without this push every
+    -- other board went on showing them in distress with no way back.
+    --
+    -- The standalone `avl.invalidate` that used to stand here is gone with
+    -- it, not merely moved: `board.unitChanged` invalidates before it
+    -- pushes, and `onCall` is every board row this clear changed, so the
+    -- cache is dropped by the same event that caused it -- which is the
+    -- ownership `board.lua` already claims. A clear with nobody on the call
+    -- changes no board row and so needs no invalidation either.
+    local rows = {}
+
+    for index = 1, #onCall do rows[#rows + 1] = onCall[index].officerId end
+
+    unitsChanged(session.agencyId, rows)
+    board.callChanged(session.agencyId, after)
+
+    return { id = input.callId, disposition = input.disposition, status = after.status }
+end
+
 route.define({
     name = 'call.clear',
     perm = 'cad.call.clear',
@@ -1202,119 +1517,24 @@ route.define({
     audit = 'cad.call.cleared',
     subjectType = 'call',
     auditDetail = function(input) return { disposition = input.disposition } end,
+    handler = clearCall,
+})
+
+route.define({
+    name = 'call.clear_mine',
+    -- Clearing the call your own unit is on, from a key: the same act as
+    -- `call.clear` with the call found by the server rather than named.
+    perm = 'cad.call.clear',
+    schema = 'CallClearMine',
+    writes = true,
+    audit = 'cad.call.cleared',
+    subjectType = 'call',
+    auditDetail = function(input) return { disposition = input.disposition } end,
     handler = function(session, input)
-        local call, refusal = openCall(session, input.callId)
-        if refusal then return refusal end
+        local assignment = repo.activeAssignment(session.agencyId, session.discordId)
+        if not assignment then return route.refuse(FredPD.ErrorCode.CONFLICT, { callId = 'not_assigned' }) end
 
-        -- Clearing your own call is not clearing somebody else's. `patrol` holds
-        -- `cad.call.clear` so a unit can close what they attended; closing a call
-        -- nobody on it asked to close is supervisory, and `cad.unit.manage` is
-        -- the key those three groups already hold.
-        if not repo.isAssigned(session.agencyId, input.callId, session.discordId)
-            and not supervises(session)
-        then
-            return route.refuse(FredPD.ErrorCode.FORBIDDEN, { callId = 'not_assigned' })
-        end
-
-        -- 7.16: an emergency call "cannot be cleared without supervisor
-        -- acknowledgement". `ck_fpd_calls_panic_ack` enforces it in the database
-        -- and the repo's WHERE closes the race; refusing here is what turns an
-        -- `internal` error into something the card can read out
-        -- (`cad.clear.needsAcknowledgement`). Cancelling is refused by the same
-        -- CHECK for the same reason -- otherwise the way to clear an
-        -- unacknowledged panic call would be to cancel it -- which is why this
-        -- test is on the call and not on the disposition.
-        if call.source == EMERGENCY.source and not call.acknowledgedAt then
-            return route.refuse(FredPD.ErrorCode.CONFLICT, { callId = 'needs_acknowledgement' })
-        end
-
-        -- `duplicate` and `cancelled` close the call as `cancelled`; everything
-        -- else closes it as `cleared`, and 7.16.1 pairs the log line with the
-        -- same two. `service.closureFor` owns that mapping, so the status, the
-        -- line and the label can never disagree about which of the two happened.
-        local status = service.closureFor(input.disposition)
-
-        -- Kept in a local instead of being passed straight in, because this list
-        -- is needed twice: `clearCall` frees these units, and every one of them
-        -- is a board row on every open console that has to be told.
-        --
-        -- It is exactly the right list. `clearCall` stamps `left_at` on the rows
-        -- this read selected and runs `freeWorked` against these officer ids, so
-        -- "the rows the clear changed" and "the rows read here" are the same set
-        -- by construction rather than by coincidence.
-        local onCall = liveUnits(session.agencyId, input.callId)
-
-        repo.clearCall(session.agencyId, input.callId, {
-            status = status,
-            disposition = input.disposition,
-            note = text(input.note),
-        }, onCall, actorOf(session))
-
-        -- The transaction reports only that it committed, and its UPDATE matches
-        -- no rows if somebody closed the call between the read above and the
-        -- write. So the call is read back: this is a conflict rather than a
-        -- quiet success, or the second officer would believe they closed it.
-        --
-        -- **What it is read back for is the signature, not the status.** Asking
-        -- whether the call is closed is the one question that cannot tell the
-        -- two apart: losing the race means it is closed *by definition*, so
-        -- `CLOSED[after.status]` is true precisely when this handler changed
-        -- nothing, and the guard let the loser through every time. It only ever
-        -- fired for a row that had vanished. What the loser then returned was
-        -- their own disposition, which was never stored -- and `route.define`'s
-        -- declarative entry wrote `cad.call.cleared` naming them as having
-        -- closed the call with it, into a log that is append-only (invariant
-        -- 11) and cannot be corrected afterwards. Their own console reloads and
-        -- shows the winner's disposition, so nothing on screen contradicts it.
-        --
-        -- `cleared_by` and `disposition` are written by the same guarded UPDATE
-        -- in the same statement, and nothing else in the module writes either,
-        -- so a row carrying this session's Discord id and the disposition they
-        -- sent is this session's write and no other's. The repo's transaction
-        -- cannot answer it directly: `Db.transaction` reports commitment and
-        -- not row counts, and `@fpd_changed` is a connection variable that does
-        -- not survive the connection going back to the pool.
-        local after = repo.getCall(session.agencyId, input.callId)
-
-        if not after
-            or not CLOSED[after.status]
-            or after.clearedBy ~= session.discordId
-            or after.disposition ~= input.disposition
-        then
-            return route.refuse(FredPD.ErrorCode.CONFLICT, { callId = 'call_cleared' })
-        end
-
-        -- Every unit on the call came free, and this route used to say so to
-        -- nobody. It pushed the call and only the call, and the NUI's handler
-        -- for `fredpd:cad:call` merges the queue row and refetches the card --
-        -- it never reloads the board. So on every console but the one that
-        -- pressed Clear, the unit stayed `on_scene`, still carrying the closed
-        -- call's number, priority and status, with its time in status counting
-        -- up from before the clear. Nothing corrected it: the console does not
-        -- poll, and `reload()` runs only on the client that made the write, so
-        -- the row was wrong for the rest of the shift. `CallCard` then never
-        -- offered the unit that had just come free, and dispatch's welfare timer
-        -- went on climbing for somebody sitting at the station.
-        --
-        -- On a panic call it is worse than a stale row. `Cad.CALL_ENDED` is the
-        -- only rule that frees `emergency`, so closing the call is the one event
-        -- that takes an officer out of distress -- and without this push every
-        -- other board went on showing them in distress with no way back.
-        --
-        -- The standalone `avl.invalidate` that used to stand here is gone with
-        -- it, not merely moved: `board.unitChanged` invalidates before it
-        -- pushes, and `onCall` is every board row this clear changed, so the
-        -- cache is dropped by the same event that caused it -- which is the
-        -- ownership `board.lua` already claims. A clear with nobody on the call
-        -- changes no board row and so needs no invalidation either.
-        local rows = {}
-
-        for index = 1, #onCall do rows[#rows + 1] = onCall[index].officerId end
-
-        unitsChanged(session.agencyId, rows)
-        board.callChanged(session.agencyId, after)
-
-        return { id = input.callId, disposition = input.disposition, status = after.status }
+        return clearCall(session, { callId = assignment.callId, disposition = input.disposition })
     end,
 })
 

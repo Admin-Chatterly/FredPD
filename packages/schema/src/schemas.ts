@@ -1450,6 +1450,26 @@ export const schemas = {
    * is the two values this field accepts. Different namespaces, as
    * `UnitStatus` already is.
    */
+  /** "Attach to nearest": the server finds the call from the officer's position. */
+  CallAttachNearest: {},
+
+  /**
+   * A call an officer raises themselves (a traffic stop, something seen on
+   * patrol). The position is read off their ped; `netId` names the car of a
+   * traffic stop, whose plate the server reads; `streetLabel` is display text
+   * only, stripped server-side like the panic button's.
+   */
+  CallSelfInitiate: {
+    type: { type: 'enum', required: true, values: CALL_TYPES },
+    netId: { type: 'integer', required: false, min: 1 },
+    streetLabel: { type: 'string', required: false, max: 96 },
+  },
+
+  /** Clearing the call the officer's own unit is on, from a key. */
+  CallClearMine: {
+    disposition: { type: 'enum', required: true, values: CALL_DISPOSITIONS },
+  },
+
   CallStatus: {
     callId: { type: 'integer', required: true, min: 1 },
     status: { type: 'enum', required: true, values: CALL_PROGRESS_STATUSES },

@@ -247,6 +247,8 @@ client_scripts {
     'client/chat.lua',
     'client/garage.lua',
     'client/fingerprint_scanner.lua',
+    -- The status keys and raising a call from the field.
+    'client/status.lua',
     -- ox_target on people and vehicles. After core (binds it at load) and
     -- the bridge; calls `FredPD.Client.mdt` from main.lua only at runtime.
     'client/field.lua',

@@ -5966,6 +5966,27 @@ CREATE TABLE IF NOT EXISTS `fpd_person_pending_identity` (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ============================================================
+-- 0029_call_source_officer.sql
+-- ============================================================
+-- 0029_call_source_officer.sql
+--
+-- Lets a call be raised by the officer who is standing at it (spec 7.16,
+-- `call.self_initiate`): a traffic stop or something seen on patrol, without
+-- the dispatch console.
+--
+-- Invariant 8: append-only. Never edit this file once it has shipped.
+--
+-- `ck_fpd_calls_source` (0007) is widened by one value, `officer`. The server
+-- decides the source; no route accepts it. Dropped and re-added under the
+-- same name, because MariaDB cannot alter a CHECK in place.
+
+ALTER TABLE `fpd_calls` DROP CONSTRAINT IF EXISTS `ck_fpd_calls_source`;
+
+ALTER TABLE `fpd_calls`
+    ADD CONSTRAINT `ck_fpd_calls_source` CHECK (`source` IN
+        ('dispatcher', 'phone', 'export', 'panic', 'alpr', 'officer'));
+
+-- ============================================================
 -- seed: 0001_permissions.sql
 -- ============================================================
 -- Default permission groups (spec 4.3, Appendix B and C).
@@ -6423,6 +6444,9 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     -- `rms.person.view` would (invariant 4), and a department that wants field
     -- units narrating calls without touching the master name index can say so.
     ('patrol', 'cad.call.self_assign'),
+    -- Raising your own call from the field -- a traffic stop, something seen
+    -- on patrol -- without the console (7.16, `call.self_initiate`).
+    ('patrol', 'cad.call.self_initiate'),
     ('patrol', 'cad.call.clear'),
     ('patrol', 'cad.call.note'),
     ('patrol', 'cad.call.link'),

@@ -364,7 +364,7 @@ local PERMISSION_CATALOGUE <const> = {
     'court.citation.adjudicate', 'court.sentence.calculate',
 
     -- Dispatch
-    'cad.call.create', 'cad.call.dispatch', 'cad.call.self_assign', 'cad.call.clear',
+    'cad.call.create', 'cad.call.dispatch', 'cad.call.self_assign', 'cad.call.self_initiate', 'cad.call.clear',
     'cad.call.note', 'cad.call.link',
     'cad.unit.manage', 'cad.unit.status', 'cad.emergency',
     'cad.broadcast',
