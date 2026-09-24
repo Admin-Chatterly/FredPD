@@ -174,6 +174,12 @@ const REASONS = new Set([
   // `t()`, which prints an unknown key verbatim, so a free string here put
   // arbitrary prose on the face of a record (invariant 6).
   'not_a_key',
+  // The impound tow (7.15, ADR-016): why a car in front of the officer
+  // cannot be taken. Drawn in the game's toast, and here if the MDT asks.
+  'occupied',
+  'fleet_vehicle',
+  'in_progress',
+  'unreachable',
   // Court (7.20): the tilltalade named is not one of the FU's misstänkta.
   'not_suspect',
   // Standing in for the åklagare or domare (7.9.1): the real role signed on
