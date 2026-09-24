@@ -922,3 +922,10 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
 
 INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('patrol_basic', 'document.print');
+
+-- A PDF of a restricted, compartmented or sealed record is an export (spec
+-- 11.1, ADR-020 amended): the link is a bearer link, and the file outlives
+-- the session that made it. Supervisors and investigators, not all of patrol.
+INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
+    ('supervisor', 'document.export.restricted'),
+    ('utredare', 'document.export.restricted');

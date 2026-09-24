@@ -940,9 +940,7 @@
         </header>
 
         <!-- A copy of this record, on paper or as a PDF (7.28). -->
-        <div class="mb-3">
-          <PrintMenu kind="custody" id={record.id} />
-        </div>
+        <PrintMenu kind="custody" id={record.id} />
 
         {#if record.needsAttention}
           <!--

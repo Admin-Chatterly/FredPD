@@ -1569,6 +1569,11 @@ FredPD.Schema = {
 
     },
 
+    DocumentPreview = {
+        kind = { type = 'enum', required = true, values = { 'citation', 'anmalan', 'custody' } },
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
     PersonPhotoCommit = {
         mediaRef = { type = 'string', required = true, min = 1, max = 64 },
     },

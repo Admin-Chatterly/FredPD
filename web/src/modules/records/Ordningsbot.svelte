@@ -402,9 +402,7 @@
         </header>
 
         <!-- A copy of this record, on paper or as a PDF (7.28). -->
-        <div class="mb-3">
-          <PrintMenu kind="citation" id={detail.id} />
-        </div>
+        <PrintMenu kind="citation" id={detail.id} />
 
         {#if detail.tariff}
           <p class="mb-3 text-xs">

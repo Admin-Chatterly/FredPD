@@ -644,9 +644,9 @@ FredPD.Modules.documents.register('custody', function(session, id)
     local fields = {
         { label = t('document.field.number'), value = row.number },
         { label = t('document.field.status'), value = t('frihet.status.' .. tostring(row.status)) },
-        { label = t('document.field.arrested'), value = documents.moment(row.gripenAt) },
+        { label = t('document.field.arrestedAt'), value = documents.moment(row.gripenAt) },
         { label = t('document.field.ground'), value = row.gripandeGrund and t('frihet.grund.' .. row.gripandeGrund) or '' },
-        { label = t('document.field.place'), value = row.gripandePlats or '' },
+        { label = t('document.field.placeArrest'), value = row.gripandePlats or '' },
     }
 
     local person = row.personId and FredPD.Repo.persons.readPerson(session, row.personId) or nil
@@ -671,6 +671,8 @@ FredPD.Modules.documents.register('custody', function(session, id)
     return {
         title = t('document.title.custody', { number = row.number }),
         classification = row.classification,
+        control = row,
+        recordType = FRIHET,
         fields = fields,
         body = {
             type = 'doc',

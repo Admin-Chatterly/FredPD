@@ -89,6 +89,27 @@ function Gateway.renderPdf(document)
     return false, { reason = result.reason or 'gateway_error', outboxId = outboxId }
 end
 
+--- Renders a PDF now, or not at all: no outbox, no retry.
+---
+--- For a print the officer is waiting on (ADR-020). A retry later would
+--- render a copy of a record, possibly a restricted one, after the officer
+--- was told nothing was printed -- a file in the media store that no
+--- document row points at -- and the outbox would keep the whole content
+--- of every failed print.
+function Gateway.renderPdfNow(document)
+    if not Gateway.isEnabled() then return false, { reason = 'disabled' } end
+
+    local result = client.request('POST', '/fx/pdf/render', document)
+    if result.ok then return true, result.body end
+
+    return false, { reason = result.reason or 'gateway_error' }
+end
+
+--- How long a signed download link stays good, in seconds.
+function Gateway.linkSeconds()
+    return tonumber(FredPD.Config.server.gateway.mediaLinkSeconds) or 900
+end
+
 --- Deletes the files of uploads nobody finished (ADR-021's retention).
 ---
 --- @param mediaRefs string[] at most 200
@@ -133,7 +154,7 @@ function Gateway.downloadUrl(mediaRef, thumbnail, now)
     end
 
     local cfg = FredPD.Config.server.gateway
-    local expiresAt = (now or os.time()) + (tonumber(cfg.mediaLinkSeconds) or 900)
+    local expiresAt = (now or os.time()) + Gateway.linkSeconds()
     local token = FredPD.Bridge.gateway.hmac.sha256Hex(
         keyFor(cfg.secret), ('%s.download.%d'):format(mediaRef, expiresAt))
 

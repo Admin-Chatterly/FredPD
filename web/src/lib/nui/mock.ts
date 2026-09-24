@@ -39,6 +39,14 @@ function wait(ms: number): Promise<void> {
 export function createMockBridge(): NuiBridge {
   const handlers = new Map<string, Set<MessageHandler>>();
 
+  /**
+   * A paper copy is being read (7.28). The client answers `fredpd:close` by
+   * letting go of the focus and saying `fredpd:close` back, which is what
+   * puts the paper away; the mock does the same, only while a paper is
+   * open, so Escape elsewhere in the browser does not blank the page.
+   */
+  let paperOpen = false;
+
   /** Lets fixtures and the dev tools push a message as the game would. */
   function emit(message: NuiMessage): void {
     for (const handler of handlers.get(message.type) ?? []) {
@@ -76,6 +84,8 @@ export function createMockBridge(): NuiBridge {
   window.addEventListener('message', (event: MessageEvent<NuiMessage>) => {
     const type = event.data?.type;
     if (type === 'fredpd:open' || type === 'fredpd:close' || type === 'fredpd:paper') emit(event.data);
+    if (type === 'fredpd:paper') paperOpen = true;
+    if (type === 'fredpd:open' || type === 'fredpd:close') paperOpen = false;
   });
 
   return {
@@ -83,6 +93,12 @@ export function createMockBridge(): NuiBridge {
 
     async call<T>(route: string, data?: unknown): Promise<RouteResponse<T>> {
       await wait(latency());
+
+      if (route === 'fredpd:close' && paperOpen) {
+        paperOpen = false;
+        emit({ type: 'fredpd:close' });
+        return { ok: true, data: {} as T };
+      }
 
       const forced = forcedFailure();
       if (forced !== null) {

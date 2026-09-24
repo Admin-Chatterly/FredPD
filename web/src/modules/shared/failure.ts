@@ -69,6 +69,13 @@ const REASONS = new Set([
   'no_character',
   // Printing (ADR-020).
   'no_paper',
+  'pdf_off',
+  'pdf_unavailable',
+  'classified',
+  'compartmented',
+  'breakglass',
+  'unclassified',
+  'export_restricted',
   'callsign_format',
   // Not `released`: an evidence item's status is `released` too, and the codes
   // share one namespace regardless of which field carried them, so the item

@@ -1107,7 +1107,9 @@ Built (the disciplinary file only).
   - A paper copy is an ox_inventory item. Its metadata carries the document as printed, so whoever holds it can read it, and the record itself stays behind its own check.
   - A PDF, when the gateway is on, carries the letterhead, the page numbers, the document number and a classification watermark on every page.
   - Not yet printable: the case summary, the warrant and the lab report.
-- **Permissions:** `document.print` (patrol_basic), plus the record's own view permission.
+- **Permissions:** `document.print` (patrol_basic), plus the record's own view permission. A PDF of a restricted record (above `internal`, compartmented or sealed) also needs `document.export.restricted` (supervisor, utredare).
+- **Paper ceiling:** a paper copy is read by whoever holds it, with no clearance and no audit. Only a record at or below `documents.paperCeiling` (default `internal`), in no compartment, not sealed and not opened by break-glass may be printed to paper. Anything else is PDF-only.
+- **Preview:** `document.preview` runs the same printer and shows the page and which copies may be made, before anything is numbered or kept (6.4).
 
 ### 7.29 Civilian and legal access (S, M6)
 
@@ -1818,7 +1820,7 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Tvångsmedel | `tvang.view`, `tvang.decide`, `tvang.decide.aklagare`, `tvang.decide.domare`, `tvang.verkstall`, `efterlysning.issue` |
 | Spaning | `spaning.view`, `spaning.create` |
 | Enforcement | `rms.arrest.create`, `rms.citation.issue`, `rms.citation.void`, `rms.fi.create`, `rms.fi.view`, `rms.stops.create`, `rms.stops.view`, `rms.impound.create`, `rms.impound.release`, `rms.impound.hold.release`, `rms.warrant.serve` |
-| Printing | `document.print` (ADR-020) |
+| Printing | `document.print`, `document.export.restricted` (ADR-020) |
 | Ordningsbot and impound | `page.ordningsbot`, `ordningsbot.view`, `ordningsbot.issue`, `ordningsbot.contest`, `ordningsbot.pay`, `ordningsbot.void`, `ordningsbot.tariff.view`, `ordningsbot.tariff.edit` (ADR-018), `page.impound`, `impound.view`, `impound.create`, `impound.release`, `impound.authorize` — the keys 7.11 and 7.15 shipped under |
 | Investigations (intelligence cases, §10) | `inv.case.create`, `inv.case.view`, `inv.case.edit`, `inv.case.assign`, `inv.case.close` |
 | Booking | `booking.view`, `booking.intake`, `booking.release` (this row's `booking.create`/`booking.biometrics.capture` were this catalog's own initial guess at names 7.9 shipped under `booking.intake` instead — including 8.8's ten-print capture, `booking.tenPrint.capture`, which reuses it rather than adding a fifth key) |

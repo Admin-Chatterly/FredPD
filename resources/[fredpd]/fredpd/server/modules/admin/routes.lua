@@ -360,6 +360,7 @@ local PERMISSION_CATALOGUE <const> = {
 
     -- Printing (7.28): a paper copy or a PDF of a record the reader may read.
     'document.print',
+    'document.export.restricted',
 
     -- Investigations
     'inv.case.create', 'inv.case.view', 'inv.case.edit', 'inv.case.assign', 'inv.case.close',

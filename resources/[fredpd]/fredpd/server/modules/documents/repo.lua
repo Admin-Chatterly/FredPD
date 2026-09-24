@@ -10,8 +10,12 @@ local function db()
 end
 
 --- Writes a printed document and gives it its number, in one transaction with
---- the counter (13.1). Read back by the number the counter handed out, which
---- is unique per agency.
+--- the counter (13.1).
+---
+--- Read back as this officer's newest print of this record. That is only
+--- unambiguous because `document.print` holds a lock per officer and record
+--- around the call: a second caller of this function must hold the same lock,
+--- or two prints could come back as one row.
 ---
 --- @param document table { kind, subjectId, title, classification, payload (JSON string) }
 --- @return table|nil { id, number }
@@ -38,7 +42,6 @@ function Repo.insert(document, session)
                       VALUES (]] .. counters.numberSql() .. [[, ?, ?, ?, ?, ?, ?, ?)]],
             values = values,
         },
-        { query = 'SET @fpd_document_id = LAST_INSERT_ID()' },
     }))
 
     if not committed then return nil end

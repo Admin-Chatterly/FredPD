@@ -555,9 +555,7 @@
         </header>
 
         <!-- A copy of this record, on paper or as a PDF (7.28). -->
-        <div class="mb-3">
-          <PrintMenu kind="anmalan" id={detail.anmalan.id} />
-        </div>
+        <PrintMenu kind="anmalan" id={detail.anmalan.id} />
 
         {#if isLocked}
           <p class="mb-3 border border-[var(--color-border)] px-2 py-1 text-xs">

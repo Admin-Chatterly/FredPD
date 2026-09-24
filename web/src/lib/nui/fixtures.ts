@@ -6552,14 +6552,62 @@ export const fixtures: FixtureSet = {
 
     'document.capabilities': () => ({ paper: true, pdf: true }),
 
+    /**
+     * The page a print would show. Citation 3 stands in for a restricted
+     * record: paper is refused (ADR-020's ceiling) and the PDF is offered,
+     * because the fixture viewer holds document.export.restricted.
+     */
+    'document.preview': (input) => {
+      const { kind, id } = (input ?? {}) as { kind?: string; id?: number };
+      if (!kind || !id) return refuse('not_found', { kind: 'unknown' });
+
+      const citation = kind === 'citation' ? citations.find((row) => row.id === id) : undefined;
+      const anmalan = kind === 'anmalan' ? anmalningar.find((row) => row.id === id) : undefined;
+      const custody = kind === 'custody' ? frihetsberovanden.find((row) => row.id === id) : undefined;
+      const number = citation?.number ?? anmalan?.number ?? custody?.number;
+      if (!number) return refuse('not_found');
+
+      const restricted = kind === 'citation' && id === 3;
+
+      return {
+        document: {
+          title: `${kind === 'citation' ? 'Citation' : kind === 'anmalan' ? 'Report' : 'Custody record'} ${number}`,
+          agency: 'Los Santos Police Department',
+          classification: restricted ? 'restricted' : 'internal',
+          printedAt: '2026-09-24 14:02',
+          printedBy: '1-ADAM-12',
+          cut: false,
+          fields: [
+            { label: 'Number', value: number },
+            { label: 'Status', value: citation?.status ?? anmalan?.status ?? custody?.status ?? '' },
+          ],
+          body: {
+            type: 'doc',
+            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Pay the fine by 2026-10-24 14:02.' }] }],
+          },
+        },
+        copies: { paper: restricted ? 'classified' : true, pdf: true },
+      };
+    },
+
     'document.print': (input) => {
       const { kind, id, copy } = (input ?? {}) as { kind?: string; id?: number; copy?: string };
       if (!kind || !id) return refuse('not_found', { kind: 'unknown' });
 
       const number = `LSPD-D26-0000${10 + nextDocumentNumber++}`;
+      if (copy === 'paper' && kind === 'citation' && id === 3) return refuse('conflict', { copy: 'classified' });
+      // Citation 2's PDF: the gateway did not answer.
+      if (copy === 'pdf' && kind === 'citation' && id === 2) return refuse('conflict', { copy: 'pdf_unavailable' });
+
       return copy === 'pdf'
-        ? { id: nextDocumentNumber, number, url: `https://media.example/media/${number}?token=mock` }
-        : { id: nextDocumentNumber, number };
+        ? {
+            id: nextDocumentNumber,
+            number,
+            classification: 'internal',
+            url: `https://media.example/media/${number}?token=mock`,
+            expiresAt: Math.floor(Date.now() / 1000) + 900,
+          }
+        : { id: nextDocumentNumber, number, classification: 'internal' };
     },
 
     'person.photo.commit': (input) => {

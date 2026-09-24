@@ -2730,6 +2730,12 @@ export const schemas = {
 
   DocumentCapabilities: {},
 
+  /** What a print would show, and which copies may be made; keeps nothing. */
+  DocumentPreview: {
+    kind: { type: 'enum', required: true, values: DOCUMENT_KINDS },
+    id: { type: 'integer', required: true, min: 1 },
+  },
+
   /** Attaches an uploaded photograph to the record it was begun for. */
   PersonPhotoCommit: {
     mediaRef: { type: 'string', required: true, min: 1, max: 64 },

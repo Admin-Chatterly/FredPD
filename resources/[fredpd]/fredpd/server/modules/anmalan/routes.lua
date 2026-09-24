@@ -77,6 +77,19 @@ local function readable(session, id)
     return allowed
 end
 
+--- The people on a report that this session may read (4.5). A protected
+--- witness or an informant whose own record is compartmented is left off,
+--- with no gap and no count: the report does not tie them to the incident for
+--- a reader who could not open their record. Adding and removing people are
+--- per person, so a hidden entry is never overwritten by an edit.
+local function readablePersoner(session, anmalanId)
+    local out = {}
+    for _, person in ipairs(repo.personer(anmalanId)) do
+        if FredPD.Repo.persons.readPerson(session, person.personId) then out[#out + 1] = person end
+    end
+    return out
+end
+
 --- Reads a förundersökning the session is allowed to see, or refuses.
 ---
 --- The FU half had no equivalent of `readable` and its write routes went
@@ -158,7 +171,7 @@ route.define({
         return {
             anmalan = row,
             brott = charges,
-            personer = repo.personer(row.id),
+            personer = readablePersoner(session, row.id),
             -- Through the filter, not raw. A tilläggsuppgift is a full
             -- anmälan with its own classification and its own access rows --
             -- an informant statement attached to a routine burglary report --
@@ -727,20 +740,23 @@ FredPD.Modules.documents.register('anmalan', function(session, id)
         offences[#offences + 1] = t(charge.labelKey)
     end
 
+    -- A print applies the same redaction as a read (4.5).
     local people = {}
-    for _, person in ipairs(repo.personer(row.id)) do
+    for _, person in ipairs(readablePersoner(session, row.id)) do
         people[#people + 1] = ('%s (%s)'):format(person.personNumber or '', t('anmalan.roll.' .. tostring(person.roll)))
     end
 
     return {
         title = t('document.title.anmalan', { number = row.number }),
         classification = row.classification,
+        control = row,
+        recordType = ANMALAN,
         fields = {
             { label = t('document.field.number'), value = row.number },
             { label = t('document.field.heading'), value = row.title or '' },
             { label = t('document.field.status'), value = t('anmalan.status.' .. tostring(row.status)) },
-            { label = t('document.field.occurred'), value = tostring(row.occurredAt or '') },
-            { label = t('document.field.place'), value = row.occurredPlace or '' },
+            { label = t('document.field.occurred'), value = FredPD.Modules.documents.moment(row.occurredAt) },
+            { label = t('document.field.placeOffence'), value = row.occurredPlace or '' },
             { label = t('document.field.offences'), value = table.concat(offences, '; ') },
             { label = t('document.field.people'), value = table.concat(people, '; ') },
         },

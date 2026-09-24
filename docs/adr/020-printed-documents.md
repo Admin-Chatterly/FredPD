@@ -39,16 +39,40 @@ a record.
     stays behind its own access check.
   - The viewer parses the metadata as untrusted input and renders text only
     (invariant 10). A forged paper is possible, just as it is with real
-    paper, and the document number is what an officer checks it against.
+    paper. The paper is not proof: the record in the MDT is, read through
+    its own access check.
+- **Paper has a ceiling (amended after review).** A paper leaves the access
+  domain for good. It can be handed over, dropped, stolen or searched.
+  Whoever holds it reads it with no session, no clearance and no audit, and
+  ox_inventory sends item metadata to any client that opens the inventory.
+  So only a record at or below `documents.paperCeiling` (default
+  `internal`) may go to paper. It must also be in no compartment, not
+  sealed, and not opened through a break-glass grant. A record with no
+  classification the server recognises gets no copy at all.
 - **A PDF is optional.**
   - It needs the gateway.
   - The gateway now prints the letterhead and the classification at the
     head of every page, and the document number, the printer and "page n
     / m" at the foot.
   - A faint classification watermark repeats on every sheet.
-  - The officer gets a signed link, valid for 15 minutes (ADR-019).
+  - The officer gets a signed link (ADR-019), valid for
+    `gateway.mediaLinkSeconds`. It is a **bearer link**: it is not tied to
+    the officer, and anyone who has it can fetch the file until it expires.
+  - A PDF of a restricted record (above `internal`, compartmented or sealed)
+    is an export (11.1). It needs `document.export.restricted`, which is
+    granted to supervisors and investigators, not to all of patrol. The
+    print's audit row names the classification.
+  - The render happens now or not at all. It never goes through the
+    outbox: a retry after the officer was told nothing was printed would
+    leave a file that no document row points at.
+- **Preview first (6.4).** `document.preview` runs the same printer and
+  shows the page and which copies may be made, and why not. It numbers and
+  keeps nothing. The print is committed from the preview.
 - **Permission:** `document.print`, granted to `patrol_basic`, plus the
   record's own view permission, asked again by its printer.
+- **Only readable people are named.** The anmälan's printer names only the
+  people the officer may read. A protected witness is left off, and so is
+  the count of who was left off.
 
 ## Consequences
 

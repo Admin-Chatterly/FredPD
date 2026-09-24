@@ -195,7 +195,14 @@
     "not_uploaded": "bilden kom aldrig fram till bildtjänsten",
     "identity_mismatch": "personen vid terminalen är inte den person inskrivningen gäller",
     "no_character": "personen vid terminalen har ingen karaktär inläst",
-    "no_paper": "ingen papperskopia kunde läggas i ditt förråd (det är fullt, eller pappret är inte uppsatt)"
+    "no_paper": "ingen papperskopia kunde läggas i ditt inventarie (det är fullt, eller pappersföremålet är inte konfigurerat)",
+    "pdf_off": "PDF-export är inte tillgänglig på den här servern",
+    "pdf_unavailable": "PDF-tjänsten svarade inte; försök igen",
+    "classified": "handlingen är klassad högre än vad som får skrivas ut på papper",
+    "compartmented": "en handling som bara vissa enheter får läsa, eller en förseglad, skrivs aldrig ut på papper",
+    "breakglass": "en handling som öppnats med nödåtkomst skrivs inte ut på papper",
+    "unclassified": "handlingen saknar giltig klassning",
+    "export_restricted": "en PDF av en begränsad handling kräver exportbehörighet"
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -3114,18 +3121,20 @@
       "person": "Person",
       "vehicle": "Fordon",
       "heading": "Rubrik",
-      "occurred": "Tid",
-      "place": "Plats",
+      "occurred": "Inträffade",
       "offences": "Brott",
       "people": "Personer",
-      "arrested": "Gripen",
-      "ground": "Grund"
+      "ground": "Grund",
+      "arrestedAt": "Tidpunkt för gripandet",
+      "placeOffence": "Brottsplats",
+      "placeArrest": "Plats för gripandet"
     },
     "amount": "{amount} kr",
     "title": {
       "citation": "Föreläggande av ordningsbot {number}",
       "anmalan": "Anmälan {number}",
-      "custody": "Frihetsberövande {number}"
+      "custody": "Frihetsberövande {number}",
+      "citationVoid": "Makulerat föreläggande av ordningsbot {number}"
     },
     "citation": {
       "body": "Betala boten senast {due}. Vill du bestrida den, kontakta polisen inom samma tid."
@@ -3146,11 +3155,27 @@
     "print": {
       "paper": "Skriv ut papperskopia",
       "pdf": "Exportera PDF",
-      "paperDone": "Papperskopia {number} ligger i ditt förråd.",
+      "paperDone": "Papperskopian {number} ligger i ditt inventarie.",
       "pdfDone": "PDF {number} är klar.",
       "failed": "Ingenting skrevs ut.",
-      "link": "Länk till PDF:en (gäller i 15 minuter)",
-      "copy": "Kopiera länk"
+      "link": "Länk till PDF:en (gäller till {time})",
+      "copy": "Kopiera länk",
+      "open": "Skriv ut…",
+      "linkNoExpiry": "Länk till PDF:en",
+      "copied": "Länken är kopierad.",
+      "copyFailed": "Länken kunde inte kopieras. Markera den och kopiera den själv."
+    },
+    "preview": {
+      "title": "Förhandsgranskning"
+    },
+    "copy": {
+      "classified": "Handlingen är klassad högre än vad som får skrivas ut på papper. Exportera en PDF i stället.",
+      "compartmented": "En handling som bara vissa enheter får läsa, eller en förseglad handling, skrivs aldrig ut på papper.",
+      "breakglass": "En handling som öppnats med nödåtkomst skrivs inte ut på papper.",
+      "unclassified": "Handlingen saknar giltig klassning, så ingen kopia kan göras.",
+      "export_restricted": "En PDF av en begränsad handling kräver exportbehörighet.",
+      "no_paper": "Pappersföremålet är inte konfigurerat på den här servern.",
+      "pdf_off": "PDF-export är inte tillgänglig på den här servern."
     }
   }
 }

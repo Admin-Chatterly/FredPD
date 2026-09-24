@@ -419,8 +419,12 @@ FredPD.Modules.documents.register('citation', function(session, id)
     end
 
     return {
-        title = t('document.title.citation', { number = row.number }),
+        -- A voided citation is still a record, and its copy says so on its face.
+        title = t(row.status == 'void' and 'document.title.citationVoid' or 'document.title.citation',
+            { number = row.number }),
         classification = row.classification,
+        control = row,
+        recordType = ORDNINGSBOT,
         fields = fields,
         body = documents.textToDoc(t('document.citation.body', { due = documents.moment(row.dueAt) })),
     }

@@ -195,7 +195,14 @@
     "not_uploaded": "the picture never reached the photo service",
     "identity_mismatch": "the person at the terminal is not the person this booking names",
     "no_character": "the person at the terminal has no character loaded",
-    "no_paper": "no paper copy could be put in your inventory (it is full, or the paper item is not set up)"
+    "no_paper": "no paper copy could be put in your inventory (it is full, or the paper item is not set up)",
+    "pdf_off": "PDF export is not available on this server",
+    "pdf_unavailable": "the PDF service did not answer; try again",
+    "classified": "the record is classified above what may be printed on paper",
+    "compartmented": "a record only certain units may read, or a sealed one, is never printed on paper",
+    "breakglass": "a record opened with emergency access is not printed on paper",
+    "unclassified": "the record has no valid classification",
+    "export_restricted": "a PDF of a restricted record needs the export permission"
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -3115,17 +3122,19 @@
       "vehicle": "Vehicle",
       "heading": "Heading",
       "occurred": "Occurred",
-      "place": "Place",
       "offences": "Offences",
       "people": "People named",
-      "arrested": "Arrested",
-      "ground": "Ground"
+      "ground": "Ground",
+      "arrestedAt": "Arrested at",
+      "placeOffence": "Place of offence",
+      "placeArrest": "Place of arrest"
     },
     "amount": "{amount} kr",
     "title": {
-      "citation": "Summary fine {number}",
+      "citation": "Citation {number}",
       "anmalan": "Report {number}",
-      "custody": "Custody record {number}"
+      "custody": "Custody record {number}",
+      "citationVoid": "Voided citation {number}"
     },
     "citation": {
       "body": "Pay the fine by {due}. To contest it, contact the police within the same time."
@@ -3149,8 +3158,24 @@
       "paperDone": "Paper copy {number} is in your inventory.",
       "pdfDone": "PDF {number} is ready.",
       "failed": "Nothing was printed.",
-      "link": "Link to the PDF (valid for 15 minutes)",
-      "copy": "Copy link"
+      "link": "Link to the PDF (valid until {time})",
+      "copy": "Copy link",
+      "open": "Print…",
+      "linkNoExpiry": "Link to the PDF",
+      "copied": "Link copied.",
+      "copyFailed": "The link could not be copied. Select it and copy it yourself."
+    },
+    "preview": {
+      "title": "Print preview"
+    },
+    "copy": {
+      "classified": "This record is classified above what may be printed on paper. Export a PDF instead.",
+      "compartmented": "A record only certain units may read, or a sealed record, is never printed on paper.",
+      "breakglass": "A record opened with emergency access is not printed on paper.",
+      "unclassified": "This record has no valid classification, so no copy can be made.",
+      "export_restricted": "A PDF of a restricted record needs the export permission.",
+      "no_paper": "The paper item is not set up on this server.",
+      "pdf_off": "PDF export is not available on this server."
     }
   }
 }

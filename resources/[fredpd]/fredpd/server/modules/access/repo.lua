@@ -395,6 +395,24 @@ function Repo.read(session, recordType, row, sharedAgencies)
     return shaped[1]
 end
 
+--- Is this session reading this record through a live break-glass entry?
+---
+--- Printing asks (ADR-020): a record opened for half an hour in an
+--- emergency must not leave the room on paper that outlives the half hour.
+---
+--- @return boolean
+function Repo.viaBreakglass(session, recordType, recordId)
+    if type(session) ~= 'table' or session.discordId == nil or recordId == nil then return false end
+
+    local row = db().single(
+        [[SELECT 1 AS live FROM fpd_breakglass
+           WHERE discord_id = ? AND record_type = ? AND record_id = ? AND expires_at > NOW(3)
+           LIMIT 1]],
+        { session.discordId, recordType, recordId })
+
+    return row ~= nil
+end
+
 --- May this session be *told about* this record -- its number in a
 --- notification (`FredPD.Core.push.notifyWhere`)?
 ---

@@ -464,6 +464,11 @@ FredPD.Config.server = {
     --- can read it. A PDF needs the gateway (3.7).
     documents = {
         paperItem = 'fredpd_paper',
+        -- The highest classification a paper copy may carry. A paper is read
+        -- by whoever holds it, with no clearance and no audit, so anything
+        -- above this, in a compartment, sealed or opened by break-glass is
+        -- PDF-only (and a restricted PDF needs document.export.restricted).
+        paperCeiling = 'internal',
     },
 
     --- Impound in the world (spec 7.15, ADR-016). "Impound" on a car through

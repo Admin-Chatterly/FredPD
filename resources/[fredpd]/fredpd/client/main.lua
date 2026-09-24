@@ -299,6 +299,7 @@ local NUI_ROUTES <const> = {
     -- Printing (7.28, ADR-020).
     'document.capabilities',
     'document.print',
+    'document.preview',
 
     -- Crime scenes, evidence and the chain of custody (spec 8).
     'scene.create',

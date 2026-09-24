@@ -317,7 +317,8 @@
   <PaperViewer
     {paper}
     onClose={() => {
-      paper = null;
+      // The client's own `fredpd:close` puts it away: cleared here first,
+      // the MDT underneath would show for the round trip.
       void nui.call('fredpd:close');
     }}
   />
