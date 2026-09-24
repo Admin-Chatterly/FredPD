@@ -132,6 +132,11 @@ local REQUIRED_TABLES <const> = {
 
     -- Migration 0030. Who a print search points at (8.8).
     'fpd_lab_candidates',
+
+    -- Migration 0034. The address index and its hazards (7.6).
+    'fpd_locations',
+    'fpd_location_hazards',
+    'fpd_location_keyholders',
 }
 
 --- Columns a migration added to a table that already existed, which the table

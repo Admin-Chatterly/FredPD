@@ -1160,3 +1160,29 @@ export type ImpoundHeldReason = (typeof IMPOUND_HELD_REASONS)[number];
 export const PERSONNEL_ISSUE_KINDS = ['equipment', 'certification'] as const;
 
 export type PersonnelIssueKind = (typeof PERSONNEL_ISSUE_KINDS)[number];
+
+/** `ck_fpd_locations_kind` (spec 7.6, 0034) — what sort of premise an address is. */
+export const LOCATION_KINDS = ['residence', 'business', 'public', 'industrial', 'other'] as const;
+
+export type LocationKind = (typeof LOCATION_KINDS)[number];
+
+/** `ck_fpd_location_hazards_kind` (spec 7.6, 0034) — what an officer should
+ * know before walking up to the door. Rendered from `location.hazard.<kind>`. */
+export const LOCATION_HAZARD_KINDS = [
+  'dog',
+  'weapons',
+  'hostile',
+  'violent_history',
+  'medical',
+  'infectious',
+  'children',
+  'hazardous_materials',
+  'other',
+] as const;
+
+export type LocationHazardKind = (typeof LOCATION_HAZARD_KINDS)[number];
+
+/** `ck_fpd_location_keyholders_role` (spec 7.6, 0034). */
+export const LOCATION_KEYHOLDER_ROLES = ['owner', 'tenant', 'keyholder', 'manager', 'employee'] as const;
+
+export type LocationKeyholderRole = (typeof LOCATION_KEYHOLDER_ROLES)[number];

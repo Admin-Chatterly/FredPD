@@ -451,6 +451,34 @@ local function tellAssigned(call, units)
             return other.officerId == officerId and board.mayRead(other, call)
         end, 'cad.notify.dispatched', params, { type = 'warning', waypoint = waypoint })
     end
+
+    -- The premise hazards at the call (7.6), before the units get there: the
+    -- dog, the weapons in the house. Worked out once for the call, then per
+    -- officer only whether they may be told of each premise. After the
+    -- response, so dispatching never waits on it.
+    CreateThread(function()
+        local premises = FredPD.Modules.locationsApi.premisesAt(call.agencyId, call)
+        if #premises == 0 then return end
+
+        local assigned = {}
+        for index = 1, #units do assigned[units[index].officerId] = true end
+
+        for src, other in pairs(FredPD.Core.session.all()) do
+            if assigned[other.officerId] and board.mayRead(other, call) then
+                for _, premise in ipairs(FredPD.Modules.locationsApi.visibleTo(other, premises)) do
+                    local names = {}
+                    for _, hazard in ipairs(premise.hazards) do
+                        names[#names + 1] = FredPD.t('location.hazard.' .. hazard.kind)
+                    end
+
+                    FredPD.Core.push.notify(src, 'cad.notify.hazard', {
+                        label = premise.label,
+                        hazards = table.concat(names, ', '),
+                    }, { type = 'error' })
+                end
+            end
+        end
+    end)
 end
 
 --- May this session work a call it is not a unit on?
@@ -869,6 +897,8 @@ route.define({
         return {
             id = input.id,
             call = call,
+            -- Standing premise hazards at the call (7.6), for this reader.
+            hazards = FredPD.Modules.locationsApi.hazardsAt(session, call),
             units = repo.callUnits(session.agencyId, input.id),
             log = log,
             links = repo.callLinks(session.agencyId, input.id),

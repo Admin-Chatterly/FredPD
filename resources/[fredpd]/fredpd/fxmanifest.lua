@@ -83,6 +83,9 @@ server_scripts {
     'server/modules/registry/service.lua',
     'server/modules/registry/repo.lua',
     'server/modules/registry/routes.lua',
+    'server/modules/locations/service.lua',
+    'server/modules/locations/repo.lua',
+    'server/modules/locations/routes.lua',
 
     -- Suggests real citizens and vehicles from ESX's own tables while
     -- registering one (server/bridges/framework.lua). Routes only: the SQL

@@ -156,6 +156,12 @@ const PAIRED: Record<string, keyof typeof enums> = {
 
   // Impound (0020, spec 7.15).
   ck_fpd_impound_reason: 'IMPOUND_HELD_REASONS',
+
+  // Locations and premises (0034, spec 7.6).
+  ck_fpd_locations_kind: 'LOCATION_KINDS',
+  ck_fpd_locations_class: 'CLASSIFICATIONS',
+  ck_fpd_location_hazards_kind: 'LOCATION_HAZARD_KINDS',
+  ck_fpd_location_keyholders_role: 'LOCATION_KEYHOLDER_ROLES',
   ck_fpd_impound_class: 'CLASSIFICATIONS',
 };
 

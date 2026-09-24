@@ -183,7 +183,9 @@
     "fleet_vehicle": "Det är ett utryckningsfordon eller myndighetens fordon.",
     "in_progress": "Det pågår redan.",
     "unreachable": "Det gick inte att hitta härifrån.",
-    "not_suspect": "Personen är inte misstänkt i den här förundersökningen."
+    "not_suspect": "Personen är inte misstänkt i den här förundersökningen.",
+    "no_position": "Din position gick inte att läsa.",
+    "already_cancelled": "Den är redan hävd."
   },
   "placement": {
     "station_terminal": "Stationsterminal",
@@ -1119,7 +1121,8 @@
       "fu": "Förundersökningar",
       "brott": "Brottskatalog",
       "ordningsbot": "Ordningsböter",
-      "impound": "Beslag"
+      "impound": "Beslag",
+      "locations": "Adresser"
     },
     "vehicle": {
       "alpr": {
@@ -1614,7 +1617,12 @@
     "noCallsign": "Du har ingen anropssignal och syns därför inte på enhetstavlan. Be ett befäl lägga in en under Personal.",
     "notify": {
       "dispatched": "Utlarmad till {number}: {type}, {location}. Den ligger i din GPS.",
-      "noLocation": "ingen plats angiven"
+      "noLocation": "ingen plats angiven",
+      "hazard": "Varning på {label}: {hazards}"
+    },
+    "hazard": {
+      "title": "Varning på {label}",
+      "region": "Varningar på adressen"
     }
   },
   "alpr": {
@@ -2801,6 +2809,85 @@
     "error": {
       "not_assigned": "Du är inte kopplad till någon händelse.",
       "none_nearby": "Det finns ingen öppen händelse i närheten."
+    }
+  },
+  "location": {
+    "search": "Sök adress",
+    "empty": "Inga adresser hittades",
+    "detail": {
+      "none": "Välj en adress för att läsa den"
+    },
+    "created": "{label} har lagts till i adressregistret.",
+    "moved": "Positionen är uppdaterad till där du står.",
+    "positioned": "Position registrerad, {radius} m radie",
+    "noPosition": "Ingen position registrerad",
+    "field": {
+      "label": "Adress",
+      "kind": "Typ",
+      "notes": "Anteckningar",
+      "here": "På min position",
+      "hazardKind": "Varning",
+      "note": "Anteckning",
+      "days": "Upphör om (dagar)",
+      "keyholder": "Person",
+      "role": "Roll"
+    },
+    "column": {
+      "hazards": "Varningar"
+    },
+    "section": {
+      "hazards": "Varningar",
+      "keyholders": "Nyckelinnehavare",
+      "history": "Händelser på adressen"
+    },
+    "history": {
+      "none": "Inga händelser registrerade här."
+    },
+    "keyholder": {
+      "none": "Inga nyckelinnehavare registrerade."
+    },
+    "action": {
+      "create": "Lägg till adress",
+      "moveHere": "Sätt positionen till där jag står",
+      "addHazard": "Lägg till varning",
+      "cancelHazard": "Återta",
+      "addKeyholder": "Lägg till nyckelinnehavare",
+      "removeKeyholder": "Ta bort",
+      "cancelHazardNamed": "Återta varningen: {hazard}",
+      "removeKeyholderNamed": "Ta bort {name} som nyckelinnehavare",
+      "removeKeyholderTitle": "Ta bort nyckelinnehavare"
+    },
+    "kind": {
+      "residence": "Bostad",
+      "business": "Verksamhet",
+      "public": "Allmän plats",
+      "industrial": "Industri",
+      "other": "Annat"
+    },
+    "hazard": {
+      "dog": "Farlig hund",
+      "weapons": "Vapen på adressen",
+      "hostile": "Polisfientlig",
+      "violent_history": "Våldsbenägen",
+      "medical": "Medicinskt tillstånd",
+      "infectious": "Smittorisk",
+      "children": "Barn på platsen",
+      "hazardous_materials": "Farliga ämnen",
+      "other": "Annan varning",
+      "none": "Inga varningar registrerade.",
+      "cancelled": "återtagen",
+      "until": "till {at}",
+      "lapsed": "upphörd"
+    },
+    "role": {
+      "owner": "Ägare",
+      "tenant": "Hyresgäst",
+      "keyholder": "Nyckelinnehavare",
+      "manager": "Förvaltare",
+      "employee": "Anställd"
+    },
+    "confirm": {
+      "removeKeyholder": "Ta bort {name} från adressen? Personen listas då inte längre som kontakt här."
     }
   }
 }

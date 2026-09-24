@@ -4277,6 +4277,105 @@ function citationRow(row: FixtureCitation, detailed: boolean): Record<string, un
   return shaped;
 }
 
+// --------------------------------------------------------------- locations
+
+/** A premise in the address index (7.6), as `fpd_locations` holds it. */
+interface FixtureLocation {
+  id: number;
+  label: string;
+  kind: string;
+  x: number | null;
+  y: number | null;
+  radius: number;
+  notes: string | null;
+  version: number;
+  hazards: {
+    id: number;
+    kind: string;
+    note: string | null;
+    createdAgo: number;
+    expiresIn?: number;
+    cancelledAgo?: number;
+  }[];
+  keyholders: { personId: number; role: string }[];
+}
+
+/**
+ * One premise at the collision call (call 2, Alta Street at Power Street),
+ * with a dog on it, so the call card has a hazard to draw; and one with none.
+ */
+let fixtureLocations: FixtureLocation[] = [
+  {
+    id: 1,
+    label: 'Alta Street at Power Street',
+    kind: 'residence',
+    x: 130,
+    y: -1040,
+    radius: 30,
+    notes: 'Back door to the alley.',
+    version: 1,
+    hazards: [
+      { id: 1, kind: 'dog', note: 'Large dog in the yard, has bitten before.', createdAgo: 3 * DAY },
+      { id: 2, kind: 'weapons', note: null, createdAgo: 40 * DAY, cancelledAgo: 10 * DAY },
+    ],
+    keyholders: [{ personId: 3, role: 'owner' }],
+  },
+  {
+    id: 2,
+    label: '4 Vinewood Hills Drive',
+    kind: 'residence',
+    x: null,
+    y: null,
+    radius: 30,
+    notes: null,
+    version: 1,
+    hazards: [],
+    keyholders: [],
+  },
+];
+
+let nextLocationHazardId = 10;
+
+function liveLocationHazards(location: FixtureLocation): FixtureLocation['hazards'] {
+  return location.hazards.filter((hazard) => hazard.cancelledAgo === undefined);
+}
+
+function locationRow(location: FixtureLocation): Record<string, unknown> {
+  return {
+    id: location.id,
+    label: location.label,
+    kind: location.kind,
+    x: location.x,
+    y: location.y,
+    radius: location.radius,
+    notes: location.notes,
+    version: location.version,
+    liveHazards: liveLocationHazards(location).length,
+  };
+}
+
+/** `hazardsAt` for a fixture call: by position within the radius, or by address. */
+function hazardsAtCall(call: { x: number | null; y: number | null; locationText: string | null }): unknown[] {
+  return fixtureLocations
+    .filter((location) => {
+      const byPosition =
+        location.x !== null &&
+        location.y !== null &&
+        call.x !== null &&
+        call.y !== null &&
+        (call.x - location.x) ** 2 + (call.y - location.y) ** 2 <= location.radius ** 2;
+      const byText =
+        call.locationText !== null && call.locationText.toLowerCase() === location.label.toLowerCase();
+      return byPosition || byText;
+    })
+    .map((location) => ({
+      locationId: location.id,
+      label: location.label,
+      hazards: liveLocationHazards(location).map((hazard) => ({ kind: hazard.kind, note: hazard.note })),
+    }))
+    .filter((premise) => premise.hazards.length > 0);
+}
+
 // ----------------------------------------------------------------- impound
 
 interface FixtureImpound {
@@ -5913,6 +6012,160 @@ export const fixtures: FixtureSet = {
 
     // ----------------------------------------------------------- impound
 
+    // ------------------------------------------------------------ locations
+
+    'location.search': (input) => {
+      const { term } = (input ?? {}) as { term?: string };
+      const needle = (term ?? '').toLowerCase();
+
+      return {
+        locations: fixtureLocations
+          .filter((location) => location.label.toLowerCase().includes(needle))
+          .map(locationRow),
+      };
+    },
+
+    'location.get': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      const location = fixtureLocations.find((entry) => entry.id === id);
+      if (!location) return refuse('not_found');
+
+      return {
+        location: locationRow(location),
+        hazards: location.hazards.map((hazard) => ({
+          id: hazard.id,
+          kind: hazard.kind,
+          note: hazard.note,
+          createdAt: secondsAgo(hazard.createdAgo),
+          expiresAt: hazard.expiresIn !== undefined ? secondsAgo(-hazard.expiresIn) : null,
+          cancelledAt: hazard.cancelledAgo !== undefined ? secondsAgo(hazard.cancelledAgo) : null,
+          createdByCallsign: '1-ADAM-12',
+          createdByName: 'Berg',
+        })),
+        keyholders: location.keyholders.map((holder) => {
+          const person = personRef(holder.personId);
+          return person ? { role: holder.role, person } : { role: holder.role, restricted: true };
+        }),
+        history: cadCalls
+          .filter((call) => {
+            const byText = call.locationText?.toLowerCase() === location.label.toLowerCase();
+            const byPosition =
+              location.x !== null &&
+              location.y !== null &&
+              call.x !== null &&
+              call.y !== null &&
+              (call.x - location.x) ** 2 + (call.y - location.y) ** 2 <= location.radius ** 2;
+            return byText || byPosition;
+          })
+          .map((call) => ({
+            id: call.id,
+            callNumber: call.callNumber,
+            type: call.type,
+            status: call.status,
+            disposition: call.disposition,
+            receivedAt: call.receivedAtUnix,
+          })),
+      };
+    },
+
+    'location.create': (input) => {
+      const body = (input ?? {}) as { label?: string; kind?: string; notes?: string; here?: boolean };
+      const label = (body.label ?? '').trim().replace(/\s+/g, ' ');
+      if (!label) return refuse('invalid', { label: 'required' });
+
+      const id = fixtureLocations.length + 1;
+      fixtureLocations = [
+        ...fixtureLocations,
+        {
+          id,
+          label,
+          kind: body.kind ?? 'residence',
+          // The server reads the position off the officer's ped; the fixture
+          // stands the officer in Mission Row.
+          x: body.here ? 441.2 : null,
+          y: body.here ? -981.9 : null,
+          radius: 30,
+          notes: body.notes ?? null,
+          version: 1,
+          hazards: [],
+          keyholders: [],
+        },
+      ];
+
+      return { id };
+    },
+
+    'location.update': (input) => {
+      const body = (input ?? {}) as { id?: number; version?: number; here?: boolean };
+      const location = fixtureLocations.find((entry) => entry.id === body.id);
+      if (!location) return refuse('not_found');
+      if (location.version !== body.version) return refuse('conflict');
+
+      if (body.here) {
+        location.x = 441.2;
+        location.y = -981.9;
+      }
+      location.version += 1;
+
+      return { id: location.id };
+    },
+
+    'location.hazard.add': (input) => {
+      const body = (input ?? {}) as { locationId?: number; kind?: string; note?: string; days?: number };
+      const location = fixtureLocations.find((entry) => entry.id === body.locationId);
+      if (!location) return refuse('not_found');
+
+      const id = nextLocationHazardId++;
+      location.hazards.unshift({
+        id,
+        kind: body.kind ?? 'other',
+        note: body.note ?? null,
+        createdAgo: 0,
+        ...(body.days ? { expiresIn: body.days * DAY } : {}),
+      });
+
+      return { id, locationId: location.id };
+    },
+
+    'location.hazard.cancel': (input) => {
+      const { id } = (input ?? {}) as { id?: number };
+      for (const location of fixtureLocations) {
+        const hazard = location.hazards.find((entry) => entry.id === id);
+        if (hazard) {
+          if (hazard.cancelledAgo !== undefined) return refuse('conflict', { _input: 'already_cancelled' });
+          hazard.cancelledAgo = 0;
+          return { id, locationId: location.id };
+        }
+      }
+      return refuse('not_found');
+    },
+
+    'location.keyholder.set': (input) => {
+      const body = (input ?? {}) as { locationId?: number; personId?: number; role?: string };
+      const location = fixtureLocations.find((entry) => entry.id === body.locationId);
+      if (!location) return refuse('not_found');
+      if (!body.personId || !personRef(body.personId)) return refuse('not_found', { personId: 'unknown' });
+
+      location.keyholders = [
+        ...location.keyholders.filter((holder) => holder.personId !== body.personId),
+        { personId: body.personId, role: body.role ?? 'keyholder' },
+      ];
+
+      return { locationId: location.id };
+    },
+
+    'location.keyholder.remove': (input) => {
+      const body = (input ?? {}) as { locationId?: number; personId?: number };
+      const location = fixtureLocations.find((entry) => entry.id === body.locationId);
+      if (!location) return refuse('not_found');
+
+      const before = location.keyholders.length;
+      location.keyholders = location.keyholders.filter((holder) => holder.personId !== body.personId);
+      if (location.keyholders.length === before) return refuse('not_found', { personId: 'unknown' });
+
+      return { locationId: location.id };
+    },
+
     'impound.list': (input) => {
       const filter = (input ?? {}) as { held?: boolean };
 
@@ -6199,6 +6452,7 @@ export const fixtures: FixtureSet = {
         // call's source would have the card reasoning about why it is missing,
         // and absent already means something — no.
         mayAcknowledge: mayAcknowledge(call),
+        hazards: hazardsAtCall(call),
       };
     },
 

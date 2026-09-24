@@ -330,7 +330,7 @@ local PERMISSION_CATALOGUE <const> = {
     'tvang.view', 'tvang.decide', 'tvang.decide.aklagare', 'tvang.decide.domare',
     'tvang.verkstall', 'efterlysning.issue',
     'spaning.view', 'spaning.create',
-    'rms.location.view', 'rms.location.hazard.edit',
+    'rms.location.view', 'rms.location.edit', 'rms.location.hazard.edit',
 
     -- Anmälan och förundersökning (spec 7.7, 7.8).
     --

@@ -180,6 +180,10 @@ const REASONS = new Set([
   'fleet_vehicle',
   'in_progress',
   'unreachable',
+  // Locations (7.6): the officer's position could not be read for "at my
+  // position", and a hazard already lifted.
+  'no_position',
+  'already_cancelled',
   // Court (7.20): the tilltalade named is not one of the FU's misstänkta.
   'not_suspect',
   // Standing in for the åklagare or domare (7.9.1): the real role signed on

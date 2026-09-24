@@ -181,6 +181,15 @@
     links: CallLink[];
     recommended?: Recommendation[] | null;
     mayAcknowledge?: boolean;
+    /** Standing premise hazards at the call (7.6), for this reader. */
+    hazards?: PremiseHazards[];
+  }
+
+  /** The hazards on one premise the call is at. */
+  export interface PremiseHazards {
+    locationId: number;
+    label: string;
+    hazards: { kind: string; note?: string | null }[];
   }
 
   /** A row of the unit board, with whatever call it is on joined on. */

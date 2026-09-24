@@ -183,7 +183,9 @@
     "fleet_vehicle": "That is an emergency or agency vehicle.",
     "in_progress": "That is already being done.",
     "unreachable": "It could not be found from here.",
-    "not_suspect": "That person is not a suspect in this investigation."
+    "not_suspect": "That person is not a suspect in this investigation.",
+    "no_position": "Your position could not be read.",
+    "already_cancelled": "It has already been cancelled."
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -1119,7 +1121,8 @@
       "fu": "Investigations",
       "brott": "Offences",
       "ordningsbot": "Citations",
-      "impound": "Impound"
+      "impound": "Impound",
+      "locations": "Locations"
     },
     "vehicle": {
       "alpr": {
@@ -1614,7 +1617,12 @@
     "noCallsign": "You have no callsign, so you are not on the unit board. Ask a supervisor to set one under Personnel.",
     "notify": {
       "dispatched": "Dispatched to {number}: {type}, {location}. It is on your GPS.",
-      "noLocation": "no location given"
+      "noLocation": "no location given",
+      "hazard": "Hazard at {label}: {hazards}"
+    },
+    "hazard": {
+      "title": "Hazard at {label}",
+      "region": "Hazards at the address"
     }
   },
   "alpr": {
@@ -2801,6 +2809,85 @@
     "error": {
       "not_assigned": "You are not on a call.",
       "none_nearby": "There is no open call near you."
+    }
+  },
+  "location": {
+    "search": "Search addresses",
+    "empty": "No addresses found",
+    "detail": {
+      "none": "Select an address to read it"
+    },
+    "created": "{label} added to the address index.",
+    "moved": "Position updated to where you stand.",
+    "positioned": "Position on file, {radius} m radius",
+    "noPosition": "No position on file",
+    "field": {
+      "label": "Address",
+      "kind": "Type",
+      "notes": "Notes",
+      "here": "At my position",
+      "hazardKind": "Hazard",
+      "note": "Note",
+      "days": "Expires in (days)",
+      "keyholder": "Person",
+      "role": "Role"
+    },
+    "column": {
+      "hazards": "Hazards"
+    },
+    "section": {
+      "hazards": "Hazards",
+      "keyholders": "Keyholders",
+      "history": "Incidents at the address"
+    },
+    "history": {
+      "none": "No calls recorded here."
+    },
+    "keyholder": {
+      "none": "No keyholders recorded."
+    },
+    "action": {
+      "create": "Add address",
+      "moveHere": "Set position to where I stand",
+      "addHazard": "Add hazard",
+      "cancelHazard": "Withdraw",
+      "addKeyholder": "Add keyholder",
+      "removeKeyholder": "Remove",
+      "cancelHazardNamed": "Withdraw the hazard: {hazard}",
+      "removeKeyholderNamed": "Remove {name} as keyholder",
+      "removeKeyholderTitle": "Remove keyholder"
+    },
+    "kind": {
+      "residence": "Residence",
+      "business": "Business",
+      "public": "Public place",
+      "industrial": "Industrial",
+      "other": "Other"
+    },
+    "hazard": {
+      "dog": "Dangerous dog",
+      "weapons": "Weapons at the address",
+      "hostile": "Hostile to police",
+      "violent_history": "History of violence",
+      "medical": "Medical condition",
+      "infectious": "Risk of infection",
+      "children": "Children present",
+      "hazardous_materials": "Hazardous materials",
+      "other": "Other hazard",
+      "none": "No hazards recorded.",
+      "cancelled": "withdrawn",
+      "until": "until {at}",
+      "lapsed": "lapsed"
+    },
+    "role": {
+      "owner": "Owner",
+      "tenant": "Tenant",
+      "keyholder": "Keyholder",
+      "manager": "Manager",
+      "employee": "Employee"
+    },
+    "confirm": {
+      "removeKeyholder": "Remove {name} from this address? They are no longer listed as someone to contact here."
     }
   }
 }

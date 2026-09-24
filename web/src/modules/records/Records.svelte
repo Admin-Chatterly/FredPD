@@ -18,6 +18,7 @@
   import Spaning from './Spaning.svelte';
   import Ordningsbot from './Ordningsbot.svelte';
   import Impound from './Impound.svelte';
+  import Locations from './Locations.svelte';
   import { t } from '../../lib/i18n';
   import { formatDate, formatMoment } from '../../lib/time';
   import {
@@ -98,7 +99,8 @@
     | 'efterlysning'
     | 'spaning'
     | 'ordningsbot'
-    | 'impound';
+    | 'impound'
+    | 'locations';
 
   /** Which form's label a rejected field belongs to (spec 3.5). */
   const FIELD_LABELS: Record<string, string> = {
@@ -1210,6 +1212,8 @@
     'brott',
     'ordningsbot',
     'impound',
+    // The address index and its hazards (7.6).
+    'locations',
   ];
 
   /**
@@ -3306,5 +3310,7 @@
     <Ordningsbot />
   {:else if tab === 'impound'}
     <Impound />
+  {:else if tab === 'locations'}
+    <Locations />
   {/if}
 </section>

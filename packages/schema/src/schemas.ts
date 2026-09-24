@@ -27,6 +27,9 @@ import {
   HAK_TARGETS,
   HOTLIST_REASONS,
   IMPOUND_HELD_REASONS,
+  LOCATION_HAZARD_KINDS,
+  LOCATION_KEYHOLDER_ROLES,
+  LOCATION_KINDS,
   INTEL_CASE_STATUSES,
   INTEL_CONFIDENCE,
   INTEL_ORG_STATUSES,
@@ -2720,6 +2723,64 @@ export const schemas = {
    * plate and model are read off the car by the server; the client names only
    * the entity and the reason.
    */
+  // ----------------------------------------------------- locations (spec 7.6)
+
+  /** The address index. An empty term lists the most recently touched. */
+  LocationSearch: {
+    term: { type: 'string', required: false, max: 64 },
+    limit: { type: 'integer', required: false, min: 1, max: 100 },
+  },
+
+  LocationGet: {
+    id: { type: 'integer', required: true, min: 1 },
+  },
+
+  /**
+   * A premise. `here` takes the position off the officer's own ped, on the
+   * server; a client never sends coordinates.
+   */
+  LocationCreate: {
+    label: { type: 'string', required: true, min: 1, max: 191 },
+    kind: { type: 'enum', required: true, values: LOCATION_KINDS },
+    notes: { type: 'string', required: false, max: 500 },
+    here: { type: 'boolean', required: false },
+    radius: { type: 'integer', required: false, min: 5, max: 500 },
+    classification: { type: 'enum', required: false, values: CLASSIFICATIONS },
+  },
+
+  LocationUpdate: {
+    id: { type: 'integer', required: true, min: 1 },
+    version: { type: 'integer', required: true, min: 1 },
+    label: { type: 'string', required: false, min: 1, max: 191 },
+    kind: { type: 'enum', required: false, values: LOCATION_KINDS },
+    notes: { type: 'string', required: false, max: 500 },
+    here: { type: 'boolean', required: false },
+    radius: { type: 'integer', required: false, min: 5, max: 500 },
+  },
+
+  LocationHazardAdd: {
+    locationId: { type: 'integer', required: true, min: 1 },
+    kind: { type: 'enum', required: true, values: LOCATION_HAZARD_KINDS },
+    note: { type: 'string', required: false, max: 255 },
+    /** Days until it lapses; absent for a hazard that stands until cancelled. */
+    days: { type: 'integer', required: false, min: 1, max: 365 },
+  },
+
+  LocationHazardCancel: {
+    id: { type: 'integer', required: true, min: 1 },
+  },
+
+  LocationKeyholderSet: {
+    locationId: { type: 'integer', required: true, min: 1 },
+    personId: { type: 'integer', required: true, min: 1 },
+    role: { type: 'enum', required: true, values: LOCATION_KEYHOLDER_ROLES },
+  },
+
+  LocationKeyholderRemove: {
+    locationId: { type: 'integer', required: true, min: 1 },
+    personId: { type: 'integer', required: true, min: 1 },
+  },
+
   ImpoundTow: {
     netId: { type: 'integer', required: true, min: 1 },
     heldReasonKey: { type: 'enum', required: true, values: IMPOUND_HELD_REASONS },

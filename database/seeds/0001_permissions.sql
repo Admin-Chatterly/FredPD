@@ -856,3 +856,21 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('patrol', 'ordningsbot.pay'),
 
     ('supervisor', 'ordningsbot.void');
+
+-- -----------------------------------------------------------------------------
+-- Locations and premises (spec 7.6)
+--
+-- Reading the address index is ordinary work for anybody who answers a call,
+-- dispatchers included: the hazard on a premise is for the person about to
+-- knock on its door. Registering an address, linking its keyholders and
+-- flagging a hazard is patrol work -- the officer who met the dog is the one
+-- who knows about it.
+-- -----------------------------------------------------------------------------
+
+INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
+    ('patrol_basic', 'rms.location.view'),
+    -- `dispatch` is a root group (it does not inherit patrol_basic), and the
+    -- hazard on a call card is first read at the console.
+    ('dispatch', 'rms.location.view'),
+    ('patrol', 'rms.location.edit'),
+    ('patrol', 'rms.location.hazard.edit');

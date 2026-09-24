@@ -508,6 +508,29 @@
       {/if}
     </header>
 
+    {#if card.hazards && card.hazards.length > 0}
+      <!--
+        Premise hazards (7.6): outside the scrolling body, directly under the
+        header, so it is on screen whenever the card is, and one line per
+        premise so it never takes the card over. In words, not colour alone
+        (6.7). A region rather than an alert: the card is re-read on every push
+        for this call, and a standing caution must not be read out each time.
+      -->
+      <section
+        class="mx-3 mt-2 border-2 border-[var(--color-alert)] px-2 py-1 text-xs"
+        aria-label={t('cad.hazard.region')}
+      >
+        {#each card.hazards as premise (premise.locationId)}
+          <p>
+            <span class="font-semibold text-[var(--color-alert)]">{t('cad.hazard.title', { label: premise.label })}:</span>
+            {premise.hazards
+              .map((hazard) => (hazard.note ? `${t(`location.hazard.${hazard.kind}`)} (${hazard.note})` : t(`location.hazard.${hazard.kind}`)))
+              .join(', ')}
+          </p>
+        {/each}
+      </section>
+    {/if}
+
     <div class="min-h-0 flex-1 overflow-y-auto">
       <!-- What the call is. -->
       <dl class="grid grid-cols-[10rem_1fr] gap-x-3 gap-y-1 px-3 py-2 text-xs">

@@ -715,9 +715,14 @@ Each module lists features with a tag: **[M]** MUST (launch), **[S]** SHOULD (pl
 
 ### 7.6 Locations and premises (S, M4)
 
-- [S] Address index (housing bridge plus manual), premise hazards (dogs, weapons, hostile occupants), key holders, incident history at the address.
-- [S] Premise hazards appear automatically on dispatch call cards.
-- **Permissions:** `rms.location.view`, `rms.location.hazard.edit`.
+Built. Migration 0034, `server/modules/locations/`, the Locations tab in Records.
+
+- [S] **Address index.** Addresses are entered by hand, or registered where the officer stands: "At my position" has the server read the officer's ped, and a client never sends coordinates. Each address has a type, notes, a radius (default 30 m) and a classification, and every read goes through the `location` access checks. A housing bridge is not built; no housing resource is in use.
+- [S] **Premise hazards**, from a closed list: dog, weapons, hostile to police, history of violence, medical, infection risk, children present, hazardous materials, other. A hazard can carry a note and can lapse after N days. Cancelling a hazard keeps it on the record, marked as cancelled.
+- [S] **Keyholders.** Owner, tenant, keyholder, manager or employee, stored as person records so the person's own access control applies. Naming a keyholder, with their phone number, also needs `rms.person.view`. A keyholder in a stubbed compartment is shown as restricted; one the reader may not know of is left out.
+- [S] **Incident history.** The calls within the address's radius, or whose location text is the address, each passed through the CAD read check.
+- [S] **Premise hazards on the call card and in the dispatch notice.** `call.get` returns the standing hazards at the call, matched by position within the radius or by exact address. A reader sees them only with `rms.location.view`, and only for premises that pass the record access check, which is audited for restricted ones. A unit sent to the call is warned in-game before it arrives (`cad.notify.hazard`).
+- **Permissions:** `rms.location.view` (patrol_basic, dispatch), `rms.location.edit` and `rms.location.hazard.edit` (patrol).
 
 ### 7.7 Anmälan (M2)
 
@@ -1780,7 +1785,7 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 |---|---|
 | Pages | `page.query`, `page.dispatch`, `page.records`, `page.evidence`, `page.lab`, `page.intel`, `page.surveillance`, `page.court`, `page.personnel`, `page.stats`, `page.admin`, `page.comms` |
 | Queries | `query.run`, `query.hit.confirm`, `query.person.run`, `query.vehicle.run`, `query.firearm.run`, `query.phone.run`, `query.address.run`, `query.log.view` |
-| Records | `rms.person.view`, `rms.person.edit`, `rms.person.photo.upload`, `rms.person.caution.edit`, `rms.vehicle.view`, `rms.vehicle.edit`, `rms.vehicle.flag`, `rms.firearm.view`, `rms.firearm.edit`, `rms.firearm.trace`, `rms.brott.view`, `rms.location.view`, `rms.location.hazard.edit` |
+| Records | `rms.person.view`, `rms.person.edit`, `rms.person.photo.upload`, `rms.person.caution.edit`, `rms.vehicle.view`, `rms.vehicle.edit`, `rms.vehicle.flag`, `rms.firearm.view`, `rms.firearm.edit`, `rms.firearm.trace`, `rms.brott.view`, `rms.location.view`, `rms.location.edit`, `rms.location.hazard.edit` |
 | Anmälan | `rms.anmalan.view`, `rms.anmalan.create`, `rms.anmalan.edit.any`, `rms.anmalan.approve`, `rms.anmalan.view.<type>` |
 | Förundersökning | `inv.fu.view`, `inv.fu.open`, `inv.fu.lead`, `inv.fu.assign` |
 | Frihetsberövande | `frihet.view`, `frihet.gripande`, `frihet.anhallande`, `frihet.haktning`, `frihet.frigiv`, `frihet.fallback.aklagare`, `frihet.fallback.domare` |

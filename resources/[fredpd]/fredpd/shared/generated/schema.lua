@@ -1570,6 +1570,56 @@ FredPD.Schema = {
         classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
     },
 
+    LocationSearch = {
+        term = { type = 'string', required = false, max = 64 },
+        limit = { type = 'integer', required = false, min = 1, max = 100 },
+    },
+
+    LocationGet = {
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
+    LocationCreate = {
+        label = { type = 'string', required = true, min = 1, max = 191 },
+        kind = { type = 'enum', required = true, values = { 'residence', 'business', 'public', 'industrial', 'other' } },
+        notes = { type = 'string', required = false, max = 500 },
+        here = { type = 'boolean', required = false },
+        radius = { type = 'integer', required = false, min = 5, max = 500 },
+        classification = { type = 'enum', required = false, values = { 'open', 'internal', 'restricted', 'confidential', 'secret' } },
+    },
+
+    LocationUpdate = {
+        id = { type = 'integer', required = true, min = 1 },
+        version = { type = 'integer', required = true, min = 1 },
+        label = { type = 'string', required = false, min = 1, max = 191 },
+        kind = { type = 'enum', required = false, values = { 'residence', 'business', 'public', 'industrial', 'other' } },
+        notes = { type = 'string', required = false, max = 500 },
+        here = { type = 'boolean', required = false },
+        radius = { type = 'integer', required = false, min = 5, max = 500 },
+    },
+
+    LocationHazardAdd = {
+        locationId = { type = 'integer', required = true, min = 1 },
+        kind = { type = 'enum', required = true, values = { 'dog', 'weapons', 'hostile', 'violent_history', 'medical', 'infectious', 'children', 'hazardous_materials', 'other' } },
+        note = { type = 'string', required = false, max = 255 },
+        days = { type = 'integer', required = false, min = 1, max = 365 },
+    },
+
+    LocationHazardCancel = {
+        id = { type = 'integer', required = true, min = 1 },
+    },
+
+    LocationKeyholderSet = {
+        locationId = { type = 'integer', required = true, min = 1 },
+        personId = { type = 'integer', required = true, min = 1 },
+        role = { type = 'enum', required = true, values = { 'owner', 'tenant', 'keyholder', 'manager', 'employee' } },
+    },
+
+    LocationKeyholderRemove = {
+        locationId = { type = 'integer', required = true, min = 1 },
+        personId = { type = 'integer', required = true, min = 1 },
+    },
+
     ImpoundTow = {
         netId = { type = 'integer', required = true, min = 1 },
         heldReasonKey = { type = 'enum', required = true, values = { 'investigative', 'evidence', 'abandoned', 'dui', 'unregistered', 'other' } },
