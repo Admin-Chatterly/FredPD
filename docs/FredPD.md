@@ -325,7 +325,10 @@ route.subject   rate limit → schema → subject → handler → audit → resp
   requires the player to be standing at a public placement, checked on the server,
   and returns the character the framework says they are playing, plus that
   character's person record. The handler receives this subject, never a session
-  and never a bare `src`.
+  and never the player's server id. The subject's name is the character's own,
+  or empty, and never the identifier.
+- **Held at load:** `Route.subject` will not start a route missing from its own
+  allowlist, or one whose schema lacks `placementId`.
 - **The handler reads only what is keyed on the subject.** Other modules supply it
   through `*ForSubject` functions, which show only records that are not restricted:
   open or internal, in no compartment, and not sealed.
@@ -1146,7 +1149,8 @@ Built (the disciplinary file only).
   - **The visitor** sees their own citations (with payment status), the prosecution decisions and verdicts that name them, and the reports they have handed in. Only records that are not restricted are shown.
   - **Handing in:** the visitor can hand in a stolen-property report or a complaint about the police (`fpd_public_reports`, numbered `{AGENCY}-M{YY}-{######}`), up to `civilian.perDay` per character.
   - **Officers** read these on the Records tab *From the public* (`public.report.view`, patrol) and close them as handled or rejected (`public.report.handle`).
-  - **Complaints** are read and closed only with `ia.case.view` / `ia.case.manage`. Whoever may read a kind is notified when one comes in.
+  - **Complaints** are read and closed only with `ia.case.view` / `ia.case.manage`. Every list that returns complaints writes an audit row naming them. Whoever may read a kind is notified when one comes in.
+  - **Retention:** closed reports are swept after `retention.days.publicReports` (default 730 days).
   - **Not yet built:** court *dates*, because hearings are not scheduled in FredPD yet.
 - **Permissions:** `public.report.view`, `public.report.handle`.
 - [S] Defense attorney mode: assigned discovery packages only.

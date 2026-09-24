@@ -130,6 +130,16 @@ function Repo.stops(days)
         { days })
 end
 
+--- A report from the public (0040) closed long enough ago: handled or
+--- rejected, never one still waiting to be read.
+function Repo.publicReports(days)
+    return perAgency(
+        [[DELETE FROM fpd_public_reports
+           WHERE agency_id = ? AND status <> 'received'
+             AND handled_at < DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL ? DAY) LIMIT ?]],
+        { days })
+end
+
 --- Uploads begun and never committed (ADR-019), oldest first.
 function Repo.abandonedUploads(days, limit)
     return db().query(

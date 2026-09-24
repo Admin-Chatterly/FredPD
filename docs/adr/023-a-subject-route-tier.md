@@ -36,13 +36,20 @@ route.subject   rate limit → schema → subject → handler → audit → resp
   the server). It returns who the framework says the player's character is,
   and that character's person record. Nothing about identity is taken from
   input (invariant 1).
-- **The handler receives the subject, never a session.** It reads only what
+- **The handler receives the subject, never a session and never the player's
+  server id.** The subject carries no `src`. Its name is the character's own,
+  or empty, and never the identifier (11.4).
+  It It reads only what
   is keyed on the subject: citations, åtal and reports that name this person.
   Other modules supply these through `*ForSubject` functions they own. Those
   functions show a record only when it is not restricted: open or internal,
   in no compartment, and not sealed. This is the same line a paper copy draws
   (ADR-020). The desk is not a way round a seal.
+- **Held at load, too.** `Route.subject` refuses to start a route that is
+  missing from its own allowlist, or whose schema does not declare
+  `placementId`.
 - **Held by CI, like the public tier.** `wiring-check.ts`:
+  - fails a `route.subject` declared anywhere but a `routes.lua`;
   - fails a `route.subject` that is not in its `SUBJECT_ROUTES` allowlist,
     where each entry carries a reason;
   - fails a subject handler that names the session, a permission set, an

@@ -246,7 +246,7 @@
         "evidence_bench": "Marks a location for evidence work. No client action is wired to it yet.",
         "fingerprint_scanner": "Collects a fingerprint from whoever uses it.",
         "impound_lot": "Where impounded vehicles stand. Opens the impound register.",
-        "public_counter": "A police front desk anyone may use: their own citations and court decisions, and handing in a report."
+        "public_counter": "A police front desk anyone may use: their own citations, prosecution decisions and verdicts, and handing in a report or a complaint."
       },
       "newZone": "New here — area",
       "newProp": "New here — bind to the prop I am looking at",
@@ -3247,7 +3247,7 @@
     "close": "Leave the desk",
     "tab": {
       "mine": "My matters",
-      "report": "Hand in a report"
+      "report": "Report or complaint"
     },
     "citations": {
       "title": "My citations",
@@ -3271,8 +3271,8 @@
       "life": "Life imprisonment"
     },
     "reports": {
-      "title": "Reports I have handed in",
-      "none": "You have not handed in any reports.",
+      "title": "What I have handed in",
+      "none": "You have not handed anything in.",
       "number": "Number",
       "kind": "Kind",
       "status": "Status",
@@ -3285,25 +3285,29 @@
       "property": "What was taken? Include serial numbers if you have them.",
       "description": "Describe what happened",
       "submit": "Hand in",
-      "complaintNote": "A complaint about the police is read by internal affairs, not by the officers it concerns."
+      "complaintNote": "A complaint about the police is read by internal affairs, not by the officers it concerns.",
+      "descriptionHint": "At least 10 characters."
     },
-    "received": "Your report was received. Its number is {number}."
+    "received": "We have received what you handed in. Number: {number}.",
+    "visitorUnnamed": "At the desk",
+    "sections": "Front desk sections",
+    "limit": "You have handed in as many as you may today. Come back tomorrow."
   },
   "public": {
     "kind": {
-      "stolen_property": "Stolen property",
+      "stolen_property": "Theft",
       "complaint": "Complaint about the police"
     },
     "status": {
       "received": "Received",
       "handled": "Handled",
-      "rejected": "Rejected"
+      "rejected": "Closed, no action"
     },
     "notify": {
-      "received": "A report from the public came in: {number}"
+      "received": "Something was handed in at the front desk: {number}"
     },
     "inbox": {
-      "title": "Reports from the public",
+      "title": "Handed in by the public",
       "none": "Nothing has been handed in.",
       "filter": "Show",
       "all": "All",
@@ -3315,10 +3319,15 @@
       "description": "Description",
       "handledNote": "Note",
       "handle": "Mark as handled",
-      "reject": "Reject",
+      "reject": "Close with no action",
       "confirmHandle": "Mark {number} as handled?",
-      "confirmReject": "Reject {number}?",
-      "done": "{number} is closed."
+      "confirmReject": "Close {number} with no action?",
+      "done": "{number} is closed.",
+      "number": "Number",
+      "kind": "Kind",
+      "handedIn": "Handed in",
+      "status": "Status",
+      "noName": "name not given"
     }
   }
 }

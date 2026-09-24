@@ -5857,6 +5857,7 @@ export const fixtures: FixtureSet = {
 
       return {
         name: 'Anna Svensson',
+        agencyName: 'Los Santos Police Department',
         citations: [
           {
             number: 'LSPD-T26-000287',
@@ -5929,6 +5930,7 @@ export const fixtures: FixtureSet = {
             handledNote: row.handledNote ?? null,
             version: row.version,
             createdAt: secondsAgo(row.createdAgo),
+            canHandle: true,
           })),
       };
     },

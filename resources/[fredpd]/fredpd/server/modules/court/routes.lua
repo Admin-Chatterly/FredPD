@@ -376,9 +376,16 @@ function FredPD.Modules.courtForSubject(agencyId, personId)
 
     local out = {}
     for _, row in ipairs(repo.forPerson(agencyId, personId, 25)) do
-        local control = access.attachControl('case', { { id = row.fuId, classification = row.classification } })[1]
+        -- The åtal's own control, exactly as an officer's read of it
+        -- (`readable`), and the investigation's, from the investigation's own
+        -- row: both must be open or internal, uncompartmented and unsealed.
+        local own = access.attachControl(ATAL, { { id = row.id, classification = row.classification } })[1]
+        local fu = FredPD.Repo.anmalan.fuById(row.fuId, agencyId)
+        local investigation = fu and access.attachControl('case', { fu })[1] or nil
 
-        if control and not accessRules.isRestricted(control) then
+        if own and investigation
+            and not accessRules.isRestricted(own) and not accessRules.isRestricted(investigation)
+        then
             out[#out + 1] = {
                 number = row.number,
                 beslut = row.beslut,

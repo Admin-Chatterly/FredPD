@@ -468,7 +468,14 @@ end)
 FredPD.Client.placements.registerAction('public_counter', function(placement)
     isOpen = true
     SetNuiFocus(true, true)
-    SendNUIMessage({ type = 'fredpd:civilian', placementId = placement.id })
+    -- The department's language and clock travel with it: a visitor has no
+    -- session for the page to read them from.
+    SendNUIMessage({
+        type = 'fredpd:civilian',
+        placementId = placement.id,
+        locale = FredPD.Config.shared.locale,
+        timezone = FredPD.Config.shared.timezone,
+    })
 end)
 
 --- Where the front desks are: asked for by every player, session or not.

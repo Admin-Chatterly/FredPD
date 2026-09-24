@@ -17,12 +17,16 @@ Retention.DEFAULTS = {
     staleDrafts = { days = 180, floor = 30 },
     surveillanceSessions = { days = 730, floor = 90 },
     stops = { days = 730, floor = 90 },
+    -- A report from the public (7.29) once it is closed: it carries a
+    -- character identifier and free text, and its work is done.
+    publicReports = { days = 730, floor = 90 },
     abandonedUploads = { days = 1, floor = 1 },
 }
 
 --- The order the sweeps run and are reported in.
 Retention.ORDER = {
-    'lapsedLookouts', 'queryLog', 'alprReads', 'staleDrafts', 'surveillanceSessions', 'stops', 'abandonedUploads',
+    'lapsedLookouts', 'queryLog', 'alprReads', 'staleDrafts', 'surveillanceSessions', 'stops', 'publicReports',
+    'abandonedUploads',
 }
 
 --- The days each sweep keeps, from config, never below its floor. A sweep

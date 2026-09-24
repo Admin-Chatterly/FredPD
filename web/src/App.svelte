@@ -320,6 +320,14 @@
   let desk = $state<number | null>(null);
   $effect(() =>
     nui.on('fredpd:civilian', (message) => {
+      // A visitor has no session: the department's language and clock come
+      // with the message, and an explicit `?locale=` still wins.
+      const timezone = message['timezone'];
+      if (typeof timezone === 'string') setDepartmentTimezone(timezone);
+      const locale = message['locale'];
+      const explicit = new URLSearchParams(window.location.search).get('locale');
+      if (explicit === null && typeof locale === 'string' && isLocale(locale)) setLocale(locale);
+
       const id = Number(message['placementId']);
       desk = Number.isInteger(id) && id > 0 ? id : null;
     }),

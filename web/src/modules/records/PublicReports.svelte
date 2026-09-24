@@ -30,6 +30,8 @@
     handledAt?: number | null;
     version: number;
     createdAt: number;
+    /** Whether this reader may close it: the server's answer, re-checked on the close. */
+    canHandle?: boolean;
   }
 
   interface Props {
@@ -54,6 +56,7 @@
   let pending = $state<'handled' | 'rejected' | null>(null);
   let note = $state('');
   let trigger: HTMLButtonElement | null = null;
+  let statusLine = $state<HTMLParagraphElement | null>(null);
 
   async function load(): Promise<void> {
     const response = await nui.call<{ reports: PublicReport[] }>(
@@ -109,6 +112,14 @@
     pending = null;
     status = t('public.inbox.done', { number: response.data.number });
     await load();
+    // The row, its dialog and the button that opened it may all be gone now
+    // (the list shows what is waiting): focus goes to what happened.
+    await tick();
+    statusLine?.focus();
+  }
+
+  function reporter(row: PublicReport): string {
+    return row.reporterName || t('public.inbox.noName');
   }
 
   const button =
@@ -118,10 +129,13 @@
 <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
   <section aria-labelledby="public-inbox-title">
     <div class="mb-2 flex items-end justify-between gap-2">
-      <h2 id="public-inbox-title" class="text-sm font-semibold">{t('public.inbox.title')}</h2>
+      <h2 id="public-inbox-title" class="text-[15px] font-semibold">{t('public.inbox.title')}</h2>
       <label class="flex items-center gap-1 text-xs">
         {t('public.inbox.filter')}
-        <select bind:value={filter} class="border border-[var(--color-border)] px-2 py-1">
+        <select
+          bind:value={filter}
+          class="border border-[var(--color-border)] px-2 py-1 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+        >
           {#each PUBLIC_REPORT_STATUSES as value (value)}
             <option {value}>{t(`public.status.${value}`)}</option>
           {/each}
@@ -133,32 +147,55 @@
     {#if rows.length === 0}
       <p class="text-xs text-[var(--color-ink-muted)]">{t('public.inbox.none')}</p>
     {:else}
-      <ul class="text-xs">
-        {#each rows as row (row.id)}
-          <li class="border-t border-[var(--color-border)]">
-            <button
-              type="button"
-              class="flex w-full items-center justify-between gap-2 px-2 py-1 text-left focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
-              class:font-semibold={selected?.id === row.id}
-              aria-current={selected?.id === row.id ? 'true' : undefined}
-              onclick={() => {
-                selected = row;
-                status = '';
-              }}
-            >
-              <span class="font-[family-name:var(--font-mono)]">{row.number}</span>
-              <span>{t(`public.kind.${row.kind}`)}</span>
-              <span class="text-[var(--color-ink-muted)]">{formatMoment(row.createdAt)}</span>
-            </button>
-          </li>
-        {/each}
-      </ul>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-[12.5px] tabular-nums">
+          <thead>
+            <tr class="text-[var(--color-ink-muted)]">
+              <th class="px-2 py-1 font-normal">{t('public.inbox.number')}</th>
+              <th class="px-2 py-1 font-normal">{t('public.inbox.kind')}</th>
+              <th class="px-2 py-1 font-normal">{t('public.inbox.reporter')}</th>
+              <th class="px-2 py-1 font-normal">{t('public.inbox.handedIn')}</th>
+              <th class="px-2 py-1 font-normal">{t('public.inbox.status')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each rows as row (row.id)}
+              <tr class="border-t border-[var(--color-border)]" class:font-semibold={selected?.id === row.id}>
+                <td class="px-2 py-1">
+                  <button
+                    type="button"
+                    class="font-[family-name:var(--font-mono)] underline focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+                    aria-current={selected?.id === row.id ? 'true' : undefined}
+                    onclick={() => {
+                      selected = row;
+                      status = '';
+                    }}
+                  >
+                    {row.number}
+                  </button>
+                </td>
+                <td class="px-2 py-1">{t(`public.kind.${row.kind}`)}</td>
+                <td class="px-2 py-1">{reporter(row)}</td>
+                <td class="px-2 py-1">{formatMoment(row.createdAt)}</td>
+                <td class="px-2 py-1">{t(`public.status.${row.status}`)}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
     {/if}
   </section>
 
-  <section class="border border-[var(--color-border)] p-3 text-xs" aria-live="polite">
+  <section class="border border-[var(--color-border)] p-3 text-xs">
     {#if status}
-      <p class="mb-2 text-[var(--color-ink-muted)]" role="status">{status}</p>
+      <p
+        bind:this={statusLine}
+        tabindex="-1"
+        class="mb-2 text-[var(--color-ink-muted)] outline-offset-2 focus-visible:outline focus-visible:outline-[var(--color-focus)]"
+        role="status"
+      >
+        {status}
+      </p>
     {/if}
     {#if failure && !pending}
       <div class="mb-2 border border-[var(--color-alert)] px-2 py-1" role="alert">
@@ -180,10 +217,10 @@
               class="underline focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
               onclick={() => selected?.reporterPersonId && onOpenPerson?.(selected.reporterPersonId)}
             >
-              {selected.reporterName}
+              {reporter(selected)}
             </button>
           {:else}
-            {selected.reporterName}
+            {reporter(selected)}
             <span class="text-[var(--color-ink-muted)]">({t('public.inbox.unregistered')})</span>
           {/if}
         </dd>
@@ -207,7 +244,7 @@
         {/if}
       </dl>
 
-      {#if selected.status === 'received'}
+      {#if selected.status === 'received' && selected.canHandle}
         {#if pending}
           <ConfirmDialog
             label={t(pending === 'handled' ? 'public.inbox.handle' : 'public.inbox.reject')}
@@ -222,7 +259,11 @@
           >
             <label class="mt-2 flex flex-col gap-1">
               {t('public.inbox.handledNote')}
-              <textarea bind:value={note} maxlength="500" rows="2" class="border border-[var(--color-border)] px-2 py-1"
+              <textarea
+                bind:value={note}
+                maxlength="500"
+                rows="2"
+                class="border border-[var(--color-border)] px-2 py-1 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
               ></textarea>
             </label>
           </ConfirmDialog>

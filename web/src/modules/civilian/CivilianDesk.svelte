@@ -44,6 +44,7 @@
 
   interface Overview {
     name: string;
+    agencyName: string;
     citations: Citation[];
     court: CourtCase[];
     reports: MyReport[];
@@ -135,6 +136,42 @@
     heading?.focus();
   }
 
+  /** A report being written has something in it worth keeping. */
+  const drafted = $derived(
+    form.description.trim() !== '' || form.place.trim() !== '' || form.property.trim() !== '' || form.occurredAt !== '',
+  );
+
+  /**
+   * Escape with a report half-written goes back to "My matters" and keeps the
+   * draft, instead of reaching `main.ts` and closing the desk with it;
+   * Ctrl+Enter hands it in; Enter in a one-line field does not (6.4).
+   */
+  function formKeys(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && drafted) {
+      event.stopPropagation();
+      event.preventDefault();
+      tab = 'mine';
+      return;
+    }
+
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      (event.currentTarget as HTMLFormElement).requestSubmit();
+      return;
+    }
+
+    if (event.key === 'Enter' && event.target instanceof HTMLInputElement) event.preventDefault();
+  }
+
+  /** A refusal line: the field's own reason, or a sentence for the visitor. */
+  function refusalLine(name: string, label: string, reason: string): string {
+    if (name === '_input' && failure?.fields?.['_input'] === 'too_many') return t('civilian.limit');
+    if (name === '_input' || name === 'placementId') return reason;
+    return `${label} — ${reason}`;
+  }
+
+  const descriptionInvalid = $derived(failure?.fields?.['description'] !== undefined);
+
   function verdict(row: CourtCase): string {
     if (!row.disposition) return row.beslut === 'atalad' ? t('court.disposition.pending') : '';
     return t(`court.disposition.${row.disposition}`);
@@ -158,6 +195,9 @@
   >
     <header class="flex items-start justify-between gap-4 border-b border-[var(--color-border)] px-5 py-3">
       <div>
+        {#if overview?.agencyName}
+          <p class="text-xs text-[var(--color-ink-muted)]">{overview.agencyName}</p>
+        {/if}
         <h1
           id="civilian-title"
           bind:this={heading}
@@ -166,14 +206,16 @@
         >
           {t('civilian.title')}
         </h1>
-        {#if overview?.name}
-          <p class="text-xs text-[var(--color-ink-muted)]">{t('civilian.visitor', { name: overview.name })}</p>
+        {#if overview}
+          <p class="text-xs text-[var(--color-ink-muted)]">
+            {overview.name ? t('civilian.visitor', { name: overview.name }) : t('civilian.visitorUnnamed')}
+          </p>
         {/if}
       </div>
       <button type="button" class={`${button} text-xs`} onclick={onClose}>{t('civilian.close')}</button>
     </header>
 
-    <nav class="flex gap-2 border-b border-[var(--color-border)] px-5 py-2 text-xs" aria-label={t('civilian.title')}>
+    <nav class="flex gap-2 border-b border-[var(--color-border)] px-5 py-2 text-xs" aria-label={t('civilian.sections')}>
       {#each ['mine', 'report'] as const as name (name)}
         <button
           type="button"
@@ -195,7 +237,7 @@
             <p>{t(`error.${failure.err}`)}</p>
           {/if}
           {#each messages as message (message.name)}
-            <p>{message.name === 'placementId' ? message.reason : `${message.label} — ${message.reason}`}</p>
+            <p>{refusalLine(message.name, message.label, message.reason)}</p>
           {/each}
         </div>
       {/if}
@@ -205,12 +247,12 @@
 
       {#if tab === 'mine'}
         {#if overview}
-          <h2 class="mb-1 text-xs font-semibold">{t('civilian.citations.title')}</h2>
+          <h2 class="mb-1 text-[15px] font-semibold">{t('civilian.citations.title')}</h2>
           {#if overview.citations.length === 0}
             <p class="mb-4 text-xs text-[var(--color-ink-muted)]">{t('civilian.citations.none')}</p>
           {:else}
             <div class="mb-4 overflow-x-auto">
-              <table class="w-full text-left text-xs">
+              <table class="w-full text-left text-[12.5px] tabular-nums">
                 <thead>
                   <tr class="text-[var(--color-ink-muted)]">
                     <th class="px-2 py-1 font-normal">{t('civilian.citations.number')}</th>
@@ -245,12 +287,12 @@
             </div>
           {/if}
 
-          <h2 class="mb-1 text-xs font-semibold">{t('civilian.court.title')}</h2>
+          <h2 class="mb-1 text-[15px] font-semibold">{t('civilian.court.title')}</h2>
           {#if overview.court.length === 0}
             <p class="mb-4 text-xs text-[var(--color-ink-muted)]">{t('civilian.court.none')}</p>
           {:else}
             <div class="mb-4 overflow-x-auto">
-              <table class="w-full text-left text-xs">
+              <table class="w-full text-left text-[12.5px] tabular-nums">
                 <thead>
                   <tr class="text-[var(--color-ink-muted)]">
                     <th class="px-2 py-1 font-normal">{t('civilian.court.number')}</th>
@@ -275,12 +317,12 @@
             </div>
           {/if}
 
-          <h2 class="mb-1 text-xs font-semibold">{t('civilian.reports.title')}</h2>
+          <h2 class="mb-1 text-[15px] font-semibold">{t('civilian.reports.title')}</h2>
           {#if overview.reports.length === 0}
             <p class="text-xs text-[var(--color-ink-muted)]">{t('civilian.reports.none')}</p>
           {:else}
             <div class="overflow-x-auto">
-              <table class="w-full text-left text-xs">
+              <table class="w-full text-left text-[12.5px] tabular-nums">
                 <thead>
                   <tr class="text-[var(--color-ink-muted)]">
                     <th class="px-2 py-1 font-normal">{t('civilian.reports.number')}</th>
@@ -304,8 +346,11 @@
           {/if}
         {/if}
       {:else}
-        <!-- `novalidate`: the server's translated refusal is the message. -->
-        <form class="flex flex-col gap-3 text-xs" novalidate onsubmit={submit}>
+        <!-- `novalidate`: the server's translated refusal is the message. The
+             keys are the form's own (Escape keeps the draft, Ctrl+Enter
+             submits), as FieldWork's forms do. -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <form class="flex flex-col gap-3 text-xs" novalidate onsubmit={submit} onkeydown={formKeys}>
           <label class="flex flex-col gap-1">
             {t('civilian.form.kind')}
             <select bind:value={form.kind} class={field}>
@@ -334,8 +379,19 @@
             </label>
           {/if}
           <label class="flex flex-col gap-1">
-            {t('civilian.form.description')}
-            <textarea bind:value={form.description} maxlength="2000" rows="6" class={field}></textarea>
+            <span>{t('civilian.form.description')} <span aria-hidden="true">*</span></span>
+            <textarea
+              bind:value={form.description}
+              maxlength="2000"
+              rows="6"
+              class={field}
+              aria-required="true"
+              aria-invalid={descriptionInvalid}
+              aria-describedby="civilian-description-hint"
+            ></textarea>
+            <span id="civilian-description-hint" class="text-[var(--color-ink-muted)]">
+              {t('civilian.form.descriptionHint')}
+            </span>
           </label>
           <div>
             <button type="submit" class={button} aria-disabled={busy}>{t('civilian.form.submit')}</button>

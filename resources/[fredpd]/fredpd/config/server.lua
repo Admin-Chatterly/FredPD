@@ -478,6 +478,7 @@ FredPD.Config.server = {
             staleDrafts = 180,
             surveillanceSessions = 730,
             stops = 730,
+            publicReports = 730,
             abandonedUploads = 1,
         },
     },

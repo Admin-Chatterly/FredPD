@@ -947,9 +947,10 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
 --
 -- A stolen-property report handed in at a front desk is read and closed by
 -- patrol. A complaint about the police is read by internal affairs alone
--- (`ia.case.view` / `ia.case.manage`), which is why `public.report.view` is
--- also granted to those who hold the IA keys: it is the door to the inbox,
--- and the kind decides what is behind it.
+-- (`ia.case.view` / `ia.case.manage`). `public.report.view` is the door to
+-- the inbox and the kind decides what is behind it, so an operator who sets
+-- up internal affairs grants that group `public.report.view` as well (the
+-- seed configures no internal-affairs group; see the installation guide).
 -- -----------------------------------------------------------------------------
 
 INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES

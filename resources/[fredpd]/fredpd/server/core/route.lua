@@ -403,8 +403,18 @@ end
 ---   audit   string|nil an action written on success, attributed to no officer
 ---   auditDetail function(input, result, subject)|nil
 ---   handler function(subject, input) -> data
+--- The only subject routes there are (ADR-023). Adding one is a decision with
+--- an ADR, and the list is checked here as well as in CI, so a route that
+--- slipped past the text scan still does not start.
+local SUBJECT_ROUTES <const> = {
+    ['civilian.overview'] = true,
+    ['civilian.report.create'] = true,
+}
+
 function Route.subject(definition)
     assert(definition.name, 'subject route needs a name')
+    assert(SUBJECT_ROUTES[definition.name],
+        'subject route not in the ADR-023 allowlist: ' .. tostring(definition.name))
     assert(definition.handler, 'subject route needs a handler: ' .. tostring(definition.name))
     assert(
         type(definition.limit) == 'table'
@@ -413,6 +423,9 @@ function Route.subject(definition)
         'subject route needs an explicit limit { per, window }: ' .. tostring(definition.name)
     )
     assert(type(definition.schema) == 'string', 'subject route needs a schema: ' .. tostring(definition.name))
+    -- The desk the caller stands at is how the subject is found at all.
+    assert(FredPD.Schema and FredPD.Schema[definition.schema] and FredPD.Schema[definition.schema].placementId,
+        'subject route schema must declare placementId: ' .. tostring(definition.name))
 
     for _, field in ipairs({ 'perm', 'context', 'writes', 'sensitive' }) do
         assert(

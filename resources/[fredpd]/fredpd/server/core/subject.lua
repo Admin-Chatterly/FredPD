@@ -12,7 +12,7 @@ local Subject = {}
 
 --- @param src number
 --- @param placementId number the desk the player says they are at
---- @return table|nil subject { src, placementId, agencyId, identifier, name, personId }
+--- @return table|nil subject { placementId, agencyId, identifier, name, personId }
 --- @return string|nil reason 'not_here' | 'no_character'
 function Subject.resolve(src, placementId)
     local placement = FredPD.Core.placements.publicAt(src, placementId)
@@ -28,13 +28,15 @@ function Subject.resolve(src, placementId)
     local agencyId = placement.agencyId or FredPD.Config.server.agency.id
     local name = ('%s %s'):format(character.firstName or '', character.lastName or ''):match('^%s*(.-)%s*$')
 
+    -- No `src`: the handler reads by the subject, never by the player's
+    -- server id, and a name is never the identifier (11.4) -- a character
+    -- whose name is not set yet has none.
     return {
-        src = src,
         placementId = placement.id,
         placementKind = placement.kind,
         agencyId = agencyId,
         identifier = character.identifier,
-        name = name ~= '' and name or character.identifier,
+        name = name,
         personId = FredPD.Repo.persons.byIdentifier(agencyId, character.identifier),
     }
 end

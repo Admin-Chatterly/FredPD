@@ -679,6 +679,16 @@ for (const file of await walk(core)) {
   }
 }
 
+// The subject tier is scanned in routes.lua files only, so a subject route
+// declared anywhere else would escape every check above.
+for (const file of await walk(core)) {
+  if (!file.endsWith('.lua') || file.endsWith('routes.lua') || file.endsWith('/core/route.lua')) continue;
+  if (NOT_LOADED.test(file)) continue;
+  if (/\broute\.subject\(/.test(await readFile(file, 'utf8'))) {
+    fail(`${relative(REPO, file)}: route.subject is declared outside a routes.lua, where the ADR-023 checks cannot see it`);
+  }
+}
+
 for (const [name, why] of Object.entries(SUBJECT_ROUTES)) {
   if (!subjectSeen.has(name)) fail(`routes: '${name}' is in SUBJECT_ROUTES and no routes.lua declares it — ${why}`);
 }

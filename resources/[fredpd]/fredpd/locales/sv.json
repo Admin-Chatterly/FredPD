@@ -246,7 +246,7 @@
         "evidence_bench": "Markerar en plats för bevishantering. Ingen klientfunktion är kopplad till den ännu.",
         "fingerprint_scanner": "Tar ett fingeravtryck från den som använder den.",
         "impound_lot": "Där bärgade och omhändertagna fordon ställs upp. Öppnar registret över omhändertagna fordon.",
-        "public_counter": "En reception som alla kan använda: egna ordningsböter och domstolsbeslut, och att lämna in en anmälan."
+        "public_counter": "En reception som alla kan använda: egna ordningsböter, åtalsbeslut och domar, och att lämna in en anmälan eller ett klagomål."
       },
       "newZone": "Ny här — område",
       "newProp": "Ny här — koppla till föremålet jag tittar på",
@@ -3243,11 +3243,11 @@
   },
   "civilian": {
     "title": "Polisens reception",
-    "visitor": "Vid receptionen: {name}",
+    "visitor": "Besökare: {name}",
     "close": "Lämna receptionen",
     "tab": {
       "mine": "Mina ärenden",
-      "report": "Lämna in en anmälan"
+      "report": "Anmälan eller klagomål"
     },
     "citations": {
       "title": "Mina ordningsböter",
@@ -3271,8 +3271,8 @@
       "life": "Livstids fängelse"
     },
     "reports": {
-      "title": "Anmälningar jag har lämnat in",
-      "none": "Du har inte lämnat in några anmälningar.",
+      "title": "Det jag har lämnat in",
+      "none": "Du har inte lämnat in något.",
       "number": "Nummer",
       "kind": "Typ",
       "status": "Status",
@@ -3285,25 +3285,29 @@
       "property": "Vad togs? Ange serienummer om du har dem.",
       "description": "Beskriv vad som hände",
       "submit": "Lämna in",
-      "complaintNote": "Ett klagomål på polisen läses av internutredningen, inte av de poliser det gäller."
+      "complaintNote": "Ett klagomål på polisen läses av internutredningen, inte av de poliser det gäller.",
+      "descriptionHint": "Minst 10 tecken."
     },
-    "received": "Din anmälan har tagits emot. Den har nummer {number}."
+    "received": "Vi har tagit emot det du lämnade in. Nummer: {number}.",
+    "visitorUnnamed": "Besökare",
+    "sections": "Receptionens delar",
+    "limit": "Du har lämnat in så många som du får i dag. Kom tillbaka i morgon."
   },
   "public": {
     "kind": {
-      "stolen_property": "Stöld av egendom",
+      "stolen_property": "Stöld",
       "complaint": "Klagomål på polisen"
     },
     "status": {
       "received": "Inkommen",
       "handled": "Handlagd",
-      "rejected": "Avvisad"
+      "rejected": "Utan åtgärd"
     },
     "notify": {
-      "received": "En anmälan från allmänheten har kommit in: {number}"
+      "received": "Något har lämnats in i receptionen: {number}"
     },
     "inbox": {
-      "title": "Anmälningar från allmänheten",
+      "title": "Inlämnat av allmänheten",
       "none": "Inget har lämnats in.",
       "filter": "Visa",
       "all": "Alla",
@@ -3315,10 +3319,15 @@
       "description": "Beskrivning",
       "handledNote": "Anteckning",
       "handle": "Markera som handlagd",
-      "reject": "Avvisa",
+      "reject": "Avsluta utan åtgärd",
       "confirmHandle": "Markera {number} som handlagd?",
-      "confirmReject": "Avvisa {number}?",
-      "done": "{number} är avslutad."
+      "confirmReject": "Avsluta {number} utan åtgärd?",
+      "done": "{number} är avslutad.",
+      "number": "Nummer",
+      "kind": "Typ",
+      "handedIn": "Inlämnad",
+      "status": "Status",
+      "noName": "namn saknas"
     }
   }
 }
