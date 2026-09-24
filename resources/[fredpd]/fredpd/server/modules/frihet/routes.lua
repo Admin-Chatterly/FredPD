@@ -110,6 +110,31 @@ end
 -- Reads
 -- -----------------------------------------------------------------------------
 
+--- Tells whoever takes the next decision in the chain that it is waiting on
+--- them (spec 7.9). A custody chain that sits unread is somebody held with
+--- nobody deciding, and the åklagare used to find out only by opening the
+--- screen. The notice carries the chain's number and nothing else, and only
+--- reaches a session that could read the chain anyway.
+local NOTICE_FOR <const> = {
+    ['frihet.anhallande'] = 'frihet.notify.needsDecision',
+    ['frihet.haktning'] = 'frihet.notify.needsHaktning',
+}
+
+local function announceNext(session, id)
+    local row = repo.byId(id, session.agencyId)
+    if not row then return end
+
+    local permission = service.nextDecisionPermission(row.status)
+    if not permission then return end
+
+    FredPD.Core.push.notifyPermission(permission, NOTICE_FOR[permission], { number = row.number },
+        { type = 'warning' },
+        function(other)
+            return other.agencyId == session.agencyId and other.src ~= session.src
+                and access.mayBeToldOf(other, FRIHET, row)
+        end)
+end
+
 route.define({
     name = 'frihet.open',
     perm = 'frihet.view',
@@ -234,6 +259,8 @@ route.define({
             discordId = session.discordId,
         })
 
+        announceNext(session, row.id)
+
         return {
             id = row.id,
             number = row.number,
@@ -272,6 +299,8 @@ local function runDecision(session, input, action)
                    input.grund, input.version) == 0 then
         return route.refuse(FredPD.ErrorCode.CONFLICT)
     end
+
+    announceNext(session, row.id)
 
     return { id = row.id, status = toStatus }
 end

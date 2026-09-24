@@ -114,6 +114,8 @@ server_scripts {
     'server/modules/frihet/service.lua',
     'server/modules/frihet/repo.lua',
     'server/modules/frihet/routes.lua',
+    -- Deadline warnings on a timer; after the routes, reads the repo and service.
+    'server/modules/frihet/events.lua',
 
     -- Tvångsmedel och efterlysning (spec 7.12, 7.13). After frihet, whose
     -- chain an efterlysning links to.

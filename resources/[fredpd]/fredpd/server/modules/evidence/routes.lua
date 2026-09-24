@@ -1032,6 +1032,18 @@ route.define({
             repo.indexTraceProfile(session.agencyId, facts.evidenceId, indexKind, session.discordId)
         end
 
+        -- The officer who asked hears it is done, wherever they are.
+        local notice = repo.analysisNotice(session.agencyId, input.id)
+        if notice then
+            FredPD.Core.push.notifyWhere(function(other)
+                return other.discordId == notice.requestedBy and other.agencyId == session.agencyId
+            end, 'lab.notify.completed', {
+                analysis = FredPD.t('lab.analysis.' .. tostring(notice.analysis)),
+                item = notice.evidenceNumber,
+                case = notice.caseNumber or '—',
+            }, { type = 'success' })
+        end
+
         return { id = input.id, analysis = facts.analysis, resultCode = result }
     end,
 })

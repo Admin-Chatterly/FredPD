@@ -50,13 +50,16 @@ Att en åtgärd vägras är i regel inte ett fel. Det är systemet som gör vad 
 
 ---
 
-## 2. Terminaler
+## 2. Öppna FredPD, och terminalerna
 
-FredPD öppnas inte var som helst. Det finns fysiska platser för det, precis som
-med vilken myndighetsutrustning som helst.
+**Tryck F6** var du än är för att öppna FredPD (MDT:n), och F6 igen för att
+stänga. Tangenten går att byta under Inställningar → Tangentbindningar → FiveM.
+Därifrån slår du, skriver anmälan och ser händelser.
 
-Gå fram till en terminal. När du är tillräckligt nära dyker det upp en
-uppmaning på skärmen. **Tryck E.**
+Vissa saker kräver ändå en fysisk plats, precis som med riktig
+myndighetsutrustning. Gå fram till en terminal. När du är tillräckligt nära
+dyker det upp en uppmaning på skärmen. **Tryck E.** FredPD öppnas då direkt på
+rätt sida för terminalen.
 
 | Terminal | Var den står | Vad den används till |
 | --- | --- | --- |

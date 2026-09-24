@@ -52,8 +52,12 @@ FredPD.Config.shared = {
     --- saving, so it is a correction and not a configuration to prefer.
     timezoneOffset = setting('fredpd:timezone_offset', ''),
 
-    --- Opens and closes the MDC while seated in an agency vehicle (spec 1.4).
+    --- Opens and closes the MDT (spec 1.4). The default key for a player who
+    --- has not bound their own under Settings -> Key Bindings -> FiveM.
     mdcKeybind = 'F6',
+    --- `true` makes the key work only while seated in a vehicle, like a
+    --- car-mounted MDC. Feel only: the server checks every route regardless.
+    mdtInVehicleOnly = false,
 
     --- Per-module feature flags that the NUI needs in order to draw its rail.
     --- The server still decides what a session may actually open (invariant 4);

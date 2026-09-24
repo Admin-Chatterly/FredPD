@@ -671,6 +671,20 @@ function Repo.startAnalysis(agencyId, id, discordId, turnaroundSeconds)
     ) or 0
 end
 
+--- Who to tell that an analysis finished, and what to call it: the officer
+--- who asked, the case, the item number. No result, no hidden truth -- the
+--- notice says a result exists; the MDT is where a cleared reader sees it.
+function Repo.analysisNotice(agencyId, analysisId)
+    return db().single(
+        [[SELECT r.requested_by AS requestedBy, r.case_number AS caseNumber,
+                 e.evidence_number AS evidenceNumber, a.analysis
+            FROM fpd_lab_analyses a
+            JOIN fpd_lab_requests r ON r.id = a.request_id
+            JOIN fpd_evidence e ON e.id = a.evidence_id
+           WHERE a.id = ? AND r.agency_id = ?]],
+        { analysisId, agencyId })
+end
+
 --- Everything needed to compute a result, and nothing that may be returned.
 ---
 --- This is the only function in FredPD that reads `fpd_evidence_owner`,

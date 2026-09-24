@@ -33,7 +33,8 @@
     "unbuilt": {
       "title": "Inte byggd ännu",
       "body": "Din behörighet öppnar modulen, men den är ännu inte byggd i den här versionen av FredPD. Det saknas ingenting i din behörighet — det finns bara ingenting här än."
-    }
+    },
+    "keybind": "Öppna FredPD (MDT)"
   },
   "error": {
     "no_session": "Du är inte inloggad i FredPD. Oftast beror det på att du spelar en annan karaktär än den som står på din personalrad, att dina Discordroller inte ger någon behörighet här, eller att Discord inte är igång och kopplat till FiveM. Ett befäl kan se den exakta orsaken i serverkonsolen.",
@@ -443,6 +444,9 @@
       "insufficient": "Otillräckligt för jämförelse",
       "candidate_match": "Träff i register, kräver bekräftelse",
       "no_match": "Ingen träff"
+    },
+    "notify": {
+      "completed": "Labbsvar klart: {analysis} på {item} (ärende {case}). Öppna Beslag eller ärendet för att läsa det."
     }
   },
   "intel": {
@@ -1526,7 +1530,8 @@
       "title": "Kontroll av enhet",
       "body": "{callsign} har varit på plats på {number} i {minutes} minuter utan statusändring.",
       "prompt": "Kontrollera enheten",
-      "dismiss": "Sett"
+      "dismiss": "Sett",
+      "self": "Du har varit på plats i {minutes} minuter. Uppdatera din status, eller tryck på nödknappen om du behöver hjälp."
     },
     "broadcast": {
       "title": "Utskick",
@@ -1588,7 +1593,11 @@
       "panic": "Nödlarm",
       "alpr": "Skyltavläsning"
     },
-    "noCallsign": "Du har ingen anropssignal och syns därför inte på enhetstavlan. Be ett befäl lägga in en under Personal."
+    "noCallsign": "Du har ingen anropssignal och syns därför inte på enhetstavlan. Be ett befäl lägga in en under Personal.",
+    "notify": {
+      "dispatched": "Utlarmad till {number}: {type}, {location}. Den ligger i din GPS.",
+      "noLocation": "ingen plats angiven"
+    }
   },
   "alpr": {
     "title": "Skyltavläsningar",
@@ -1796,6 +1805,10 @@
     "confirm": {
       "approve": "Att godkänna innebär att du signerar anmälan och låser den. Därefter kan den endast kompletteras med en tilläggsuppgift.",
       "atersand": "Anmälan återsänds till den som upprättat den, tillsammans med din kommentar."
+    },
+    "notify": {
+      "returned": "Din anmälan {number} har återsänts för komplettering.",
+      "approved": "Din anmälan {number} har godkänts."
     }
   },
   "fu": {
@@ -1862,6 +1875,9 @@
       "slutdelge": "Materialet i {number} har slutdelgetts.",
       "redovisa": "{number} har redovisats till åklagaren.",
       "lagg_ned": "{number} har lagts ned."
+    },
+    "notify": {
+      "assigned": "Du är nu förundersökningsledare för {number}."
     }
   },
   "frihet": {
@@ -1977,6 +1993,11 @@
     "field": {
       "personId": "Person-id",
       "plats": "Plats"
+    },
+    "notify": {
+      "needsDecision": "Frihetsberövande {number} väntar på åklagarens beslut.",
+      "needsHaktning": "Frihetsberövande {number}: en häktningsframställan väntar på rätten.",
+      "deadline": "Frihetsberövande {number}: {deadline} löper ut inom en timme."
     }
   },
   "tvang": {

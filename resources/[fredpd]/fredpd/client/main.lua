@@ -341,6 +341,35 @@ AddEventHandler('fredpd:toggleInterface', function()
     setOpen(not isOpen)
 end)
 
+--- The MDT on a key (spec 1.4), bound by default to `Config.shared.mdcKeybind`
+--- and rebindable under Settings -> Key Bindings -> FiveM. An officer used to
+--- have to walk to a terminal to read a record; the car and the street are
+--- where the work is.
+---
+--- Opening is not access. Everything inside is a route the server checks, and
+--- the routes pinned to a terminal (`accessPoint`) still need the terminal:
+--- this opens with no placement, so they refuse with a sentence saying where
+--- to go. `mdtInVehicleOnly` narrows the key to a car for a server that wants
+--- the MDC to feel like one -- a matter of feel, not of security.
+local MDT_COMMAND <const> = 'fredpd_mdt'
+
+RegisterCommand(MDT_COMMAND, function()
+    if isOpen then
+        setOpen(false)
+        return
+    end
+
+    if FredPD.Config.shared.mdtInVehicleOnly and not IsPedInAnyVehicle(PlayerPedId(), false) then
+        FredPD.Client.core.showError({ err = FredPD.ErrorCode.CONTEXT, fields = { _context = 'inAgencyVehicle' } })
+        return
+    end
+
+    setOpen(true)
+end, false)
+
+RegisterKeyMapping(MDT_COMMAND, FredPD.t('shell.keybind'), 'keyboard',
+    FredPD.Config.shared.mdcKeybind or '')
+
 --- Opening a terminal is the same action wherever it is placed, so every
 --- terminal kind maps to it (spec 3.10). What the officer can then *do* inside
 --- differs by permission, which the server decides.

@@ -20,7 +20,7 @@ local function plain(params)
     local out = {}
     for name, value in pairs(params) do
         if type(value) == 'string' then
-            out[name] = value:gsub('[%[%]%(%)!%*_`#<>\\~|]', '\\%0')
+            out[name] = FredPD.Client.core.plainText(value)
         elseif type(value) == 'number' then
             out[name] = value
         end

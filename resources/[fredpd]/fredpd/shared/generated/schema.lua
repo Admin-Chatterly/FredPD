@@ -987,7 +987,7 @@ FredPD.Schema = {
     },
 
     Emergency = {
-
+        streetLabel = { type = 'string', required = false, max = 96 },
     },
 
     GarageVehicleEvent = {

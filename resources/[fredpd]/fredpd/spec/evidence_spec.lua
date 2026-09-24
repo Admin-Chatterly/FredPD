@@ -579,6 +579,7 @@ describe('evidence routes', function()
             end,
 
             hiddenFacts = function() return state.facts end,
+            analysisNotice = function() return state.notice end,
             indexHits = function() return state.indexHits end,
             completeAnalysis = function() return state.completedRows end,
             completionBlocker = function() return state.blocker end,
@@ -611,6 +612,11 @@ describe('evidence routes', function()
             custody = {},
             inserted = {},
             indexed = {},
+            notified = {},
+            notice = {
+                requestedBy = '100000000000000001', caseNumber = 'FU26-00001',
+                evidenceNumber = 'LSPD-2026-000001', analysis = 'dna',
+            },
             unprotected = 0,
             latestCaseNumber = nil,
             listResults = {},
@@ -658,7 +664,24 @@ describe('evidence routes', function()
                     return state.standingAt[kind] == placementId
                 end,
             },
+            -- Two sessions online: the requester, and the same Discord id
+            -- signed on in another agency. Only the first may be told.
+            push = {
+                notifyWhere = function(predicate, key, params)
+                    for _, other in ipairs({
+                        helper.session({ src = 2 }),
+                        helper.session({ src = 3, agencyId = 'bcso' }),
+                    }) do
+                        if predicate(other) then
+                            state.notified[#state.notified + 1] = {
+                                src = other.src, discordId = other.discordId, key = key, params = params,
+                            }
+                        end
+                    end
+                end,
+            },
         }
+        FredPD.t = function(key) return key end
 
         FredPD.Repo = { evidence = fakeRepo() }
         FredPD.Evidence = { claimTrace = function() return state.trace end }
@@ -898,6 +921,20 @@ describe('evidence routes', function()
             assert.are.equal('profile_obtained', result.resultCode)
             assert.are.equal('dna_trace', state.indexed[1].indexKind)
             assert.are.equal(1, state.indexed[1].evidenceId)
+        end)
+
+        it('tells the officer who asked, without the result', function()
+            call('lab.analysis.complete', analyst(), { id = 5 })
+
+            assert.are.equal(1, #state.notified)
+            assert.are.equal(2, state.notified[1].src)
+            assert.are.equal('100000000000000001', state.notified[1].discordId)
+            assert.are.equal('lab.notify.completed', state.notified[1].key)
+            assert.are.equal('LSPD-2026-000001', state.notified[1].params.item)
+            -- A notice says a result exists; it never carries it.
+            for _, value in pairs(state.notified[1].params) do
+                assert.is_nil(tostring(value):find('profile_obtained', 1, true))
+            end
         end)
 
         it('files nothing when the sample gave no profile', function()

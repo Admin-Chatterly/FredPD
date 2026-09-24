@@ -577,7 +577,17 @@ function Avl.welfarePass()
         -- split. `board.welfarePush` builds the payload per recipient for that
         -- reason, and skips the copies entirely on the common pass where nobody
         -- due a check is on a call at all.
-        if #due > 0 then board.welfarePush(agencyId, due) end
+        if #due > 0 then
+            board.welfarePush(agencyId, due)
+
+            -- The unit itself is asked too (7.16): "are you OK?" is a question
+            -- for the officer standing there, not only one for dispatch to
+            -- relay. Their own status and minutes, nothing about anyone else.
+            for index = 1, #due do
+                FredPD.Core.push.notifyOfficer(due[index].officerId, 'cad.welfare.self',
+                    { minutes = due[index].minutes }, { type = 'warning' })
+            end
+        end
     end
 end
 

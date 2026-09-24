@@ -285,6 +285,12 @@ route.define({
 ---
 --- @param action string 'submit', 'return' or 'approve'
 --- @param guard function(row, session) -> boolean, reason
+--- What the author is told after a review decision on their anmälan.
+local AUTHOR_NOTICE <const> = {
+    ['return'] = { key = 'anmalan.notify.returned', type = 'warning' },
+    approve = { key = 'anmalan.notify.approved', type = 'success' },
+}
+
 local function runTransition(session, input, action, guard)
     local row, refusal = readable(session, input.id)
     if not row then return refusal end
@@ -308,6 +314,16 @@ local function runTransition(session, input, action, guard)
     if not repo.transition(row.id, session.agencyId, toStatus, session.discordId,
                            snapshot, input.version, input.note) then
         return route.refuse(FredPD.ErrorCode.CONFLICT)
+    end
+
+    -- The author hears what the reviewer decided, wherever they are: a
+    -- report sent back sat unnoticed until they happened to open the list.
+    local notice = AUTHOR_NOTICE[action]
+    if notice then
+        FredPD.Core.push.notifyWhere(function(other)
+            return other.discordId == row.createdBy and other.agencyId == session.agencyId
+                and access.mayBeToldOf(other, ANMALAN, row)
+        end, notice.key, { number = row.number }, { type = notice.type })
     end
 
     return { id = row.id, status = toStatus }
@@ -572,6 +588,16 @@ route.define({
         if repo.fuAssign(row.id, session.agencyId, input.fuLedare,
                          input.ledareKind, input.version) == 0 then
             return route.refuse(FredPD.ErrorCode.CONFLICT)
+        end
+
+        -- The new förundersökningsledare learns the case is theirs -- if the
+        -- id names somebody signed on in this agency who may read the case.
+        -- `fuLedare` arrives from the client, so it is matched, never trusted.
+        if input.fuLedare ~= session.discordId then
+            FredPD.Core.push.notifyWhere(function(other)
+                return other.discordId == input.fuLedare and other.agencyId == session.agencyId
+                    and access.mayBeToldOf(other, FU, row)
+            end, 'fu.notify.assigned', { number = row.number }, { type = 'inform' })
         end
 
         return { id = row.id }

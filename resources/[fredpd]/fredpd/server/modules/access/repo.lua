@@ -393,6 +393,27 @@ function Repo.read(session, recordType, row, sharedAgencies)
     return shaped[1]
 end
 
+--- May this session be *told about* this record -- its number in a
+--- notification (`FredPD.Core.push.notifyWhere`)?
+---
+--- The same answer a read gives -- agency, clearance, seals, compartments and
+--- grants, prepared from their own tables exactly as `Repo.read` prepares them
+--- -- without the audit row a read writes, because nothing of the record is
+--- shown. Works on a copy, so the caller's row is not given working fields.
+---
+--- @return boolean
+function Repo.mayBeToldOf(session, recordType, row)
+    if type(session) ~= 'table' or type(row) ~= 'table' then return false end
+
+    local copy = {}
+    for key, value in pairs(row) do copy[key] = value end
+
+    local reader = Repo.reader(session)
+    Repo.prepare(reader, recordType, { copy })
+
+    return service().canRead(reader, copy) == true
+end
+
 --- A list of rows, shaped by what this session may see (invariant 4).
 ---
 --- This is the function that makes search safe. Rows the reader may not know

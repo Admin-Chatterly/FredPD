@@ -185,3 +185,22 @@ test.describe('Intelligence', () => {
     await expect(page.getByText('Skyddad källa')).toBeVisible();
   });
 });
+
+test('opening at a terminal lands on the module that terminal is for', async ({ page }) => {
+  await page.goto('/?locale=en');
+  await expect(page.getByText('Signed in as A. Lindqvist')).toBeVisible();
+
+  // What client/main.lua sends when an officer presses E at the booking
+  // terminal. The shell opens straight on Booking rather than on whatever
+  // module was open last.
+  await page.evaluate(() => {
+    window.postMessage(
+      { type: 'fredpd:open', placementId: 7, placementKind: 'booking_terminal' },
+      window.location.origin,
+    );
+  });
+
+  await expect(
+    page.locator('nav').first().getByRole('button', { name: 'Booking' }),
+  ).toHaveAttribute('aria-current', 'page');
+});

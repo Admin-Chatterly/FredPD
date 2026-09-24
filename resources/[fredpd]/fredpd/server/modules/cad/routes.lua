@@ -428,6 +428,31 @@ local function openCall(session, callId, field)
     return call, nil
 end
 
+--- Tells each officer just put on a call that they were, with the call on
+--- their GPS. The officer with the MDT shut used to find out only by radio.
+--- Only the number, the type and the caller's location text: what the unit
+--- needs to start driving, and nothing the call card would not show them --
+--- and only to a session that may read the call at all, the same test every
+--- other push of a call passes (`board.mayRead`).
+local function tellAssigned(call, units)
+    if not call then return end
+
+    local waypoint = (call.x and call.y) and { x = call.x, y = call.y } or nil
+    local params = {
+        number = call.callNumber,
+        type = FredPD.t('cad.callType.' .. tostring(call.type)),
+        location = call.locationText or FredPD.t('cad.notify.noLocation'),
+    }
+
+    for index = 1, #units do
+        local officerId = units[index].officerId
+
+        FredPD.Core.push.notifyWhere(function(other)
+            return other.officerId == officerId and board.mayRead(other, call)
+        end, 'cad.notify.dispatched', params, { type = 'warning', waypoint = waypoint })
+    end
+end
+
 --- May this session work a call it is not a unit on?
 local function supervises(session)
     return perms.satisfies(session.permissions, SUPERVISE)
@@ -1048,8 +1073,10 @@ route.define({
         -- The call the dispatcher asked about, and every call a unit was taken
         -- off to get here. The second list is empty on an ordinary dispatch to
         -- units that were free, which is most of them.
-        board.callChanged(session.agencyId, repo.getCall(session.agencyId, input.callId))
+        local call = repo.getCall(session.agencyId, input.callId)
+        board.callChanged(session.agencyId, call)
         callsChanged(session.agencyId, diverted)
+        tellAssigned(call, joinUnits)
 
         return { id = input.callId, joined = #joinUnits, left = #leaveUnits }
     end,
@@ -1108,8 +1135,10 @@ route.define({
         end
 
         board.unitChanged(session.agencyId, repo.getUnit(session.agencyId, session.officerId))
-        board.callChanged(session.agencyId, repo.getCall(session.agencyId, input.callId))
+        local fresh = repo.getCall(session.agencyId, input.callId)
+        board.callChanged(session.agencyId, fresh)
         callsChanged(session.agencyId, diverted)
+        tellAssigned(fresh, { unit })
 
         return { id = input.callId, callNumber = call.callNumber }
     end,
@@ -1768,7 +1797,7 @@ route.define({
     limit = { per = 5, window = 60 },
     audit = 'cad.emergency.raised',
     subjectType = 'call',
-    handler = function(session)
+    handler = function(session, input)
         local unit, refusal = ownUnit(session, 'status')
         if refusal then return refusal end
 
@@ -1791,6 +1820,11 @@ route.define({
             type = EMERGENCY.type,
             priority = EMERGENCY.priority,
             source = EMERGENCY.source,
+            -- Display text only (see the `Emergency` schema); never a
+            -- position. Reduced to what a GTA street name is made of, so it
+            -- cannot carry markup to the responders' screens.
+            locationText = text(input and type(input.streetLabel) == 'string'
+                and input.streetLabel:gsub("[^%w %-%./',&]", '') or nil),
             x = at.x,
             y = at.y,
             z = at.z,

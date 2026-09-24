@@ -56,4 +56,18 @@ function Client.notify(localeKey, params)
     })
 end
 
+--- Escapes markdown in a piece of data before it is placed into a
+--- notification. ox_lib renders notification text as markdown, and a value
+--- that came from a player -- a street label, a broadcast title, a name --
+--- must never become a link or an image: an image URL loaded on another
+--- officer's screen is an IP grab (spec 11.1, 11.3).
+--- @param value any
+--- @return string|nil
+function Client.plainText(value)
+    if value == nil then return nil end
+
+    local escaped = tostring(value):gsub('[%[%]%(%)!%*_`#<>\\~|]', '\\%0')
+    return escaped
+end
+
 FredPD.Client.core = Client

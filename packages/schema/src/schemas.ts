@@ -1622,8 +1622,18 @@ export const schemas = {
    * The schema exists rather than being omitted because a route that declares
    * one has every key it did not ask for dropped before the handler runs; with
    * an empty schema, that is every key (as `GroupList`).
+   *
+   * `streetLabel` is the one exception, and it is a label, not a position:
+   * the street name the officer's own game reads at their feet, shown to
+   * responders as the call's location text so the banner says "Grove St"
+   * instead of "no location". The position is still read off the ped on the
+   * server. The server keeps only letters, digits, spaces and `-./',&`, and
+   * every client escapes it before a notification renders it, so a label can
+   * mislabel a panic but never carry markup to another officer's screen.
    */
-  Emergency: {},
+  Emergency: {
+    streetLabel: { type: 'string', required: false, max: 96 },
+  },
 
   /**
    * A BOLO or an all-units message (7.16 [S]).

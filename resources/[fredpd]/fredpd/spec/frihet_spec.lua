@@ -419,6 +419,51 @@ describe('frihet', function()
     end)
 
     -- -------------------------------------------------------------------------
+    describe('deadlinesDueWithin', function()
+        local HOUR = 3600
+
+        it('warns about a förhandling deadline inside the window', function()
+            local gripen = utc(2026, 3, 9, 0, 0)
+            -- 96 hours later, minus 30 minutes.
+            local now = gripen + 96 * HOUR - 30 * 60
+
+            assert.are.same({ 'forhandling' },
+                frihet.deadlinesDueWithin({ gripenAt = gripen, status = 'gripen' }, now, UTC, HOUR))
+        end)
+
+        it('says nothing about a deadline further off than the window', function()
+            local gripen = utc(2026, 3, 9, 0, 0)
+
+            assert.are.same({},
+                frihet.deadlinesDueWithin({ gripenAt = gripen, status = 'gripen' }, gripen, UTC, HOUR))
+        end)
+
+        it('says nothing about a deadline already passed', function()
+            local gripen = utc(2026, 3, 9, 0, 0)
+            local now = gripen + 97 * HOUR
+
+            assert.are.same({},
+                frihet.deadlinesDueWithin({ gripenAt = gripen, status = 'gripen' }, now, UTC, HOUR))
+        end)
+    end)
+
+    describe('nextDecisionPermission', function()
+        it('names the åklagare after a gripande and an anhållande', function()
+            assert.are.equal('frihet.anhallande', frihet.nextDecisionPermission('gripen'))
+            assert.are.equal('frihet.anhallande', frihet.nextDecisionPermission('anhallen'))
+        end)
+
+        it('names the domare after a framställan', function()
+            assert.are.equal('frihet.haktning', frihet.nextDecisionPermission('framstalld'))
+        end)
+
+        it('names nobody once held or released', function()
+            assert.is_nil(frihet.nextDecisionPermission('haktad'))
+            assert.is_nil(frihet.nextDecisionPermission('frigiven'))
+        end)
+    end)
+
+    -- -------------------------------------------------------------------------
     describe('heldFor', function()
         it('grows while the person is held', function()
             local gripen = utc(2026, 3, 9, 14, 0)

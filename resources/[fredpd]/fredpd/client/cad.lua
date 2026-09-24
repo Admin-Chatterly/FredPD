@@ -197,6 +197,21 @@ local function showRefusal(response)
     core.showError(response)
 end
 
+--- The street (and crossing) at the player's feet, as the game names it. A
+--- label for responders to read, never a position: the server reads that off
+--- the ped itself.
+local function streetLabel()
+    local at = GetEntityCoords(PlayerPedId())
+    local street, crossing = GetStreetNameAtCoord(at.x, at.y, at.z)
+    local name = street and street ~= 0 and GetStreetNameFromHashKey(street) or nil
+    local cross = crossing and crossing ~= 0 and GetStreetNameFromHashKey(crossing) or nil
+
+    if not name or name == '' then return nil end
+    if cross and cross ~= '' then name = name .. ' / ' .. cross end
+
+    return name:sub(1, 96)
+end
+
 --- Raises an emergency call at this officer's position (7.16).
 ---
 --- What the officer gets: an ox_lib notification, and the banner the NUI draws
@@ -216,8 +231,9 @@ function Cad.panic()
     end
 
     pressing = true
-    -- No argument, and there is no field to put one in. See the header.
-    local response = core.call('unit.emergency')
+    -- No position, and there is no field to put one in. See the header. The
+    -- street name is a label for the banner, nothing more.
+    local response = core.call('unit.emergency', { streetLabel = streetLabel() })
     pressing = false
 
     if not response.ok then
@@ -272,9 +288,14 @@ function showEmergency(payload)
 
     lib.notify({
         title = FredPD.t('cad.emergency.title'),
+        -- Both are data, and the location can be a label the panicking
+        -- client supplied: escaped so neither can render as markdown.
         description = call.locationText
-            and FredPD.t('cad.emergency.banner', { callsign = callsign, location = call.locationText })
-            or FredPD.t('cad.emergency.bannerNoLocation', { callsign = callsign }),
+            and FredPD.t('cad.emergency.banner', {
+                callsign = core.plainText(callsign),
+                location = core.plainText(call.locationText),
+            })
+            or FredPD.t('cad.emergency.bannerNoLocation', { callsign = core.plainText(callsign) }),
         type = 'error',
         duration = EMERGENCY_NOTIFY_MS,
     })
@@ -426,7 +447,8 @@ local function broadcastAlert(payload)
 
     lib.notify({
         title = FredPD.t('cad.broadcastKind.' .. broadcast.kind),
-        description = broadcast.title,
+        -- Officer-written text; escaped so it cannot render as markdown.
+        description = core.plainText(broadcast.title),
         type = 'inform',
         duration = BROADCAST_NOTIFY_MS,
     })
@@ -445,8 +467,8 @@ local function garageAlert(payload)
     lib.notify({
         title = FredPD.t('cad.broadcastKind.bolo'),
         description = FredPD.t('cad.garageAlert.' .. payload.action, {
-            plate = payload.plate,
-            case = payload.caseNumber or '',
+            plate = core.plainText(payload.plate),
+            case = core.plainText(payload.caseNumber or ''),
         }),
         type = 'inform',
         duration = BROADCAST_NOTIFY_MS,

@@ -187,6 +187,10 @@ files['**/client/**/*.lua'] = {
         'SetModelAsNoLongerNeeded',
         -- A dispatch push sets the officer's GPS to the call (client/notify.lua).
         'SetNewWaypoint',
+        -- The panic button labels the call with the street the officer is on
+        -- (client/cad.lua); the position itself is read on the server.
+        'GetStreetNameAtCoord',
+        'GetStreetNameFromHashKey',
         'SetPedIntoVehicle',
         'SetTextCentre',
         'SetTextColour',

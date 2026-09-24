@@ -52,7 +52,20 @@
    */
   let sequence = 0;
 
-  async function loadSession(): Promise<void> {
+  /**
+   * The module a terminal opens into. An officer who walks up to the property
+   * room wants the evidence screen, not whatever they had open last.
+   */
+  const MODULE_FOR_PLACEMENT: Record<string, string> = {
+    station_terminal: 'records',
+    property_terminal: 'evidence',
+    lab_terminal: 'lab',
+    booking_terminal: 'booking',
+    dispatch_console: 'dispatch',
+    courthouse_terminal: 'court',
+  };
+
+  async function loadSession(preferred: string | null = null): Promise<void> {
     const mine = ++sequence;
     const response = await nui.call<Session>('session.get');
     if (mine !== sequence) return;
@@ -72,7 +85,9 @@
         setLocale(response.data.locale);
       }
 
-      if (current === null || !response.data.modules.includes(current)) {
+      if (preferred !== null && response.data.modules.includes(preferred)) {
+        current = preferred;
+      } else if (current === null || !response.data.modules.includes(current)) {
         current = response.data.modules[0] ?? null;
       }
     } else {
@@ -91,7 +106,12 @@
     };
   });
 
-  $effect(() => nui.on('fredpd:open', () => void loadSession()));
+  $effect(() =>
+    nui.on('fredpd:open', (message) => {
+      const kind = message['placementKind'];
+      void loadSession(typeof kind === 'string' ? (MODULE_FOR_PLACEMENT[kind] ?? null) : null);
+    }),
+  );
 
   /**
    * Permissions changed while the MDT was open — a role was added or removed,
@@ -241,6 +261,7 @@
           class:font-semibold={current === module}
           class:border-[var(--color-accent)]={current === module}
           class:bg-[var(--color-surface)]={current === module}
+          aria-current={current === module ? 'page' : undefined}
           onclick={() => (current = module)}
         >
           {t(`shell.module.${module}`)}

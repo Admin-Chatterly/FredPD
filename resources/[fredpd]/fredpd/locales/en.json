@@ -33,7 +33,8 @@
     "unbuilt": {
       "title": "Not built yet",
       "body": "Your permissions open this module, but it has not been built into this version of FredPD. Nothing is missing from your access — there is nothing here yet."
-    }
+    },
+    "keybind": "Open FredPD (MDT)"
   },
   "error": {
     "no_session": "You are not signed on to FredPD. Usually: you are on a different character than the one on your roster row, your Discord roles give you no access here, or Discord is not running and linked to FiveM. A supervisor can see the exact reason in the server console.",
@@ -443,6 +444,9 @@
       "insufficient": "Insufficient for comparison",
       "candidate_match": "Candidate match, confirmation required",
       "no_match": "No match"
+    },
+    "notify": {
+      "completed": "Lab result ready: {analysis} on {item} (case {case}). Open Evidence or the case to read it."
     }
   },
   "intel": {
@@ -1526,7 +1530,8 @@
       "title": "Welfare check",
       "body": "{callsign} has been on scene at {number} for {minutes} minutes with no change of status.",
       "prompt": "Check on the unit",
-      "dismiss": "Seen"
+      "dismiss": "Seen",
+      "self": "You have been on scene for {minutes} minutes. Update your status, or press the panic button if you need help."
     },
     "broadcast": {
       "title": "Broadcasts",
@@ -1588,7 +1593,11 @@
       "panic": "Emergency button",
       "alpr": "Plate read"
     },
-    "noCallsign": "You have no callsign, so you are not on the unit board. Ask a supervisor to set one under Personnel."
+    "noCallsign": "You have no callsign, so you are not on the unit board. Ask a supervisor to set one under Personnel.",
+    "notify": {
+      "dispatched": "Dispatched to {number}: {type}, {location}. It is on your GPS.",
+      "noLocation": "no location given"
+    }
   },
   "alpr": {
     "title": "Plate reads",
@@ -1796,6 +1805,10 @@
     "confirm": {
       "approve": "Approving signs this report and locks it. It can then only be amended by a supplemental.",
       "atersand": "Returning sends this report back to its author with your comment."
+    },
+    "notify": {
+      "returned": "Your report {number} was sent back for changes.",
+      "approved": "Your report {number} was approved."
     }
   },
   "fu": {
@@ -1862,6 +1875,9 @@
       "slutdelge": "Material in {number} disclosed to the suspect.",
       "redovisa": "{number} reported to the prosecutor.",
       "lagg_ned": "{number} discontinued."
+    },
+    "notify": {
+      "assigned": "You are now the lead on investigation {number}."
     }
   },
   "frihet": {
@@ -1977,6 +1993,11 @@
     "field": {
       "personId": "Person id",
       "plats": "Where"
+    },
+    "notify": {
+      "needsDecision": "Custody {number} is waiting on a prosecutor's decision.",
+      "needsHaktning": "Custody {number}: a remand application is waiting on the court.",
+      "deadline": "Custody {number}: {deadline} is due within the hour."
     }
   },
   "tvang": {

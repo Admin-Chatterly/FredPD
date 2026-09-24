@@ -117,4 +117,46 @@ function Push.notifyOfficer(officerId, key, params, options)
     end
 end
 
+--- `Push.notify` to every open session the predicate accepts.
+---
+--- The predicate is where the access question lives, and every caller has to
+--- answer it: a notice names a record by its number, and a number is itself
+--- information (invariant 4). Match the recipient (officer, author) *and* ask
+--- whether that session may read the record -- `FredPD.Repo.access.mayBeToldOf`
+--- -- rather than trusting a stored id to still point at somebody cleared.
+---
+--- @param predicate function (session) -> boolean
+--- @return number recipients
+function Push.notifyWhere(predicate, key, params, options)
+    local sent = 0
+
+    for src, session in pairs(FredPD.Core.session.all()) do
+        if predicate(session) then
+            Push.notify(src, key, params, options)
+            sent = sent + 1
+        end
+    end
+
+    return sent
+end
+
+--- `Push.notify` to every session holding `permission`, optionally filtered.
+--- A notice, never a record: the caller passes only a number or a label the
+--- recipients may read anyway.
+--- @return number recipients
+function Push.notifyPermission(permission, key, params, options, filter)
+    local sent = 0
+
+    for src, session in pairs(FredPD.Core.session.all()) do
+        if FredPD.Core.perms.satisfies(session.permissions, permission)
+            and (not filter or filter(session))
+        then
+            Push.notify(src, key, params, options)
+            sent = sent + 1
+        end
+    end
+
+    return sent
+end
+
 FredPD.Core.push = Push

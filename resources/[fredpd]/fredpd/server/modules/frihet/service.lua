@@ -419,6 +419,40 @@ function Frihet.needsAttention(row, now, offset)
     return deadline.passed or deadline.remaining <= Frihet.WARN_SECONDS
 end
 
+--- The statutory deadlines that fall inside the next `window` seconds and
+--- have not passed yet, for the warning pushed to the officers who have to
+--- act on them (spec 7.9). Sorted so the output is stable.
+---
+--- @return table list of deadline keys ('framstallan', 'forhandling')
+function Frihet.deadlinesDueWithin(row, now, offset, window)
+    local out = {}
+    local deadlines = Frihet.deadlines(row, now, offset)
+
+    for _, key in ipairs({ 'framstallan', 'forhandling' }) do
+        local deadline = deadlines[key]
+
+        if deadline and not deadline.passed and deadline.remaining <= window then
+            out[#out + 1] = key
+        end
+    end
+
+    return out
+end
+
+--- Who decides next in the chain from a status, as the permission that
+--- decision needs: the åklagare after a gripande and after the anhållande
+--- (framställan), the domare after a framställan. Nil when nothing waits on a
+--- decision-maker.
+local NEXT_DECISION <const> = {
+    gripen = 'frihet.anhallande',
+    anhallen = 'frihet.anhallande',
+    framstalld = 'frihet.haktning',
+}
+
+function Frihet.nextDecisionPermission(status)
+    return NEXT_DECISION[status]
+end
+
 FredPD.Modules.frihet = Frihet
 
 return Frihet
