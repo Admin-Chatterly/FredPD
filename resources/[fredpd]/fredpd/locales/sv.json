@@ -2668,7 +2668,18 @@
     },
     "tariff": {
       "parking": "Otillåten parkering",
-      "noise": "Förargelseväckande beteende"
+      "noise": "Förargelseväckande beteende",
+      "speeding_10": "Hastighetsöverträdelse, högst 10 km/h",
+      "speeding_20": "Hastighetsöverträdelse, 11–20 km/h",
+      "speeding_30": "Hastighetsöverträdelse, 21–30 km/h",
+      "red_light": "Körning mot rött ljus",
+      "failure_to_yield": "Brott mot väjningsplikt",
+      "unsafe_overtaking": "Otillåten omkörning",
+      "phone_driving": "Handhållen mobiltelefon under körning",
+      "no_seatbelt": "Bilbälte ej använt",
+      "vehicle_defect": "Fel på fordonet",
+      "no_licence_carried": "Körkort ej medfört",
+      "custom": "Annan ordningsbot"
     },
     "bill": {
       "label": "Ordningsbot {number}"
@@ -2676,7 +2687,40 @@
     "notify": {
       "paid": "Ordningsbot {number} är betald."
     },
-    "billSent": "Faktura skickad {at}. Boten markeras som betald av sig själv när fakturan är betald."
+    "billSent": "Faktura skickad {at}. Boten markeras som betald av sig själv när fakturan är betald.",
+    "tariffOption": {
+      "plain": "{name} — {amount}",
+      "withPoints": "{name} — {amount}, {points} p"
+    },
+    "points": "{points} prickar på körkortet",
+    "licence": {
+      "valid": "Körkort: {points} av {threshold} prickar.",
+      "warning": "Körkort: {points} av {threshold} prickar. Nära återkallelse.",
+      "revoked": "Körkortet är återkallat: {points} av {threshold} prickar."
+    },
+    "tariffEditor": {
+      "open": "Redigera taxan",
+      "close": "Stäng taxan",
+      "title": "Taxa",
+      "hint": "En ändring blir en ny version av raden. Ordningsböter som redan är utfärdade behåller belopp och prickar från när de skrevs.",
+      "code": "Kod",
+      "label": "Benämning",
+      "amount": "Belopp",
+      "points": "Prickar",
+      "actions": "Åtgärder",
+      "edit": "Ändra",
+      "editLine": "Ändra {name}",
+      "retire": "Avveckla",
+      "retireLine": "Avveckla {name}",
+      "confirmRetire": "Avveckla {name}? Den kan inte längre utfärdas. Redan utfärdade ordningsböter påverkas inte.",
+      "new": "Ny rad",
+      "editing": "Ändrar {code}",
+      "keepName": "Lämna tomt för att behålla benämningen",
+      "save": "Spara raden",
+      "cancelEdit": "Avbryt",
+      "saved": "{code} sparad.",
+      "retired": "{code} avvecklad."
+    }
   },
   "impound": {
     "filter": {
@@ -2748,7 +2792,8 @@
       "title": "Välj ordningsbot",
       "amount": "{amount} kr",
       "confirmTitle": "Utfärda ordningsboten?",
-      "confirm": "{tariff} till {who}."
+      "confirm": "{tariff} till {who}.",
+      "amountPoints": "{amount} kr, {points} prickar på körkortet"
     },
     "arrest": {
       "title": "Grund för gripandet",
@@ -2779,6 +2824,11 @@
       "search": "Genomsöktes något?",
       "result": "Hur slutade kontrollen?",
       "recorded": "Kontrollen är registrerad."
+    },
+    "licence": {
+      "valid": "Körkort: {points} av {threshold} prickar.",
+      "warning": "Körkort: {points} av {threshold} prickar. Nära återkallelse.",
+      "revoked": "Körkortet ÅTERKALLAT: {points} av {threshold} prickar."
     }
   },
   "status": {

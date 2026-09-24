@@ -811,8 +811,18 @@ Renamed from "Citations": ordningsbot is the correct Swedish term for a summary 
 - [M] Lifecycle: issued → paid, contested or void, each a one-way transition out of `issued` only. Void requires a reason from a closed list.
 - [M] **A payment due date and an overdue state** (0024). `due_at` is written once at issue time from `config.server.ordningsbot.paymentWindowDays` (default 30 days), so a later change to the window never moves the deadline on a citation already issued. `overdue` is not a fifth database status — `ordningsbot/service.lua`'s `Ordningsbot.paymentStatus` reads `issued` against `dueAt` and reports `unpaid` or `overdue`, the same "computed from dates, not timers" shape `impound/service.lua`'s fee clock already uses.
 - [M] **A real bill** (ADR-015, migration 0031). Issuing a citation bills the person it names, or the vehicle's registered keeper, through esx_billing (`server/bridges/billing.lua`), paid into the agency's society account. When that bill leaves esx_billing's table, the citation is marked paid automatically and audited as such, and the issuing officer is told. Voiding, contesting or manually paying the citation withdraws the bill. `ordningsbot.pay` remains for citations that sent no bill. `billing.enabled = false` in `config/server.lua` turns this off.
-- **Not built:** points on a licence (no licence-points concept exists in this suite).
-- **Permissions:** `page.ordningsbot`, `ordningsbot.tariff.view`, `ordningsbot.view` (patrol_basic); `ordningsbot.issue`, `.contest`, `.pay` (patrol); `ordningsbot.void` (supervisor).
+- [M] **An editable tariff, with the shipped catalogue written at start** (ADR-018, migration 0036).
+  - An agency whose tariff has never had a line gets `ordningsbot.defaultTariff` from `config/server.lua` when the server starts.
+  - Its command then edits the tariff in the MDT (`ordningsbot.tariff.set`, `.retire`). Each save is a new version.
+  - A line the agency adds is named in its own words.
+- [M] **Licence points** (ADR-018).
+  - Each tariff version carries 0–20 points.
+  - A person's licence standing is summed from the citations naming them that are still issued or paid inside `ordningsbot.licence.windowDays`. It reads `valid`, then `warning` from three quarters of `threshold`, then `revoked` (sv: *återkallat*) at it.
+  - It is computed, never stored. Voiding or contesting a citation removes its points.
+  - It is shown on the person record, in the field ID check, and to the officer issuing a fine, and only to a reader of citations.
+  - Nothing is written to esx_license.
+- [M] `ordningsbot.issue` reads the person and vehicle it names through the access check (ADR-018).
+- **Permissions:** `page.ordningsbot`, `ordningsbot.tariff.view`, `ordningsbot.view` (patrol_basic); `ordningsbot.issue`, `.contest`, `.pay` (patrol); `ordningsbot.void` (supervisor); `ordningsbot.tariff.edit` (command).
 
 ### 7.12 Tvångsmedel och efterlysning (M2)
 
@@ -1792,6 +1802,7 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Tvångsmedel | `tvang.view`, `tvang.decide`, `tvang.decide.aklagare`, `tvang.decide.domare`, `tvang.verkstall`, `efterlysning.issue` |
 | Spaning | `spaning.view`, `spaning.create` |
 | Enforcement | `rms.arrest.create`, `rms.citation.issue`, `rms.citation.void`, `rms.fi.create`, `rms.fi.view`, `rms.stops.create`, `rms.stops.view`, `rms.impound.create`, `rms.impound.release`, `rms.impound.hold.release`, `rms.warrant.serve` |
+| Ordningsbot and impound | `page.ordningsbot`, `ordningsbot.view`, `ordningsbot.issue`, `ordningsbot.contest`, `ordningsbot.pay`, `ordningsbot.void`, `ordningsbot.tariff.view`, `ordningsbot.tariff.edit` (ADR-018), `page.impound`, `impound.view`, `impound.create`, `impound.release`, `impound.authorize` — the keys 7.11 and 7.15 shipped under |
 | Investigations (intelligence cases, §10) | `inv.case.create`, `inv.case.view`, `inv.case.edit`, `inv.case.assign`, `inv.case.close` |
 | Booking | `booking.view`, `booking.intake`, `booking.release` (this row's `booking.create`/`booking.biometrics.capture` were this catalog's own initial guess at names 7.9 shipped under `booking.intake` instead — including 8.8's ten-print capture, `booking.tenPrint.capture`, which reuses it rather than adding a fifth key) |
 | Court | `court.warrant.request`, `court.warrant.review`, `court.warrant.recall`, `court.referral.review`, `court.calendar.manage`, `court.disposition.enter`, `court.discovery.issue`, `court.discovery.view`, `court.seal.order`, `court.citation.adjudicate`, `court.sentence.calculate` |
@@ -1801,7 +1812,7 @@ Swedish legal procedure differs from US procedure. Where no direct equivalent ex
 | Lab | `lab.request.create`, `lab.queue.view`, `lab.analysis.perform`, `lab.analysis.review`, `lab.report.release` |
 | Surveillance | `surv.view`, `surv.request`, `surv.decide`, `surv.upphav`, `surv.phone.intercept`, `surv.radio.monitor`, `surv.device.deploy`, `surv.device.listen`, `surv.tracker.deploy`, `surv.tracker.view`, `surv.log.view` |
 | Intelligence | `intel.module.open`, `intel.report.create`, `intel.report.view`, `intel.report.edit`, `intel.person.view`, `intel.person.edit`, `intel.person.merge`, `intel.org.view`, `intel.org.edit`, `intel.case.view`, `intel.case.edit`, `intel.evidence.add`, `intel.record.delete`, `intel.surveillance.log`, `intel.source.view`, `intel.source.manage`, `intel.source.identity.view`, `intel.operation.approve` |
-| Personnel | `personnel.view`, `personnel.hire`, `personnel.promote`, `personnel.discipline`, `personnel.equipment.assign`, `ia.case.view`, `ia.case.manage`, `uof.review`, `policy.manage`, `policy.ack` |
+| Personnel | `personnel.view`, `personnel.hire`, `personnel.promote`, `personnel.discipline`, `personnel.equipment.assign`, `ia.case.view`, `ia.case.manage`, `uof.review`, `policy.manage`, `policy.ack`; as 7.22 shipped: `personnel.roster.view`, `personnel.roster.edit`, `personnel.shift.own`, `personnel.certification.manage`, `personnel.discipline.view`, `personnel.discipline.manage`, `personnel.equipment.manage` |
 | Communications | `comms.message.send`, `comms.bulletin.post`, `comms.pdchat.send`, `comms.pdchat.view`, `comms.pdchat.all` |
 | Motor pool | `garage.vehicle.draw`, `garage.vehicle.return`, `garage.fleet.edit` |
 | Statistics | `stats.view`, `stats.export` |

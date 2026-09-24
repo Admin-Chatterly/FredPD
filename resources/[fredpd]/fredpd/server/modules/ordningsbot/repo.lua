@@ -44,7 +44,8 @@ end
 -- -----------------------------------------------------------------------------
 
 local TARIFF_SELECT <const> = [[
-    SELECT id, agency_id AS agencyId, code, label_key AS labelKey, amount, version,
+    SELECT id, agency_id AS agencyId, code, label_key AS labelKey, label, amount,
+           licence_points AS licencePoints, version,
            UNIX_TIMESTAMP(effective_from) AS effectiveFrom,
            UNIX_TIMESTAMP(retired_at) AS retiredAt
       FROM fpd_ordningsbot_tariff
@@ -86,8 +87,9 @@ local NEXT_VERSION_SQL <const> =
         WHERE t.agency_id = ? AND t.code = ?)]]
 
 local TARIFF_INSERT_SQL <const> = [[
-    INSERT INTO fpd_ordningsbot_tariff (agency_id, code, version, label_key, amount, created_by)
-    VALUES (?, ?, ]] .. NEXT_VERSION_SQL .. [[, ?, ?, ?)
+    INSERT INTO fpd_ordningsbot_tariff (agency_id, code, version, label_key, label, amount, licence_points,
+                                        created_by)
+    VALUES (?, ?, ]] .. NEXT_VERSION_SQL .. [[, ?, ?, ?, ?, ?)
 ]]
 
 --- Retires the current version of a tariff code (if there is one) and writes
@@ -99,19 +101,58 @@ local TARIFF_INSERT_SQL <const> = [[
 --- commits (`brott/repo.lua`'s `Repo.createVersion` makes the identical
 --- argument).
 ---
+--- @param line table { code, labelKey, label, amount, points }
+--- @param discordId string|nil nil for the shipped catalogue
 --- @return boolean committed
-function Repo.setTariff(agencyId, code, labelKey, amount, session)
+function Repo.setTariff(agencyId, line, discordId)
     return db().transaction({
         {
             query = [[UPDATE fpd_ordningsbot_tariff SET retired_at = CURRENT_TIMESTAMP(3)
                        WHERE agency_id = ? AND code = ? AND retired_at IS NULL]],
-            values = { agencyId, code },
+            values = { agencyId, line.code },
         },
         {
             query = TARIFF_INSERT_SQL,
-            values = { agencyId, code, agencyId, code, labelKey, amount, session.discordId },
+            values = {
+                agencyId, line.code, agencyId, line.code, line.labelKey, line.label, line.amount,
+                line.points or 0, discordId,
+            },
         },
     })
+end
+
+--- Takes a code out of the catalogue. Citations already issued under it keep
+--- the version they cite (0019).
+---
+--- @return number rows affected -- 0 when the code had no current version
+function Repo.retireTariff(agencyId, code)
+    return db().execute(
+        [[UPDATE fpd_ordningsbot_tariff SET retired_at = CURRENT_TIMESTAMP(3)
+           WHERE agency_id = ? AND code = ? AND retired_at IS NULL]],
+        { agencyId, code })
+end
+
+--- Has this agency ever had a tariff at all? Retired lines count: an agency
+--- that emptied its own catalogue did so on purpose.
+function Repo.hasAnyTariff(agencyId)
+    return (db().scalar('SELECT COUNT(*) FROM fpd_ordningsbot_tariff WHERE agency_id = ?', { agencyId }) or 0) > 0
+end
+
+-- -----------------------------------------------------------------------------
+-- Licence points (0036)
+-- -----------------------------------------------------------------------------
+
+--- The points counting against a person's licence: citations naming them
+--- that are still issued or paid and younger than the window. Void and
+--- contested ones do not count.
+function Repo.licencePoints(agencyId, personId, windowDays)
+    return db().scalar(
+        [[SELECT COALESCE(SUM(t.licence_points), 0)
+            FROM fpd_ordningsbot o
+            JOIN fpd_ordningsbot_tariff t ON t.id = o.tariff_id AND t.agency_id = o.agency_id
+           WHERE o.agency_id = ? AND o.person_id = ? AND o.status IN ('issued', 'paid')
+             AND o.issued_at >= DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL ? DAY)]],
+        { agencyId, personId, windowDays }) or 0
 end
 
 -- -----------------------------------------------------------------------------

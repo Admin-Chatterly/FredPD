@@ -4185,14 +4185,38 @@ interface FixtureTariff {
   id: number;
   code: string;
   labelKey: string;
+  label?: string | null;
   amount: number;
+  licencePoints: number;
   version: number;
+  retired?: boolean;
 }
 
-const tariffs: FixtureTariff[] = [
-  { id: 1, code: 'parking', labelKey: 'ordningsbot.tariff.parking', amount: 800, version: 1 },
-  { id: 2, code: 'noise', labelKey: 'ordningsbot.tariff.noise', amount: 1500, version: 1 },
+let tariffs: FixtureTariff[] = [
+  { id: 1, code: 'parking', labelKey: 'ordningsbot.tariff.parking', amount: 800, licencePoints: 0, version: 1 },
+  { id: 2, code: 'noise', labelKey: 'ordningsbot.tariff.noise', amount: 1500, licencePoints: 0, version: 1 },
+  { id: 3, code: 'red_light', labelKey: 'ordningsbot.tariff.red_light', amount: 3000, licencePoints: 3, version: 1 },
 ];
+let nextTariffId = 10;
+
+/** `config.server.ordningsbot.licence` as shipped (ADR-018). */
+const LICENCE_THRESHOLD = 12;
+
+/** Points a person already carries from citations outside this fixture's list. */
+const PRIOR_POINTS: Record<number, number> = { 1: 8 };
+
+function fixtureLicence(personId: number): { points: number; threshold: number; standing: string } {
+  const points =
+    (PRIOR_POINTS[personId] ?? 0) +
+    citations
+      .filter((row) => row.personId === personId && (row.status === 'issued' || row.status === 'paid'))
+      .reduce((sum, row) => sum + (tariffs.find((entry) => entry.id === row.tariffId)?.licencePoints ?? 0), 0);
+  const standing =
+    points >= LICENCE_THRESHOLD ? 'revoked' : points >= Math.ceil(LICENCE_THRESHOLD * 0.75) ? 'warning' : 'valid';
+  return { points, threshold: LICENCE_THRESHOLD, standing };
+}
+
+const liveTariffs = (): FixtureTariff[] => tariffs.filter((entry) => !entry.retired);
 
 interface FixtureCitation {
   id: number;
@@ -4646,7 +4670,7 @@ export const fixtures: FixtureSet = {
         plats?: string;
       };
 
-      if (!personId) return refuse('invalid', { personId: 'needs_subject' });
+      if (!personId) return refuse('invalid', { personId: 'required' });
       if (!grund) return refuse('invalid', { grund: 'required' });
 
       const id = frihetsberovanden.length + 1;
@@ -5172,7 +5196,7 @@ export const fixtures: FixtureSet = {
         expiresInSeconds?: number;
       };
 
-      if (!notice.personId) return refuse('invalid', { personId: 'needs_subject' });
+      if (!notice.personId) return refuse('invalid', { personId: 'required' });
       if (!notice.grund) return refuse('invalid', { grund: 'required' });
       if (!DETAIN_ON_SIGHT.includes(notice.grund) && !['delgivning', 'forsvunnen', 'oidentifierad', 'annan'].includes(notice.grund)) {
         return refuse('invalid', { grund: 'unknown' });
@@ -5615,7 +5639,7 @@ export const fixtures: FixtureSet = {
         } else if (suspects.length === 1) {
           personId = suspects[0];
         } else if (suspects.length > 1) {
-          return refuse('invalid', { personId: 'needs_subject' });
+          return refuse('invalid', { personId: 'required' });
         }
       }
 
@@ -6026,7 +6050,39 @@ export const fixtures: FixtureSet = {
 
     // -------------------------------------------------------- ordningsbot
 
-    'ordningsbot.tariff.list': () => ({ tariffs }),
+    'ordningsbot.tariff.list': () => ({ tariffs: liveTariffs(), mayEdit: true, licence: true }),
+
+    'ordningsbot.tariff.set': (input) => {
+      const body = (input ?? {}) as { code?: string; label?: string; amount?: number; licencePoints?: number };
+      const code = body.code ?? '';
+      if (!/^[a-z0-9_]{1,32}$/.test(code)) return refuse('invalid', { code: 'format' });
+
+      const existing = liveTariffs().find((entry) => entry.code === code);
+      if (!existing && !body.label) return refuse('invalid', { label: 'required' });
+
+      const line: FixtureTariff = {
+        id: nextTariffId++,
+        code,
+        labelKey: body.label ? 'ordningsbot.tariff.custom' : (existing?.labelKey ?? ''),
+        label: body.label ?? existing?.label ?? null,
+        amount: body.amount ?? 0,
+        licencePoints: body.licencePoints ?? 0,
+        version: (existing?.version ?? 0) + 1,
+      };
+      if (existing) existing.retired = true;
+      tariffs = [...tariffs, line].sort((a, b) => a.code.localeCompare(b.code));
+
+      return { id: line.id, tariff: line };
+    },
+
+    'ordningsbot.tariff.retire': (input) => {
+      const { code } = (input ?? {}) as { code?: string };
+      const existing = liveTariffs().find((entry) => entry.code === code);
+      if (!existing) return refuse('not_found', { code: 'unknown' });
+
+      existing.retired = true;
+      return { code };
+    },
 
     'ordningsbot.list': (input) => {
       const filter = (input ?? {}) as { status?: string };
@@ -6049,11 +6105,11 @@ export const fixtures: FixtureSet = {
       const body = (input ?? {}) as { tariffId?: number; personId?: number; vehicleId?: number };
 
       if (!body.tariffId) return refuse('invalid', { tariffId: 'required' });
-      if (!tariffs.some((entry) => entry.id === body.tariffId)) {
+      if (!liveTariffs().some((entry) => entry.id === body.tariffId)) {
         return refuse('not_found', { tariffId: 'unknown' });
       }
       if (!body.personId && !body.vehicleId) {
-        return refuse('invalid', { personId: 'needs_subject' });
+        return refuse('invalid', { personId: 'required' });
       }
 
       const id = citations.length + 1;
@@ -6070,7 +6126,8 @@ export const fixtures: FixtureSet = {
         version: 1,
       });
 
-      return { id, number };
+      const points = tariffs.find((entry) => entry.id === body.tariffId)?.licencePoints ?? 0;
+      return { id, number, licence: body.personId && points > 0 ? fixtureLicence(body.personId) : null };
     },
 
     'ordningsbot.void': (input) => {
@@ -7964,7 +8021,7 @@ export const fixtures: FixtureSet = {
         notes?: string;
       };
 
-      if (!body.personId) return refuse('invalid', { personId: 'needs_subject' });
+      if (!body.personId) return refuse('invalid', { personId: 'required' });
 
       const id = nextIntelVehicleId++;
 

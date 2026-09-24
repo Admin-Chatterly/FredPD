@@ -28,3 +28,4 @@ When a decision changes `docs/FredPD.md`, the ADR and the spec edit go in the
 | [015](015-citations-send-real-bills.md) | A citation sends a real bill through esx_billing, and learns it was paid | Accepted |
 | [016](016-impound-reaches-the-street.md) | An impound takes the car off the street and out of the garage (amends ADR-008) | Accepted |
 | [017](017-a-verdict-is-served.md) | A verdict is served in the game: the tilltalade is named and handed to the jail | Accepted |
+| [018](018-licence-points-and-an-editable-tariff.md) | Licence points on the tariff, and a tariff the agency's command edits | Accepted |

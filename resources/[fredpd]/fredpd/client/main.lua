@@ -260,6 +260,8 @@ local NUI_ROUTES <const> = {
 
     -- Ordningsbot (spec 7.11, M6).
     'ordningsbot.tariff.list',
+    'ordningsbot.tariff.set',
+    'ordningsbot.tariff.retire',
     'ordningsbot.list',
     'ordningsbot.get',
     'ordningsbot.issue',

@@ -408,6 +408,38 @@ FredPD.Config.server = {
     --- somebody -- see migration 0024's header.
     ordningsbot = {
         paymentWindowDays = 30,
+
+        --- Licence points (ADR-018). Each tariff line says how many points a
+        --- citation under it adds to the named person's driving licence;
+        --- points count while the citation is issued or paid and younger
+        --- than `windowDays`. At `threshold` the licence reads as revoked
+        --- (sv: återkallat) wherever an officer looks the person up. Nothing
+        --- is written to another resource: this is the record, not a
+        --- licence system.
+        licence = {
+            enabled = true,
+            threshold = 12,
+            windowDays = 365,
+        },
+
+        --- The catalogue written for an agency whose tariff is empty, at
+        --- start. Amounts in whole currency units. An agency's command edits
+        --- it in the MDT afterwards (`ordningsbot.tariff.edit`); this list is
+        --- never re-applied over an edited tariff.
+        defaultTariff = {
+            { code = 'speeding_10', labelKey = 'ordningsbot.tariff.speeding_10', amount = 2000, points = 1 },
+            { code = 'speeding_20', labelKey = 'ordningsbot.tariff.speeding_20', amount = 2800, points = 2 },
+            { code = 'speeding_30', labelKey = 'ordningsbot.tariff.speeding_30', amount = 3600, points = 4 },
+            { code = 'red_light', labelKey = 'ordningsbot.tariff.red_light', amount = 3000, points = 3 },
+            { code = 'failure_to_yield', labelKey = 'ordningsbot.tariff.failure_to_yield', amount = 2000, points = 2 },
+            { code = 'unsafe_overtaking', labelKey = 'ordningsbot.tariff.unsafe_overtaking', amount = 3000, points = 3 },
+            { code = 'phone_driving', labelKey = 'ordningsbot.tariff.phone_driving', amount = 1500, points = 2 },
+            { code = 'no_seatbelt', labelKey = 'ordningsbot.tariff.no_seatbelt', amount = 1500, points = 1 },
+            { code = 'vehicle_defect', labelKey = 'ordningsbot.tariff.vehicle_defect', amount = 1000, points = 0 },
+            { code = 'no_licence_carried', labelKey = 'ordningsbot.tariff.no_licence_carried', amount = 400, points = 0 },
+            { code = 'parking', labelKey = 'ordningsbot.tariff.parking', amount = 800, points = 0 },
+            { code = 'noise', labelKey = 'ordningsbot.tariff.noise', amount = 1500, points = 0 },
+        },
     },
 
     --- Impound in the world (spec 7.15, ADR-016). "Impound" on a car through

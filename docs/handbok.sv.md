@@ -262,6 +262,26 @@ placering tar du bort en dörr — inte en behörighet.
 
 Samtliga ändringar förs in i loggboken med vem som gjorde vad.
 
+### Ordningsbotstaxan och prickar
+
+**Register → Ordningsböter → Redigera taxan** (kräver `ordningsbot.tariff.edit`,
+som ledningen har).
+
+En ny myndighet får en färdig taxa första gången servern startar: hastighet,
+rött ljus, väjningsplikt, mobiltelefon, bälte, parkering med flera. Den kan
+ändras fritt därefter:
+
+- **Ändra** en rad för nytt belopp eller nya prickar. Det blir en ny version.
+  Redan utfärdade böter behåller det de skrevs för.
+- **Ny rad** med egen kod och egen benämning.
+- **Avveckla** en rad som inte längre ska kunna utfärdas.
+
+Varje rad kan ge **prickar** på körkortet. Prickarna räknas från böter som är
+utfärdade eller betalda under det senaste året. Når någon gränsen (12 som
+standard) visas körkortet som **återkallat** på personen och vid ID-kontrollen.
+En makulerad eller bestriden bot slutar räknas direkt. Prickar är en
+spelanpassning, inte svensk lag.
+
 ---
 
 ## 7. Sammanfattning

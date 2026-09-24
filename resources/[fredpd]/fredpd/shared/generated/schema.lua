@@ -1676,6 +1676,17 @@ FredPD.Schema = {
 
     },
 
+    OrdningsbotTariffSet = {
+        code = { type = 'string', required = true, min = 1, max = 32 },
+        label = { type = 'string', required = false, min = 1, max = 120 },
+        amount = { type = 'integer', required = true, min = 0, max = 1000000 },
+        licencePoints = { type = 'integer', required = false, min = 0, max = 20 },
+    },
+
+    OrdningsbotTariffRetire = {
+        code = { type = 'string', required = true, min = 1, max = 32 },
+    },
+
     OrdningsbotList = {
         status = { type = 'enum', required = false, values = { 'issued', 'paid', 'contested', 'void' } },
         limit = { type = 'integer', required = false, min = 1, max = 200 },

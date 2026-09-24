@@ -98,3 +98,62 @@ test('renders the tab in Swedish', async ({ page }) => {
 
   await expect(page.getByRole('button', { name: 'LSPD-T26-000301' })).toBeVisible();
 });
+
+test('says what a fine did to the driving licence', async ({ page }) => {
+  await openOrdningsbot(page);
+
+  const form = page.locator('form').filter({ hasText: 'Fine' });
+  // Running a red light carries 3 points; John Doe already has 8 (ADR-018).
+  await form.getByLabel('Fine').selectOption({ label: 'Running a red light — 3000, 3 p' });
+  await form.getByLabel('Person id').fill('doe');
+  await page.getByRole('option', { name: /Doe, John/ }).click();
+  await form.getByRole('button', { name: 'Issue citation' }).click();
+
+  await expect(page.getByRole('status')).toContainText('Driving licence: 11 of 12 points. Close to revocation.');
+
+  await form.getByLabel('Fine').selectOption({ label: 'Running a red light — 3000, 3 p' });
+  await form.getByLabel('Person id').fill('doe');
+  await page.getByRole('option', { name: /Doe, John/ }).click();
+  await form.getByRole('button', { name: 'Issue citation' }).click();
+
+  await expect(page.getByRole('status')).toContainText('Driving licence revoked: 14 of 12 points.');
+});
+
+test('command edits the tariff: a new line, new points, a line retired', async ({ page }) => {
+  await openOrdningsbot(page);
+  await page.getByRole('button', { name: 'Edit the tariff' }).click();
+
+  const editor = page.getByRole('region', { name: 'Tariff' });
+
+  // A new line in the agency's own words.
+  await editor.getByLabel(/^Code/).fill('littering');
+  await editor.getByLabel(/^Name/).fill('Littering in a public place');
+  await editor.getByLabel(/^Amount/).fill('500');
+  await editor.getByRole('button', { name: 'Save line' }).click();
+  await expect(editor.getByRole('status')).toHaveText('littering saved.');
+  await expect(editor.getByRole('row').filter({ hasText: 'Littering in a public place' })).toBeVisible();
+
+  // New points on an existing line keep its name.
+  await editor.getByRole('button', { name: 'Edit Running a red light' }).click();
+  await expect(editor.getByLabel(/^Code/)).toHaveValue('red_light');
+  await editor.getByLabel('Licence points').fill('4');
+  await editor.getByRole('button', { name: 'Save line' }).click();
+  await expect(editor.getByRole('row').filter({ hasText: 'Running a red light' }).getByRole('cell').nth(3)).toHaveText('4');
+
+  // Retired after a confirmation, and gone from the fine list.
+  await editor.getByRole('button', { name: 'Retire Disturbing the peace' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Retire' }).click();
+  await expect(editor.getByRole('status')).toHaveText('noise retired.');
+  await expect(page.locator('form').filter({ hasText: 'Fine' }).getByRole('option', { name: /Disturbing the peace/ })).toHaveCount(0);
+});
+
+test('reads the tariff editor in Swedish', async ({ page }) => {
+  await page.goto('/?locale=sv');
+  await page.locator('nav').first().getByRole('button', { name: 'Register' }).click();
+  await page.getByRole('button', { name: 'Ordningsböter', exact: true }).click();
+  await page.getByRole('button', { name: 'Redigera taxan' }).click();
+
+  const editor = page.getByRole('region', { name: 'Taxa' });
+  await expect(editor.getByRole('columnheader', { name: 'Prickar' })).toBeVisible();
+  await expect(editor.getByRole('row').filter({ hasText: 'Körning mot rött ljus' })).toBeVisible();
+});

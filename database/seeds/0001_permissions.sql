@@ -889,3 +889,14 @@ INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
     ('patrol', 'rms.fi.view'),
     ('patrol', 'rms.stops.create'),
     ('patrol', 'rms.stops.view');
+
+-- -----------------------------------------------------------------------------
+-- The ordningsbot tariff editor (spec 7.11, 0036)
+--
+-- What a fine costs and what it does to a licence is the agency's policy,
+-- set by its command -- the same level that already owns the offence
+-- catalogue beside it.
+-- -----------------------------------------------------------------------------
+
+INSERT IGNORE INTO `fpd_group_permissions` (`group_key`, `permission`) VALUES
+    ('command', 'ordningsbot.tariff.edit');

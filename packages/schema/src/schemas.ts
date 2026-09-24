@@ -2855,6 +2855,22 @@ export const schemas = {
 
   OrdningsbotTariffList: {},
 
+  /**
+   * A new version of a tariff line (0036). `code` is checked for shape by
+   * `Ordningsbot.isTariffCode`; `label` is required for a new code and
+   * optional for an existing one, which keeps its name.
+   */
+  OrdningsbotTariffSet: {
+    code: { type: 'string', required: true, min: 1, max: 32 },
+    label: { type: 'string', required: false, min: 1, max: 120 },
+    amount: { type: 'integer', required: true, min: 0, max: 1000000 },
+    licencePoints: { type: 'integer', required: false, min: 0, max: 20 },
+  },
+
+  OrdningsbotTariffRetire: {
+    code: { type: 'string', required: true, min: 1, max: 32 },
+  },
+
   OrdningsbotList: {
     status: { type: 'enum', required: false, values: ORDNINGSBOT_STATUSES },
     limit: { type: 'integer', required: false, min: 1, max: 200 },

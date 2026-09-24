@@ -53,6 +53,13 @@ import { fileURLToPath } from 'node:url';
  *      five-deep chain of exactly that shape. See the scan's own scope note
  *      below: it is a floor, deliberately narrow, and reports nothing it cannot
  *      prove from one manifest and the files it names.
+ *   9. a key granted in the seed, or a route's own `perm`, that is missing from
+ *      `PERMISSION_CATALOGUE` in `server/modules/admin/routes.lua`. The group
+ *      editor offers the catalogue plus whatever some group already holds, so
+ *      a key only the seed knows leaves the editor the day the last group
+ *      loses it, and nothing in game can grant it again. The catalogue's own
+ *      comment said no tool compared the two; this one does. Patterns
+ *      (`clearance.*`, `compartment.*`) and `*` are not keys and are skipped.
  *
  * Both route tiers count as declaring a name: `route.define` and, since
  * ADR-013, `route.public`. A public route has no permission by construction, so
@@ -904,6 +911,40 @@ for (const file of await walk(RESOURCES)) {
     }
   }
 }
+
+// 9. The seed and the routes against the editor's catalogue.
+{
+  const adminPath = join(core, 'server', 'modules', 'admin', 'routes.lua');
+  const adminSource = await readFile(adminPath, 'utf8');
+  const start = adminSource.indexOf('local PERMISSION_CATALOGUE');
+  const end = adminSource.indexOf('\n}\n', start);
+
+  if (start < 0 || end < 0) {
+    fail(`${relative(REPO, adminPath)}: PERMISSION_CATALOGUE not found — the catalogue check cannot run`);
+  } else {
+    const catalogue = new Set(
+      [...adminSource.slice(start, end).matchAll(/'([a-z0-9_.]+)'/g)].map((match) => match[1] ?? ''),
+    );
+    const isPattern = (key: string): boolean =>
+      key === '*' || key.startsWith('clearance.') || key.startsWith('compartment.');
+
+    const routePerms = new Set<string>();
+    for (const file of (await walk(join(core, 'server'))).filter((path) => path.endsWith('.lua'))) {
+      const source = await readFile(file, 'utf8');
+      for (const match of source.matchAll(/\bperm\s*=\s*'([a-z0-9_.]+)'/g)) routePerms.add(match[1] ?? '');
+    }
+
+    for (const key of [...new Set([...granted, ...routePerms])].sort()) {
+      if (key === '' || isPattern(key) || catalogue.has(key)) continue;
+      fail(
+        `${relative(REPO, adminPath)}: '${key}' is granted in the seed or required by a route but is not ` +
+          `in PERMISSION_CATALOGUE — once no group holds it, the editor cannot grant it again`,
+      );
+    }
+  }
+}
+
+console.log('wiring: every seeded or required permission is in the editor catalogue');
 
 if (failures > 0) {
   console.error(`\nwiring check failed: ${failures} problem${failures === 1 ? '' : 's'}`);

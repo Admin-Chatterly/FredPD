@@ -175,6 +175,8 @@ route.define({
             firstName = person.firstName,
             lastName = person.lastName,
             registered = registered,
+            licence = FredPD.Modules.ordningsbotLicence and FredPD.Modules.ordningsbotLicence.standingFor(session, person.id)
+                or nil,
         }
     end,
 })

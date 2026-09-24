@@ -126,6 +126,100 @@ function Ordningsbot.validateVoid(input)
     return nil
 end
 
+-- -----------------------------------------------------------------------------
+-- The tariff editor (0036)
+-- -----------------------------------------------------------------------------
+
+--- The key a line an agency wrote itself carries in `label_key`: never
+--- shown when the line has a label of its own.
+Ordningsbot.CUSTOM_LABEL_KEY = 'ordningsbot.tariff.custom'
+
+Ordningsbot.MAX_POINTS = 20
+
+--- A tariff code: lower-case letters, digits and underscores. It is part of
+--- a unique key and appears in audit rows, so it is kept to a shape that
+--- reads the same everywhere.
+function Ordningsbot.isTariffCode(value)
+    return type(value) == 'string' and #value >= 1 and #value <= 32 and value:match('^[a-z0-9_]+$') ~= nil
+end
+
+--- Checks a tariff line a route is about to write. `existing` is the
+--- current version of the code, when there is one: a new code needs a label
+--- of its own, an existing one keeps the name it has unless given another.
+---
+--- @return string|nil code
+--- @return table|nil fields
+function Ordningsbot.validateTariff(input, existing)
+    if not Ordningsbot.isTariffCode(input.code) then return 'invalid', { code = 'format' } end
+
+    local label = type(input.label) == 'string' and input.label:match('^%s*(.-)%s*$') or nil
+    if label == '' then label = nil end
+
+    if not label and not existing then return 'invalid', { label = 'required' } end
+
+    local points = input.licencePoints or 0
+    if type(points) ~= 'number' or points < 0 or points > Ordningsbot.MAX_POINTS or points ~= math.floor(points) then
+        return 'invalid', { licencePoints = 'too_large' }
+    end
+
+    return nil
+end
+
+--- What a new version is named by: the label given, or the existing line's
+--- own name carried forward unchanged.
+---
+--- @return string labelKey, string|nil label
+function Ordningsbot.tariffName(input, existing)
+    local label = type(input.label) == 'string' and input.label:match('^%s*(.-)%s*$') or nil
+    if label and label ~= '' then return Ordningsbot.CUSTOM_LABEL_KEY, label end
+
+    return existing.labelKey, existing.label
+end
+
+--- The shipped catalogue as rows to write, skipping any entry that is not a
+--- well-formed line -- a typo in config must not stop the rest loading.
+function Ordningsbot.defaultTariffRows(list)
+    local rows = {}
+
+    for _, entry in ipairs(type(list) == 'table' and list or {}) do
+        local points = tonumber(entry.points) or 0
+        local amount = tonumber(entry.amount)
+
+        if Ordningsbot.isTariffCode(entry.code) and type(entry.labelKey) == 'string' and entry.labelKey ~= ''
+            and amount and amount >= 0 and amount == math.floor(amount)
+            and points >= 0 and points <= Ordningsbot.MAX_POINTS and points == math.floor(points)
+        then
+            rows[#rows + 1] = { code = entry.code, labelKey = entry.labelKey, amount = amount, points = points }
+        end
+    end
+
+    return rows
+end
+
+-- -----------------------------------------------------------------------------
+-- Licence points (0036, ADR-018)
+-- -----------------------------------------------------------------------------
+
+--- A licence's standing from the points counting against it: `valid`,
+--- `warning` from three quarters of the threshold, `revoked` at it.
+---
+--- @param points number
+--- @param config table { threshold }
+--- @return table { points, threshold, standing }
+function Ordningsbot.licenceStanding(points, config)
+    local threshold = math.max(1, tonumber(config and config.threshold) or 12)
+    points = math.max(0, tonumber(points) or 0)
+
+    local standing = 'valid'
+    if points >= threshold then
+        standing = 'revoked'
+    elseif points >= math.ceil(threshold * 0.75) then
+        standing = 'warning'
+    end
+
+    return { points = points, threshold = threshold, standing = standing }
+end
+
 FredPD.Modules.ordningsbot = Ordningsbot
 
 return Ordningsbot

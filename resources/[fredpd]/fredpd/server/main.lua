@@ -154,6 +154,10 @@ local REQUIRED_COLUMNS <const> = {
     -- 0004: optimistic locking for the permission group editor.
     { table = 'fpd_permission_groups', column = 'version' },
 
+    -- 0036: the tariff's own label and licence points.
+    { table = 'fpd_ordningsbot_tariff', column = 'label' },
+    { table = 'fpd_ordningsbot_tariff', column = 'licence_points' },
+
     -- 0024: the payment due date a citation's overdue state is read from.
     { table = 'fpd_ordningsbot', column = 'due_at' },
 
@@ -267,6 +271,10 @@ AddEventHandler('onResourceStart', function(resource)
             FredPD.Modules.cad.boloMark(flags[index].plate, flags[index])
         end
     end
+
+    -- An agency with no fines to pick from cannot issue one (7.11): the
+    -- shipped catalogue is written for any agency whose tariff is empty.
+    FredPD.Modules.ordningsbotTariff.ensureDefaults()
 
     print(('[fredpd] %s started (env=%s, locale=%s, routes=%d)'):format(
         FredPD.version, FredPD.env(), FredPD.lang, #FredPD.Core.route.names()

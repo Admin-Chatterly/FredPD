@@ -8,6 +8,8 @@
   import PersonPicker from '../shared/PersonPicker.svelte';
   import VehiclePicker from '../shared/VehiclePicker.svelte';
   import { onIntent, peekIntent, takeIntent } from '../../lib/intent';
+  import TariffEditor from './TariffEditor.svelte';
+  import { tariffName, type LicenceStanding, type Tariff } from './tariff';
 
   /**
    * Ordningsbot: on-the-spot fines against a versioned tariff (spec 7.11).
@@ -17,14 +19,6 @@
    * use) -- never re-looked-up against whatever the current tariff says, so a
    * citation keeps the amount it was actually issued under.
    */
-
-  interface Tariff {
-    id: number;
-    code: string;
-    labelKey: string;
-    amount: number;
-    version: number;
-  }
 
   interface Citation {
     id: number;
@@ -57,6 +51,12 @@
   };
 
   let tariffs = $state<Tariff[]>([]);
+  /** From the server: whether this session may edit the tariff (0036). */
+  let mayEdit = $state(false);
+  let licenceOn = $state(false);
+  let editingTariff = $state(false);
+  /** What the last fine did to the named person's licence, when it added points. */
+  let licenceNote = $state<LicenceStanding | null>(null);
   let rows = $state<Maybe<Citation>[]>([]);
   let detail = $state<Citation | null>(null);
   let failure = $state<Failure | null>(null);
@@ -96,8 +96,15 @@
   const messages = $derived(fieldList(failure, FIELD_LABELS));
 
   async function loadTariffs(): Promise<void> {
-    const response = await nui.call<{ tariffs: Tariff[] }>('ordningsbot.tariff.list', {});
-    if (response.ok) tariffs = response.data.tariffs ?? [];
+    const response = await nui.call<{ tariffs: Tariff[]; mayEdit?: boolean; licence?: boolean }>(
+      'ordningsbot.tariff.list',
+      {},
+    );
+    if (response.ok) {
+      tariffs = response.data.tariffs ?? [];
+      mayEdit = response.data.mayEdit === true;
+      licenceOn = response.data.licence === true;
+    }
   }
 
   async function load(): Promise<void> {
@@ -144,7 +151,7 @@
     const personId = issueForm.personId ? Number.parseInt(issueForm.personId, 10) : undefined;
     const vehicleId = issueForm.vehicleId ? Number.parseInt(issueForm.vehicleId, 10) : undefined;
 
-    const response = await nui.call<{ id: number; number: string }>('ordningsbot.issue', {
+    const response = await nui.call<{ id: number; number: string; licence?: LicenceStanding | null }>('ordningsbot.issue', {
       tariffId,
       personId,
       vehicleId,
@@ -153,6 +160,7 @@
     if (response.ok) {
       failure = null;
       status = t('ordningsbot.issued', { number: response.data.number });
+      licenceNote = response.data.licence ?? null;
       issueForm = { tariffId: '', personId: '', vehicleId: '' };
       await Promise.all([load(), open(response.data.id)]);
     } else {
@@ -226,6 +234,22 @@
 </script>
 
 <div class="flex flex-col gap-3">
+  {#if mayEdit}
+    <div>
+      <button
+        type="button"
+        class="border border-[var(--color-border)] px-3 py-1 text-xs focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+        aria-expanded={editingTariff}
+        onclick={() => (editingTariff = !editingTariff)}
+      >
+        {editingTariff ? t('ordningsbot.tariffEditor.close') : t('ordningsbot.tariffEditor.open')}
+      </button>
+    </div>
+    {#if editingTariff}
+      <TariffEditor {tariffs} licence={licenceOn} onChanged={loadTariffs} />
+    {/if}
+  {/if}
+
   <form
     class="flex flex-wrap items-end gap-2"
     onsubmit={(event) => {
@@ -266,7 +290,15 @@
       <select bind:value={issueForm.tariffId} required class="border border-[var(--color-border)] px-2 py-1">
         <option value="">{t('ordningsbot.field.tariff')}</option>
         {#each tariffs as tariff (tariff.id)}
-          <option value={String(tariff.id)}>{t(tariff.labelKey)} — {tariff.amount}</option>
+          <option value={String(tariff.id)}>
+            {licenceOn && (tariff.licencePoints ?? 0) > 0
+              ? t('ordningsbot.tariffOption.withPoints', {
+                  name: tariffName(tariff),
+                  amount: tariff.amount,
+                  points: tariff.licencePoints ?? 0,
+                })
+              : t('ordningsbot.tariffOption.plain', { name: tariffName(tariff), amount: tariff.amount })}
+          </option>
         {/each}
       </select>
     </label>
@@ -292,7 +324,14 @@
   </form>
 
   {#if status}
-    <p class="text-xs text-[var(--color-ink-muted)]" role="status">{status}</p>
+    <div role="status" class="text-xs">
+      <p class="text-[var(--color-ink-muted)]">{status}</p>
+      {#if licenceNote}
+        <p class:font-semibold={licenceNote.standing !== 'valid'} class:text-[var(--color-alert)]={licenceNote.standing === 'revoked'}>
+          {t(`ordningsbot.licence.${licenceNote.standing}`, { points: licenceNote.points, threshold: licenceNote.threshold })}
+        </p>
+      {/if}
+    </div>
   {/if}
 
   <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -359,7 +398,12 @@
         </header>
 
         {#if detail.tariff}
-          <p class="mb-3 text-xs">{t(detail.tariff.labelKey)} — {detail.tariff.amount}</p>
+          <p class="mb-3 text-xs">
+            {t('ordningsbot.tariffOption.plain', { name: tariffName(detail.tariff), amount: detail.tariff.amount })}
+            {#if licenceOn && (detail.tariff.licencePoints ?? 0) > 0}
+              · {t('ordningsbot.points', { points: detail.tariff.licencePoints ?? 0 })}
+            {/if}
+          </p>
         {/if}
 
         {#if detail.status === 'issued'}

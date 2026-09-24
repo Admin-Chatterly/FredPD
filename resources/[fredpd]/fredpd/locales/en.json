@@ -2668,7 +2668,18 @@
     },
     "tariff": {
       "parking": "Illegal parking",
-      "noise": "Disturbing the peace"
+      "noise": "Disturbing the peace",
+      "speeding_10": "Speeding, up to 10 km/h over",
+      "speeding_20": "Speeding, 11–20 km/h over",
+      "speeding_30": "Speeding, 21–30 km/h over",
+      "red_light": "Running a red light",
+      "failure_to_yield": "Failure to yield",
+      "unsafe_overtaking": "Unsafe overtaking",
+      "phone_driving": "Handheld phone while driving",
+      "no_seatbelt": "No seatbelt",
+      "vehicle_defect": "Vehicle defect",
+      "no_licence_carried": "Driving licence not carried",
+      "custom": "Other fine"
     },
     "bill": {
       "label": "Fixed penalty {number}"
@@ -2676,7 +2687,40 @@
     "notify": {
       "paid": "Citation {number} has been paid."
     },
-    "billSent": "Bill sent {at}. It is marked paid by itself when the bill is paid."
+    "billSent": "Bill sent {at}. It is marked paid by itself when the bill is paid.",
+    "tariffOption": {
+      "plain": "{name} — {amount}",
+      "withPoints": "{name} — {amount}, {points} p"
+    },
+    "points": "{points} points on the licence",
+    "licence": {
+      "valid": "Driving licence: {points} of {threshold} points.",
+      "warning": "Driving licence: {points} of {threshold} points. Close to revocation.",
+      "revoked": "Driving licence revoked: {points} of {threshold} points."
+    },
+    "tariffEditor": {
+      "open": "Edit the tariff",
+      "close": "Close the tariff",
+      "title": "Tariff",
+      "hint": "A change is a new version of the line. Citations already issued keep the amount and points they were written under.",
+      "code": "Code",
+      "label": "Name",
+      "amount": "Amount",
+      "points": "Licence points",
+      "actions": "Actions",
+      "edit": "Edit",
+      "editLine": "Edit {name}",
+      "retire": "Retire",
+      "retireLine": "Retire {name}",
+      "confirmRetire": "Retire {name}? It can no longer be issued. Citations already issued under it are unchanged.",
+      "new": "New line",
+      "editing": "Editing {code}",
+      "keepName": "Leave empty to keep the name",
+      "save": "Save line",
+      "cancelEdit": "Cancel",
+      "saved": "{code} saved.",
+      "retired": "{code} retired."
+    }
   },
   "impound": {
     "filter": {
@@ -2748,7 +2792,8 @@
       "title": "Choose the fine",
       "amount": "{amount} kr",
       "confirmTitle": "Issue this fine?",
-      "confirm": "{tariff} to {who}."
+      "confirm": "{tariff} to {who}.",
+      "amountPoints": "{amount} kr, {points} points on the licence"
     },
     "arrest": {
       "title": "Ground for the arrest",
@@ -2779,6 +2824,11 @@
       "search": "Was anything searched?",
       "result": "How did the stop end?",
       "recorded": "Stop recorded."
+    },
+    "licence": {
+      "valid": "Driving licence: {points} of {threshold} points.",
+      "warning": "Driving licence: {points} of {threshold} points. Close to revocation.",
+      "revoked": "Driving licence REVOKED: {points} of {threshold} points."
     }
   },
   "status": {

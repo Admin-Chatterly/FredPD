@@ -45,14 +45,113 @@ end
 -- The tariff
 -- -----------------------------------------------------------------------------
 
+local function licenceConfig()
+    return (FredPD.Config.server.ordningsbot or {}).licence or {}
+end
+
 route.define({
     name = 'ordningsbot.tariff.list',
     perm = 'ordningsbot.tariff.view',
     schema = 'OrdningsbotTariffList',
     handler = function(session)
-        return { tariffs = repo.tariffList(session.agencyId) }
+        return {
+            tariffs = repo.tariffList(session.agencyId),
+            -- The screen draws the editor from this; the edit routes check
+            -- the permission again for themselves.
+            mayEdit = FredPD.Core.perms.satisfies(session.permissions, 'ordningsbot.tariff.edit'),
+            licence = licenceConfig().enabled ~= false,
+        }
     end,
 })
+
+route.define({
+    name = 'ordningsbot.tariff.set',
+    perm = 'ordningsbot.tariff.edit',
+    schema = 'OrdningsbotTariffSet',
+    writes = true,
+    audit = 'ordningsbot.tariff.set',
+    subjectType = 'ordningsbot_tariff',
+    auditDetail = function(input)
+        return { code = input.code, amount = input.amount, licencePoints = input.licencePoints or 0 }
+    end,
+    handler = function(session, input)
+        local existing = repo.currentTariff(session.agencyId, input.code)
+
+        local err, fields = service.validateTariff(input, existing)
+        if err then return route.refuse(err, fields) end
+
+        local labelKey, label = service.tariffName(input, existing)
+
+        local committed = repo.setTariff(session.agencyId, {
+            code = input.code,
+            labelKey = labelKey,
+            label = label,
+            amount = input.amount,
+            points = input.licencePoints or 0,
+        }, session.discordId)
+        if not committed then return route.refuse(FredPD.ErrorCode.CONFLICT) end
+
+        local line = repo.currentTariff(session.agencyId, input.code)
+        return { id = line and line.id, tariff = line }
+    end,
+})
+
+route.define({
+    name = 'ordningsbot.tariff.retire',
+    perm = 'ordningsbot.tariff.edit',
+    schema = 'OrdningsbotTariffRetire',
+    writes = true,
+    audit = 'ordningsbot.tariff.retired',
+    subjectType = 'ordningsbot_tariff',
+    auditDetail = function(input) return { code = input.code } end,
+    handler = function(session, input)
+        if repo.retireTariff(session.agencyId, input.code) == 0 then
+            return route.refuse(FredPD.ErrorCode.NOT_FOUND, { code = 'unknown' })
+        end
+
+        return { code = input.code }
+    end,
+})
+
+-- -----------------------------------------------------------------------------
+-- The shipped catalogue and licence points, for the rest of the server
+-- -----------------------------------------------------------------------------
+
+local Tariff = {}
+
+--- Writes the configured catalogue for every agency that has never had a
+--- tariff (7.11). Called once at start, after the agencies load.
+function Tariff.ensureDefaults()
+    local rows = service.defaultTariffRows((FredPD.Config.server.ordningsbot or {}).defaultTariff)
+    if #rows == 0 then return end
+
+    for agencyId in pairs(FredPD.Core.agencies.all()) do
+        if not repo.hasAnyTariff(agencyId) then
+            for _, line in ipairs(rows) do repo.setTariff(agencyId, line, nil) end
+            print(('[fredpd] ordningsbot: wrote the default tariff (%d lines) for %s'):format(#rows, agencyId))
+        end
+    end
+end
+
+FredPD.Modules.ordningsbotTariff = Tariff
+
+local Licence = {}
+
+--- The licence standing a reader may see for a person already read through
+--- the access check: nil without `ordningsbot.view`, or with licence points
+--- turned off. The caller has read the person; this adds only the sum.
+---
+--- @return table|nil { points, threshold, standing }
+function Licence.standingFor(session, personId)
+    local config = licenceConfig()
+    if config.enabled == false or not personId then return nil end
+    if not FredPD.Core.perms.satisfies(session.permissions, 'ordningsbot.view') then return nil end
+
+    local points = repo.licencePoints(session.agencyId, personId, tonumber(config.windowDays) or 365)
+    return service.licenceStanding(points, config)
+end
+
+FredPD.Modules.ordningsbotLicence = Licence
 
 -- -----------------------------------------------------------------------------
 -- Reads
@@ -134,13 +233,34 @@ route.define({
             return route.refuse(FredPD.ErrorCode.FORBIDDEN, { classification = 'over_clearance' })
         end
 
+        -- Whoever and whatever the fine names must be readable by the officer
+        -- writing it, answered as a record that does not exist otherwise: a
+        -- citation must not be a way to reach a hidden record (invariant 4),
+        -- and its answer carries the person's licence standing.
+        if input.personId and not FredPD.Repo.persons.readPerson(session, input.personId) then
+            return route.refuse(FredPD.ErrorCode.NOT_FOUND, { personId = 'unknown' })
+        end
+
+        if input.vehicleId then
+            local vehicle = FredPD.Repo.registry.findVehicle(session.agencyId, { id = input.vehicleId })
+            if not vehicle or not access.read(session, 'vehicle', vehicle) then
+                return route.refuse(FredPD.ErrorCode.NOT_FOUND, { vehicleId = 'unknown' })
+            end
+        end
+
         local row = repo.issue(input, session)
         if not row then return route.refuse(FredPD.ErrorCode.INTERNAL) end
 
         -- The fined player is asked for the money; paying it pays this.
         bills().billCitation(row.id, session)
 
-        return { id = row.id, number = row.number, citation = row }
+        -- What the fine did to the licence, for the officer who wrote it: the
+        -- person was already read to be cited, so this tells them nothing new
+        -- about who it is.
+        local licence = input.personId and tariff.licencePoints > 0
+            and Licence.standingFor(session, input.personId) or nil
+
+        return { id = row.id, number = row.number, citation = row, licence = licence }
     end,
 })
 

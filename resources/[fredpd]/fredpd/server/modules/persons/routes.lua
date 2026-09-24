@@ -348,6 +348,9 @@ route.define({
             -- read never carries a restricted vehicle or firearm out with them.
             vehicles = repo.linkedVehicles(session, person.id),
             firearms = repo.linkedFirearms(session, person.id),
+            -- Licence points from citations (0036), for a reader of citations.
+            licence = FredPD.Modules.ordningsbotLicence and FredPD.Modules.ordningsbotLicence.standingFor(session, person.id)
+                or nil,
         }
     end,
 })

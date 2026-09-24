@@ -352,10 +352,17 @@ local PERMISSION_CATALOGUE <const> = {
     'rms.impound.create', 'rms.impound.release', 'rms.impound.hold.release',
     'rms.warrant.serve',
 
+    -- Ordningsbot (spec 7.11) and impound (7.15), as the modules actually
+    -- check them.
+    'page.ordningsbot', 'ordningsbot.view', 'ordningsbot.issue', 'ordningsbot.contest',
+    'ordningsbot.pay', 'ordningsbot.void', 'ordningsbot.tariff.view', 'ordningsbot.tariff.edit',
+    'page.impound', 'impound.view', 'impound.create', 'impound.release', 'impound.authorize',
+
     -- Investigations
     'inv.case.create', 'inv.case.view', 'inv.case.edit', 'inv.case.assign', 'inv.case.close',
 
     -- Booking
+    'page.booking', 'booking.view', 'booking.intake',
     'booking.create', 'booking.biometrics.capture', 'booking.release',
 
     -- Court
@@ -383,7 +390,7 @@ local PERMISSION_CATALOGUE <const> = {
 
     -- Forensics
     'forensics.scene.create', 'forensics.scene.release',
-    'forensics.evidence.collect', 'forensics.tools.use',
+    'forensics.evidence.collect', 'forensics.tools.use', 'forensics.identity.scan',
 
     -- Property room
     'evidence.item.view', 'evidence.item.intake', 'evidence.item.transfer',
@@ -410,6 +417,10 @@ local PERMISSION_CATALOGUE <const> = {
     -- Personnel
     'personnel.view', 'personnel.hire', 'personnel.promote', 'personnel.discipline',
     'personnel.equipment.assign', 'ia.case.view', 'ia.case.manage', 'uof.review',
+    -- The keys the personnel module's routes actually check (7.22).
+    'personnel.roster.view', 'personnel.roster.edit', 'personnel.shift.own',
+    'personnel.certification.manage', 'personnel.discipline.view', 'personnel.discipline.manage',
+    'personnel.equipment.manage',
     'policy.manage', 'policy.ack',
 
     -- Communications

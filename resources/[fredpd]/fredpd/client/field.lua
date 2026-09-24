@@ -200,12 +200,18 @@ local function cite(subject)
 
     local options = {}
     for _, tariff in ipairs(list.tariffs or {}) do
+        -- A line the agency wrote itself carries its own label (0036).
+        local name = tariff.label or FredPD.t(tariff.labelKey)
+        local points = tonumber(tariff.licencePoints) or 0
+
         options[#options + 1] = {
-            title = FredPD.t(tariff.labelKey),
-            description = FredPD.t('field.cite.amount', { amount = tariff.amount }),
+            title = name,
+            description = points > 0 and list.licence
+                and FredPD.t('field.cite.amountPoints', { amount = tariff.amount, points = points })
+                or FredPD.t('field.cite.amount', { amount = tariff.amount }),
             onSelect = function()
                 if not confirm(FredPD.t('field.cite.confirmTitle'),
-                    FredPD.t('field.cite.confirm', { tariff = FredPD.t(tariff.labelKey), who = subject.label }))
+                    FredPD.t('field.cite.confirm', { tariff = core.plainText(name), who = subject.label }))
                 then return end
 
                 local issued = call('ordningsbot.issue', {
@@ -214,7 +220,14 @@ local function cite(subject)
                     vehicleId = subject.vehicleId,
                 })
 
-                if issued then core.notify('ordningsbot.issued', { number = issued.number }) end
+                if issued then
+                    core.notify('ordningsbot.issued', { number = issued.number })
+                    if issued.licence then
+                        core.notify('field.licence.' .. issued.licence.standing, {
+                            points = issued.licence.points, threshold = issued.licence.threshold,
+                        })
+                    end
+                end
             end,
         }
     end
@@ -369,6 +382,20 @@ local function checkId(entity)
     local options = {}
     if person.registered then
         options[#options + 1] = { title = FredPD.t('field.person.registered'), icon = 'user-plus', readOnly = true }
+    end
+
+    -- The licence, when it carries points (0036): a revoked one is the thing
+    -- a traffic stop turns on.
+    local licence = person.licence
+    if licence and licence.points > 0 then
+        options[#options + 1] = {
+            title = FredPD.t('field.licence.' .. licence.standing, {
+                points = licence.points, threshold = licence.threshold,
+            }),
+            icon = 'id-card',
+            iconColor = licence.standing == 'revoked' and '#c62828' or nil,
+            readOnly = true,
+        }
     end
 
     hitOptions(row, options)

@@ -232,6 +232,8 @@ export interface PersonDetail {
   biometrics?: PersonBiometric[];
   vehicles?: Maybe<LinkedVehicle>[];
   firearms?: Maybe<LinkedFirearm>[];
+  /** Licence points from citations (ADR-018); absent for a reader of no citations. */
+  licence?: { points: number; threshold: number; standing: 'valid' | 'warning' | 'revoked' } | null;
 }
 
 // --------------------------------------------------------------- vehicles
