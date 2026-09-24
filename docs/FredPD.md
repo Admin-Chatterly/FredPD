@@ -640,6 +640,20 @@ Evidence number: [E26-001234        ] [Look up]
 Custody: 13:02 Collected (Berg) → 13:10 Temporary locker 3 → 13:40 Accepted (Lind)
 ```
 
+**The overview (Översikt)** is where F6 lands. It answers "what do I need to know right now" before the officer picks a module. It has five panels:
+- **My shift:** officer, unit, duty, unit status since, and the current call.
+- **On the air:** active broadcasts.
+- **Open calls:** most urgent first, with how many have no unit.
+- **My reports:** those sent back, then drafts.
+- **My recent queries:** each one runs again with one click.
+
+The rules that keep it useful:
+- Each panel is a route the officer's modules already call (`unit.list`, `call.list`, `broadcast.list`, `anmalan.list`, `query.log`), checked on the server as it is there.
+- A panel whose route refuses the session is not drawn at all, so the overview never names a register the officer may not open.
+- There are at most four one-line rows per panel. Everything else is one click away, in the module that owns it.
+- The overview refreshes each time F6 opens the MDT.
+- It needs no page permission, since it holds nothing of its own. It appears only when the session can open at least one other module, so an empty rail still means that no role is mapped.
+
 ### 6.4 Interaction rules
 
 - **Keyboard first:** command line, F-keys for unit status, `Ctrl+Enter` submits, `Esc` closes dialogs and tabs, `Ctrl+Tab` switches tabs. Every action works without a mouse.

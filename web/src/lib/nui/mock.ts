@@ -12,6 +12,10 @@ import type { MessageHandler, NuiBridge, NuiMessage, RouteResponse } from './typ
  * Query parameters steer a session without code changes:
  *   ?latency=400    delay every call by 400 ms
  *   ?fail=forbidden make every call fail with that code
+ *   ?failRoute=broadcast.list[:code]
+ *                   make one route fail (forbidden unless a code is given);
+ *                   repeat it for more. For screens built from several routes,
+ *                   to see how each behaves when one of them refuses.
  */
 
 const DEFAULT_LATENCY_MS = 120;
@@ -30,6 +34,15 @@ function latency(): number {
 
 function forcedFailure(): string | null {
   return queryParams().get('fail');
+}
+
+/** The code `?failRoute=` names for this route, or null. */
+function forcedRouteFailure(route: string): string | null {
+  for (const entry of queryParams().getAll('failRoute')) {
+    const [name, code] = entry.split(':');
+    if (name === route) return code || 'forbidden';
+  }
+  return null;
 }
 
 function wait(ms: number): Promise<void> {
@@ -109,7 +122,7 @@ export function createMockBridge(): NuiBridge {
         return { ok: true, data: {} as T };
       }
 
-      const forced = forcedFailure();
+      const forced = forcedFailure() ?? forcedRouteFailure(route);
       if (forced !== null) {
         return { ok: false, err: forced as RouteResponse<T> extends { ok: false; err: infer E } ? E : never };
       }

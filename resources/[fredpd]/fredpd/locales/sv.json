@@ -21,7 +21,8 @@
       "comms": "Kommunikation",
       "admin": "Administration",
       "surveillance": "Hemlig avlyssning",
-      "booking": "Häkte"
+      "booking": "Häkte",
+      "overview": "Översikt"
     },
     "status": {
       "unit": "Enhet {callsign}",
@@ -3434,5 +3435,46 @@
     },
     "cctvName": "Övervakningskamera {id}",
     "openFailed": "Visningen kunde inte öppnas."
+  },
+  "overview": {
+    "updated": "Uppdaterad {time}",
+    "refresh": "Uppdatera",
+    "all": "Alla",
+    "openDispatch": "Öppna ledning",
+    "noLocation": "Plats saknas",
+    "since": "sedan {time}",
+    "shift": {
+      "title": "Mitt pass",
+      "officer": "Polis",
+      "unit": "Enhet",
+      "noCallsign": "Ingen anropssignal än",
+      "duty": "Tjänst",
+      "offDutyHint": "Gå i tjänst vid polisjobbets instämplingsplats.",
+      "status": "Status",
+      "call": "Händelse",
+      "noCall": "Inte på någon händelse"
+    },
+    "broadcasts": {
+      "title": "Utlysningar",
+      "none": "Inga utlysningar just nu."
+    },
+    "calls": {
+      "title": "Öppna händelser",
+      "counts": "Öppna {open} · Utan enhet {waiting}",
+      "none": "Inga öppna händelser."
+    },
+    "reports": {
+      "title": "Mina anmälningar",
+      "open": "Öppna anmälningar",
+      "none": "Inget väntar på dig.",
+      "counts": "Återsända {returned} · Utkast {drafts}"
+    },
+    "recent": {
+      "title": "Mina senaste slagningar",
+      "none": "Inga slagningar än.",
+      "again": "Slå {term} igen",
+      "results": "Resultat {count}",
+      "hits": "Registerträffar {count}"
+    }
   }
 }

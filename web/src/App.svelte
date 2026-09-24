@@ -13,6 +13,7 @@
   import Fleet from './modules/admin/Fleet.svelte';
   import Health from './modules/admin/Health.svelte';
   import Records from './modules/records/Records.svelte';
+  import Overview from './modules/overview/Overview.svelte';
   import Dispatch from './modules/cad/Dispatch.svelte';
   import Evidence from './modules/evidence/Evidence.svelte';
   import Lab from './modules/lab/Lab.svelte';
@@ -290,6 +291,7 @@
    * rail entry draws the placeholder.
    */
   const BUILT = new Set([
+    'overview',
     'records',
     'dispatch',
     'evidence',
@@ -476,11 +478,11 @@
          decides the list; the UI just draws it (invariant 4). Sized and
          weighted for a reader who has never used this screen before: a
          visible left bar and tint mark where you are, not font-weight alone. -->
-    <nav class="w-48 shrink-0 border-r border-[var(--color-border)] p-2">
+    <nav class="w-48 shrink-0 overflow-y-auto border-r border-[var(--color-border)] p-2">
       {#each session?.modules ?? [] as module (module)}
         <button
           type="button"
-          class="mb-0.5 block w-full border-l-2 border-transparent px-3 py-2.5 text-left text-sm hover:bg-[var(--color-surface)]"
+          class="mb-0.5 block w-full border-l-2 border-transparent px-3 py-2 text-left text-sm hover:bg-[var(--color-surface)]"
           class:font-semibold={current === module}
           class:border-[var(--color-accent)]={current === module}
           class:bg-[var(--color-surface)]={current === module}
@@ -503,6 +505,13 @@
         <p class="text-sm text-[var(--color-ink-muted)]">{t('app.loading')}</p>
       {:else if error}
         <p class="text-sm">{t(`error.${error}`)}</p>
+      {:else if session && current === 'overview'}
+        <Overview
+          {session}
+          onOpenModule={(module) => {
+            if (session?.modules.includes(module)) current = module;
+          }}
+        />
       {:else if current === 'intel'}
         <Intel />
       {:else if current === 'records'}

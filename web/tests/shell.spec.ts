@@ -14,9 +14,10 @@ test('renders the shell from fixture data', async ({ page }) => {
   await page.goto('/?locale=en');
 
   await expect(page.getByText('Los Santos Police Department')).toBeVisible();
-  await expect(page.getByText('Unit 12-40')).toBeVisible();
-  await expect(page.getByText('Signed in as A. Lindqvist')).toBeVisible();
-  await expect(page.getByText('On duty')).toBeVisible();
+  await expect(page.getByRole('contentinfo').getByText('Unit 12-40')).toBeVisible();
+  await expect(page.getByRole('contentinfo').getByText('Signed in as A. Lindqvist')).toBeVisible();
+  // The status bar's own line: the overview's shift panel says it too.
+  await expect(page.getByRole('contentinfo').getByText('On duty')).toBeVisible();
 });
 
 test('draws only the modules the session is permitted to open', async ({ page }) => {
@@ -54,8 +55,8 @@ test('shows a translated message when a route refuses', async ({ page }) => {
 test('renders in Swedish', async ({ page }) => {
   await page.goto('/?locale=sv');
 
-  await expect(page.getByText('Enhet 12-40')).toBeVisible();
-  await expect(page.getByText('I tjänst')).toBeVisible();
+  await expect(page.getByRole('contentinfo').getByText('Enhet 12-40')).toBeVisible();
+  await expect(page.getByRole('contentinfo').getByText('I tjänst')).toBeVisible();
   await expect(page.locator('nav').first().getByRole('button', { name: 'Register' })).toBeVisible();
 });
 
@@ -66,8 +67,8 @@ test('defaults to the session\'s configured language with no override', async ({
   // matching the fixture and config/shared.lua's own default.
   await page.goto('/');
 
-  await expect(page.getByText('Enhet 12-40')).toBeVisible();
-  await expect(page.getByText('I tjänst')).toBeVisible();
+  await expect(page.getByRole('contentinfo').getByText('Enhet 12-40')).toBeVisible();
+  await expect(page.getByRole('contentinfo').getByText('I tjänst')).toBeVisible();
 });
 
 test.describe('Discord role mapping', () => {
@@ -215,7 +216,7 @@ test.describe('Intelligence', () => {
 
 test('opening at a terminal lands on the module that terminal is for', async ({ page }) => {
   await page.goto('/?locale=en');
-  await expect(page.getByText('Signed in as A. Lindqvist')).toBeVisible();
+  await expect(page.getByRole('contentinfo').getByText('Signed in as A. Lindqvist')).toBeVisible();
 
   // What client/main.lua sends when an officer presses E at the booking
   // terminal. The shell opens straight on Booking rather than on whatever

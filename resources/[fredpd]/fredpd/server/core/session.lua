@@ -479,6 +479,12 @@ function Session.allowedModules(session)
         end
     end
 
+    -- The overview is where F6 lands. It holds nothing of its own -- every
+    -- panel is a route of a module above, checked there -- so it needs no
+    -- page permission; but it only appears beside something to open, so an
+    -- empty rail still means "no role is mapped" (installation guide, 10).
+    if #modules > 0 then table.insert(modules, 1, 'overview') end
+
     return modules
 end
 

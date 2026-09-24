@@ -21,7 +21,8 @@
       "comms": "Communications",
       "admin": "Administration",
       "surveillance": "Surveillance",
-      "booking": "Booking"
+      "booking": "Booking",
+      "overview": "Overview"
     },
     "status": {
       "unit": "Unit {callsign}",
@@ -3434,5 +3435,46 @@
     },
     "cctvName": "CCTV {id}",
     "openFailed": "The view could not be opened."
+  },
+  "overview": {
+    "updated": "Updated {time}",
+    "refresh": "Refresh",
+    "all": "All",
+    "openDispatch": "Open dispatch",
+    "noLocation": "No location",
+    "since": "since {time}",
+    "shift": {
+      "title": "My shift",
+      "officer": "Officer",
+      "unit": "Unit",
+      "noCallsign": "No callsign yet",
+      "duty": "Duty",
+      "offDutyHint": "Go on duty at the police job's clock-in point.",
+      "status": "Status",
+      "call": "Call",
+      "noCall": "Not on a call"
+    },
+    "broadcasts": {
+      "title": "On the air",
+      "none": "Nothing on the air."
+    },
+    "calls": {
+      "title": "Open calls",
+      "counts": "Open {open} · No unit {waiting}",
+      "none": "No open calls."
+    },
+    "reports": {
+      "title": "My reports",
+      "open": "Open reports",
+      "none": "Nothing waiting on you.",
+      "counts": "Sent back {returned} · Drafts {drafts}"
+    },
+    "recent": {
+      "title": "My recent queries",
+      "none": "No queries yet.",
+      "again": "Run {term} again",
+      "results": "Found {count}",
+      "hits": "Hits {count}"
+    }
   }
 }

@@ -19,7 +19,8 @@ runs the whole interface with no game server. Add a fixture in
 `src/lib/nui/fixtures.ts` for every route you call.
 
 Query parameters while developing: `?locale=sv`, `?latency=400`,
-`?fail=forbidden`.
+`?fail=forbidden`, `?failRoute=broadcast.list` (one route refuses; add
+`:code` for another error, repeat for more).
 
 ## Rules specific to this package
 

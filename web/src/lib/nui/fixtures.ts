@@ -130,7 +130,7 @@ const session = {
   // Only what this fake session may open. The real list is derived from
   // Discord roles on the server (invariant 2).
   modules: [
-    'records', 'dispatch', 'evidence', 'lab', 'intel', 'surveillance', 'court',
+    'overview', 'records', 'dispatch', 'evidence', 'lab', 'intel', 'surveillance', 'court',
     'personnel', 'booking', 'comms', 'admin',
   ],
 };
