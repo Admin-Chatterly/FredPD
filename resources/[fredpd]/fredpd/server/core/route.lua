@@ -44,7 +44,7 @@ local conditions = {}
 
 --- Must be on duty, as p_policejob sees it (spec 3.11).
 function conditions.onDuty(session)
-    return FredPD.Bridge.policejob.isOnDuty(session.src)
+    return (FredPD.Bridge.policejob.isOnDuty(session.src))
 end
 
 --- Must be standing at a placement of the given kind (spec 3.10, ADR-006).

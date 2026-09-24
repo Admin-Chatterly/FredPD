@@ -532,6 +532,25 @@ FredPD.Config.server = {
         },
     },
 
+    --- Duty: where FredPD reads whether an officer is on duty (ADR-025).
+    ---
+    --- Going on duty is done where your police job does it -- pScripts'
+    --- clock-in point, which keeps duty in its job core -- never in the MDT.
+    --- FredPD asks, in order, and the first that can say decides:
+    ---
+    ---   1. `resource`'s `export`, called with the character identifier
+    ---      (piotreq_jobcore's `isPlayerOnDuty` by default);
+    ---   2. p_policejob's own `isOnDuty`, on a version that has one;
+    ---   3. ESX's `job.onDuty` (ESX Legacy 1.10 and newer);
+    ---   4. the flag FredPD sets where sign-on is configured to.
+    ---
+    --- Nobody can go on duty? Run `fredpd_duty <server id>` in the server
+    --- console: it prints what each of the four says.
+    duty = {
+        resource = 'piotreq_jobcore',
+        export = 'isPlayerOnDuty',
+    },
+
     --- Jail: a court sentence is served in the game (spec 7.20, ADR-017).
     ---
     --- When a domare enters a guilty verdict with a prison sentence, the

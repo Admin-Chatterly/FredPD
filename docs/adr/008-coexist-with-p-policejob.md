@@ -1,6 +1,6 @@
 # ADR-008: FredPD coexists with p_policejob rather than replacing it
 
-- **Status:** Accepted
+- **Status:** Accepted (amended by ADR-025: duty is read from the job core)
 - **Date:** 2026-09-17
 - **Spec:** 3.11, 3.8, 7.15, 7.31
 

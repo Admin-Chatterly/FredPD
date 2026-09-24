@@ -53,7 +53,8 @@ ska — gå direkt till [avsnitt 10, Felsökning](#10-felsökning), eller kör
 | `ox_lib` | **Ja** | Callbacks, menyer, dialoger |
 | `oxmysql` | **Ja** | Databasåtkomst |
 | `ox_target` | Nej, men rekommenderas | Kontrollera ID, bötfäll, gripa, köra reg.nr och beslagta fordon direkt på personen eller bilen |
-| `p_policejob` | Nej | Tjänstestatus, grad, och fängelset en dom skickas till (`JailPlayer`) |
+| `p_policejob` | Nej | Grad, och fängelset en dom skickas till (`JailPlayer`) |
+| `piotreq_jobcore` | Nej, men behövs för tjänst med pScripts | Tjänstestatus: pScripts håller tjänst där, inte i `p_policejob`. Utan den läses tjänst från ESX (`job.onDuty`) |
 | `esx_billing` | Nej | Ordningsböter skickas som riktiga fakturor och markeras betalda av sig själva |
 | `esx_society` | Nej | Fordonsdepån registrerar bilar på myndigheten; böter betalas in till myndighetens konto |
 | `esx_textui` | Nej | "Tryck E"-rutan (annars används ox_lib) |
@@ -467,6 +468,7 @@ omstart, ingen omanslutning krävs.
 | Fordonsmenyn visar `fleet.cruiser` i stället för ett namn | Språknyckeln saknas i `en.json`/`sv.json` |
 | Resursen startar inte, klagar på tabeller | Migrationen är inte körd |
 | Resursen startar inte i produktion | `discord.token`, `discord.guildId` eller `agency` saknas i `config/server.lua` |
+| *"Du måste vara i tjänst"*, fast du stämplat in | Kör `fredpd_duty <server-id>` i serverkonsolen. Den visar vad varje tjänstekälla svarar: `piotreq_jobcore`, `p_policejob`, ESX:s `job.onDuty` och FredPD:s egen flagga. Svarar ingen, eller fel resurs: ställ in `duty` i `config/server.lua` |
 
 Loggboken (`fpd_audit_log`) innehåller även nekade försök, med skäl. Den är ofta
 snabbaste vägen till varför något vägras.

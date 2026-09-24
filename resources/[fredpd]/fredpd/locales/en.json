@@ -48,7 +48,7 @@
     "stale_permissions": "Your permissions are out of date. Sign on again.",
     "internal": "Something went wrong on the server. The error has been logged.",
     "contextNeeds": {
-      "onDuty": "You need to be on duty for this.",
+      "onDuty": "You need to be on duty for this. Go on duty at the police job's clock-in point; the bar at the bottom of FredPD says when it sees you on duty.",
       "accessPoint": "This is done at the right terminal or station. Open FredPD there.",
       "inAgencyVehicle": "You need to be in a police vehicle for this."
     }

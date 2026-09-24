@@ -35,3 +35,4 @@ When a decision changes `docs/FredPD.md`, the ADR and the spec edit go in the
 | [022](022-discord-role-actions.md) | Discord role actions (hire, promote, demote, dismiss) through a bot of their own, with two allowlists (amends ADR-010) | Accepted |
 | [023](023-a-subject-route-tier.md) | A subject route tier: a sessionless caller reads only their own records, at a public desk (amends ADR-013) | Accepted |
 | [024](024-the-master-sql-corrects-what-mariadb-cannot-run.md) | The master SQL is generated, checked in CI against MariaDB, and corrects shipped statements MariaDB cannot run -- the migrations stay as shipped | Accepted |
+| [025](025-duty-is-read-from-the-job-core.md) | Duty is read from the job core (piotreq_jobcore), then p_policejob, ESX job.onDuty and FredPD's flag; `fredpd_duty` diagnoses it (amends ADR-008) | Accepted |

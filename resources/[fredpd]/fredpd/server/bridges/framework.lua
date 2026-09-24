@@ -46,8 +46,11 @@ function Framework.getCharacter(src)
         lastName = player.get('lastName') or '',
         job = player.getJob().name,
         grade = player.getJob().grade,
-        -- ESX has no duty concept of its own; servers model it as a job or a
-        -- metadata flag. Treated as context only, never as a grant.
+        -- ESX Legacy 1.10+ keeps duty on the job itself (`job.onDuty`, set by
+        -- `setJob(name, grade, onDuty)`); older ESX has none, and this is nil.
+        jobOnDuty = type(player.getJob().onDuty) == 'boolean' and player.getJob().onDuty or nil,
+        -- A flag FredPD itself sets where sign-on is configured to (7.1).
+        -- Treated as context only, never as a grant.
         onDuty = player.get('onDuty') == true,
     }
 end

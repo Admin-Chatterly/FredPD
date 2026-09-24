@@ -39,20 +39,69 @@ local function tryExport(name, ...)
     return result
 end
 
---- Is this officer on duty?
+--- Where duty is read (ADR-025). pScripts keeps duty in its job core, not in
+--- p_policejob: `isPlayerOnDuty(identifier)` there, keyed by the character
+--- identifier. `config/server.lua`'s `duty` names another resource that takes
+--- the same call.
+local function dutyConfig()
+    local config = FredPD.Config and FredPD.Config.server and FredPD.Config.server.duty or {}
+    return {
+        resource = config.resource or 'piotreq_jobcore',
+        export = config.export or 'isPlayerOnDuty',
+    }
+end
+
+--- An export's answer read as on or off duty, or nil when it said neither.
+local function asDuty(value)
+    if type(value) == 'boolean' then return value end
+    if type(value) == 'number' then return value ~= 0 end
+    return nil
+end
+
+--- Every duty source this server has, in the order they are asked, each with
+--- what it answered: `true`, `false`, or nil for "cannot say".
+---
+---   1. the job core (`duty.resource`, piotreq_jobcore by default), by the
+---      character identifier;
+---   2. p_policejob's own `isOnDuty`, on a version that has one;
+---   3. ESX's `job.onDuty` (ESX Legacy 1.10+);
+---   4. the flag FredPD sets where sign-on is configured to.
+---
+--- @return table list of { source, onDuty }
+function PoliceJob.dutySources(src)
+    local character = FredPD.Bridge.framework.getCharacter(src)
+    local config = dutyConfig()
+    local answers = {}
+
+    local core = nil
+    if character and character.identifier and GetResourceState(config.resource) == 'started' then
+        local ok, result = pcall(function()
+            return exports[config.resource][config.export](nil, character.identifier)
+        end)
+        if ok then core = asDuty(result) end
+    end
+    answers[#answers + 1] = { source = config.resource, onDuty = core }
+
+    answers[#answers + 1] = { source = RESOURCE, onDuty = asDuty(tryExport('isOnDuty', src)) }
+    answers[#answers + 1] = { source = 'esx_job', onDuty = character and character.jobOnDuty }
+    answers[#answers + 1] = { source = 'fredpd', onDuty = character and character.onDuty or nil }
+
+    return answers
+end
+
+--- Is this officer on duty? The first source that can say decides.
 ---
 --- Unknown counts as off duty. A context condition that fails open would let a
 --- duty requirement be satisfied by breaking the thing that answers it.
 --- @param src number
 --- @return boolean
+--- @return string|nil the source that decided
 function PoliceJob.isOnDuty(src)
-    local fromJob = tryExport('isOnDuty', src)
-    if type(fromJob) == 'boolean' then return fromJob end
+    for _, answer in ipairs(PoliceJob.dutySources(src)) do
+        if answer.onDuty ~= nil then return answer.onDuty == true, answer.source end
+    end
 
-    -- Fall back to the framework's own duty flag, which is how some ESX servers
-    -- model it (ADR-005).
-    local character = FredPD.Bridge.framework.getCharacter(src)
-    return character ~= nil and character.onDuty == true
+    return false, nil
 end
 
 --- The officer's rank in the police job, for display and context only.
@@ -134,6 +183,12 @@ end
 --- work without it, and every context condition it answers fails closed. Saying
 --- so loudly at boot beats discovering it when nobody can go on duty.
 function PoliceJob.verify()
+    local core = dutyConfig().resource
+    if GetResourceState(core) ~= 'started' then
+        print(('[fredpd] policejob bridge: %s is not started, so duty is read from ESX (job.onDuty) '
+            .. 'instead. If nobody can go on duty, run `fredpd_duty <server id>` in the console.'):format(core))
+    end
+
     if not available() then
         print(('[fredpd] policejob bridge: %s is not started. Duty and impound context are unavailable; on-duty routes refuse.')
             :format(RESOURCE))

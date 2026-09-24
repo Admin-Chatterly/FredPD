@@ -360,7 +360,7 @@ Built (the outbound half). `server/bridges/gateway/{sha256,hmac,client,repo,serv
 | Bridge | Responsibilities | Default implementation |
 |---|---|---|
 | framework | Characters, names, DOB, phone, jobs, duty, licences | es_extended |
-| policejob | Duty state, rank, armory, cloakroom; jail handoff | p_policejob (section 3.11) |
+| policejob | Duty state, rank, armory, cloakroom; jail handoff | p_policejob; duty from piotreq_jobcore, then ESX `job.onDuty` (section 3.11, ADR-025) |
 | society | Agency funds, society-owned vehicles | esx_society |
 | textui | In-world prompts ("Press E to open the terminal") | esx_textui |
 | menu | In-world option menus and input dialogs | esx_menu_dialog |

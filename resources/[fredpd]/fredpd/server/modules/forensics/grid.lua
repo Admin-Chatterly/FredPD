@@ -910,7 +910,7 @@ local function isPrivileged(src)
     -- see a latent print somebody just powdered, or a marker nobody but a
     -- technician placed. Duty is what tells the two apart, the same context
     -- condition every route in this section already carries.
-    return FredPD.Bridge.policejob.isOnDuty(src)
+    return (FredPD.Bridge.policejob.isOnDuty(src))
 end
 
 --- Is there anything at all in the cells this player is standing in?

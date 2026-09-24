@@ -48,7 +48,7 @@
     "stale_permissions": "Dina behörigheter är inaktuella. Logga in igen.",
     "internal": "Något gick fel på servern. Felet har loggats.",
     "contextNeeds": {
-      "onDuty": "Du måste vara i tjänst för det här.",
+      "onDuty": "Du måste vara i tjänst för det här. Gå i tjänst vid polisjobbets instämplingsplats; raden längst ned i FredPD visar när du syns som i tjänst.",
       "accessPoint": "Det här görs vid rätt terminal eller station. Öppna FredPD där.",
       "inAgencyVehicle": "Du måste sitta i ett polisfordon för det här."
     }

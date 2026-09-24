@@ -274,6 +274,7 @@ server_scripts {
     'server/modules/admin/routes.lua',
     'server/modules/admin/bootstrap.lua',
     'server/modules/admin/superuser.lua',
+    'server/modules/admin/diagnostics.lua',
 
     'server/main.lua',
 }
