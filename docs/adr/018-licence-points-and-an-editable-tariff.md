@@ -29,6 +29,11 @@ whether the driver may drive.
   - Up to three quarters of `threshold` the licence is `valid`. From three
     quarters it is `warning`. At `threshold` it is `revoked`.
   - Voiding or contesting a citation takes its points away immediately.
+  - **Only citations the reader may see count.** The counting rows go
+    through the same `filterSearch` as a citation list. A total that
+    disagreed with the citations a reader can list would reveal that
+    hidden or court-sealed ones exist. So two readers can see different
+    totals for the same person, and that is the correct outcome.
   - Nothing expires on a timer. This is the same "computed from dates" shape
     as the payment status and the impound fee.
 - **Points land only on a named person.** A fine sent to a vehicle's keeper
@@ -48,6 +53,9 @@ whether the driver may drive.
 - **Nothing is written to another resource.** A revoked licence is a fact on
   the record, not a removed `drive` licence in esx_license. If that is
   wanted, it is a bridge with its own ADR.
+- **A label is data, never markup.** ox_lib renders menu text as markdown,
+  so the server refuses a label containing link, image or HTML syntax or a
+  control character, and the client escapes it anyway.
 - **The agency's command edits the tariff** through
   `ordningsbot.tariff.set` and `.retire`, with permission
   `ordningsbot.tariff.edit`, granted to `command` in the seed.
@@ -56,7 +64,8 @@ whether the driver may drive.
   - A line the agency adds is named in its own words (`label`) and carries
     the sentinel key `ordningsbot.tariff.custom`. The shipped lines keep
     their locale keys, so they read in both languages.
-  - Both routes are audited.
+  - Both routes are `sensitive`, like the offence catalogue's, and audited.
+    The label is included in the audit.
 - **An empty agency gets the shipped catalogue at start.** It comes from
   `ordningsbot.defaultTariff` in `config/server.lua`, and is written only
   for an agency that has never had a tariff line. An agency that retired

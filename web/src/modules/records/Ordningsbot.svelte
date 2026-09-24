@@ -127,6 +127,10 @@
 
   async function open(id: number): Promise<void> {
     busy = true;
+    // What the last fine did to a licence belongs to the moment it was
+    // issued: opening any citation, or reopening one after a void or a
+    // contest, clears it. `issue` sets it again after its own open.
+    licenceNote = null;
 
     const response = await nui.call<{ citation: Citation }>('ordningsbot.get', { id });
 
@@ -160,9 +164,9 @@
     if (response.ok) {
       failure = null;
       status = t('ordningsbot.issued', { number: response.data.number });
-      licenceNote = response.data.licence ?? null;
       issueForm = { tariffId: '', personId: '', vehicleId: '' };
       await Promise.all([load(), open(response.data.id)]);
+      licenceNote = response.data.licence ?? null;
     } else {
       failure = response;
     }
@@ -234,22 +238,6 @@
 </script>
 
 <div class="flex flex-col gap-3">
-  {#if mayEdit}
-    <div>
-      <button
-        type="button"
-        class="border border-[var(--color-border)] px-3 py-1 text-xs focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
-        aria-expanded={editingTariff}
-        onclick={() => (editingTariff = !editingTariff)}
-      >
-        {editingTariff ? t('ordningsbot.tariffEditor.close') : t('ordningsbot.tariffEditor.open')}
-      </button>
-    </div>
-    {#if editingTariff}
-      <TariffEditor {tariffs} licence={licenceOn} onChanged={loadTariffs} />
-    {/if}
-  {/if}
-
   <form
     class="flex flex-wrap items-end gap-2"
     onsubmit={(event) => {
@@ -269,7 +257,22 @@
     <button type="submit" class="border border-[var(--color-border)] px-3 py-1 text-xs" disabled={busy}>
       {t('form.search')}
     </button>
+    {#if mayEdit}
+      <button
+        type="button"
+        class="ml-auto border border-[var(--color-border)] px-3 py-1 text-xs focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+        aria-expanded={editingTariff}
+        aria-controls="tariff-editor"
+        onclick={() => (editingTariff = !editingTariff)}
+      >
+        {editingTariff ? t('ordningsbot.tariffEditor.close') : t('ordningsbot.tariffEditor.open')}
+      </button>
+    {/if}
   </form>
+
+  {#if mayEdit && editingTariff}
+    <TariffEditor {tariffs} licence={licenceOn} onChanged={loadTariffs} />
+  {/if}
 
   {#if failure}
     <div class="border border-[var(--color-alert)] px-3 py-2 text-sm" role="alert">
@@ -327,7 +330,7 @@
     <div role="status" class="text-xs">
       <p class="text-[var(--color-ink-muted)]">{status}</p>
       {#if licenceNote}
-        <p class:font-semibold={licenceNote.standing !== 'valid'} class:text-[var(--color-alert)]={licenceNote.standing === 'revoked'}>
+        <p class:font-semibold={licenceNote.standing !== 'valid'} class:text-[var(--color-caution)]={licenceNote.standing !== 'valid'}>
           {t(`ordningsbot.licence.${licenceNote.standing}`, { points: licenceNote.points, threshold: licenceNote.threshold })}
         </p>
       {/if}

@@ -157,6 +157,12 @@ function Ordningsbot.validateTariff(input, existing)
 
     if not label and not existing then return 'invalid', { label = 'required' } end
 
+    -- Shown in ox_lib menus, which render markdown: no link, image or markup
+    -- syntax and no control characters, whatever escaping the reader does.
+    if label and (label:find('[%c%[%]%(%)!<>`\\|]') or #label > 120) then
+        return 'invalid', { label = 'format' }
+    end
+
     local points = input.licencePoints or 0
     if type(points) ~= 'number' or points < 0 or points > Ordningsbot.MAX_POINTS or points ~= math.floor(points) then
         return 'invalid', { licencePoints = 'too_large' }

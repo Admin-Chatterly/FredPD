@@ -2669,7 +2669,7 @@
     "tariff": {
       "parking": "Otillåten parkering",
       "noise": "Förargelseväckande beteende",
-      "speeding_10": "Hastighetsöverträdelse, högst 10 km/h",
+      "speeding_10": "Hastighetsöverträdelse, 1–10 km/h",
       "speeding_20": "Hastighetsöverträdelse, 11–20 km/h",
       "speeding_30": "Hastighetsöverträdelse, 21–30 km/h",
       "red_light": "Körning mot rött ljus",
@@ -2689,19 +2689,19 @@
     },
     "billSent": "Faktura skickad {at}. Boten markeras som betald av sig själv när fakturan är betald.",
     "tariffOption": {
-      "plain": "{name} — {amount}",
-      "withPoints": "{name} — {amount}, {points} p"
+      "plain": "{name} — {amount} kr",
+      "withPoints": "{name} — {amount} kr, prickar: {points}"
     },
-    "points": "{points} prickar på körkortet",
+    "points": "Prickar: {points}",
     "licence": {
       "valid": "Körkort: {points} av {threshold} prickar.",
       "warning": "Körkort: {points} av {threshold} prickar. Nära återkallelse.",
       "revoked": "Körkortet är återkallat: {points} av {threshold} prickar."
     },
     "tariffEditor": {
-      "open": "Redigera taxan",
-      "close": "Stäng taxan",
-      "title": "Taxa",
+      "open": "Redigera bottaxan",
+      "close": "Stäng redigeringen",
+      "title": "Bottaxa",
       "hint": "En ändring blir en ny version av raden. Ordningsböter som redan är utfärdade behåller belopp och prickar från när de skrevs.",
       "code": "Kod",
       "label": "Benämning",
@@ -2710,16 +2710,17 @@
       "actions": "Åtgärder",
       "edit": "Ändra",
       "editLine": "Ändra {name}",
-      "retire": "Avveckla",
-      "retireLine": "Avveckla {name}",
-      "confirmRetire": "Avveckla {name}? Den kan inte längre utfärdas. Redan utfärdade ordningsböter påverkas inte.",
+      "retire": "Låt utgå",
+      "retireLine": "Låt {name} utgå",
+      "confirmRetire": "Låt {name} utgå? Den kan inte längre utfärdas. Ordningsböter som redan är utfärdade påverkas inte.",
       "new": "Ny rad",
       "editing": "Ändrar {code}",
-      "keepName": "Lämna tomt för att behålla benämningen",
+      "keepName": "Nu: {name}. Lämna tomt för att behålla.",
       "save": "Spara raden",
       "cancelEdit": "Avbryt",
       "saved": "{code} sparad.",
-      "retired": "{code} avvecklad."
+      "retired": "{code} har utgått.",
+      "codeHint": "Små bokstäver, siffror och _"
     }
   },
   "impound": {
@@ -2793,7 +2794,7 @@
       "amount": "{amount} kr",
       "confirmTitle": "Utfärda ordningsboten?",
       "confirm": "{tariff} till {who}.",
-      "amountPoints": "{amount} kr, {points} prickar på körkortet"
+      "amountPoints": "{amount} kr · prickar: {points}"
     },
     "arrest": {
       "title": "Grund för gripandet",
@@ -2828,7 +2829,7 @@
     "licence": {
       "valid": "Körkort: {points} av {threshold} prickar.",
       "warning": "Körkort: {points} av {threshold} prickar. Nära återkallelse.",
-      "revoked": "Körkortet ÅTERKALLAT: {points} av {threshold} prickar."
+      "revoked": "Körkortet är återkallat: {points} av {threshold} prickar."
     }
   },
   "status": {

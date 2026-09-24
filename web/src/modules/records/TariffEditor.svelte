@@ -41,6 +41,13 @@
   let busy = $state(false);
   let retiring = $state<Tariff | null>(null);
   let formTop = $state<HTMLElement | null>(null);
+  let heading = $state<HTMLElement | null>(null);
+  let table = $state<HTMLElement | null>(null);
+  /** The Retire button that opened the confirmation, to give focus back to. */
+  let retireTrigger: HTMLButtonElement | null = null;
+
+  const FOCUS = 'focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]';
+  const editingName = $derived(editing ? tariffs.find((entry) => entry.code === editing) : undefined);
 
   const messages = $derived(fieldList(failure, FIELD_LABELS));
 
@@ -63,6 +70,20 @@
     form = blank();
     failure = null;
     status = '';
+  }
+
+  /** Cancel an edit: focus goes back to the row's own Edit button. */
+  async function cancelEdit(): Promise<void> {
+    const code = editing;
+    startNew();
+    await tick();
+    table?.querySelector<HTMLButtonElement>(`button[data-edit="${code}"]`)?.focus();
+  }
+
+  function cancelRetire(): void {
+    retiring = null;
+    failure = null;
+    retireTrigger?.focus();
   }
 
   async function save(event: SubmitEvent): Promise<void> {
@@ -99,9 +120,12 @@
     if (response.ok) {
       failure = null;
       retiring = null;
-      status = t('ordningsbot.tariffEditor.retired', { code });
       if (editing === code) startNew();
+      status = t('ordningsbot.tariffEditor.retired', { code });
       await onChanged();
+      // The row and its button are gone: the heading takes focus.
+      await tick();
+      heading?.focus();
     } else {
       failure = response;
     }
@@ -110,8 +134,10 @@
   }
 </script>
 
-<section class="flex flex-col gap-2 border border-[var(--color-border)] p-3" aria-labelledby="tariff-editor-heading">
-  <h2 id="tariff-editor-heading" class="text-[15px] font-semibold">{t('ordningsbot.tariffEditor.title')}</h2>
+<section id="tariff-editor" class="flex flex-col gap-2 border border-[var(--color-border)] p-3" aria-labelledby="tariff-editor-heading">
+  <h2 id="tariff-editor-heading" class="text-[15px] font-semibold" tabindex="-1" bind:this={heading}>
+    {t('ordningsbot.tariffEditor.title')}
+  </h2>
   <p class="text-xs text-[var(--color-ink-muted)]">{t('ordningsbot.tariffEditor.hint')}</p>
 
   {#if failure && !retiring}
@@ -130,7 +156,7 @@
     <p class="text-xs text-[var(--color-ink-muted)]" role="status">{status}</p>
   {/if}
 
-  <table class="w-full text-[12.5px] tabular-nums">
+  <table class="w-full text-[12.5px] tabular-nums" bind:this={table}>
     <thead class="bg-[var(--color-surface)]">
       <tr>
         <th class="px-2 py-1 text-left font-semibold">{t('ordningsbot.tariffEditor.code')}</th>
@@ -158,7 +184,8 @@
           <td class="px-2 py-1 text-right whitespace-nowrap">
             <button
               type="button"
-              class="border border-[var(--color-border)] px-2 py-0.5 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+              class="border border-[var(--color-border)] px-2 py-0.5 {FOCUS}"
+              data-edit={tariff.code}
               aria-label={t('ordningsbot.tariffEditor.editLine', { name: tariffName(tariff) })}
               onclick={() => void edit(tariff)}
             >
@@ -166,9 +193,10 @@
             </button>
             <button
               type="button"
-              class="ml-1 border border-[var(--color-border)] px-2 py-0.5 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+              class="ml-1 border border-[var(--color-border)] px-2 py-0.5 {FOCUS}"
               aria-label={t('ordningsbot.tariffEditor.retireLine', { name: tariffName(tariff) })}
-              onclick={() => {
+              onclick={(event) => {
+                retireTrigger = event.currentTarget;
                 retiring = tariff;
                 failure = null;
               }}
@@ -189,14 +217,18 @@
       {failure}
       fieldLabels={FIELD_LABELS}
       confirm={() => void retire()}
-      cancel={() => {
-        retiring = null;
-        failure = null;
-      }}
+      cancel={cancelRetire}
     />
   {/if}
 
-  <form class="flex flex-wrap items-end gap-2 border-t border-[var(--color-border)] pt-3" onsubmit={save} bind:this={formTop}>
+  <!-- novalidate: the server's refusal is drawn above, translated; the
+       browser's own bubble is in the browser's language and names no rule. -->
+  <form
+    class="flex flex-wrap items-end gap-2 border-t border-[var(--color-border)] pt-3"
+    onsubmit={save}
+    bind:this={formTop}
+    novalidate
+  >
     <p class="w-full text-xs font-semibold">
       {editing ? t('ordningsbot.tariffEditor.editing', { code: editing }) : t('ordningsbot.tariffEditor.new')}
     </p>
@@ -207,9 +239,11 @@
         required
         readonly={editing !== null}
         maxlength="32"
-        pattern="[a-z0-9_]+"
-        class="w-40 border border-[var(--color-border)] px-2 py-1 font-[family-name:var(--font-mono)]"
+        aria-describedby="tariff-code-hint"
+        onblur={() => (form.code = form.code.trim().toLowerCase())}
+        class="w-40 border border-[var(--color-border)] px-2 py-1 font-[family-name:var(--font-mono)] {FOCUS}"
       />
+      <span id="tariff-code-hint" class="text-[var(--color-ink-muted)]">{t('ordningsbot.tariffEditor.codeHint')}</span>
     </label>
     <label class="flex flex-col gap-1 text-xs">
       <span>
@@ -220,25 +254,30 @@
         bind:value={form.label}
         required={editing === null}
         maxlength="120"
-        placeholder={editing ? t('ordningsbot.tariffEditor.keepName') : ''}
-        class="w-64 border border-[var(--color-border)] px-2 py-1"
+        aria-describedby={editingName ? 'tariff-name-hint' : undefined}
+        class="w-64 border border-[var(--color-border)] px-2 py-1 {FOCUS}"
       />
+      {#if editingName}
+        <span id="tariff-name-hint" class="text-[var(--color-ink-muted)]">
+          {t('ordningsbot.tariffEditor.keepName', { name: tariffName(editingName) })}
+        </span>
+      {/if}
     </label>
     <label class="flex flex-col gap-1 text-xs">
       <span>{t('ordningsbot.tariffEditor.amount')} <span aria-hidden="true">*</span></span>
-      <input type="number" bind:value={form.amount} required min="0" max="1000000" class="w-28 border border-[var(--color-border)] px-2 py-1" />
+      <input type="number" bind:value={form.amount} required min="0" max="1000000" class="w-28 border border-[var(--color-border)] px-2 py-1 {FOCUS}" />
     </label>
     {#if licence}
       <label class="flex flex-col gap-1 text-xs">
         {t('ordningsbot.tariffEditor.points')}
-        <input type="number" bind:value={form.licencePoints} min="0" max="20" class="w-20 border border-[var(--color-border)] px-2 py-1" />
+        <input type="number" bind:value={form.licencePoints} min="0" max="20" class="w-20 border border-[var(--color-border)] px-2 py-1 {FOCUS}" />
       </label>
     {/if}
-    <button type="submit" class="border border-[var(--color-border)] px-3 py-1 text-xs focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]">
+    <button type="submit" class="border border-[var(--color-border)] px-3 py-1 text-xs {FOCUS}">
       {t('ordningsbot.tariffEditor.save')}
     </button>
     {#if editing}
-      <button type="button" class="border border-[var(--color-border)] px-3 py-1 text-xs" onclick={startNew}>
+      <button type="button" class="border border-[var(--color-border)] px-3 py-1 text-xs {FOCUS}" onclick={() => void cancelEdit()}>
         {t('ordningsbot.tariffEditor.cancelEdit')}
       </button>
     {/if}

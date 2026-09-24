@@ -205,13 +205,15 @@ local function cite(subject)
         local points = tonumber(tariff.licencePoints) or 0
 
         options[#options + 1] = {
-            title = name,
+            -- ox_lib renders menu text as markdown; an agency's own label is
+            -- data, never markup (spec 11.3).
+            title = core.plainText(name),
             description = points > 0 and list.licence
                 and FredPD.t('field.cite.amountPoints', { amount = tariff.amount, points = points })
                 or FredPD.t('field.cite.amount', { amount = tariff.amount }),
             onSelect = function()
                 if not confirm(FredPD.t('field.cite.confirmTitle'),
-                    FredPD.t('field.cite.confirm', { tariff = core.plainText(name), who = subject.label }))
+                    FredPD.t('field.cite.confirm', { tariff = core.plainText(name), who = core.plainText(subject.label) }))
                 then return end
 
                 local issued = call('ordningsbot.issue', {

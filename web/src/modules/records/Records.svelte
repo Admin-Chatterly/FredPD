@@ -1467,25 +1467,6 @@
           </span>
         </header>
 
-        <!-- Licence points (ADR-018): only said when they are on the licence,
-             and drawn like a caution once it is revoked, because that is what
-             a traffic stop turns on. -->
-        {#if personDetail.licence && personDetail.licence.points > 0}
-          <p
-            class="text-xs"
-            class:border-2={personDetail.licence.standing === 'revoked'}
-            class:border-[var(--color-ink)]={personDetail.licence.standing === 'revoked'}
-            class:px-3={personDetail.licence.standing === 'revoked'}
-            class:py-2={personDetail.licence.standing === 'revoked'}
-            class:font-semibold={personDetail.licence.standing !== 'valid'}
-          >
-            {t(`ordningsbot.licence.${personDetail.licence.standing}`, {
-              points: personDetail.licence.points,
-              threshold: personDetail.licence.threshold,
-            })}
-          </p>
-        {/if}
-
         <!-- Cautions, at the top, because that is what an officer opens a name
              for before they get out of the car (7.3). A caution the reader is
              not cleared for was never sent, so this is the whole list. -->
@@ -1522,6 +1503,25 @@
             </ul>
           </div>
         {/if}
+
+        <!-- Licence points (ADR-018), below the cautions: officer safety
+             first. Said only when there are points; `caution`, not `alert`,
+             because a revoked licence is not a danger to anybody. -->
+        {#if personDetail.licence && personDetail.licence.points > 0}
+          <p
+            class="text-xs"
+            class:border-l-2={personDetail.licence.standing !== 'valid'}
+            class:border-[var(--color-caution)]={personDetail.licence.standing !== 'valid'}
+            class:pl-2={personDetail.licence.standing !== 'valid'}
+            class:font-semibold={personDetail.licence.standing !== 'valid'}
+          >
+            {t(`ordningsbot.licence.${personDetail.licence.standing}`, {
+              points: personDetail.licence.points,
+              threshold: personDetail.licence.threshold,
+            })}
+          </p>
+        {/if}
+
 
         <dl class="grid grid-cols-2 gap-x-6 gap-y-1 text-xs md:grid-cols-4">
           <dt class="text-[var(--color-ink-muted)]">{t('records.person.field.dateOfBirth')}</dt>

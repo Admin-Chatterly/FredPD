@@ -142,17 +142,21 @@ end
 -- Licence points (0036)
 -- -----------------------------------------------------------------------------
 
---- The points counting against a person's licence: citations naming them
---- that are still issued or paid and younger than the window. Void and
---- contested ones do not count.
-function Repo.licencePoints(agencyId, personId, windowDays)
-    return db().scalar(
-        [[SELECT COALESCE(SUM(t.licence_points), 0)
+--- The citations counting against a person's licence, with their points:
+--- naming them, still issued or paid, younger than the window. Void and
+--- contested ones do not count. Rows, not a sum: the caller runs them past
+--- the access check, because a citation the reader may not see must not count
+--- toward a total they can (ADR-018).
+function Repo.licenceCitations(agencyId, personId, windowDays)
+    return db().query(
+        [[SELECT o.id, o.agency_id AS agencyId, o.classification, t.licence_points AS licencePoints
             FROM fpd_ordningsbot o
             JOIN fpd_ordningsbot_tariff t ON t.id = o.tariff_id AND t.agency_id = o.agency_id
            WHERE o.agency_id = ? AND o.person_id = ? AND o.status IN ('issued', 'paid')
-             AND o.issued_at >= DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL ? DAY)]],
-        { agencyId, personId, windowDays }) or 0
+             AND t.licence_points > 0
+             AND o.issued_at >= DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL ? DAY)
+           LIMIT 200]],
+        { agencyId, personId, windowDays })
 end
 
 -- -----------------------------------------------------------------------------

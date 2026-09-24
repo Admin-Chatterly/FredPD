@@ -104,14 +104,14 @@ test('says what a fine did to the driving licence', async ({ page }) => {
 
   const form = page.locator('form').filter({ hasText: 'Fine' });
   // Running a red light carries 3 points; John Doe already has 8 (ADR-018).
-  await form.getByLabel('Fine').selectOption({ label: 'Running a red light — 3000, 3 p' });
+  await form.getByLabel('Fine').selectOption({ label: 'Running a red light — 3000 kr, points: 3' });
   await form.getByLabel('Person id').fill('doe');
   await page.getByRole('option', { name: /Doe, John/ }).click();
   await form.getByRole('button', { name: 'Issue citation' }).click();
 
   await expect(page.getByRole('status')).toContainText('Driving licence: 11 of 12 points. Close to revocation.');
 
-  await form.getByLabel('Fine').selectOption({ label: 'Running a red light — 3000, 3 p' });
+  await form.getByLabel('Fine').selectOption({ label: 'Running a red light — 3000 kr, points: 3' });
   await form.getByLabel('Person id').fill('doe');
   await page.getByRole('option', { name: /Doe, John/ }).click();
   await form.getByRole('button', { name: 'Issue citation' }).click();
@@ -151,9 +151,40 @@ test('reads the tariff editor in Swedish', async ({ page }) => {
   await page.goto('/?locale=sv');
   await page.locator('nav').first().getByRole('button', { name: 'Register' }).click();
   await page.getByRole('button', { name: 'Ordningsböter', exact: true }).click();
-  await page.getByRole('button', { name: 'Redigera taxan' }).click();
+  await page.getByRole('button', { name: 'Redigera bottaxan' }).click();
 
-  const editor = page.getByRole('region', { name: 'Taxa' });
+  const editor = page.getByRole('region', { name: 'Bottaxa' });
   await expect(editor.getByRole('columnheader', { name: 'Prickar' })).toBeVisible();
   await expect(editor.getByRole('row').filter({ hasText: 'Körning mot rött ljus' })).toBeVisible();
+});
+
+test('retiring a line from the keyboard leaves focus somewhere sensible', async ({ page }) => {
+  await openOrdningsbot(page);
+  await page.getByRole('button', { name: 'Edit the tariff' }).click();
+
+  const editor = page.getByRole('region', { name: 'Tariff' });
+  const retire = editor.getByRole('button', { name: 'Retire Illegal parking' });
+
+  // Cancelled: back on the button that opened it.
+  await retire.focus();
+  await page.keyboard.press('Enter');
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+  await expect(retire).toBeFocused();
+
+  // Confirmed: the row is gone, so the editor's heading takes focus.
+  await page.keyboard.press('Enter');
+  await page.getByRole('dialog').getByRole('button', { name: 'Retire' }).click();
+  await expect(editor.getByRole('heading', { name: 'Tariff' })).toBeFocused();
+});
+
+test('refuses a tariff name carrying markup, in words', async ({ page }) => {
+  await openOrdningsbot(page);
+  await page.getByRole('button', { name: 'Edit the tariff' }).click();
+
+  const editor = page.getByRole('region', { name: 'Tariff' });
+  await editor.getByLabel(/^Code/).fill('Bad Code');
+  await editor.getByRole('button', { name: 'Save line' }).click();
+
+  // The server's own refusal, translated -- not the browser's bubble.
+  await expect(editor.getByRole('alert')).toBeVisible();
 });

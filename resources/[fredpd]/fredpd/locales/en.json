@@ -2669,7 +2669,7 @@
     "tariff": {
       "parking": "Illegal parking",
       "noise": "Disturbing the peace",
-      "speeding_10": "Speeding, up to 10 km/h over",
+      "speeding_10": "Speeding, 1–10 km/h over",
       "speeding_20": "Speeding, 11–20 km/h over",
       "speeding_30": "Speeding, 21–30 km/h over",
       "red_light": "Running a red light",
@@ -2689,10 +2689,10 @@
     },
     "billSent": "Bill sent {at}. It is marked paid by itself when the bill is paid.",
     "tariffOption": {
-      "plain": "{name} — {amount}",
-      "withPoints": "{name} — {amount}, {points} p"
+      "plain": "{name} — {amount} kr",
+      "withPoints": "{name} — {amount} kr, points: {points}"
     },
-    "points": "{points} points on the licence",
+    "points": "Points: {points}",
     "licence": {
       "valid": "Driving licence: {points} of {threshold} points.",
       "warning": "Driving licence: {points} of {threshold} points. Close to revocation.",
@@ -2700,7 +2700,7 @@
     },
     "tariffEditor": {
       "open": "Edit the tariff",
-      "close": "Close the tariff",
+      "close": "Close tariff editor",
       "title": "Tariff",
       "hint": "A change is a new version of the line. Citations already issued keep the amount and points they were written under.",
       "code": "Code",
@@ -2715,11 +2715,12 @@
       "confirmRetire": "Retire {name}? It can no longer be issued. Citations already issued under it are unchanged.",
       "new": "New line",
       "editing": "Editing {code}",
-      "keepName": "Leave empty to keep the name",
+      "keepName": "Current: {name}. Leave empty to keep it.",
       "save": "Save line",
       "cancelEdit": "Cancel",
       "saved": "{code} saved.",
-      "retired": "{code} retired."
+      "retired": "{code} retired.",
+      "codeHint": "Lowercase letters, digits and _"
     }
   },
   "impound": {
@@ -2793,7 +2794,7 @@
       "amount": "{amount} kr",
       "confirmTitle": "Issue this fine?",
       "confirm": "{tariff} to {who}.",
-      "amountPoints": "{amount} kr, {points} points on the licence"
+      "amountPoints": "{amount} kr · points: {points}"
     },
     "arrest": {
       "title": "Ground for the arrest",
@@ -2828,7 +2829,7 @@
     "licence": {
       "valid": "Driving licence: {points} of {threshold} points.",
       "warning": "Driving licence: {points} of {threshold} points. Close to revocation.",
-      "revoked": "Driving licence REVOKED: {points} of {threshold} points."
+      "revoked": "Driving licence revoked: {points} of {threshold} points."
     }
   },
   "status": {

@@ -341,6 +341,9 @@
       {/if}
 
       {#if writing}
+        <!-- Ctrl+Enter submits from any field in the form: a shortcut on the
+             form itself, not a click target. -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <form
           class="flex flex-wrap items-end gap-2 border border-[var(--color-border)] p-3"
           onsubmit={writeCard}
@@ -568,6 +571,9 @@
       {/if}
 
       {#if recording}
+        <!-- Ctrl+Enter submits from any field in the form: a shortcut on the
+             form itself, not a click target. -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <form
           class="flex flex-wrap items-end gap-2 border border-[var(--color-border)] p-3"
           onsubmit={recordStop}

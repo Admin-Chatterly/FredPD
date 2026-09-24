@@ -69,10 +69,18 @@ route.define({
     perm = 'ordningsbot.tariff.edit',
     schema = 'OrdningsbotTariffSet',
     writes = true,
+    -- What a fine costs and what it does to a licence is policy, as the
+    -- offence catalogue is: not on a stale grant.
+    sensitive = true,
     audit = 'ordningsbot.tariff.set',
     subjectType = 'ordningsbot_tariff',
     auditDetail = function(input)
-        return { code = input.code, amount = input.amount, licencePoints = input.licencePoints or 0 }
+        return {
+            code = input.code,
+            label = input.label,
+            amount = input.amount,
+            licencePoints = input.licencePoints or 0,
+        }
     end,
     handler = function(session, input)
         local existing = repo.currentTariff(session.agencyId, input.code)
@@ -101,6 +109,7 @@ route.define({
     perm = 'ordningsbot.tariff.edit',
     schema = 'OrdningsbotTariffRetire',
     writes = true,
+    sensitive = true,
     audit = 'ordningsbot.tariff.retired',
     subjectType = 'ordningsbot_tariff',
     auditDetail = function(input) return { code = input.code } end,
@@ -147,7 +156,14 @@ function Licence.standingFor(session, personId)
     if config.enabled == false or not personId then return nil end
     if not FredPD.Core.perms.satisfies(session.permissions, 'ordningsbot.view') then return nil end
 
-    local points = repo.licencePoints(session.agencyId, personId, tonumber(config.windowDays) or 365)
+    -- Only citations this reader may see count: a total that disagreed with
+    -- the citations they can list would say that hidden or sealed ones exist.
+    local rows = repo.licenceCitations(session.agencyId, personId, tonumber(config.windowDays) or 365)
+    local points = 0
+    for _, row in ipairs(access.filterSearch(session, ORDNINGSBOT, rows)) do
+        if row.restricted ~= true and row.licencePoints then points = points + row.licencePoints end
+    end
+
     return service.licenceStanding(points, config)
 end
 

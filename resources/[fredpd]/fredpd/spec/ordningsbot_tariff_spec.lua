@@ -39,6 +39,15 @@ describe('ordningsbot tariff and licence', function()
             assert.are.equal('invalid', err)
         end)
 
+        it('refuses markup in a label, which ox_lib would render', function()
+            for _, label in ipairs({ '![](https://x.example/p.png)', '[link](x)', '<b>x</b>', 'a\nb', 'a`b' }) do
+                local _, fields = O.validateTariff({ code = 'x', label = label, amount = 1 }, nil)
+                assert.are.same({ label = 'format' }, fields, label)
+            end
+
+            assert.is_nil(O.validateTariff({ code = 'x', label = 'Nedskräpning, 21–30 km/h', amount = 1 }, nil))
+        end)
+
         it('bounds the points', function()
             local _, fields = O.validateTariff({ code = 'x', label = 'X', amount = 1, licencePoints = 21 }, nil)
             assert.are.same({ licencePoints = 'too_large' }, fields)
