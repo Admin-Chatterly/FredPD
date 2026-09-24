@@ -73,6 +73,23 @@ export function createServer(config: GatewayConfig, deps: ServerDeps = {}): Fast
    * as a plugin so the hook cannot accidentally be skipped by a route added
    * later somewhere else in the tree.
    */
+  /**
+   * Signatures already accepted, until they fall out of the replay window. A
+   * signed request is honoured once: the same bytes arriving again inside the
+   * window -- a role just removed, re-added by replaying the request that
+   * added it (ADR-022) -- is refused like any other bad signature.
+   */
+  const seen = new Map<string, number>();
+
+  function firstTime(signature: string, nowSeconds: number): boolean {
+    for (const [key, expires] of seen) {
+      if (expires < nowSeconds) seen.delete(key);
+    }
+    if (seen.has(signature)) return false;
+    seen.set(signature, nowSeconds + config.replayWindowSeconds * 2);
+    return true;
+  }
+
   app.register(
     async (scope) => {
       scope.addHook('preHandler', async (request, reply) => {
@@ -85,6 +102,12 @@ export function createServer(config: GatewayConfig, deps: ServerDeps = {}): Fast
           body: raw,
           replayWindowSeconds: config.replayWindowSeconds,
         });
+
+        const signature = request.headers[SIGNATURE_HEADER] as string | undefined;
+        if (result.ok && !firstTime(signature ?? '', Math.floor(Date.now() / 1000))) {
+          request.log.warn({ url: request.url }, 'rejected a replayed request');
+          return reply.code(401).send({ ok: false, err: 'forbidden' });
+        }
 
         if (!result.ok) {
           // One shape for every failure: a caller learns that it failed, not

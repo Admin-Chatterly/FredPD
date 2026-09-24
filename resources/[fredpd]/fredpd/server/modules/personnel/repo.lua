@@ -21,6 +21,13 @@ local OFFICER_SELECT <const> = [[
       FROM fpd_officers
 ]]
 
+--- Is this Discord member a superuser on any roster row (9b)? A superuser's
+--- Discord roles are not theirs to lose to somebody who is not one (ADR-022).
+function Repo.isSuperuser(discordId)
+    return FredPD.Core.db.scalar(
+        'SELECT 1 FROM fpd_officers WHERE discord_id = ? AND superuser = 1 LIMIT 1', { discordId }) ~= nil
+end
+
 function Repo.byId(id, agencyId)
     return FredPD.Core.db.single(OFFICER_SELECT .. ' WHERE id = ? AND agency_id = ?', { id, agencyId })
 end

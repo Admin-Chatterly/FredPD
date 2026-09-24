@@ -48,11 +48,30 @@ it.
     the same rule the role-map editor applies).
   - The target holds nothing the actor lacks: a supervisor does not demote the
     commander.
-  - A superuser passes the last two checks, as everywhere else.
+  - A superuser passes the last two checks, as everywhere else, and a
+    superuser's own roles count as everything, so only a superuser can change
+    them.
+  - The target is weighed on Discord as it is now. They are read back from
+    Discord before the check, and a target with no fresh row is refused
+    (`target_stale`). The one exception is a new hire by Discord id, who has
+    nothing to outrank anybody with.
+  - A role that any other agency maps to a group is refused. The guards only
+    weigh a role in the actor's own agency.
+  - A session on the ESX-job fallback never drives a role change, and role
+    actions are off whenever FredPD is not reading Discord (invariant 2).
 - **Every change is a sensitive, audited write.** It is refused on a stale
   snapshot (4.2), needs a reason, and is rate-limited. The reason goes both to
   `fpd_audit_log` (`personnel.role.changed`) and to Discord's own audit log,
-  signed with who asked.
+  signed with who asked. The reason is cut to Discord's 512 encoded bytes, a
+  whole character at a time.
+- **Every attempt is audited too.** A refused or failed request writes
+  `personnel.role.attempted`, recording the target, the role, the direction,
+  the reason and why it stopped. The wrapper's own refusal row records only
+  the error code. When the gateway gave no answer, the outcome is recorded as
+  unknown and Discord is read back: no answer is not a no.
+- **A signed request is honoured once.** The gateway refuses the same signed
+  bytes a second time inside the replay window, so a request that added a
+  role cannot be replayed to add it back after it was removed.
 - **Now or not at all.** A role change is never queued in the outbox. A
   promotion that lands an hour after the officer was told it failed is a
   change nobody decided.
@@ -68,6 +87,5 @@ it.
 - The operator keeps two lists in step. A role in only one list is refused:
   by the NUI if it is missing from config, and by the gateway if it is missing
   from its allowlist. Neither failure grants anything.
-- The escalation guard reads the target's roles from the last sync. A role
-  granted in Discord seconds ago may not count yet. That errs toward refusing,
-  never toward allowing.
+- A role change costs one extra read of the target from Discord, so the
+  guard never weighs someone by a snapshot that is out of date.

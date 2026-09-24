@@ -269,6 +269,18 @@ function Perms.ofRoles(roleIds, agencyId)
     return Perms.computeEffective(roleIds, cache.roleMap[agencyId] or {}, cache.groupPermissions or {})
 end
 
+--- Every agency that maps this Discord role to a group. Role actions refuse
+--- a role worth something in another agency: the guards only weigh it in
+--- the actor's own (ADR-022).
+--- @return table list of agency ids
+function Perms.agenciesMapping(roleId)
+    local agencies = {}
+    for agencyId, roles in pairs(cache.roleMap or {}) do
+        if roles[roleId] then agencies[#agencies + 1] = agencyId end
+    end
+    return agencies
+end
+
 --- Permissions in `required` that `effective` does not already satisfy.
 ---
 --- Used to stop an administrator granting a group that is worth more than what

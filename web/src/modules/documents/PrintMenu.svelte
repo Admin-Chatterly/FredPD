@@ -97,6 +97,9 @@
       preview = { paper, copies: response.data.copies };
     } else if (!response.ok) {
       failure = response;
+    } else {
+      // An answer that is not a page is not something to preview.
+      failure = { err: 'internal' };
     }
   }
 

@@ -124,6 +124,9 @@ body[data-standalone='true'] {
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-device);
   overflow: hidden;
+  /* The containing block for anything fixed inside it: a modal (the print
+     preview) covers the device, never the world behind it (6.3). */
+  contain: layout;
   transition: width 120ms ease, height 120ms ease;
 }
 

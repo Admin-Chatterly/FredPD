@@ -168,3 +168,38 @@ describe('discord role actions', () => {
     expect(discord.calls).toHaveLength(0);
   });
 });
+
+describe('the signed scope', () => {
+  it('honours a signed request once, and refuses the same bytes replayed', async () => {
+    const discord = fakeDiscord(204);
+    const config = configWith(true);
+    const app = createServer(config, { discordFetch: discord.fetcher });
+    const body = JSON.stringify({ discordId: MEMBER, roleId: RANK, action: 'add' });
+    const timestamp = Math.floor(Date.now() / 1000);
+    const headers = {
+      [SIGNATURE_HEADER]: sign(config.secret, timestamp, body),
+      [TIMESTAMP_HEADER]: String(timestamp),
+      'content-type': 'application/json',
+    };
+
+    const first = await app.inject({ method: 'POST', url: '/fx/discord/role', payload: body, headers });
+    const replayed = await app.inject({ method: 'POST', url: '/fx/discord/role', payload: body, headers });
+    await app.close();
+
+    expect(first.statusCode).toBe(200);
+    expect(replayed.statusCode).toBe(401);
+    expect(discord.calls).toHaveLength(1);
+  });
+});
+
+describe('the audit reason', () => {
+  it('fits Discord’s 512 encoded bytes, never cutting a letter in half', async () => {
+    const { encodeReason } = await import('./roles.js');
+    const encoded = encodeReason('å'.repeat(400));
+
+    expect(encoded.length).toBeLessThanOrEqual(512);
+    expect(() => decodeURIComponent(encoded)).not.toThrow();
+    expect(decodeURIComponent(encoded)).toMatch(/^å+$/);
+    expect(encodeReason('line one\r\nline two')).toBe(encodeURIComponent('line one line two'));
+  });
+});

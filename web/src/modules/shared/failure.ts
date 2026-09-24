@@ -72,6 +72,7 @@ const REASONS = new Set([
   'needs_permission',
   'exceeds_own',
   'outranks',
+  'target_stale',
   'role_actions_off',
   'role_not_allowed',
   'member_not_found',

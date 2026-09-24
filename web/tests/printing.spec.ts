@@ -152,10 +152,36 @@ test('prints and reads in Swedish', async ({ page }) => {
   await expect(preview.getByRole('button', { name: 'Skriv ut papperskopia' })).toBeVisible();
   await expect(preview.getByRole('button', { name: 'Exportera PDF' })).toBeVisible();
   await preview.getByRole('button', { name: 'Skriv ut papperskopia' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Papperskopian' })).toContainText('ligger i ditt inventarie');
+  await expect(page.getByRole('status').filter({ hasText: 'Papperskopian' })).toContainText('ligger i din packning');
 
   await postPaper(page, 'internal');
   const paper = page.getByRole('article', { name: 'Citation LSPD-T26-000301' });
   await expect(paper.getByText('Intern', { exact: true })).toBeVisible();
   await expect(paper.getByRole('button', { name: 'Lägg undan' })).toBeVisible();
+});
+
+test('a click on the backdrop and then Escape closes the preview, not the interface', async ({ page }) => {
+  await openCitation(page);
+
+  await page.getByRole('button', { name: 'Print…' }).click();
+  const preview = page.getByRole('dialog', { name: 'Print preview' });
+  await expect(preview).toBeVisible();
+
+  // The backdrop covers the device, not the world: its corner, outside the sheet.
+  const device = await page.locator('.fredpd-device').boundingBox();
+  if (!device) throw new Error('no device frame');
+  await page.mouse.click(device.x + 6, device.y + 6);
+  await page.keyboard.press('Escape');
+
+  await expect(preview).toHaveCount(0);
+  await expect(page.locator('nav').first()).toBeVisible();
+});
+
+test('says why a classified record stays off paper, in Swedish', async ({ page }) => {
+  await openCitation(page, 'sv', 'LSPD-T26-000254');
+
+  await page.getByRole('button', { name: 'Skriv ut…' }).click();
+  const preview = page.getByRole('dialog', { name: 'Förhandsgranskning' });
+  await expect(preview.getByText('Begränsat hemlig', { exact: true })).toBeVisible();
+  await expect(preview.getByText(/klassad högre än vad som får skrivas ut på papper/)).toBeVisible();
 });

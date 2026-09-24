@@ -24,7 +24,26 @@ import type { GatewayConfig } from '../config.js';
 
 const API = 'https://discord.com/api/v10';
 const SNOWFLAKE = /^\d{17,20}$/;
-const REASON_MAX = 400;
+/** Discord's limit on `X-Audit-Log-Reason`, counted after URL-encoding. */
+const REASON_MAX_ENCODED = 512;
+
+/**
+ * The reason, URL-encoded and cut to Discord's limit *after* encoding: a
+ * Swedish reason is several encoded bytes a letter in places, and a cut made
+ * before encoding would still overrun. Cut a whole character at a time, so
+ * Discord never decodes half of one.
+ */
+export function encodeReason(reason: string): string {
+  let encoded = '';
+
+  for (const char of reason.replace(/[\r\n]+/g, ' ').trim()) {
+    const piece = encodeURIComponent(char);
+    if (encoded.length + piece.length > REASON_MAX_ENCODED) break;
+    encoded += piece;
+  }
+
+  return encoded;
+}
 
 export type DiscordFetch = (input: string, init: RequestInit) => Promise<Response>;
 
@@ -72,9 +91,7 @@ export function registerDiscordRoutes(scope: FastifyInstance, config: GatewayCon
 
     // Discord shows this in the guild's own audit log. URL-encoded, because
     // that is the header's contract, and bounded.
-    const auditReason = encodeURIComponent(
-      (typeof reason === 'string' ? reason : '').replace(/[\r\n]+/g, ' ').trim().slice(0, REASON_MAX),
-    );
+    const auditReason = encodeReason(typeof reason === 'string' ? reason : '');
 
     let response: Response;
     try {

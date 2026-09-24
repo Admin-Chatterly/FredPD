@@ -170,7 +170,7 @@ test('promotes an officer through a Discord role, with a reason, after confirmin
 
   const roles = page.getByRole('region', { name: 'Discord roles' });
   await expect(roles.getByText('Inspektör')).toBeVisible();
-  await roles.getByRole('button', { name: 'Promote' }).click();
+  await roles.getByRole('button', { name: 'Promote: Inspektör' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Promote' });
   await expect(dialog).toContainText('Give Inspektör?');
@@ -178,7 +178,8 @@ test('promotes an officer through a Discord role, with a reason, after confirmin
   await dialog.getByRole('button', { name: 'Promote' }).click();
 
   await expect(roles.getByRole('status')).toHaveText('Inspektör was given.');
-  await expect(roles.getByRole('button', { name: 'Demote' })).toBeVisible();
+  // Focus comes back to the same row, now offering the opposite verb.
+  await expect(roles.getByRole('button', { name: 'Demote: Inspektör' })).toBeFocused();
 });
 
 test('never offers an officer a change to their own roles', async ({ page }) => {
@@ -195,12 +196,12 @@ test('Escape closes the role dialog, not the interface', async ({ page }) => {
   await page.getByRole('button', { name: '12-41' }).click();
 
   const roles = page.getByRole('region', { name: 'Discord roles' });
-  await roles.getByRole('button', { name: 'Dismiss' }).click();
+  await roles.getByRole('button', { name: 'Dismiss: Polis' }).click();
   await expect(page.getByRole('dialog', { name: 'Dismiss' })).toBeVisible();
 
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(roles.getByRole('button', { name: 'Dismiss' })).toBeFocused();
+  await expect(roles.getByRole('button', { name: 'Dismiss: Polis' })).toBeFocused();
 });
 
 test('hires somebody new by Discord id, and says why when Discord does not know them', async ({ page }) => {
@@ -215,14 +216,24 @@ test('hires somebody new by Discord id, and says why when Discord does not know 
   await page.getByLabel('Discord user id').fill('300000000000000003');
   await page.getByRole('button', { name: 'Hire', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Hired' })).toContainText('Hired with Polis.');
+  await expect(page.getByRole('button', { name: 'Hire a new member…' })).toBeFocused();
 });
 
-test('shows role actions in Swedish', async ({ page }) => {
+test('promotes in Swedish, and refuses in Swedish', async ({ page }) => {
   await page.goto('/?locale=sv');
   await page.locator('nav').first().getByRole('button', { name: 'Personal' }).click();
   await page.getByRole('button', { name: '12-41' }).click();
 
   const roles = page.getByRole('region', { name: 'Discord-roller' });
-  await expect(roles.getByRole('button', { name: 'Befordra' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Anställ en ny medlem…' })).toBeVisible();
+  await roles.getByRole('button', { name: 'Befordra: Inspektör' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Befordra' });
+  await dialog.getByLabel(/Skäl/).fill('Klarade inspektörsprovet');
+  await dialog.getByRole('button', { name: 'Befordra' }).click();
+  await expect(roles.getByRole('status')).toHaveText('Rollen Inspektör har tilldelats.');
+
+  await page.getByRole('button', { name: 'Anställ en ny medlem…' }).click();
+  await page.getByLabel('Användar-id i Discord').fill('999999999999999999');
+  await page.getByLabel(/Skäl/).fill('Klar med utbildningen');
+  await page.getByRole('button', { name: 'Anställ', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Discord-användaren finns inte på servern');
 });

@@ -487,7 +487,10 @@ end
 --- Role actions are offered only when this server and the gateway both say
 --- so; either one off is "not here", never an error to retry.
 local function roleActionsOn()
+    -- And FredPD must be reading Discord: without the read sync nothing here
+    -- can weigh a role or a target, and every guard below would be a no-op.
     return roleConfig().enabled == true and FredPD.Bridge.gateway.service.isEnabled()
+        and FredPD.Core.discord.enabled()
 end
 
 --- Discord's own names for the managed roles, read at most every ten
@@ -552,11 +555,57 @@ route.define({
 
 --- One role change, for either route. `kind` is the route's own: the hire
 --- route never touches a rank and the rank route never touches the hire role.
+--- Every role request that does not end in a change is audited here, with
+--- what was asked and why it stopped: the wrapper's own refusal row carries
+--- only the error code, and an attempt to demote the commander is exactly
+--- what internal affairs needs to read in full (invariant 11).
+local function auditRole(session, outcome, input, targetDiscordId, extra)
+    local detail = {
+        officerId = input.officerId,
+        targetDiscordId = targetDiscordId,
+        roleId = input.roleId,
+        grant = input.grant,
+        reason = input.reason,
+    }
+    for key, value in pairs(extra or {}) do detail[key] = value end
+
+    FredPD.Core.audit.write({
+        action = 'personnel.role.attempted',
+        discordId = session.discordId,
+        agencyId = session.agencyId,
+        subjectType = 'officer',
+        subjectId = input.officerId and tostring(input.officerId) or nil,
+        outcome = outcome,
+        detail = detail,
+    })
+end
+
+--- One role change, for either route. `kind` is the route's own: the hire
+--- route never touches a rank and the rank route never touches the hire role.
 local function changeRole(session, input, kind)
-    if not roleActionsOn() then return route.refuse(FredPD.ErrorCode.CONFLICT, { roleId = 'role_actions_off' }) end
+    local function refuse(code, why, targetDiscordId, extra)
+        extra = extra or {}
+        extra.why = why
+        auditRole(session, 'denied', input, targetDiscordId, extra)
+        return route.refuse(code, { roleId = why })
+    end
+
+    if not roleActionsOn() then return refuse(FredPD.ErrorCode.CONFLICT, 'role_actions_off') end
+
+    -- A session on the ESX-job fallback holds no Discord grant at all; it
+    -- never drives a Discord role (invariant 2).
+    if session.localFallback then return refuse(FredPD.ErrorCode.FORBIDDEN, 'needs_permission') end
 
     local role = service.manageableRoles(roleConfig().roles)[input.roleId]
-    if not role or role.kind ~= kind then return route.refuse(FredPD.ErrorCode.FORBIDDEN, { roleId = 'not_allowed' }) end
+    if not role or role.kind ~= kind then return refuse(FredPD.ErrorCode.FORBIDDEN, 'not_allowed') end
+
+    local perms = FredPD.Core.perms
+
+    -- A role worth something in another agency is weighed only in this one
+    -- below, so it is not one this screen hands out.
+    for _, agencyId in ipairs(perms.agenciesMapping(role.id)) do
+        if agencyId ~= session.agencyId then return refuse(FredPD.ErrorCode.FORBIDDEN, 'not_allowed') end
+    end
 
     -- The target: an officer on this agency's roster, or -- only to hire --
     -- a Discord member who is not on it yet.
@@ -574,22 +623,37 @@ local function changeRole(session, input, kind)
         return route.refuse(FredPD.ErrorCode.INVALID, { officerId = 'required' })
     end
 
-    local perms = FredPD.Core.perms
+    -- The target is weighed on what Discord says now, not on the last sync:
+    -- a role given to them in Discord minutes ago is what makes them the
+    -- actor's superior. A target with no fresh row is refused -- except a new
+    -- hire by Discord id, who has nothing to outrank anybody with, and whose
+    -- role is capped by "worth no more than the actor holds" regardless.
+    FredPD.Core.discord.refreshOne(targetDiscordId, true)
+    local _, age = perms.memberRoles(targetDiscordId)
+    local newHire = input.discordId ~= nil and input.officerId == nil
+    if (age == nil and not newHire)
+        or (age ~= nil and age > FredPD.Config.server.discord.sensitiveStaleAfterSeconds)
+    then
+        return refuse(FredPD.ErrorCode.CONFLICT, 'target_stale', targetDiscordId)
+    end
+
+    -- A superuser's Discord roles are not a non-superuser's to take (9b).
+    local targetPermissions = perms.effectiveFor(targetDiscordId, session.agencyId)
+    if repo.isSuperuser(targetDiscordId) then targetPermissions = { ['*'] = true } end
+
     local ok, why = service.roleChange({
         role = role,
         grant = input.grant,
         actorDiscordId = session.discordId,
         targetDiscordId = targetDiscordId,
         actorPermissions = session.permissions,
-        targetPermissions = perms.effectiveFor(targetDiscordId, session.agencyId),
+        targetPermissions = targetPermissions,
         rolePermissions = perms.ofRoles({ role.id }, session.agencyId),
         superuser = session.superuser == true,
         satisfies = perms.satisfies,
         missing = perms.missing,
     })
-    if not ok then
-        return route.refuse(FredPD.ErrorCode.FORBIDDEN, { roleId = why })
-    end
+    if not ok then return refuse(FredPD.ErrorCode.FORBIDDEN, why, targetDiscordId) end
 
     local reason = ('%s (%s): %s'):format(
         session.callsign or session.name or '', session.discordId, input.reason)
@@ -601,21 +665,41 @@ local function changeRole(session, input, kind)
         -- not a request I understand", in this screen's vocabulary.
         if err == 'disabled' then err = 'role_actions_off' end
         if err == 'invalid' then err = 'discord_error' end
-        return route.refuse(FredPD.ErrorCode.CONFLICT, { roleId = err })
+
+        -- No answer is not a no: Discord may have made the change after the
+        -- gateway gave up waiting. Audited as unknown, and read back.
+        if err == 'discord_unreachable' or err == 'gateway_unavailable' then
+            auditRole(session, 'error', input, targetDiscordId, { why = err, result = 'unknown' })
+            pcall(FredPD.Core.discord.refreshOne, targetDiscordId, true)
+            return route.refuse(FredPD.ErrorCode.CONFLICT, { roleId = err })
+        end
+
+        return refuse(FredPD.ErrorCode.CONFLICT, err, targetDiscordId)
     end
 
     -- Discord is the truth: read it back rather than assume, then let every
-    -- open session -- the target's included -- re-derive what it may do.
-    FredPD.Core.discord.refreshOne(targetDiscordId, true)
-    FredPD.Core.session.refreshAll()
+    -- open session -- the target's included -- re-derive what it may do. A
+    -- failure here must not turn a change Discord made into an error with no
+    -- audit row: the change stands, and the next sync picks it up.
+    local refreshed = pcall(function()
+        FredPD.Core.discord.refreshOne(targetDiscordId, true)
+        FredPD.Core.session.refreshAll()
+    end)
+    if not refreshed then print('[fredpd] role actions: the change was made; the read-back failed and waits for the next sync') end
 
-    return { id = officerId or 0, roleId = role.id, kind = role.kind, grant = input.grant }
+    return {
+        id = officerId or 0,
+        roleId = role.id,
+        kind = role.kind,
+        grant = input.grant,
+        targetDiscordId = targetDiscordId,
+    }
 end
 
 local function roleAuditDetail(input, result)
     return {
         officerId = input.officerId,
-        discordId = input.discordId,
+        targetDiscordId = result.targetDiscordId,
         roleId = input.roleId,
         kind = result.kind,
         grant = input.grant,

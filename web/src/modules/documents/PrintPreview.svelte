@@ -77,7 +77,23 @@
     'border border-[var(--color-border)] px-3 py-1 text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] aria-disabled:opacity-60';
 </script>
 
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-surface)] p-4">
+<!--
+  Fixed inside the device (`contain: layout` on `.fredpd-device`), so it
+  covers the MDT and not the world. Escape is caught on the backdrop too: a
+  click there leaves focus on nothing, and the next Escape would otherwise
+  reach `main.ts` and close the whole interface.
+-->
+<div
+  class="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-surface)] p-4"
+  role="presentation"
+  onkeydown={onKeydown}
+  onmousedown={(event) => {
+    if (event.target === event.currentTarget) {
+      event.preventDefault();
+      body?.focus();
+    }
+  }}
+>
   <div
     bind:this={box}
     role="dialog"
@@ -85,7 +101,6 @@
     aria-labelledby="print-preview-title"
     tabindex="-1"
     class="flex max-h-full w-full max-w-2xl flex-col border border-[var(--color-focus)] bg-[var(--color-panel)] text-[var(--color-ink)]"
-    onkeydown={onKeydown}
   >
     <p id="print-preview-title" class="border-b border-[var(--color-border)] px-5 py-2 text-xs font-semibold">
       {t('document.preview.title')}

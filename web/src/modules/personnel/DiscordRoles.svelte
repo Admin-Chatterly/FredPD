@@ -62,6 +62,7 @@
 
   // Hiring somebody new.
   let hiring = $state(false);
+  let hireToggle = $state<HTMLButtonElement | null>(null);
   let hireForm = $state({ discordId: '', roleId: '' });
 
   const messages = $derived(fieldList(failure, FIELD_LABELS));
@@ -165,6 +166,9 @@
     hireForm.discordId = '';
     reason = '';
     hiring = false;
+    // The form, and the button that was focused in it, are gone.
+    await tick();
+    hireToggle?.focus();
     onChanged?.();
   }
 </script>
@@ -205,7 +209,8 @@
               {#if mayChange(role)}
                 <button
                   type="button"
-                  class="border border-[var(--color-border)] px-2 py-0.5"
+                  class="border border-[var(--color-border)] px-2 py-0.5 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+                  aria-label={t('personnel.roles.actionFor', { verb: verb(role, !role.held), role: role.name })}
                   disabled={busy || pending !== null}
                   onclick={(event) => ask(role, !role.held, event)}
                 >
@@ -238,7 +243,7 @@
                 minlength="3"
                 maxlength="200"
                 rows="2"
-                class="border border-[var(--color-border)] px-2 py-1"
+                class="border border-[var(--color-border)] px-2 py-1 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
               ></textarea>
             </label>
           </ConfirmDialog>
@@ -250,15 +255,22 @@
   {:else if answer.may?.hire && hireRoles.length > 0}
     <div>
       <button
+        bind:this={hireToggle}
         type="button"
-        class="border border-[var(--color-border)] px-3 py-1 text-xs"
+        class="border border-[var(--color-border)] px-3 py-1 text-xs focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
         aria-expanded={hiring}
         onclick={() => (hiring = !hiring)}
       >
         {t('personnel.roles.hireNew')}
       </button>
       {#if hiring}
-        <form class="mt-2 flex flex-wrap items-end gap-3 border border-[var(--color-border)] p-3 text-xs" onsubmit={hire}>
+        <!-- `novalidate`: the server's own, translated refusal is the message,
+             never the browser's English bubble. -->
+        <form
+          class="mt-2 flex flex-wrap items-end gap-3 border border-[var(--color-border)] p-3 text-xs"
+          novalidate
+          onsubmit={hire}
+        >
           <label class="flex flex-col gap-1">
             {t('personnel.roles.discordId')}
             <input
@@ -267,12 +279,12 @@
               inputmode="numeric"
               pattern={'[0-9]{17,20}'}
               maxlength="20"
-              class="border border-[var(--color-border)] px-2 py-1 font-[family-name:var(--font-mono)]"
+              class="border border-[var(--color-border)] px-2 py-1 font-[family-name:var(--font-mono)] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
             />
           </label>
           <label class="flex flex-col gap-1">
             {t('personnel.roles.role')}
-            <select bind:value={hireForm.roleId} class="border border-[var(--color-border)] px-2 py-1">
+            <select bind:value={hireForm.roleId} class="border border-[var(--color-border)] px-2 py-1 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]">
               {#each hireRoles as role (role.id)}
                 <option value={role.id}>{role.name}</option>
               {/each}
@@ -285,10 +297,14 @@
               required
               minlength="3"
               maxlength="200"
-              class="border border-[var(--color-border)] px-2 py-1"
+              class="border border-[var(--color-border)] px-2 py-1 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
             />
           </label>
-          <button type="submit" class="border border-[var(--color-border)] px-3 py-1" disabled={busy}>
+          <button
+            type="submit"
+            class="border border-[var(--color-border)] px-3 py-1 aria-disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+            aria-disabled={busy}
+          >
             {t('personnel.roles.hire')}
           </button>
         </form>

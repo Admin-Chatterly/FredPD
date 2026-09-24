@@ -200,7 +200,7 @@
     "pdf_unavailable": "the PDF service did not answer; try again",
     "classified": "the record is classified above what may be printed on paper",
     "compartmented": "a record only certain units may read, or a sealed one, is never printed on paper",
-    "breakglass": "a record opened with emergency access is not printed on paper",
+    "breakglass": "a record opened with break-glass is not printed on paper",
     "unclassified": "the record has no valid classification",
     "export_restricted": "a PDF of a restricted record needs the export permission",
     "self": "nobody changes their own roles",
@@ -214,7 +214,8 @@
     "bot_token_rejected": "Discord rejected the role bot’s token",
     "rate_limited": "Discord asked for a pause; try again shortly",
     "discord_error": "Discord could not make the change",
-    "discord_unreachable": "Discord did not answer; try again"
+    "discord_unreachable": "Discord did not answer; try again",
+    "target_stale": "their Discord roles could not be read just now; try again shortly"
   },
   "placement": {
     "station_terminal": "Station terminal",
@@ -2633,7 +2634,8 @@
       "confirmRemove": "Take {role} away? The change is made in Discord and takes effect when FredPD reads it back.",
       "granted": "{role} was given.",
       "removed": "{role} was taken away.",
-      "hired": "Hired with {role}. They appear on the roster the next time they connect."
+      "hired": "Hired with {role}. They appear on the roster the next time they connect.",
+      "actionFor": "{verb}: {role}"
     }
   },
   "booking": {
@@ -3162,7 +3164,7 @@
       "offences": "Offences",
       "people": "People named",
       "ground": "Ground",
-      "arrestedAt": "Arrested at",
+      "arrestedAt": "Time of arrest",
       "placeOffence": "Place of offence",
       "placeArrest": "Place of arrest"
     },
@@ -3206,9 +3208,9 @@
       "title": "Print preview"
     },
     "copy": {
-      "classified": "This record is classified above what may be printed on paper. Export a PDF instead.",
+      "classified": "This record is classified above what may be printed on paper.",
       "compartmented": "A record only certain units may read, or a sealed record, is never printed on paper.",
-      "breakglass": "A record opened with emergency access is not printed on paper.",
+      "breakglass": "A record opened with break-glass is not printed on paper.",
       "unclassified": "This record has no valid classification, so no copy can be made.",
       "export_restricted": "A PDF of a restricted record needs the export permission.",
       "no_paper": "The paper item is not set up on this server.",
