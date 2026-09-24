@@ -81,9 +81,6 @@ const SERVER_CALLED: Record<string, string> = {
   'call.self_initiate':
     'client/status.lua and the ox_target traffic-stop option raise it from the world; ' +
     'raising a call at the console is call.create',
-  'call.attach_nearest': 'the "attach to nearest call" key in client/status.lua',
-  'call.clear_mine': 'the "clear my call" key in client/status.lua; the card uses call.clear',
-  'unit.progress': 'the status keys in client/status.lua; the card uses call.status and unit.status',
   'forensics.observe':
     'a sensor in fredpd_forensics reports it, not the NUI: the satellite calls ' +
     'lib.callback.await on the global event name the core registered (ADR-011)',

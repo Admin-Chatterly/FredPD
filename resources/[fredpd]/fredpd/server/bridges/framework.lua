@@ -174,7 +174,8 @@ function Framework.searchCharacters(term, limit)
     end)
 
     if not ok then
-        print(('[fredpd] esxData.characters: query failed against `%s` -- check the column names in config/server.lua match your framework fork. (%s)')
+        print(('[fredpd] esxData.characters: query failed against `%s` -- check the column names '
+            .. 'in config/server.lua match your framework fork. (%s)')
             :format(config.table, tostring(rows)))
         return {}
     end
@@ -222,7 +223,8 @@ function Framework.searchOwnedVehicles(term, limit)
     end)
 
     if not ok then
-        print(('[fredpd] esxData.vehicles: query failed against `%s` -- check the column names in config/server.lua match your framework fork. (%s)')
+        print(('[fredpd] esxData.vehicles: query failed against `%s` -- check the column names '
+            .. 'in config/server.lua match your framework fork. (%s)')
             :format(config.table, tostring(rows)))
         return {}
     end

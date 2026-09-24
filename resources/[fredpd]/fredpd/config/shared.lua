@@ -58,18 +58,4 @@ FredPD.Config.shared = {
     --- `true` makes the key work only while seated in a vehicle, like a
     --- car-mounted MDC. Feel only: the server checks every route regardless.
     mdtInVehicleOnly = false,
-
-    --- Per-module feature flags that the NUI needs in order to draw its rail.
-    --- The server still decides what a session may actually open (invariant 4);
-    --- these only keep the UI from advertising a module that is switched off.
-    modules = {
-        records = true,
-        dispatch = false, -- M4
-        evidence = false, -- M3
-        lab = false, -- M3
-        intel = true,
-        court = false, -- M6
-        personnel = false, -- M6
-        admin = true,
-    },
 }

@@ -52,14 +52,16 @@ ska — gå direkt till [avsnitt 10, Felsökning](#10-felsökning), eller kör
 | `es_extended` (ESX) | **Ja** | Karaktärer, namn, jobb |
 | `ox_lib` | **Ja** | Callbacks, menyer, dialoger |
 | `oxmysql` | **Ja** | Databasåtkomst |
-| `p_policejob` | Nej | Tjänstestatus, grad, beslag |
-| `esx_society` | Nej | Fordonsdepån registrerar bilar på myndigheten |
+| `ox_target` | Nej, men rekommenderas | Kontrollera ID, bötfäll, gripa, köra reg.nr och beslagta fordon direkt på personen eller bilen |
+| `p_policejob` | Nej | Tjänstestatus, grad, och fängelset en dom skickas till (`JailPlayer`) |
+| `esx_billing` | Nej | Ordningsböter skickas som riktiga fakturor och markeras betalda av sig själva |
+| `esx_society` | Nej | Fordonsdepån registrerar bilar på myndigheten; böter betalas in till myndighetens konto |
 | `esx_textui` | Nej | "Tryck E"-rutan (annars används ox_lib) |
 | `esx_menu_dialog` | Nej | Menyer i världen (annars används ox_lib) |
 
-De fyra sista är frivilliga. Saknas någon av dem loggar FredPD en varning vid
-start och fortsätter — varje villkor de svarar på faller då tillbaka till
-"nej", aldrig till "ja".
+Alla utom de tre första är frivilliga. Saknas någon av dem loggar FredPD en
+varning vid start och fortsätter — varje villkor de svarar på faller då tillbaka
+till "nej", aldrig till "ja".
 
 ### På maskinen
 
@@ -107,7 +109,16 @@ Migrationerna är **append-only**: en fil som en gång körts ändras aldrig, de
 rättas med en ny migration. Seed-filen går att köra om hur många gånger som
 helst utan att det blir dubbletter.
 
-Alla tabeller heter `fpd_*`, så inget i ditt befintliga ESX-schema rörs.
+Alla tabeller heter `fpd_*`. FredPD läser ESX:s egna tabeller och skriver i två
+av dem, och databasanvändaren FredPD ansluter med behöver då de rättigheterna:
+
+| Tabell | Rättighet | Varför |
+| --- | --- | --- |
+| `users`, `owned_vehicles` | `SELECT` | Förifyller personer och fordon från ESX |
+| `owned_vehicles` | `UPDATE` | Ett beslagtaget fordon står inte i garaget förrän det lämnas ut (ADR-016) |
+| `billing` | `SELECT`, `DELETE` | Ser att en bot är betald, och drar tillbaka fakturan när boten makuleras (ADR-015) |
+
+Använder du samma databasanvändare som ESX har den redan allt detta.
 
 Seed-filen skapar behörighets**grupperna**, men kopplar inga Discord-roller till
 dem. Roll-ID:n är unika för just din Discord-server, så den kopplingen görs i
@@ -146,18 +157,24 @@ Starta beroendena före FredPD:
 ensure ox_lib
 ensure oxmysql
 ensure es_extended
+ensure ox_target
+# Frivilliga, men gör mest nytta: fängelse, fakturor, myndighetens konto.
+ensure p_policejob
+ensure esx_billing
+ensure esx_society
 
 ensure fredpd_assets
 ensure fredpd
+ensure fredpd_forensics
 ```
 
 Inga convars behövs. All konfiguration ligger i en enda fil — se nästa steg.
 
-> `fredpd_forensics` och `fredpd_surveillance` ska **inte** startas ännu. De är
-> tomma skal för M3 och M5 och kräver `ox_target` respektive `pma-voice`, så
-> utan dem vägrar FXServer starta dem och fyller konsolen med fel som ser ut som
-> en trasig installation. Bevisregistret i sig ligger i kärnresursen (ADR-011),
-> inte i dem.
+> `fredpd_forensics` (spår, bevisinsamling, fingeravtrycksläsare) kräver
+> `ox_target`. `fredpd_surveillance` kräver `pma-voice` — starta den bara om
+> servern har det, annars vägrar FXServer starta den och fyller konsolen med
+> fel som ser ut som en trasig installation. Bevisregistret i sig ligger i
+> kärnresursen (ADR-011), inte i dem.
 
 ---
 
@@ -288,8 +305,9 @@ första gång.
 
 ## 7. Steg 6 — Fordonsflottan
 
-Fordonsdepån visar inga bilar förrän du lagt in dem. Det finns ingen
-flotteditor i gränssnittet ännu, så raderna läggs in i databasen.
+Fordonsdepån visar inga bilar förrän du lagt in dem. Enklast är MDT:n:
+**Administration → Fordonspark** (kräver `garage.fleet.manage`). Vill du hellre
+lägga in raderna direkt i databasen ser det ut så här:
 
 ```sql
 INSERT INTO fpd_fleet (agency_id, model, label_key, permission, certification, livery, sort_order)
@@ -474,21 +492,16 @@ Ge någon behörighet genom att koppla en Discord-roll till `intel_analyst`,
 
 ## 12. Vad som inte är byggt ännu
 
-Var beredd på det här — det är inte fel, det är kommande milstolpar:
+Var beredd på det här — det är inte fel, det är kommande arbete:
 
-- **Migrationskörare.** Migrationen körs för hand tills vidare.
-- **Flotteditor i gränssnittet.** `fpd_fleet` redigeras i databasen.
-- **Tomma sidor i listan.** Ger du någon `patrol` eller `dispatch` dyker
-  *Register* och *Kommunikation* upp i listan till vänster utan att ha någon
-  sida bakom sig ännu.
-- **Certifieringar** (M6). En flottrad med `certification` visas för ingen ännu.
-- **Register, ledningscentral, bevis, laboratorium, domstol** — M2 till M6.
+- **Migrationskörare.** Migrationerna körs för hand tills vidare.
 - **Länkdiagrammet** (`/board` i PD-Span) är ännu inte byggt i MDT:n.
 - **Uppladdade bilder som bevis** kräver gateway-tjänstens mediadel, som inte är
   byggd. Externa länkar (Medal, YouTube, Streamable, bildadresser) fungerar.
-- **Beslag** ligger kvar hos `p_policejob` och är inte tänkt att flytta.
-
-Ingenting av Lua-koden har ännu körts på en riktig FiveM-server. Logiken täcks av
-enhetstester, men de delar som använder spelets egna funktioner — att skapa
-gestalter, sikta på föremål, ta fokus till gränssnittet — är oprövade i skarpt
-läge. Räkna med att det är där de första problemen dyker upp.
+- **Kommandoraden** (Ctrl+K i MDT:n) kan söka (`REG`, `N`, `VAP`, `TEL`, `ADR`),
+  sätta status (`ST ER`), ansluta till närmaste händelse (`TILL`) och avsluta den
+  (`KLAR`). Att öppna en händelse, anmälan eller ett bevis med nummer, skicka
+  meddelanden och skapa poster med `NY` är inte byggt.
+- **Fängelsets tidsenhet.** p_policejobs `JailPlayer` dokumenterar inte om
+  `jail` är minuter. FredPD skickar minuter; justera `jail.minutesPerMonth` i
+  `config/server.lua` om fängelset räknar annorlunda.

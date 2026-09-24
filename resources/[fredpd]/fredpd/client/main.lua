@@ -319,6 +319,10 @@ local NUI_ROUTES <const> = {
     'call.link',
     'unit.list',
     'unit.status',
+    -- The command line (Appendix F): the routes the in-game status keys call.
+    'unit.progress',
+    'call.attach_nearest',
+    'call.clear_mine',
     'unit.manage',
     'unit.emergency',
     'broadcast.create',

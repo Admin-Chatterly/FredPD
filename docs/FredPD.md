@@ -1985,6 +1985,8 @@ Commands are localized through aliases (Swedish aliases in parentheses).
 | `MSG <unit> <text>` (`MED`) | Send message |
 | `NEW R`, `NEW BOLO`, `NEW CASE` (`NY`) | Create record |
 
+**Built** (its own row under the title bar, as 6.3 draws it; Ctrl+K focuses it): `P`/`REG`, `N`, `S`/`VAP`, `PH`/`TEL`, `A`/`ADR` open the query tab and run the search. `ST <code>` sets the unit status, going through `unit.progress` for ER and OS so the call moves too. `ATT`/`TILL` takes no call number; it attaches to the nearest open call (`call.attach_nearest`). `CLR`/`KLAR` clears the officer's own call, as handled on scene unless a code (`HOS`, `RPT`, `ARR`, `CIT`, `WARN`, `GOA`, `UTL`, `UNF`) or a disposition name follows. Anything else is run as a search. Parsing is `web/src/lib/command.ts`; each command is an intent or an ordinary route. **Not built:** `C`, `R`, `E`, `MSG` and `NEW` (and their aliases) answer "not available yet" rather than running as a search.
+
 ## Appendix G — References
 
 - noobsystems/evidences: https://github.com/noobsystems/evidences

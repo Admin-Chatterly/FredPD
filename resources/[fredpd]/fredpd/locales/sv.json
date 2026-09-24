@@ -2788,5 +2788,19 @@
     },
     "withheld": "Vissa poster hölls inne. Sök i Slagning med ett ärende för att se dem.",
     "chosen": "En post är vald"
+  },
+  "command": {
+    "invalid": {
+      "empty": "Skriv ett kommando eller något att söka efter.",
+      "needs_term": "Skriv ett sökbegrepp efter kommandot, till exempel REG ABC123.",
+      "unknown_status": "Okänd statuskod. Använd AV, ER, OS, BU, TR, ST eller OOS.",
+      "unknown_disposition": "Okänd avslutskod. Använd HOS, RPT, ARR, CIT, WARN, GOA, UTL eller UNF.",
+      "not_built": "Det kommandot finns inte ännu."
+    },
+    "prompt": "Kommando",
+    "error": {
+      "not_assigned": "Du är inte kopplad till någon händelse.",
+      "none_nearby": "Det finns ingen öppen händelse i närheten."
+    }
   }
 }

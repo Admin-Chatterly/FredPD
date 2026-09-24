@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { nui } from './lib/nui';
   import { t, isLocale, setLocale } from './lib/i18n';
   import { setDepartmentTimezone } from './lib/time';
   import { onIntent, parseIntent, setIntent } from './lib/intent';
+  import { parseCommand } from './lib/command';
   import { setAllowedModules } from './lib/modules';
   import type { ErrorCode } from '@fredpd/schema';
   import type { Session } from './lib/types';
@@ -116,6 +118,105 @@
       if (session?.modules.includes(intent.module)) current = intent.module;
     }),
   );
+
+  /**
+   * The command line (Appendix F). A query opens the query screen through an
+   * intent; a status, attach or clear is the same route the status keys in
+   * the game call. The server decides every one of them.
+   */
+  let commandInput = $state<HTMLInputElement | null>(null);
+  let commandText = $state('');
+  let commandNote = $state<{ text: string; error: boolean } | null>(null);
+  let commandBusy = $state(false);
+
+  /** What a refusal means here, in the officer's terms where the route's own
+   * field reason says more than the generic error does. */
+  const COMMAND_REASONS = new Set(['not_assigned', 'none_nearby']);
+
+  function refusalText(response: { err: ErrorCode; fields?: Record<string, string> }): string {
+    const reason = response.fields?.['callId'];
+    return reason && COMMAND_REASONS.has(reason)
+      ? t(`command.error.${reason}`)
+      : t(`error.${response.err}`);
+  }
+
+  async function runCommand(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    if (commandBusy) return;
+
+    const command = parseCommand(commandText);
+
+    if (command.kind === 'invalid') {
+      commandNote = { text: t(`command.invalid.${command.reason}`), error: true };
+      return;
+    }
+
+    if (command.kind === 'query') {
+      // Navigation only to a screen this session could click to anyway.
+      if (!session?.modules.includes('records')) {
+        commandNote = { text: t('error.forbidden'), error: true };
+        return;
+      }
+
+      setIntent({
+        module: 'records',
+        tab: 'query',
+        term: command.term,
+        ...(command.type ? { type: command.type } : {}),
+      });
+      commandText = '';
+      commandNote = null;
+      return;
+    }
+
+    commandBusy = true;
+
+    let response;
+    let done: string;
+
+    if (command.kind === 'status') {
+      // En route and on scene move the call along with the unit, exactly as
+      // the in-game keys do; the rest are the unit's own business.
+      const progress = command.status === 'en_route' || command.status === 'on_scene';
+      response = await nui.call(progress ? 'unit.progress' : 'unit.status', { status: command.status });
+      done = t('status.done', { status: t(`cad.unitStatus.${command.status}`) });
+    } else if (command.kind === 'attach') {
+      response = await nui.call<{ callNumber?: string }>('call.attach_nearest', {});
+      done = response.ok ? t('status.attached', { number: response.data.callNumber ?? '' }) : '';
+    } else {
+      response = await nui.call('call.clear_mine', { disposition: command.disposition });
+      // Says which ending was recorded: a bare CLR records "handled on scene".
+      done = t('cad.log.cleared', { disposition: t(`cad.disposition.${command.disposition}`) });
+    }
+
+    commandBusy = false;
+
+    if (response.ok) {
+      commandText = '';
+      commandNote = { text: done, error: false };
+    } else {
+      commandNote = { text: refusalText(response), error: true };
+    }
+
+    await tick();
+    commandInput?.focus();
+  }
+
+  // Ctrl+K (Cmd+K) puts the cursor in the command line from anywhere.
+  $effect(() => {
+    function focusCommand(event: KeyboardEvent): void {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        // Never out of an open confirmation: its focus trap would lose the
+        // officer, and Esc would then close the whole MDT under it.
+        if (document.querySelector('[aria-modal="true"]')) return;
+        event.preventDefault();
+        commandInput?.focus();
+      }
+    }
+
+    window.addEventListener('keydown', focusCommand);
+    return () => window.removeEventListener('keydown', focusCommand);
+  });
 
   $effect(() =>
     nui.on('fredpd:open', (message) => {
@@ -266,6 +367,53 @@
       </button>
     </div>
   </header>
+
+  <!--
+    The command line (Appendix F), in its own row under the title bar as 6.3
+    draws it: a visible label, the line, and the answer beside it with room
+    to be read in full.
+  -->
+  {#if session}
+    <form
+      class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-[var(--color-border)] px-4 py-1.5"
+      onsubmit={runCommand}
+    >
+      <label for="fredpd-command" class="text-xs font-semibold">{t('command.prompt')}</label>
+      <input
+        id="fredpd-command"
+        bind:this={commandInput}
+        bind:value={commandText}
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        aria-keyshortcuts="Control+K"
+        aria-describedby="fredpd-command-note"
+        placeholder={t('shell.commandPlaceholder')}
+        readonly={commandBusy}
+        aria-busy={commandBusy}
+        oninput={() => (commandNote = null)}
+        onkeydown={(event) => {
+          // Esc abandons a half-typed command; only an empty line lets it
+          // through to close the MDT.
+          if (event.key === 'Escape' && commandText !== '') {
+            event.stopPropagation();
+            commandText = '';
+            commandNote = null;
+          }
+        }}
+        class="w-72 max-w-full shrink-0 border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 font-[family-name:var(--font-mono)] text-xs focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+      />
+      <span
+        id="fredpd-command-note"
+        aria-live="polite"
+        class="min-w-0 flex-1 text-xs"
+        class:text-[var(--color-alert)]={commandNote?.error}
+        class:text-[var(--color-ink-muted)]={!commandNote?.error}
+      >
+        {commandNote?.text ?? ''}
+      </span>
+    </form>
+  {/if}
 
   <div class="flex min-h-0 flex-1">
     <!-- Module rail: only what this session is permitted to open. The server

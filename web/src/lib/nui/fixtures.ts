@@ -6781,6 +6781,32 @@ export const fixtures: FixtureSet = {
       return { id: OWN_OFFICER_ID, status };
     },
 
+    // The command line's ST ER / ST OS, ATT and CLR (Appendix F): the same
+    // routes the in-game status keys call.
+    'unit.progress': (input) => fixtures.ok['unit.status']!(input),
+
+    'call.attach_nearest': () => {
+      const open = cadCalls.find(
+        (row) =>
+          (row.status === 'pending' || row.status === 'dispatched') &&
+          !liveOn(row.id).some((assignment) => assignment.officerId === OWN_OFFICER_ID),
+      );
+      if (!open) return refuse('not_found', { callId: 'none_nearby' });
+
+      const joined = fixtures.ok['call.self_assign']!({ callId: open.id });
+      if (isRefusal(joined)) return joined;
+
+      return { id: open.id, callNumber: open.callNumber };
+    },
+
+    'call.clear_mine': (input) => {
+      const { disposition } = input as { disposition: string };
+      const mine = cadAssignments.find((row) => row.officerId === OWN_OFFICER_ID && row.active === 1);
+      if (!mine) return refuse('conflict', { callId: 'not_assigned' });
+
+      return fixtures.ok['call.clear']!({ callId: mine.callId, disposition });
+    },
+
     'unit.manage': (input) => {
       const body = input as {
         officerId: number;

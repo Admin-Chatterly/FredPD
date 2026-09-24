@@ -302,7 +302,7 @@ RegisterCommand('fredpd_superuser', function(source, args)
     -- and awaiting one inside a command handler would block the scheduler
     -- (same reason fredpd_setup does this). Harmless to do unconditionally.
     CreateThread(function()
-        local ok, message = FredPD.Modules.superuser.grant(target, args[2])
+        local _, message = FredPD.Modules.superuser.grant(target, args[2])
         print(('[fredpd] %s'):format(message))
     end)
 end, true)
@@ -335,7 +335,7 @@ RegisterCommand('fredpd_superuser_revoke', function(source, args)
         return
     end
 
-    local ok, message = FredPD.Modules.superuser.revoke(args[1])
+    local _, message = FredPD.Modules.superuser.revoke(args[1])
     print(('[fredpd] %s'):format(message))
 end, true)
 

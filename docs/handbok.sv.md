@@ -77,9 +77,55 @@ att du verkligen står där — det räcker inte att påstå det.
 Står ingen terminal där du tycker att det borde stå en: säg till. De placeras ut
 av systemansvarig och går att flytta.
 
-> Delar av modulerna ovan är ännu inte tagna i drift. Beslagsrum, laboratorium,
-> arrest och domstol öppnar i takt med att de införs. Terminalen står redan där,
-> den svarar bara ännu inte.
+---
+
+## 2b. I fält — utan att öppna MDT:n
+
+Det mesta görs direkt på personen eller bilen. Titta på dem och välj i menyn
+(ox_target):
+
+| På en person | Vad som händer |
+| --- | --- |
+| Kontrollera ID | Personen får frågan om de visar legitimation. I förvar behövs inget samtycke. Träffar (efterlyst, varningar) visas direkt. |
+| Bötfäll | Välj bot ur listan. Boten skickas som faktura till personen och markeras betald av sig själv när den betalas. |
+| Gripa | Välj grund. Ett frihetsberövande startas, klockorna börjar gå och ett utkast till anmälan skrivs åt dig. |
+| Fingeravtryck | Avtrycket jämförs mot registret. |
+
+| På en bil | Vad som händer |
+| --- | --- |
+| Kör reg.nr | Ägare, status och träffar. |
+| Trafikkontroll | En händelse skapas på platsen och du står som på plats. |
+| Beslagta | Välj orsak. Bilen bärgas bort och står inte i ägarens garage förrän den lämnas ut. |
+
+**Statustangenter** (bind dem själv under Tangentbindningar → FiveM): på väg,
+på plats, tillgänglig, ansluta till närmaste händelse, avsluta min händelse.
+
+**Kommandoraden** i MDT:n (**Ctrl+K**):
+
+| Skriv | Gör |
+| --- | --- |
+| `REG ABC123` | Kör registreringsnumret |
+| `N Andersson, Anna` | Söker person |
+| `VAP`, `TEL`, `ADR` | Vapen, telefon, adress |
+| `ST ER` / `ST OS` / `ST AV` | På väg / på plats / tillgänglig |
+| `TILL` | Ansluter till närmaste öppna händelse |
+| `KLAR` eller `KLAR ARR` | Avslutar din händelse (som hanterad på plats, eller med gripande) |
+
+Det du slipper göra för hand:
+
+- **Anmälan skriver sig själv.** Ett gripande eller en avslutad händelse med
+  bot eller gripande lägger ett utkast med personer, brott och händelsen redan
+  ifyllda. Du kompletterar berättelsen.
+- **Bevis hittar sitt ärende.** Det du säkrar kopplas till brottsplatsen, din
+  händelse eller den förundersökning du leder.
+- **Labbet arbetar själv** när ingen analytiker är inloggad, och ett
+  fingeravtryck som träffar någon ger en ledtråd på ärendet — en kandidat,
+  inte en identifiering.
+- **Domen verkställs.** Fäller domstolen till fängelse skickas den dömde till
+  fängelset, direkt eller när de loggar in nästa gång. Du som grep eller
+  utredde får veta utgången.
+- **Ingen åklagare eller domare inloggad?** Ett befäl kan fatta anhållningsbeslutet
+  som ersättare, och kommenderingen häktningsbeslutet. Det syns i arrestjournalen.
 
 ---
 
@@ -222,7 +268,9 @@ Samtliga ändringar förs in i loggboken med vem som gjorde vad.
 
 | Vad du vill göra | Hur |
 | --- | --- |
-| Öppna terminalen | Gå fram till en terminal, tryck **E** |
+| Öppna MDT:n | **F6** var som helst, eller **E** vid en terminal |
+| Söka eller sätta status snabbt | **Ctrl+K** i MDT:n, t.ex. `REG ABC123`, `ST OS` |
+| Kontrollera, bötfälla, gripa, beslagta | Titta på personen eller bilen, välj i menyn |
 | Skriva på interna kanalen | `/pd <meddelande>` |
 | Kvittera ut ett fordon | Gå fram till tjänstemannen vid depån, tryck **E** |
 | Lämna tillbaka ett fordon | Kör till depån, tryck **E**, välj Lämna tillbaka |

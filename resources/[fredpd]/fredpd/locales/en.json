@@ -2788,5 +2788,19 @@
     },
     "withheld": "Some records were withheld. Search in Query with a reason to see them.",
     "chosen": "A record is chosen"
+  },
+  "command": {
+    "invalid": {
+      "empty": "Type a command or something to search for.",
+      "needs_term": "Type what to search for after the command, for example P ABC123.",
+      "unknown_status": "Unknown status code. Use AV, ER, OS, BU, TR, ST or OOS.",
+      "unknown_disposition": "Unknown disposition. Use HOS, RPT, ARR, CIT, WARN, GOA, UTL or UNF.",
+      "not_built": "That command is not available yet."
+    },
+    "prompt": "Command",
+    "error": {
+      "not_assigned": "You are not on a call.",
+      "none_nearby": "There is no open call near you."
+    }
   }
 }
